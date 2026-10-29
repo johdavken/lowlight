@@ -4,7 +4,6 @@
 //   npm run st-cast -- --user <SillyTavern>/data/default-user
 //   npm run st-cast -- --package <dir> --version 1.2.0     into a package folder's cast/ (st-publish does this)
 //   --data <dir>: Lowlight's data folder for greetings (default: this checkout's, else the main checkout's)
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,19 +16,6 @@ const arg = (name: string) => {
   return i >= 0 ? process.argv[i + 1] : undefined;
 };
 
-/** data/ is git-ignored, so a worktree has none: then the main checkout's. */
-function dataDir(): string {
-  if (arg('data')) return path.resolve(arg('data')!);
-  const own = path.join(repo, 'data');
-  if (fs.existsSync(own)) return own;
-  try {
-    const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd: repo, encoding: 'utf8' }).trim();
-    return path.join(path.resolve(repo, common), '..', 'data');
-  } catch {
-    return own;
-  }
-}
-
 const pkg = arg('package');
 const user = path.resolve(arg('user') ?? path.join(os.homedir(), 'Projects/SillyTavern/data/default-user'));
 if (!pkg && !fs.existsSync(path.join(user, 'characters'))) {
@@ -38,7 +24,6 @@ if (!pkg && !fs.existsSync(path.join(user, 'characters'))) {
 }
 const { cast, report } = await exportCast({
   repo,
-  data: dataDir(),
   target: pkg ? { package: path.resolve(pkg) } : { user },
   version: arg('version'),
   replace: process.argv.includes('--replace'),

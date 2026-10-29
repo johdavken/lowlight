@@ -24,7 +24,7 @@ export function showWelcome(cast, changes = []) {
       el('div', 'llw-tag', '// LOWLIGHT'),
       el('div', 'llw-title', 'INSTALL THE LOWLIGHT CAST?'),
       el('div', 'llw-line', `${chars} characters · ${personas} personas · the city's lore`),
-      el('div', 'llw-small', 'They go into your character and persona lists. You can install them later from SYS → CAST.'),
+      el('div', 'llw-small', 'They go into your character and persona lists. You can install them later: type /lowcast.'),
       ...(changes.length ? [el('div', 'llw-small', `Y also sets, for all your chats: ${changes.map((c) => c.replace(/ \(.*\)$/, '').toLowerCase()).join(' · ')}.`)] : []),
       el('div', 'llw-keys'),
     );

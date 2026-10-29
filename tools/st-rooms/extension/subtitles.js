@@ -3,6 +3,10 @@
 //   Page Down, or Enter/Space while the message box is empty. It stays on its last page.
 // - Page Up opens the whole chat as history over a dimmed room; Page Up/Down scroll it; Escape closes it, and so
 //   does a new line.
+// - The name row shows the time and model as Lowlight writes them (01:18 GLM-5.2), not SillyTavern's full date.
+
+import { modelLabel } from './lowlight-room.js';
+import { timestampToMoment } from '../../../utils.js';
 
 const PAGE_KEYS = ['PageDown', 'Enter', ' '];
 
@@ -28,6 +32,37 @@ export function mountSubtitles() {
     t.style.maxHeight = '';
     t.style.overflow = '';
     t.scrollTop = 0;
+  }
+
+  /** Each shown message's .ll-stamp, after SillyTavern's .timestamp (hidden with /lowchat on). */
+  function stamp() {
+    const log = SillyTavern.getContext().chat;
+    for (const mes of chat.querySelectorAll('.mes')) {
+      const ts = mes.querySelector('.timestamp');
+      const m = log[Number(mes.getAttribute('mesid'))];
+      if (!ts || !m) continue;
+      const time = m.send_date ? timestampToMoment(m.send_date) : null;
+      const clock = time?.isValid() ? time.format('HH:mm') : '';
+      const model = !m.is_user && m.extra?.model ? modelLabel(m.extra.model) : '';
+      let el = ts.nextElementSibling?.classList.contains('ll-stamp') ? ts.nextElementSibling : null;
+      // Only real changes touch the row: the chat's own observer would otherwise see this and stamp again, forever.
+      if (el && el.dataset.clock === clock && el.dataset.model === model) continue;
+      if (!el) {
+        el = document.createElement('small');
+        el.className = 'll-stamp';
+        ts.after(el);
+      }
+      el.dataset.clock = clock;
+      el.dataset.model = model;
+      el.textContent = clock;
+      if (model) {
+        const tag = document.createElement('span');
+        tag.className = 'll-model';
+        tag.textContent = model;
+        tag.title = m.extra.model;
+        el.append(tag);
+      }
+    }
   }
 
   /** Lays the newest line out in pages that fit the band (re-run on every change, stream and resize). */
@@ -134,12 +169,14 @@ export function mountSubtitles() {
         page = 0;
         if (historyOpen()) document.body.classList.remove('ll-history');
       }
+      stamp();
       layout();
     });
   }).observe(chat, { childList: true, subtree: true, characterData: true });
   window.addEventListener('resize', layout);
   // /lowchat on or off.
   new MutationObserver(layout).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  stamp();
   layout();
   return { layout, openHistory, closeHistory };
 }

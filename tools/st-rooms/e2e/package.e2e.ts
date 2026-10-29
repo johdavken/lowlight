@@ -178,6 +178,8 @@ async function runAccepted() {
 
     // The subtitle band pages a long line as Lowlight's dialogue box does, and Page Up opens the history.
     const long = Array.from({ length: 30 }, (_, n) => `Line ${n + 1} of a long reply, long enough that the band has to page it.`).join(' ');
+    // An earlier line for the history (cards carry no greeting, and there's no API here for her live one).
+    await page.evaluate(`SillyTavern.getContext().executeSlashCommandsWithOptions('/sendas name=Nix You made it.')`);
     await page.evaluate(`SillyTavern.getContext().executeSlashCommandsWithOptions(${JSON.stringify(`/sendas name=Nix ${long}`)})`);
     const pager = () => page.evaluate<string>("document.querySelector('.ll-continue:not([hidden])')?.textContent ?? ''");
     await until(page, "/1\\/\\d/.test(document.querySelector('.ll-continue:not([hidden])')?.textContent ?? '')", 15_000);
@@ -292,7 +294,7 @@ async function runOwnContext() {
 }
 
 async function runDeclined() {
-  console.log('\n— a fresh SillyTavern, N at the welcome, then SYS → CAST → INSTALL —');
+  console.log('\n— a fresh SillyTavern, N at the welcome, then /lowcast —');
   const st = await startST();
   const browser = await chromium.launch({ args: GL_ARGS });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
@@ -308,13 +310,12 @@ async function runDeclined() {
     await page.waitForTimeout(2000);
     const none = await inPage<any>(page, () => SillyTavern.getContext().characters.some((c: { name: string }) => c.name === 'Cass'));
     check('N installs nothing', !none);
+    // Later, from a plain SillyTavern (no Keys bar there): /lowcast installs it.
     await inPage<any>(page, () => (window as any).lowlightSelect?.close());
-    await page.click('.llh-sys');
-    await page.waitForTimeout(300);
-    const row = await inPage<any>(page, () => [...document.querySelectorAll('.llh-row')].find((r) => r.textContent?.startsWith('CAST'))?.textContent ?? '');
-    check('SYS → CAST offers INSTALL', row.includes('INSTALL'), row);
-    await page.click('.llh-row:has-text("CAST")');
-    check('INSTALL from SYS installs the cast', await until(page, "SillyTavern.getContext().characters.some((c) => c.name === 'Cass')"));
+    await page.waitForTimeout(1000);
+    check('the Keys bar stays out of a plain SillyTavern', !(await page.locator('.llh-sys').isVisible()));
+    await inPage<any>(page, () => SillyTavern.getContext().executeSlashCommandsWithOptions('/lowcast'));
+    check('/lowcast installs the cast', await until(page, "SillyTavern.getContext().characters.some((c) => c.name === 'Cass')"));
   } finally {
     await browser.close();
     await stopST(st);

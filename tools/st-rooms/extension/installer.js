@@ -58,6 +58,28 @@ async function persona(c, get) {
   }
 }
 
+/** Where a persona's "# Wearing" section starts (cast-export.ts adds it after the bio). */
+const WEARING = '\n\n# Wearing\n\n';
+
+/**
+ * Personas still holding the package's own text from before it said what they wear get the new text; one you've
+ * edited stays yours. Returns the names updated.
+ */
+export function addPersonaWearing(cast) {
+  const pu = ctx().powerUserSettings;
+  const updated = [];
+  for (const c of cast.characters ?? []) {
+    const p = c.persona;
+    if (!p || !p.description.includes(WEARING)) continue;
+    const entry = pu.persona_descriptions?.[p.file];
+    if (!entry || entry.description !== p.description.slice(0, p.description.indexOf(WEARING))) continue;
+    entry.description = p.description;
+    updated.push(p.name);
+  }
+  if (updated.length) ctx().saveSettingsDebounced();
+  return updated;
+}
+
 /** Imports a card; `overwrite`: over this file (its name without .png), as UPDATE CARDS does. */
 async function card(c, get, overwrite = null) {
   await upload('/api/characters/import', overwrite ? { file_type: 'png', preserved_name: overwrite } : { file_type: 'png' }, await get(c.card), `${c.name}.png`);

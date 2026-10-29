@@ -12,10 +12,13 @@ Studio's PREVIEW tab runs the same build from **REBUILD SILLYTAVERN** in its Ins
 
 The default `--out` is `~/Projects/SillyTavern/data/default-user/extensions/lowlight-rooms`. Reload SillyTavern after a build.
 
+**Only in Lowlight chats.** Everything below happens in a chat with one of the Lowlight cast (alone, not a group) and on the character select. Anywhere else (your own characters, groups, SillyTavern's welcome after another character's chat) SillyTavern stays as it is: the room is hidden and its sound paused, and no room line, rules, tools, saved rooms or greeting reach her prompt. On a phone or a window too small for the 1600×900 stage to read (zoom under 0.6), a Lowlight chat keeps the room but uses SillyTavern's own chat look.
+
 In the chat box:
 - `/room <folder>` fades to another room.
 - `/mood <name>` tweens to one of the room's moods, and `/mood default` goes back to the room as painted.
 - `/map` or **Alt+M** (or the map icon in the top bar) opens Lowlight's city map. GO fades to that place's room, adds a one-time `[travel: …]` note to her prompt (cleared once she answers), and triggers her arrival beat, as Lowlight's travel does. Only places whose room is in the extension can be gone to. Gigs, comms, side rooms, job marks and who's where don't come along.
+- **Her greeting:** a chat where nothing has been said yet opens on her, written live as Lowlight's greeting is (an `[arrival: first meeting]` note and the game's own greeting instructions, once her room is back and, after //JACK IN, your persona is set). It costs one reply. A card from before 1.2.6 that still has a fixed first message gives way to it.
 - **Sound** is Lowlight's room sound: the room's songs (shuffled, with pauses), its bed and timed sounds, rain following the weather, light hums, and thunder after lightning. It starts on your first click or key, because browsers block sound before a gesture. The speaker icon in the top bar mutes on click and sets the volume on scroll. `/music <0-100>` and `/ambient <0-100>` set the two levels from SYS. Levels are remembered per browser.
 - **The Keys bar** (with `/lowchat` on) replaces SillyTavern's top bar, like Lowlight's HUD:
   - Left: the place, the clock and the weather.
@@ -24,6 +27,7 @@ In the chat box:
   - SillyTavern's panels open below the bar, restyled in Lowlight's look (`panels.css`): the SYS menu's dark glass and cyan hairline, VT323 headings in spaced capitals, Plex Mono text, underlined fields, outlined buttons, pink square slider thumbs, and square corners everywhere.
 - **Character select** (`/select`, SYS → SELECT, and on its own whenever no chat is open with the Lowlight look on) is Lowlight's select screen. 1P picks who you are from your personas and CPU picks your contact from the Lowlight cast (**A** switches to every SillyTavern character and back, remembered per browser), each with their file, facts and figure. //JACK IN switches persona and opens that chat. The room behind shows the skyline, then each contact's own room once the cursor rests on them, with Lowlight's menu cues. Esc steps back, and closing without jacking in puts the room back.
 - `/lowchat` switches Lowlight's subtitle chat look on or off. It's on by default, and each browser remembers the choice. The look shows no frame, only the newest line over a dark scrim, Plex Mono text, pink actions and a purple underline for typing. Switch it off to see the whole log.
+- `/lowcast` installs the Lowlight cast if you said NOT NOW at the welcome (the Keys bar and its SYS → CAST only show in a Lowlight chat), or updates its cards when they have updates.
 
 ## Publishing the public package
 
@@ -47,7 +51,7 @@ Create the checkout once with `git init -b main`, set `user.email` to the GitHub
 npx tsx tools/st-rooms/e2e/package.e2e.ts --package ~/Projects/lowlight-sillytavern
 ```
 
-It covers: Y at the welcome, then the cast, personas, lore book and function calling; her tool moving the room, saved on the message and back after a reload; an update adding a character and refreshing a sprite; and N, then SYS → CAST → INSTALL. It needs the GPU (Vulkan), because in software the live room starves the installer.
+It covers: Y at the welcome, then the cast, personas, lore book and function calling; her tool moving the room, saved on the message and back after a reload; an update adding a character and refreshing a sprite; and N, then /lowcast from a plain SillyTavern. It needs the GPU (Vulkan), because in software the live room starves the installer.
 
 ## The cast
 
@@ -57,7 +61,7 @@ npm run st-cast -- --replace    # rewrite those too (your chats stay; edits to t
 ```
 
 It exports every character in `characters/` except `nix`, the old base that `nix-direct` extends:
-- **Card:** their `identity.md` (or a resident's `voice.md`), one of their real greetings from your newest playthrough, Lowlight's roleplay guide as the system prompt, and the `Lowlight` lore book.
+- **Card:** their `identity.md` (or a resident's `voice.md`), no greeting (a new chat opens on her greeting, written live: see Her greeting above), Lowlight's roleplay guide as the system prompt, and the `Lowlight` lore book.
 - **Avatar:** their face, cropped on the Intake's violet.
 - **Expression sprites:** their faces laid onto their sprite as whole figures, mapped to SillyTavern's labels.
 
@@ -71,7 +75,7 @@ It exports every character in `characters/` except `nix`, the old base that `nix
   - `hud.js`: the Keys bar.
   - `select.js`, `select.css`: the character select, on a 1600×900 stage scaled to the window.
   - `panels.css`: SillyTavern's panels in Lowlight's look. It's mostly SillyTavern's theme variables set inside the panels, plus its shared classes (`.menu_button`, `.text_pole`, sliders, the character and persona lists). Every rule is scoped to `body.lowlight-chat`, so `/lowchat` off gives SillyTavern's own panels back.
-  - `index.js`: mounts the canvas behind the chat, stands your persona's picture on the left (`#lowlight-persona`; with `/lowchat` on, she moves to the right at Lowlight's stage positions), lights both sprites with Lowlight's figure lighting (`web/src/ui/stage-light.ts`), and registers the slash commands.
+  - `index.js`: mounts the canvas behind the chat, writes Lowlight's 1600×900 stage rect for `style.css` (`--stage-x/-y/-w/-h`, `--ll-scale`: the band, the figures, the Keys bar and the map lay out on it, as in the game), stands your persona's picture on the left (`#lowlight-persona`; with `/lowchat` on, she moves to the right at Lowlight's stage positions), lights both sprites with Lowlight's figure lighting (`web/src/ui/stage-light.ts`), and registers the slash commands.
   - `style.css`
 - **`build.ts`:** builds the bundle (`lowlight-room.js` and `lowlight-room.css`, with the map and its fonts), copies `extension/`, copies each room's folder (sounds included) into `rooms/` with the list in `rooms.json`, every district's songs flat into `rooms/_music/`, the rain and thunder recordings into `sound/`, and copies `map/lowlight.json` and its picture into `map/`.
 - **`cast.ts`, `export-cast.ts`:** the cast export (`npm run st-cast`).

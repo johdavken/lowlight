@@ -21,6 +21,8 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
     if (c.groupId || c.characterId === undefined) return null;
     return byName.get(c.characters[c.characterId]?.name) ?? null;
   };
+  /** A Lowlight chat (one of the cast, alone): everywhere else her room line, rules, tools and saved rooms stay out. */
+  const ours = () => speaker() !== null;
   const placesOf = (who) => (who ? (who.places ?? (who.home ? [who.home] : [])) : []);
   const exitsHere = () => (room.scene()?.exits ?? []).map((e) => ({ folder: String(e.to).split('/').pop(), way: e.way }));
 
@@ -48,8 +50,8 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
    * extension prompts when a chat opens). Without tools the rules would have her write calls out as prose. */
   const refreshLine = () => {
     const c = ctx();
-    c.setExtensionPrompt(LINE_KEY, line(), 1, 0, false, 0);
-    c.setExtensionPrompt(RULES_KEY, enabled && canCall() ? ROOM_RULES : '', 2, 0, false, 0);
+    c.setExtensionPrompt(LINE_KEY, ours() ? line() : '', 1, 0, false, 0);
+    c.setExtensionPrompt(RULES_KEY, ours() && enabled && canCall() ? ROOM_RULES : '', 2, 0, false, 0);
   };
 
   /** The room now, to save on a message. */
@@ -59,6 +61,7 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
   };
   /** Saves the room on message `i` (default: the newest), once any restore in flight has landed. */
   async function stamp(i) {
+    if (!ours()) return;
     await restoring;
     const c = ctx();
     const at = i ?? c.chat.length - 1;
@@ -92,7 +95,7 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
     return restoring;
   }
   const home = () => speaker()?.home ?? null;
-  const restoreFromChat = () => restore(roomFromChat(ctx().chat, home()));
+  const restoreFromChat = () => (ours() ? restore(roomFromChat(ctx().chat, home())) : restoring);
 
   // ── the tools ──
   function register() {
@@ -118,7 +121,7 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
           return appliedText(line());
         },
         formatMessage: () => '',
-        shouldRegister: () => enabled,
+        shouldRegister: () => enabled && ours(),
       });
     }
   }
@@ -145,6 +148,7 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
   eventSource.on(eventTypes.MESSAGE_DELETED, () => restoreFromChat());
   eventSource.on(eventTypes.MESSAGE_EDITED, () => restoreFromChat());
   eventSource.on(eventTypes.MESSAGE_SWIPED, (i) => {
+    if (!ours()) return;
     const c = ctx();
     const at = typeof i === 'number' ? i : c.chat.length - 1;
     const msg = c.chat[at];
@@ -170,6 +174,7 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
   // is superseded: hidden from the prompt the way SillyTavern's own hide does (is_system) and from view, its saved room
   // kept. The live check saw both on GLM: empty messages, and the same beat twice.
   const supersedePreTool = () => {
+    if (!ours()) return;
     const c = ctx();
     let changed = false;
     for (let i = 0; i < c.chat.length; i++) {
@@ -188,5 +193,7 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
     if (ev) eventSource.on(ev, () => setTimeout(markToolMessages, 0));
   }
 
-  return { setEnabled, refreshLine, stamp, line, isEnabled: () => enabled, canCall, stampOf };
+  /** Resolves once the room restores queued so far (a chat opened, a message deleted) have landed. */
+  const settled = () => restoring;
+  return { setEnabled, refreshLine, stamp, line, isEnabled: () => enabled, canCall, stampOf, settled, ours };
 }

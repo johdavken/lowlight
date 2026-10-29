@@ -44,7 +44,7 @@ export interface CardInput {
   name: string;
   /** identity.md for a contact, voice.md for a resident. */
   description: string;
-  /** One of their real greetings, or '' (SillyTavern then opens on an empty chat). */
+  /** Always '' from the export: the chat opens empty and the extension has her greet live (index.js greetIfNew). */
   firstMes: string;
   /** Lowlight's roleplay guide, as the card's system prompt. */
   systemPrompt: string;

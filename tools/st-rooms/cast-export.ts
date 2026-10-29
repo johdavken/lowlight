@@ -1,11 +1,10 @@
 // Lowlight's cast as SillyTavern files: a card per character (their face as the avatar, their identity or voice sheet,
-// one real greeting, Lowlight's roleplay guide, the lore book), their faces as whole-figure expression sprites, the
+// Lowlight's roleplay guide, the lore book; no greeting: the extension has her write it live), their faces as whole-figure expression sprites, the
 // playable ones as personas, and cast.json. Two targets: a package folder (cast/…, what the public package installs
 // from) or a SillyTavern user folder (your own, as npm run st-cast always did).
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import sharp from 'sharp';
 import { cardData, labelFaces, pngWithCard, type CastCharacter, type CastJson } from './cast';
 import { worldInfoFrom } from './lore';
@@ -20,6 +19,9 @@ interface CharacterJson {
   schedule?: { room: string }[];
   identity?: string;
   sprite: { src: string };
+  outfits?: Record<string, string>;
+  /** Each outfit's one line, as Lowlight's [wearing] line tells her model. */
+  outfitWears?: Record<string, string>;
   expressions?: Record<string, string>;
   /** The face Lowlight's select screen shows (`neutral`: the sprite as it is). */
   selectExpression?: string;
@@ -31,6 +33,15 @@ interface CharacterJson {
 
 /** The game's default face position (server/src/character-profile.ts DEFAULT_FACE). */
 const DEFAULT_FACE = { x: 0.5, y: 0.08 };
+
+/**
+ * What they wear on their sprite: the WEARS line of the outfit that is their sprite (server/src/wearing.ts
+ * baseOutfitOf), which is what every exported figure shows. null when that outfit has no line.
+ */
+export function spriteWears(c: Pick<CharacterJson, 'sprite' | 'outfits' | 'outfitWears'>): string | null {
+  const outfit = Object.keys(c.outfits ?? {}).find((n) => c.outfits![n] === c.sprite.src);
+  return (outfit && c.outfitWears?.[outfit]?.trim()) || null;
+}
 
 /** The expression Lowlight's select screen shows (server/src/agents.ts selectFace): theirs, else happy, else none. */
 export function selectFaceName(c: { selectExpression?: string }, faces: Record<string, string>): string | null {
@@ -50,8 +61,6 @@ export function cardBox(w: number, h: number, face: { x: number; y: number }): {
 
 export interface ExportOptions {
   repo: string;
-  /** Lowlight's data folder (playthroughs, for greetings); missing: no greetings. */
-  data: string;
   target: { package: string } | { user: string };
   /** The package version being published (cast.json's version, and `since` for new ids). */
   version?: string;
@@ -66,28 +75,6 @@ const sha = (...parts: (Buffer | string)[]) => {
   for (const p of parts) h.update(p);
   return h.digest('hex');
 };
-
-/** One of their real greetings from the newest playthrough that has one ('' when none). */
-function greeting(data: string, id: string): string {
-  const root = path.join(data, 'playthroughs');
-  if (!fs.existsSync(root)) return '';
-  const dbs = fs
-    .readdirSync(root)
-    .map((pt) => path.join(root, pt, 'chars', id, 'room.db'))
-    .filter((f) => fs.existsSync(f))
-    .sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
-  for (const f of dbs) {
-    try {
-      const db = new DatabaseSync(f, { readOnly: true });
-      const row = db.prepare("SELECT text FROM messages WHERE mode = 'greet' AND role = 'agent' AND status = 'ok' AND length(text) BETWEEN 120 AND 1200 ORDER BY id DESC LIMIT 1").get() as { text?: string } | undefined;
-      db.close();
-      if (row?.text) return row.text.trim();
-    } catch {
-      // A locked or old database: try the next.
-    }
-  }
-  return '';
-}
 
 /** Their sprite with `face` laid over it (Lowlight's faces are face-only, on the sprite's canvas). */
 async function figure(dir: string, sprite: string, face?: string): Promise<Buffer> {
@@ -176,7 +163,11 @@ export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; re
     }
 
     // The card: in a user folder, kept when SillyTavern already has it (unless replace), so chats and edits stay.
-    const data = cardData({ name: c.name, description: fs.readFileSync(path.join(dir, identity), 'utf8').trim(), firstMes: greeting(o.data, id), systemPrompt: guide, world: 'Lowlight' });
+    // What they have on, as the game's [wearing] line tells her every turn: SillyTavern reads it from the card and
+    // the persona (cards are written in second person, voice sheets and bios in third: a heading suits both).
+    const wears = spriteWears(c);
+    const wearing = wears ? `\n\n# Wearing\n\n${wears}` : '';
+    const data = cardData({ name: c.name, description: fs.readFileSync(path.join(dir, identity), 'utf8').trim() + wearing, firstMes: '', systemPrompt: guide, world: 'Lowlight' });
     const card = where.card(c.name);
     const had = !isPackage && fs.existsSync(path.join(root, card));
     // The face Lowlight's own select screen shows, cropped where the game crops its face tiles. Part of the card's hash,
@@ -202,7 +193,7 @@ export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; re
         write(pic, buf);
         if (!isPackage) fs.rmSync(path.join(root, 'thumbnails', 'persona', file), { force: true });
       }
-      persona = { file, name: c.name, description: fs.readFileSync(path.join(bioDir, 'bio.md'), 'utf8').trim(), picture: pic };
+      persona = { file, name: c.name, description: fs.readFileSync(path.join(bioDir, 'bio.md'), 'utf8').trim() + wearing, picture: pic };
       personaHash = sha(buf);
     }
 
@@ -221,8 +212,7 @@ export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; re
       accent: c.accent ?? base?.accent ?? null,
       home: places[0] ?? null,
       places,
-      // The greeting comes from the newest playthrough and changes whenever someone plays: it isn't a card update.
-      hash: { card: sha(JSON.stringify({ ...data, data: { ...data.data, first_mes: '' } }), pictureRaw), sprites: sha(...spriteBufs), persona: personaHash },
+      hash: { card: sha(JSON.stringify(data), pictureRaw), sprites: sha(...spriteBufs), persona: personaHash },
     });
     report.push(`${c.name}${had && !o.replace ? ' (card kept)' : ''}`);
   }

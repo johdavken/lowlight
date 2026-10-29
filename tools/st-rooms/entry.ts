@@ -1,6 +1,9 @@
 // Lowlight's room renderer as one ES module for the SillyTavern extension (tools/st-rooms/build.ts).
 import { createRenderer } from '../../web/src/renderer/index';
 export { roomLine } from '../../shared/room-line';
+export { modelLabel } from '../../shared/model-label';
+export { stageRect } from '../../web/src/ui/game-stage';
+export { GREET_INSTRUCTIONS } from '../../server/src/instructions';
 export { ROOM_TOOLS, checkRoomTool, appliedText, isRoomToolMessage, preToolMessage } from './room-tools';
 export { stampOf, withStamp, roomFromChat } from './room-stamp';
 export { planInstall } from './install-plan';
@@ -72,9 +75,16 @@ function roomSound(renderer: Awaited<ReturnType<typeof createRenderer>>, soundBa
   const audio = createRoomAudio({ engine, view });
   if (THUNDER_TAKES.length) renderer.onStrike((s) => audio.thunder(s.distance, s.sceneId));
   renderer.onFrame(() => audio.frame(renderer.time()));
-  document.addEventListener('visibilitychange', () => audio.visibility(document.hidden));
+  /** Away: a chat that isn't Lowlight's. The sound pauses then, as for a hidden tab. */
+  let away = false;
+  const quiet = () => audio.visibility(document.hidden || away);
+  document.addEventListener('visibilitychange', quiet);
   // Browsers start sound only after a gesture: the first click or key anywhere unlocks it.
-  const unlock = (e: Event) => audio.gesture({ fromSpeaker: e.target instanceof Element && e.target.closest('#lowlight-sound') !== null });
+  // A gesture in another character's chat unlocks it still paused.
+  const unlock = (e: Event) => {
+    audio.gesture({ fromSpeaker: e.target instanceof Element && e.target.closest('#lowlight-sound') !== null });
+    if (away) quiet();
+  };
   window.addEventListener('pointerdown', unlock, true);
   window.addEventListener('keydown', unlock, true);
   /**
@@ -85,7 +95,11 @@ function roomSound(renderer: Awaited<ReturnType<typeof createRenderer>>, soundBa
     engine.setScale(on ? MENU_SCALE : 1);
     audio.overrideMusic(on && map.theme ? `${soundBase}${map.theme}` : null);
   };
-  return { audio, menu };
+  const setAway = (on: boolean) => {
+    away = on;
+    quiet();
+  };
+  return { audio, menu, setAway };
 }
 
 /** The room behind the select screen, as the game's landing hears it (web/src/landing: scale 0.25). */
@@ -95,7 +109,7 @@ const MENU_SCALE = 0.25;
  * `soundBase` the shared rain and thunder; `view` hears the speaker's state (locked, on, muted, levels). */
 export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase: string, view: (v: SoundView) => void = () => {}, map: SoundMap = FULL_SOUND) {
   const renderer = await createRenderer(host, undefined, { backdrop: true });
-  const { audio, menu } = roomSound(renderer, soundBase, view, map);
+  const { audio, menu, setAway } = roomSound(renderer, soundBase, view, map);
   let scene: SceneDef | null = null;
   let state: RoomState | null = null;
   /** The mood last applied (null: as painted, or changed light by light since). */
@@ -115,6 +129,11 @@ export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase:
     audio,
     /** The select screen's sound on (theme, room at a quarter) or off. */
     menu,
+    /** Away (another character's chat): the room stops drawing and its sound pauses; back, both resume. */
+    away(on: boolean) {
+      setAway(on);
+      renderer.setPaused(on);
+    },
     /** Lights the figures `figures()` returns (re-read every sample, so they can come and go). */
     light: (figures: () => HTMLElement[]) => lightFigures(renderer, figures),
     /** Loads a room by folder name at its painted state, its sound crossfading over `seconds`; returns its mood names. */

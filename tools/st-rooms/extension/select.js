@@ -19,9 +19,11 @@ const el = (tag, cls, text) => {
 const thumb = (type, file) => `/thumbnail?type=${type}&file=${encodeURIComponent(file)}`;
 
 /**
- * @param {{ cast: { characters?: any[] }, rooms: string[], current: () => string, goTo: (folder: string) => Promise<void>, cue: (name: string) => void, menu?: (on: boolean) => void }} deps
+ * @param {{ cast: { characters?: any[] }, rooms: string[], current: () => string, goTo: (folder: string) => Promise<void>, cue: (name: string) => void, menu?: (on: boolean) => void, jackedIn?: () => void }} deps
  */
-export function mountSelect({ cast, rooms, current, goTo, cue, menu = () => {} }) {
+export function mountSelect({ cast, rooms, current, goTo, cue, menu = () => {}, jackedIn = () => {} }) {
+  /** Mid //JACK IN: the chat has opened but your persona isn't set yet. */
+  let jacking = false;
   const info = new Map((cast.characters ?? []).map((c) => [c.name, c]));
   const root = el('div', 'lls-root');
   root.hidden = true;
@@ -242,6 +244,16 @@ export function mountSelect({ cast, rooms, current, goTo, cue, menu = () => {} }
     if (!p1 || !p2) return;
     cue('confirm');
     close(false);
+    jacking = true;
+    try {
+      await enter();
+    } finally {
+      jacking = false;
+    }
+    jackedIn();
+  }
+  async function enter() {
+    const { p1, p2 } = picked;
     const c = SillyTavern.getContext();
     // The chat first: opening it applies its locked persona, else the default one, which would undo the pick. Then
     // the persona, locked to this chat so reloads and later visits keep it (no "temporary persona" warning).
@@ -316,5 +328,5 @@ export function mountSelect({ cast, rooms, current, goTo, cue, menu = () => {} }
   );
   banner.addEventListener('click', () => void jackIn());
 
-  return { open, close: () => close(true), get isOpen() { return !root.hidden; } };
+  return { open, close: () => close(true), get isOpen() { return !root.hidden; }, get jacking() { return jacking; } };
 }

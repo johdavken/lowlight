@@ -4,23 +4,26 @@
  * key closes it. ← / → move between tabs when no text field has focus. It won't close over unsaved journal
  * work: Esc and the backdrop flash the page's SAVE instead.
  */
-import type { ContactEntry, LeadView } from '../../../shared/types';
+import type { ContactEntry, LeadView, LooseEndsView } from '../../../shared/types';
 import type { JournalView } from '../ui/journal';
 import { bugReportOpen } from '../ui/bug-report';
 import { openScreen, SCREEN_GLITCH_OUT_MS } from '../ui/screen';
 import { contactsTab, type KeyedTab } from './people-contacts';
 import { leadsTab } from './people-leads';
+import { looseEndsTab } from './people-loose-ends';
 import './people-screen.css';
 
-export type PeopleTab = 'contacts' | 'leads' | 'journal';
-export const PEOPLE_TABS: PeopleTab[] = ['contacts', 'leads', 'journal'];
-const TAB_NAME: Record<PeopleTab, string> = { contacts: 'CONTACTS', leads: 'LEADS', journal: 'JOURNAL' };
-const TAB_KEY: Record<string, PeopleTab> = { KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal' };
+export type PeopleTab = 'contacts' | 'leads' | 'journal' | 'loose';
+export const PEOPLE_TABS: PeopleTab[] = ['contacts', 'leads', 'journal', 'loose'];
+const TAB_NAME: Record<PeopleTab, string> = { contacts: 'CONTACTS', leads: 'LEADS', journal: 'JOURNAL', loose: 'LOOSE ENDS' };
+const TAB_KEY: Record<string, PeopleTab> = { KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal', KeyO: 'loose' };
 
 export interface PeopleOpts {
   tab: PeopleTab;
   contacts(): Promise<ContactEntry[]>;
   leads(): Promise<LeadView[]>;
+  /** LOOSE ENDS (cipher spec §2.8); absent: the tab shows nothing noticed. */
+  looseEnds?(): Promise<LooseEndsView>;
   journal: JournalView;
   /** The contact you're with. */
   current: string;
@@ -126,6 +129,11 @@ export function openPeople(host: HTMLElement, o: PeopleOpts): PeopleHandle {
       void Promise.all([o.contacts(), o.leads().catch(() => [] as LeadView[])]).then(
         ([list, held]) => draw(contactsTab(list, held, { current: o.current, dev: o.dev, pick: o.pick })),
         () => draw(el('div', 'pe-error', "Couldn't load your contacts."), false),
+      );
+    } else if (t === 'loose') {
+      void (o.looseEnds?.() ?? Promise.resolve<LooseEndsView>({ open: [], solved: [] })).then(
+        (v) => draw(looseEndsTab(v)),
+        () => draw(el('div', 'pe-error', "Couldn't load your loose ends."), false),
       );
     } else {
       void o.leads().then(

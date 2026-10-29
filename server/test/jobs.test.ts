@@ -384,13 +384,13 @@ describe('jobs: cracking', () => {
     expect(active.crack!.grab).toMatchObject({ length: 6, tries: 5, extraBracket: true, strikeOne: false, ghost: false, skin: 'slab', deck: 'Stall build' });
   });
 
-  it('an ice terminal shows ICE whatever the deck; the deck still counts', async () => {
-    const iced = job(JOB.replace('- grab: Take it all. → paid / part [check reflex 50]', '- grab: Take it all. → paid / part [crack 6 ice]'));
+  it('a corp terminal shows CORP whatever the deck; the deck still counts', async () => {
+    const iced = job(JOB.replace('- grab: Take it all. → paid / part [check reflex 50]', '- grab: Take it all. → paid / part [crack 6 corp]'));
     const d = plainDoor('easy');
     const r = relayWith({ book: [iced], clock: () => evening(d), rolls: [10] });
     await r.relay.startQuest('hicks', 'back-door');
     await pick(r.relay, 'door', 'talk');
-    expect(r.relay.questState('hicks').active!.crack!.grab).toMatchObject({ skin: 'ice', deck: 'Stall build', extraBracket: true, strikeOne: false, ghost: false, tries: 5 });
+    expect(r.relay.questState('hicks').active!.crack!.grab).toMatchObject({ skin: 'corp', deck: 'Stall build', extraBracket: true, strikeOne: false, ghost: false, tries: 5 });
   });
 
   it('no deck: green, and no deck named', () => {
@@ -398,7 +398,7 @@ describe('jobs: cracking', () => {
     const words = parseWords(fs.readFileSync('world/gear/words.md', 'utf8')).byLength[6];
     const base = { seed: 's', words, stats: { ...DEFAULT_STATS } };
     expect(crackSetup({ ...base, tag, ctx: { flags: {}, trust: null, warmth: null, with: '', deck: null } })).toMatchObject({ skin: 'green', deck: null });
-    expect(crackSetup({ ...base, tag: { ...tag, ice: true }, ctx: { flags: {}, trust: null, warmth: null, with: '', deck: null } })).toMatchObject({ skin: 'ice', deck: null });
+    expect(crackSetup({ ...base, tag: { ...tag, corp: true }, ctx: { flags: {}, trust: null, warmth: null, with: '', deck: null } })).toMatchObject({ skin: 'corp', deck: null });
   });
 
   it('a crack choice scores the sent moves from the seed: granted → pass outcome; locked → fail outcome and ALARM +1', async () => {

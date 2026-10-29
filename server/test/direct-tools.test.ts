@@ -7,7 +7,7 @@ import { openDb } from '../src/db';
 import { Journal } from '../src/journal';
 import { Room } from '../src/room-state';
 import { SceneRegistry } from '../src/scenes';
-import { dispatchTool, SCRIBE_TOOLS, TOOLS, toolsFor } from '../src/tools';
+import { dispatchTool, RESIDUAL_TOOLS, TOOLS, toolsFor } from '../src/tools';
 import { generateScenes } from '../../tools/gen-placeholders';
 
 let tmpDir: string;
@@ -21,11 +21,11 @@ afterAll(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 const ctx = () => ({ room: new Room(registry), journal: new Journal(openDb(':memory:', { defaultPlayer: 'hicks' })), player: () => 'hicks', expressions: null });
 
 describe('toolDefinitions', () => {
-  it('without expressions: one function per room tool (the journal is the scribe\'s), with its description and a JSON schema', () => {
+  it('without expressions: one function per room tool (the journal is the Residual\'s), with its description and a JSON schema', () => {
     const defs = toolDefinitions(ctx());
     expect(DIRECT_TOOL_ROUNDS).toBe(4);
     expect(defs.map((d) => d.function.name)).toEqual(
-      TOOLS.map((t) => t.name).filter((n) => n !== 'set_expression' && n !== 'share_contact' && n !== 'play_sound' && n !== 'pass_time' && n !== 'give_lead' && !SCRIBE_TOOLS.includes(n)),
+      TOOLS.map((t) => t.name).filter((n) => n !== 'set_expression' && n !== 'share_contact' && n !== 'play_sound' && n !== 'pass_time' && n !== 'give_lead' && !RESIDUAL_TOOLS.includes(n)),
     );
     expect(defs).toHaveLength(7);
     const setLight = defs.find((d) => d.function.name === 'set_light')!;
@@ -34,7 +34,7 @@ describe('toolDefinitions', () => {
     expect(setLight.function.parameters).toMatchObject({ type: 'object', required: ['light_id'] });
   });
 
-  it('shift_standing is never hers, even where standing applies (the scribe moves it)', () => {
+  it('shift_standing is never hers, even where standing applies (the Residual moves it)', () => {
     const standing = { applies: () => true, player: () => 'hicks', move: () => 'already' as const, repliesSinceMove: () => null };
     expect(toolDefinitions({ ...ctx(), standing }).map((d) => d.function.name)).not.toContain('shift_standing');
   });
@@ -53,7 +53,7 @@ describe('toolDefinitions', () => {
     expect(toolDefinitions(withFaces).map((d) => [d.function.name, d.function.description])).toEqual(toolsFor(withFaces, { agent: true }).map((t) => [t.name, t.description]));
   });
 
-  it("a misnamed call's error lists only her tools, never set_expression or the scribe's", () => {
+  it("a misnamed call's error lists only her tools, never set_expression or the Residual's", () => {
     const withFaces = { ...ctx(), expressions: { names: () => ['happy'], set: () => ({ ok: true as const, text: 'expression: happy' }) } };
     const out = runToolCall(withFaces, { name: 'set_face', args: '{"name":"happy"}' });
     expect(out).toMatch(/^error: unknown tool 'set_face'; available: /);

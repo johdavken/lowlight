@@ -1,5 +1,5 @@
 /**
- * The scribe owns her bookkeeping (scribe spec §1): none of the six tools is offered to her, none runs
+ * The Residual owns her bookkeeping (scribe spec §1): none of the six tools is offered to her, none runs
  * when she calls it anyway, and no prompt she reads names one. The dev panel can still fire them.
  */
 import fs from 'node:fs';
@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 import { openDb } from '../src/db';
 import { Journal } from '../src/journal';
 import { Room } from '../src/room-state';
-import { dispatchTool, SCRIBE_TOOLS, toolsFor, type ToolContext } from '../src/tools';
+import { dispatchTool, RESIDUAL_TOOLS, toolsFor, type ToolContext } from '../src/tools';
 import { runToolCall } from '../src/direct-tools';
 import { END_SCENE_INSTRUCTIONS, GREET_INSTRUCTIONS, LEAVE_INSTRUCTIONS, ROOM_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, roomInstructions } from '../src/instructions';
 import { DEFAULT_SHARED_STANDING, standingBlock } from '../../shared/standing';
@@ -22,9 +22,9 @@ function ctx(): ToolContext {
   return { room: {} as Room, journal: new Journal(db), player: () => 'hicks', expressions: null, replyId: () => 'r1' } as unknown as ToolContext;
 }
 
-describe('her bookkeeping belongs to the scribe', () => {
-  it('SCRIBE_TOOLS names the six', () => {
-    expect([...SCRIBE_TOOLS].sort()).toEqual([...SIX].sort());
+describe('her bookkeeping belongs to the Residual', () => {
+  it('RESIDUAL_TOOLS names the six', () => {
+    expect([...RESIDUAL_TOOLS].sort()).toEqual([...SIX].sort());
   });
 
   it('her toolset has none of the six', () => {

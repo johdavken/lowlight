@@ -86,8 +86,8 @@ export function shouldReturnToDialIn(e: KeyboardEvent, s: { feedExpanded: boolea
 }
 
 /** The room's chrome hotkeys: Alt+Y you (the sheet), Alt+S save, Alt+C contacts, Alt+L leads, Alt+T title, Alt+H hide the UI. */
-export type ChromeKey = 'you' | 'save' | 'people' | 'contacts' | 'leads' | 'journal' | 'quest' | 'crew' | 'title' | 'hide';
-const CHROME_KEYS: Record<string, ChromeKey> = { KeyY: 'you', KeyS: 'save', KeyP: 'people', KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal', KeyQ: 'quest', KeyK: 'crew', KeyT: 'title', KeyH: 'hide' };
+export type ChromeKey = 'you' | 'save' | 'people' | 'contacts' | 'leads' | 'journal' | 'loose' | 'quest' | 'crew' | 'title' | 'hide';
+const CHROME_KEYS: Record<string, ChromeKey> = { KeyY: 'you', KeyS: 'save', KeyP: 'people', KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal', KeyO: 'loose', KeyQ: 'quest', KeyK: 'crew', KeyT: 'title', KeyH: 'hide' };
 
 /**
  * The chrome action a key asks for: Alt+S, Alt+C or Alt+T (like the prompt's Alt+M), from anywhere,

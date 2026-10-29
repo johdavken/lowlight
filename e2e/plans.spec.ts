@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DIRECT, awaitGreeting, send, skipSplash } from './fixtures';
 
-// Her plans (spec 2026-10-21 §5): a line about her going home makes the fake scribe record a going plan; the card
+// Her plans (spec 2026-10-21 §5): a line about her going home makes the fake residual record a going plan; the card
 // comes up. LET HER GO: her goodbye, then /solo with her row showing where she went. GO WITH HER: the card goes and
 // the scene stays. Each in a playthrough of its own; the one it found is put back.
 test.describe.configure({ mode: 'serial' });

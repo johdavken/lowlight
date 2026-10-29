@@ -70,11 +70,11 @@ export interface ToolSpec {
   describe?(ctx: ToolContext): string;
 }
 
-/** The bookkeeping tools the scribe owns (scribe spec §1): never offered to her model or run when it calls one anyway (direct-tools); the dev panel still can. */
-export const SCRIBE_TOOLS: readonly string[] = ['note', 'read_notes', 'forget', 'set_recap', 'update_dossier', 'shift_standing'];
+/** The bookkeeping tools the Residual owns (scribe spec §1): never offered to her model or run when it calls one anyway (direct-tools); the dev panel still can. */
+export const RESIDUAL_TOOLS: readonly string[] = ['note', 'read_notes', 'forget', 'set_recap', 'update_dossier', 'shift_standing'];
 
-/** Tools her model is never offered, and a call she makes anyway answers as unknown: the scribe's, and set_expression (faces come from her *actions*, spec 2026-10-20; the dev panel still sets them). */
-export const NOT_HERS: readonly string[] = [...SCRIBE_TOOLS, 'set_expression'];
+/** Tools her model is never offered, and a call she makes anyway answers as unknown: the Residual's, and set_expression (faces come from her *actions*, spec 2026-10-20; the dev panel still sets them). */
+export const NOT_HERS: readonly string[] = [...RESIDUAL_TOOLS, 'set_expression'];
 
 const transitionSchema = z.enum(['fade', 'glitch']);
 const weatherSchema = z.enum(['none', 'rain', 'snow', 'ash', 'dust']);
@@ -406,7 +406,7 @@ export function dispatchTool(ctx: ToolContext, name: string, args: unknown, src:
   if (src === 'agent' && !offComms(ctx, name)) return { ok: false, error: `${name} isn't yours on comms: you're not there` };
   const tool = TOOLS.find((t) => t.name === name && (t.available?.(ctx) ?? true));
   if (!tool) {
-    // Her model is shown only the tools she's offered (not the scribe's or set_expression).
+    // Her model is shown only the tools she's offered (not the Residual's or set_expression).
     const names = toolsFor(ctx, { agent: src === 'agent' })
       .map((t) => t.name)
       .join(', ');

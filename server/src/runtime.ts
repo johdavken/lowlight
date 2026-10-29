@@ -7,7 +7,7 @@ import type { StockItem } from '../../shared/stock';
 import type { Deck } from '../../shared/gear';
 import type { RoomRegistry } from './rooms';
 import { completeOnce, completeOnceWithUsage, NARRATOR_MAX_TOKENS, NARRATOR_TEMPERATURE } from './scenario';
-import { SCRIBE_TEMPERATURE, SCRIBE_TIMEOUT_MS, ScribeRunner, plansApply, promisesApply } from './scribe-runner';
+import { RESIDUAL_TEMPERATURE, RESIDUAL_TIMEOUT_MS, ResidualRunner, plansApply, promisesApply } from './residual-runner';
 import type { CompletionMessage } from './turn';
 import type { LoreSelection } from '../../shared/lore';
 import type { LeadsForTurn } from '../../shared/leads';
@@ -39,6 +39,7 @@ import { dispatchTool, type ToolContext } from './tools';
 import type { CheckpointPort } from './world';
 import { nowOf, standingControl, storedStanding, trustControl } from './standing';
 import { bandOf, standingBlock } from '../../shared/standing';
+import { cipherBlock } from '../../shared/cipher';
 import { flagsOf, PICK_CHECK_MAX_TOKENS, PICK_RECENT_LINES, pickCheckMessages, type QuestEntry } from '../../shared/quests';
 import type { Extra } from '../../shared/extras';
 import type { Settings } from './settings';
@@ -362,7 +363,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
         ? createExpressionControl({ names: expressionNames, db, relay: () => relay, emit: (e, p) => hub.emit(e, p) })
         : null,
   };
-  // The scribe (spec 2026-10-15): her bookkeeping, one call on her model after each reply, in a playthrough.
+  // The Residual (spec 2026-10-15): her bookkeeping, one call on her model after each reply, in a playthrough.
   /** Rewinds so far: a delayed end-of-scene save made before one is called off. */
   let rewinds = 0;
   const standingFor = (p: string) => (cp && cp.standingStart(id, p) !== null ? standingControl({ db, player: () => p, start: (q) => cp.standingStart(id, q), config: () => cp.standingConfig(id), shared: () => cp.sharedStanding() }) : null);
@@ -374,9 +375,9 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
     if (!cp || clock === null || !rec.photos?.length) return [];
     return fittingPhotos(rec.photos, photoMoment(rec.sprite, cp.placeAt(id, clock), clock));
   };
-  const scribe =
+  const residual =
     direct && cp && modelStore
-      ? new ScribeRunner({
+      ? new ResidualRunner({
           db,
           journal,
           photoCaption,
@@ -392,7 +393,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             return `${now.word} (trust ${now.values.trust}, warmth ${now.values.warmth})`;
           },
           setLight: (p, lightId, intensity) => dispatchTool({ ...tools, player: () => p }, 'set_light', { light_id: lightId, intensity }, 'world'),
-          passTime: (p, r, minutes) => relay.scribePass(p, r.id, r.take, minutes),
+          passTime: (p, r, minutes) => relay.residualPass(p, r.id, r.take, minutes),
           // Her plans: in a stamped in-character turn, not on comms (spec 2026-10-21 §4, §5).
           plan: (p, r) => {
             const reply = db.getMessage(p, r.id);
@@ -405,6 +406,12 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           },
           herDay: () => cp?.dayLine?.(id) ?? null,
           storyClock: () => cp?.clockNow?.() ?? null,
+          // Cipher (spec §2.3): the playthrough's truths, from every contact's room.
+          ...(cp ? { cipher: (p: string) => cp.cipherOf(p), cipherCast: (p: string) => cp.cipherCast(p) } : {}),
+          sceneId: () => room.state.sceneId,
+          selfId: id,
+          // The lore book's ids read as titles ("old-karasu-deck" → "old karasu deck"), so a truth doesn't fight it.
+          ...(opts.loreIds ? { loreTitles: () => [...opts.loreIds!()].map((l) => l.replace(/-/g, ' ')) } : {}),
           // Promised texts (spec 2026-10-23 §4): from any stamped in-character reply, comms included.
           promise: (p, r) => {
             const reply = db.getMessage(p, r.id);
@@ -420,7 +427,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
               apiKey: apiKey(),
               model: modelStore.get(),
               messages,
-              temperature: SCRIBE_TEMPERATURE,
+              temperature: RESIDUAL_TEMPERATURE,
               maxTokens: o.maxTokens,
               ...(direct.provider === 'openrouter' ? { thinking: 'auto' as const } : {}),
               signal: o.signal,
@@ -466,6 +473,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
       : undefined;
   hub = createHub({
     ...(opts.unreadTexts ? { unreadTexts: opts.unreadTexts } : {}),
+    ...(cp ? { cipher: (p: string) => cp.cipherOf(p) } : {}),
     ...(cp ? { herPlace: () => cp.herPlace(id), herScheduled: () => cp.scheduledRoomOf(id) } : {}),
     room,
     journal,
@@ -612,6 +620,11 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             const now = nowOf(storedStanding(db, p, replaced), start, cfg, shared);
             return standingBlock({ player: opts.players.resolve(p).name, values: now.values, cfg, shared });
           },
+          // Cipher (spec §2.6): the truths she keeps from them.
+          cipher: (p: string) => {
+            const s = cp.cipherOf(p);
+            return s ? cipherBlock(s.truths, id, opts.players.resolve(p).name) : null;
+          },
         }
       : {}),
     others: othersAt,
@@ -628,14 +641,14 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
       ? {
           onTurnEnd: ({ player, mode, ok, reply }: { player: string; mode: string | undefined; ok: boolean; reply: { id: string; take: number } | null }) => {
             // A text (deck spec §3) has no "here": you aren't together, so her going plan always stands.
-            if (scribe && ok && reply && mode !== 'ooc') scribe.afterTurn(player, reply, mode === 'end' ? 'end' : 'turn', mode === 'text' ? undefined : room.state.sceneId);
+            if (residual && ok && reply && mode !== 'ooc') residual.afterTurn(player, reply, mode === 'end' ? 'end' : 'turn', mode === 'text' ? undefined : room.state.sceneId);
             // A text (deck spec §2) never moves you: no turnEnded (it would put you in her room), no save of its own;
             // but a save queued while it typed is taken now (mid review I1).
             if (mode === 'text') {
               cp.settle?.();
               return;
             }
-            // The end-of-scene save waits for the scribe's recap and dossier, so it holds them; a rewind or a
+            // The end-of-scene save waits for the Residual's recap and dossier, so it holds them; a rewind or a
             // load in the meantime calls it off (it would save the wrong story).
             const ptAtEnd = cp.active?.()?.id ?? null;
             const rewindsAtEnd = rewinds;
@@ -644,20 +657,20 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
               cp.checkpoint({ trigger: 'end', contactId: id, name: `Talk with ${name} ended` });
             };
             if (mode === 'end' && ok) {
-              if (scribe) void scribe.wait(SCRIBE_TIMEOUT_MS).then(save);
+              if (residual) void residual.wait(RESIDUAL_TIMEOUT_MS).then(save);
               else save();
             }
             cp.turnEnded(id);
             refreshOthers();
           },
-          ...(scribe
+          ...(residual
             ? {
-                beforeTurn: () => scribe.wait(),
-                onTakeReplaced: (messageId: string) => scribe.takeReplaced(messageId),
-                onTakesCollapsed: (messageId: string, keep: number) => scribe.takesCollapsed(messageId, keep),
+                beforeTurn: () => residual.wait(),
+                onTakeReplaced: (messageId: string) => residual.takeReplaced(messageId),
+                onTakesCollapsed: (messageId: string, keep: number) => residual.takesCollapsed(messageId, keep),
                 onRewind: () => {
                   rewinds++;
-                  scribe.abortAll();
+                  residual.abortAll();
                 },
               }
             : {}),

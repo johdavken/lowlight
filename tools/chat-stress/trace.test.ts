@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { expect, it } from 'vitest';
-import { traceLines, waitForScribe } from './trace';
+import { traceLines, waitForResidual } from './trace';
 
 it('reads the calls after a byte offset, though earlier lines hold multi-byte text (→ ·)', () => {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'trace-')), 'trace.jsonl');
@@ -14,14 +14,14 @@ it('reads the calls after a byte offset, though earlier lines hold multi-byte te
   expect(traceLines(path.join(path.dirname(file), 'none.jsonl'), 0)).toEqual([]);
 });
 
-it("waitForScribe resolves once the scribe's run-end line is in the trace, or at the limit", async () => {
+it("waitForResidual resolves once the Residual's run-end line is in the trace, or at the limit", async () => {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'trace-')), 'trace.jsonl');
   fs.writeFileSync(file, '');
   const from = 0;
-  setTimeout(() => fs.appendFileSync(file, `${JSON.stringify({ name: 'scribe:note', args: 'note n1 added', out: 'ok' })}\n`), 20);
-  setTimeout(() => fs.appendFileSync(file, `${JSON.stringify({ name: 'scribe', args: '', out: 'scribe · 1 note · 0.4 s' })}\n`), 60);
+  setTimeout(() => fs.appendFileSync(file, `${JSON.stringify({ name: 'residual:note', args: 'note n1 added', out: 'ok' })}\n`), 20);
+  setTimeout(() => fs.appendFileSync(file, `${JSON.stringify({ name: 'residual', args: '', out: 'residual · 1 note · 0.4 s' })}\n`), 60);
   const t0 = Date.now();
-  expect(await waitForScribe(file, from, 2000, 10)).toBe(true);
+  expect(await waitForResidual(file, from, 2000, 10)).toBe(true);
   expect(Date.now() - t0).toBeLessThan(1000);
-  expect(await waitForScribe(path.join(path.dirname(file), 'none.jsonl'), 0, 50, 10)).toBe(false);
+  expect(await waitForResidual(path.join(path.dirname(file), 'none.jsonl'), 0, 50, 10)).toBe(false);
 });

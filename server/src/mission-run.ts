@@ -71,7 +71,7 @@ export function crackSetup(o: { seed: string; tag: CrackTag; ctx: CondCtx; words
     ghost: Boolean(deck?.traits.includes('ghost')),
     hint: null,
     tries: crackTries({ tech: o.stats.tech, alarm: o.ctx.alarm ?? 0, hasDeck: deck !== null, mods }),
-    skin: o.tag.ice ? 'ice' : (deck?.skin ?? 'green'),
+    skin: o.tag.corp ? 'corp' : (deck?.skin ?? 'green'),
     deck: deck?.name ?? null,
   };
   const crew = HINTERS.find((c) => c === o.ctx.with);

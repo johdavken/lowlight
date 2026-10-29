@@ -14,7 +14,7 @@ export const STANDING = {
   highMin: 5,
   /** The most one move changes either value (2 moved Nix to her top band in one night; 2026-10-16). */
   step: 1,
-  /** Her replies after a scribe move before standing may move again: the next move is on the 4th. */
+  /** Her replies after a Residual move before standing may move again: the next move is on the 4th. */
   cooldown: 4,
   /** Moves kept with the values. */
   history: 20,
@@ -45,7 +45,7 @@ export interface StandingMove {
   /** The reply it belongs to, and which take of it (the write log's take: keep going writes the same one). */
   messageId: string;
   take: number;
-  /** A job's stake (Intake board spec §2): stamped to the job's last row; the scribe's pace ignores it. */
+  /** A job's stake (Intake board spec §2): stamped to the job's last row; the Residual's pace ignores it. */
   job?: true;
 }
 

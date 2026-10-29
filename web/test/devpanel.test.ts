@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Atmosphere, LightDef, RoomState, SceneDef, ScribeRunInfo } from '../../shared/types';
+import type { Atmosphere, LightDef, RoomState, SceneDef, ResidualRunInfo } from '../../shared/types';
 import { DevPanel } from '../src/ui/devpanel';
 
 function light(over: Partial<LightDef> & Pick<LightDef, 'id'>): LightDef {
@@ -387,37 +387,63 @@ describe('DevPanel expression picker', () => {
   });
 });
 
-describe('SCRIBE section (scribe spec §8)', () => {
-  const run = (over: Partial<ScribeRunInfo> = {}): ScribeRunInfo => ({
+describe('RESIDUAL section (scribe spec §8)', () => {
+  const run = (over: Partial<ResidualRunInfo> = {}): ResidualRunInfo => ({
     at: new Date(2026, 9, 15, 22, 41).getTime(), kind: 'turn', player: 'hicks', messageId: 'm1', take: 0, ms: 1400,
     tokensIn: 900, tokensOut: 40, raw: '{"notes":[]}', applied: ['note n3 added'], refused: ['pin n3 refused: pins full (8)'], error: null, ...over,
   });
 
   it('lists runs newest first; a row opens its raw answer beside what was applied and refused', () => {
     const { root, panel } = setup();
-    panel.setScribeRuns([run(), run({ kind: 'summary', applied: ['summary saved (20 lines)'], refused: [] }), run({ error: 'answer: not JSON', applied: [], refused: [] })]);
-    const rows = [...root.querySelectorAll<HTMLElement>('.dp-scribe-row')];
-    expect(rows.map((r) => r.querySelector('.dp-scribe-sum')!.textContent)).toEqual([
+    panel.setResidualRuns([run(), run({ kind: 'summary', applied: ['summary saved (20 lines)'], refused: [] }), run({ error: 'answer: not JSON', applied: [], refused: [] })]);
+    const rows = [...root.querySelectorAll<HTMLElement>('.dp-residual-row')];
+    expect(rows.map((r) => r.querySelector('.dp-residual-sum')!.textContent)).toEqual([
       '22:41 · turn · 1 applied · 1 refused · 1.4 s',
       '22:41 · summary · 1 applied · 1.4 s',
       '22:41 · turn · failed: answer: not JSON · 1.4 s',
     ]);
-    expect(root.querySelector('.dp-scribe-detail')).toBeNull();
-    rows[0].querySelector<HTMLElement>('.dp-scribe-sum')!.click();
-    const detail = root.querySelector('.dp-scribe-detail')!;
+    expect(root.querySelector('.dp-residual-detail')).toBeNull();
+    rows[0].querySelector<HTMLElement>('.dp-residual-sum')!.click();
+    const detail = root.querySelector('.dp-residual-detail')!;
     expect(detail.textContent).toContain('{"notes":[]}');
     expect(detail.textContent).toContain('note n3 added');
     expect(detail.textContent).toContain('pin n3 refused: pins full (8)');
   });
 
-  it('REFRESH asks for the runs, and so does a scribe log line', () => {
+  it('CIPHER: every truth with its holders and clues, off-page ones flagged; none yet without (cipher spec §2.9)', () => {
+    const { root, panel } = setup();
+    panel.setResidualRuns([], null);
+    expect(root.querySelector('.dp-cipher')!.textContent).toContain('none yet');
+    panel.setResidualRuns([], {
+      replies: 9,
+      lastRun: 6,
+      truths: [
+        {
+          id: 'nix-1', kind: 'place', truth: 'The stall is a drop.', knownBy: ['hae'], comesOutWhen: 'you see the drop', changes: 'the Tilt knows you', clueIdeas: 'chalk', state: 'open',
+          clues: [
+            { text: 'a thick envelope', messageId: 'm1', at: 1300, place: 'karasu/noodle-stall', onPage: true },
+            { text: 'a look', messageId: 'm2', at: 1310, place: 'karasu/noodle-stall', onPage: false },
+          ],
+        },
+      ],
+    });
+    const c = root.querySelector('.dp-cipher')!;
+    expect(c.textContent).toContain('nix-1 · place · open · hae');
+    expect(c.textContent).toContain('The stall is a drop.');
+    expect(c.textContent).toContain('comes out when: you see the drop');
+    expect(c.textContent).toContain('a thick envelope');
+    expect(c.textContent).toContain('OFF PAGE a look');
+    expect(c.textContent).toContain('9 replies · last run at 6');
+  });
+
+  it('REFRESH asks for the runs, and so does a Residual log line', () => {
     const { root, send, panel } = setup();
-    root.querySelector<HTMLButtonElement>('.dp-scribe-refresh')!.click();
-    expect(send).toHaveBeenLastCalledWith({ type: 'scribe_runs' });
+    root.querySelector<HTMLButtonElement>('.dp-residual-refresh')!.click();
+    expect(send).toHaveBeenLastCalledWith({ type: 'residual_runs' });
     send.mockClear();
     panel.log('info', 'lore · 2 entries');
     expect(send).not.toHaveBeenCalled();
-    panel.log('info', 'scribe · 1 note · 1.2 s');
-    expect(send).toHaveBeenLastCalledWith({ type: 'scribe_runs' });
+    panel.log('info', 'residual · 1 note · 1.2 s');
+    expect(send).toHaveBeenLastCalledWith({ type: 'residual_runs' });
   });
 });

@@ -32,6 +32,8 @@ import type { LiveDbs, Playthroughs, SaveRequest } from './playthroughs';
 import type { AgentRuntime } from './runtime';
 import { addNarrated, darkNow, dropUndone, powerOf, type PowerPlace } from './power';
 import type { Outage } from '../../shared/outage';
+import { cipherKey, foldCipher, looseEnds, parseCipherEvents, type CipherState } from '../../shared/cipher';
+import type { LooseEndsView } from '../../shared/types';
 
 type Players = ReturnType<typeof createPlayers>;
 
@@ -115,7 +117,7 @@ export interface CheckpointPort {
   planNow(contactId: string): { going: { place: string; until: string } | null; meet: { place: string; time: string } | null } | null;
   /** The places she can promise to text from: `map`, plus the rooms of her day (deck controls e2e finding). */
   promisePlaces(contactId: string, map: readonly { id: string; name: string }[]): { id: string; name: string }[];
-  /** Her schedule in words for the scribe (deck controls spec §1); null without one. */
+  /** Her schedule in words for the Residual (deck controls spec §1); null without one. */
   dayLine(contactId: string): string | null;
   /** Where the world places her at `clock` (plan, left-behind, schedule); null while you're with her or with no playthrough. */
   placeAt(contactId: string, clock: number): string | null;
@@ -147,8 +149,14 @@ export interface CheckpointPort {
   /** The kit now, or at story-clock minute `at` (events after it left out). */
   /** The kit and the crew folded on one timeline (crew spec §3). */
   kitOf(player: string, at?: number): { kit: Kit; stats: Stats; crew: CrewState } | null;
+  /** The playthrough's Cipher (cipher spec §2.1): every contact's `cipher.<player>` events folded, and her replies across them; null when it doesn't apply (no playthrough, or anyone but its player). */
+  cipherOf(player: string): CipherState | null;
+  /** Who a cipher run may give a truth to (cipher spec §2.2): the contacts met, never the player, with a line on each and her authored standing secret. */
+  cipherCast(player: string): { id: string; name: string; pronoun: string; about: string; secret: string | null }[];
   /** LEADS: the leads the active playthrough's player holds, open ones first, oldest first within each. Throws 'no-playthrough'. */
   leads(): LeadView[];
+  /** LOOSE ENDS (cipher spec §2.8): the clues the player saw and the truths they learned; never an open truth. Throws 'no-playthrough'. */
+  looseEnds(): LooseEndsView;
   /** The map's name for a scene, else the scene's own name. */
   placeName(sceneId: string): string;
 }
@@ -491,6 +499,7 @@ export function createWorld(deps: {
   let placesMemo: { key: string; places: Map<string, string> } | null = null;
   /** The last kitOf: the same playthrough, clock and database fingerprints fold the same (crew spec §3). */
   let kitMemo: { key: string; value: { kit: Kit; stats: Stats; crew: CrewState } } | null = null;
+  let cipherMemo: { key: string; value: CipherState } | null = null;
   function placesAt(pt: PlaythroughInfo, clock: number): Map<string, string> {
     const key = `${pt.id}@${clock}`;
     if (placesMemo?.key === key) return placesMemo.places;
@@ -846,6 +855,11 @@ export function createWorld(deps: {
       });
       return [...rows.filter((r) => !r.followed), ...rows.filter((r) => r.followed)];
     },
+    looseEnds() {
+      const pt = playthroughs.active();
+      if (!pt) throw new Error('no-playthrough');
+      return looseEnds(this.cipherOf(pt.player) ?? foldCipher([], 0), (id) => this.placeName(id));
+    },
     heldLeads(player) {
       const pt = playthroughs.active();
       if (!pt || pt.player !== player) return null;
@@ -924,6 +938,33 @@ export function createWorld(deps: {
       const value = { kit: r.kit, stats: start.stats, crew: r.crew };
       kitMemo = { key, value };
       return value;
+    },
+    cipherOf(player) {
+      const pt = playthroughs.active();
+      if (!pt || pt.player !== player) return null;
+      return withDbs(pt, (dbs) => {
+        // Read only when a db changed: her replies are counted from every message.
+        const key = `${pt.id}|${player}|${[...dbs.entries()].map(([id, db]) => `${id}:${db.fingerprint().join(',')}:${db.messageCount()}`).join(';')}`;
+        if (cipherMemo?.key === key) return cipherMemo.value;
+        const all = [...dbs.values()];
+        const value = foldCipher(
+          all.map((db) => parseCipherEvents(db.getMeta(cipherKey(player)))),
+          all.reduce((n, db) => n + db.allMessages(player).filter((m) => m.role === 'agent' && m.mode !== 'ooc').length, 0),
+        );
+        cipherMemo = { key, value };
+        return value;
+      });
+    },
+    cipherCast(player) {
+      const pt = playthroughs.active();
+      if (!pt || pt.player !== player) return [];
+      const roster = new Map(deps.roster().map((c) => [c.id, c]));
+      return known(pt)
+        .filter((c) => c.id !== player && roster.has(c.id))
+        .map((c) => {
+          const r = roster.get(c.id)!;
+          return { id: c.id, name: c.name, pronoun: r.pronoun, about: (r.bio ?? []).join(' ').slice(0, 200), secret: deps.standingConfig?.(c.id)?.secret ?? null };
+        });
     },
     tieFor(contactId, player) {
       const pt = playthroughs.active();

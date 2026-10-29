@@ -88,6 +88,8 @@ export function encounterPrompt(o: {
   reserved: string[];
   /** `The power is out across Karasu (since 22:00).` while this district is dark (blackouts phase 3 §2). */
   power?: string | null;
+  /** The Cipher's open truths (cipher spec §2.7): an event may carry a small hint to one. */
+  cipher?: string | null;
 }): CompletionMessage[] {
   const when = [o.room.timeOfDay, o.room.weather && o.room.weather !== 'none' ? o.room.weather : null].filter(Boolean).join(', ');
   const facts = [
@@ -95,6 +97,7 @@ export function encounterPrompt(o: {
     o.power ?? null,
     o.room.art ? `What the room looks like: ${o.room.art}` : null,
     o.lore,
+    o.cipher ?? null,
     `The user's character:\n${o.you}`,
     `The other character:\n${o.her}`,
     ...o.others.map((x) => `Also here: ${named(x.name, x.pronoun)} — ${oneLine(x.voice)}`),

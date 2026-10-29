@@ -102,12 +102,14 @@ export function flagsOf(t: TurnRecord, earlier: readonly string[] = []): Flag[] 
   for (const c of t.calls) if (c.out.startsWith('error')) add('failed-call', `${c.name}: ${c.out.slice(0, 120)}`);
 
   const names = new Set(t.calls.map((c) => c.name));
-  if (t.expect === 'light' && ![...names].some((n) => LIGHTS.has(n)) && !names.has('scribe:light')) add('missed-light');
+  // The Residual's writes, under its name or its old one (a run traced before the rename still compares).
+  const kept = (what: string) => names.has(`residual:${what}`) || names.has(`scribe:${what}`);
+  if (t.expect === 'light' && ![...names].some((n) => LIGHTS.has(n)) && !kept('light')) add('missed-light');
   // A note call without text (an id and `about` only) leaves the note as it was.
-  // The scribe's writes count as hers (scribe spec): `scribe:note` / `scribe:dossier` lines in the trace.
-  if (t.expect === 'note' && !t.calls.some((c) => (c.name === 'note' && textOf(c.args).trim() !== '') || c.name === 'update_dossier' || c.name === 'scribe:note' || c.name === 'scribe:dossier')) add('missed-note');
+  // The Residual's writes count as hers (scribe spec): `residual:note` / `residual:dossier` lines in the trace.
+  if (t.expect === 'note' && !t.calls.some((c) => (c.name === 'note' && textOf(c.args).trim() !== '') || c.name === 'update_dossier') && !kept('note') && !kept('dossier')) add('missed-note');
   if (t.expect === 'scene' && !names.has('go_to')) add('missed-scene');
-  if (t.expect === 'recap' && !names.has('set_recap') && !names.has('scribe:recap')) add('missed-recap');
+  if (t.expect === 'recap' && !names.has('set_recap') && !kept('recap')) add('missed-recap');
   if (t.mode === 'ooc' && [...names].some((n) => ROOM_CHANGES.has(n))) add('ooc-room-change', [...names].join(', '));
   return flags;
 }

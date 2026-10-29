@@ -36,7 +36,7 @@ export const CONTINUE_INSTRUCTION =
 /** `head`: lines ahead of the blocks (the room and what everyone wears), far from their words. */
 export type Turn = { kind: 'reply'; head?: string[]; contextLines: string[]; text: string; blocks?: string[] } | { kind: 'continue'; blocks?: string[] };
 
-/** A stored line as her model reads it in the history (also what the scribe reads); null when it isn't sent. */
+/** A stored line as her model reads it in the history (also what the Residual reads); null when it isn't sent. */
 export function toCompletion(m: ChatMessage): CompletionMessage | null {
   // The opening scene reaches her as the [scene] block, never as a line of the conversation.
   if (m.mode === 'scene') return null;

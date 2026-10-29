@@ -1,11 +1,11 @@
 /**
- * The crack terminal's looks (deck skins spec §1): one per deck, plus ICE for a corporate terminal. A skin
+ * The crack terminal's looks (deck skins spec §1): one per deck, plus CORP for a corporate terminal. A skin
  * is words and a few extra pieces; the dump, the moves and the cues are the same in all of them.
  */
 import type { TerminalSetup, TerminalSkin } from '../../../../shared/crack';
 
 /** Extra bits of a skin's window: a maker's plate, a row of keys, the deck's name, signal bars, a stencilled
- *  header, a manifest tag, one scrolling column, ICE's alarm segments and linked line, the holo's corners. */
+ *  header, a manifest tag, one scrolling column, CORP's alarm segments and linked line, the holo's corners. */
 export type Piece = 'plate' | 'keys' | 'name' | 'signal' | 'stencil' | 'manifest' | 'column' | 'alarm' | 'linked' | 'corners';
 
 export interface Skin {
@@ -70,10 +70,11 @@ export const SKINS: Record<TerminalSkin, Skin> = {
     text: { manifest: 'MANIFEST' },
   },
   pocket: { tries: '', likeness: (k, of) => `${k}/${of}`, dud: 'dud gone', reset: 'tries back', nothing: '—', leave: 'ESC', pieces: ['column'] },
-  ice: { tries: 'LOCKOUT FUSES', likeness: (k, of) => `REJECT · ${k}/${of}`, dud: 'DUD PURGED', reset: 'FUSES RESET', nothing: 'NULL', leave: 'DISCONNECT', pieces: ['alarm', 'linked'] },
+  corp: { tries: 'LOCKOUT FUSES', likeness: (k, of) => `REJECT · ${k}/${of}`, dud: 'DUD PURGED', reset: 'FUSES RESET', nothing: 'NULL', leave: 'DISCONNECT', pieces: ['alarm', 'linked'] },
 };
 
-/** The setup's skin; none, or one this build doesn't know, is `green`. */
+/** The setup's skin; none, or one this build doesn't know, is `green`. A run saved before the rename says `ice`. */
 export function skinOf(s: Pick<TerminalSetup, 'skin'>): TerminalSkin {
+  if ((s.skin as string) === 'ice') return 'corp';
   return s.skin && Object.hasOwn(SKINS, s.skin) ? s.skin : 'green';
 }

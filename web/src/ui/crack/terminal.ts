@@ -23,7 +23,7 @@ import './skins/meridian.css';
 import './skins/sentinel.css';
 import './skins/dock.css';
 import './skins/pocket.css';
-import './skins/ice.css';
+import './skins/corp.css';
 
 /** How long the last line stays up before the window hands back. */
 const END_MS = 1100;
@@ -98,7 +98,7 @@ export function openTerminal(
     else if (p === 'corners') win.append(n, pieceEl(p, undefined, null)!);
     else head.insertBefore(n, head.children[1] ?? null);
   }
-  // ICE's ALARM (spec §3): the job's, lit in 3 segments; a lockout shows the rise the server then applies.
+  // The corporate terminal's ALARM (spec §3): the job's, lit in 3 segments; a lockout shows the rise the server then applies.
   const alarm = has('alarm') ? el('div', 'ct-alarm') : null;
   const paintAlarm = (n: number) => {
     if (!alarm) return;

@@ -55,7 +55,7 @@ export function parsePromise(raw: string | null): TextPromise | null {
   return { when, about: o.about, from: o.from, since: o.since };
 }
 
-/** Her schedule as the scribe reads it (deck controls spec §1): `Nix's apartment 05:00–18:00 · the Tilt 18:00–19:00 (Fri, Sat) · …`. */
+/** Her schedule as the Residual reads it (deck controls spec §1): `Nix's apartment 05:00–18:00 · the Tilt 18:00–19:00 (Fri, Sat) · …`. */
 export function dayWords(blocks: readonly Block[], placeName: (room: string) => string): string | null {
   if (blocks.length === 0) return null;
   return [...blocks]

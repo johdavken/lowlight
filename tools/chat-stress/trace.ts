@@ -14,11 +14,11 @@ export function traceLines(file: string, from: number): { name: string; args: st
     .map(({ name, args, out }) => ({ name, args, out }));
 }
 
-/** Waits (polling every `every` ms, at most `limitMs`) for the scribe's run-end line after `from`; whether it came. */
-export async function waitForScribe(file: string, from: number, limitMs: number, every = 200): Promise<boolean> {
+/** Waits (polling every `every` ms, at most `limitMs`) for the Residual's run-end line after `from`; whether it came. */
+export async function waitForResidual(file: string, from: number, limitMs: number, every = 200): Promise<boolean> {
   const until = Date.now() + limitMs;
   for (;;) {
-    if (traceLines(file, from).some((c) => c.name === 'scribe')) return true;
+    if (traceLines(file, from).some((c) => c.name === 'residual')) return true;
     if (Date.now() >= until) return false;
     await new Promise((r) => setTimeout(r, every));
   }

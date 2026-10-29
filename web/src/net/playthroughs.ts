@@ -1,5 +1,5 @@
 /** The playthrough and save routes (spec 2026-10-07 §4), one function per route. */
-import type { AroundEntry, ContactEntry, LeadView, Location, PlaythroughInfo, SaveInfo } from '../../../shared/types';
+import type { AroundEntry, ContactEntry, LeadView, Location, LooseEndsView, PlaythroughInfo, SaveInfo } from '../../../shared/types';
 import type { PlaythroughPersona } from '../../../shared/persona';
 
 /** A route answered with an error: its HTTP status, the body's `error`, and (for `busy`) the contact whose turn is streaming. */
@@ -52,6 +52,7 @@ export const branchFrom = (contactId: string, messageId: string) => call<Playthr
 /** The contacts the player knows in the active playthrough (§7). */
 export const contacts = () => call<ContactEntry[]>('GET', '/api/playthroughs/active/contacts');
 export const leads = () => call<LeadView[]>('GET', '/api/playthroughs/active/leads');
+export const looseEnds = () => call<LooseEndsView>('GET', '/api/playthroughs/active/loose-ends');
 /** WALK OUT: the active playthrough goes solo (between scenes, with no one). */
 export const goSolo = () => call<PlaythroughInfo>('POST', '/api/playthroughs/active/solo');
 /** The active playthrough's story clock. */

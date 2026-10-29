@@ -46,8 +46,8 @@ test('a job with a drawn complication, a red check and a crack ends in a debrief
   await grab.click();
   await expect(page.locator('.ct-window')).toBeVisible();
   await expect(page.locator('.ct-dump .ct-row')).toHaveCount(32);
-  // A corporate terminal (deck skins spec §3): the ICE look, the deck it linked (none here), the job's ALARM.
-  await expect(page.locator('.ct-window')).toHaveClass(/ct-skin-ice/);
+  // A corporate terminal (deck skins spec §3): the CORP look, the deck it linked (none here), the job's ALARM.
+  await expect(page.locator('.ct-window')).toHaveClass(/ct-skin-corp/);
   await expect(page.locator('.ct-linked')).toHaveText('LINKED · NO DECK');
   await expect(page.locator('.ct-alarm i')).toHaveCount(3);
   await page.screenshot({ path: 'test-results/jobs-terminal.png' });

@@ -54,7 +54,7 @@ describe('PEOPLE', () => {
   it('opens on the asked tab, PEOPLE in the head, the tab lit', () => {
     const { handle } = open({ tab: 'leads' });
     expect($('.people-screen .scr-head')!.textContent).toBe('// PEOPLE[ESC] CLOSE');
-    expect($$('.pe-tab').map((t) => t.textContent)).toEqual(['CONTACTS', 'LEADS', 'JOURNAL']);
+    expect($$('.pe-tab').map((t) => t.textContent)).toEqual(['CONTACTS', 'LEADS', 'JOURNAL', 'LOOSE ENDS']);
     expect(lit()).toEqual(['leads']);
     expect(handle.tab).toBe('leads');
     expect($('.pe-pane')!.dataset.tab).toBe('leads');
@@ -90,7 +90,7 @@ describe('PEOPLE', () => {
     prompt.focus();
     const { handle } = open({ tab: 'contacts' });
     expect(key('ArrowLeft', {}, prompt).defaultPrevented).toBe(true);
-    expect(handle.tab).toBe('journal');
+    expect(handle.tab).toBe('loose');
     key('ArrowRight', {}, prompt);
     expect(handle.tab).toBe('contacts');
     const own = document.createElement('textarea');

@@ -1,3 +1,4 @@
+import type { CipherState } from './cipher';
 import type { Pronoun } from './pronoun';
 import type { Band, Risk, Specialty } from './crew-book';
 import type { CrewOdds, ErrandInstance, HireCard, LoyaltyWord } from './crew';
@@ -385,8 +386,8 @@ export type ServerEvent =
    */
   | { type: 'turn_rejected'; reason: 'busy' | 'no-link'; text?: string }
   | { type: 'dev_log'; level: 'info' | 'warn' | 'error'; text: string }
-  /** Answer to `scribe_runs`: this pair's newest runs, newest first. */
-  | { type: 'scribe_runs'; runs: ScribeRunInfo[] }
+  /** Answer to `residual_runs`: this pair's newest runs, newest first, and the playthrough's Cipher (cipher spec §2.9; null without one). */
+  | { type: 'residual_runs'; runs: ResidualRunInfo[]; cipher: CipherState | null }
   /** Her whole journal (pinned first, then newest first), on connect and after every change. */
   | { type: 'journal'; notes: Note[] }
   /** Her recap; `text` and `at` are null when there is none. */
@@ -457,8 +458,8 @@ export type ClientEvent =
   /** Undo of a delete: puts the note back exactly as it was. */
   | { type: 'journal_restore'; note: Note }
   | { type: 'recap_seen' }
-  /** The dev panel's SCRIBE section: this pair's scribe runs (scribe spec §8). */
-  | { type: 'scribe_runs' }
+  /** The dev panel's RESIDUAL section: this pair's residual runs (scribe spec §8). */
+  | { type: 'residual_runs' }
   /** Ready for her greeting (sent only when `history` said one is due); the server checks again. */
   | { type: 'greet'; /** How the scene opens, from the arrival screen (spec 2026-10-27 §3): kept only on a new game. */ opening?: string }
   | { type: 'let_her_go'; text?: string }
@@ -733,6 +734,19 @@ export interface AgentInfo {
 }
 
 /** One row of the LEADS screen (Leads spec §6): a held lead, who it points to, and whether you've followed it up. */
+/** One clue the player saw, for LOOSE ENDS (cipher spec §2.8): what was noticed, the place's name, the story clock. */
+export interface LooseClue {
+  text: string;
+  place: string;
+  at: number;
+}
+
+/** PEOPLE → LOOSE ENDS: clues grouped by the truth they point to (never named), and the truths the player learned. */
+export interface LooseEndsView {
+  open: LooseClue[][];
+  solved: { truth: string; clues: LooseClue[] }[];
+}
+
 export interface LeadView {
   id: string;
   title: string;
@@ -755,10 +769,10 @@ export interface HeldLead {
   followed: boolean;
 }
 
-/** One scribe run, as the dev panel's SCRIBE section shows it (scribe spec §8). */
-export interface ScribeRunInfo {
+/** One residual run, as the dev panel's RESIDUAL section shows it (scribe spec §8). */
+export interface ResidualRunInfo {
   at: number;
-  kind: 'turn' | 'end' | 'summary';
+  kind: 'turn' | 'end' | 'summary' | 'cipher';
   player: string;
   /** The reply it read (and its take); null when it never got that far. */
   messageId: string | null;

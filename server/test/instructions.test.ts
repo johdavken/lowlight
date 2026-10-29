@@ -151,7 +151,7 @@ describe('endSceneText', () => {
     expect(endSceneText('bye')).toBe('bye\n\n[the user ends the scene]');
   });
 
-  it('the leave note says they walk out and she stays; the scribe does the saving (scribe spec)', () => {
+  it('the leave note says they walk out and she stays; the Residual does the saving (scribe spec)', () => {
     expect(LEAVE_INSTRUCTIONS).toContain("they're walking out, you stay");
     for (const tool of ['set_recap', 'update_dossier']) expect(LEAVE_INSTRUCTIONS).not.toContain(tool);
   });

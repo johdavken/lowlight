@@ -125,6 +125,15 @@ describe('encounterPrompt', () => {
     expect(encounterPrompt(base)[1].content).not.toContain('The power is out');
   });
 
+  it("the Cipher's secrets come after the lore, only when there are any (cipher spec §2.7)", () => {
+    const secrets = 'Secrets in this story (never state them):\n- The stall is a drop. Hints: a chalk mark';
+    const user = encounterPrompt({ ...base, cipher: secrets })[1].content;
+    expect(user).toContain(secrets);
+    expect(user.indexOf(secrets)).toBeGreaterThan(user.indexOf('The Ribbon: a stacked district.'));
+    expect(user.indexOf(secrets)).toBeLessThan(user.indexOf("The user's character:"));
+    expect(encounterPrompt({ ...base, cipher: null })[1].content).toBe(encounterPrompt(base)[1].content);
+  });
+
   it('the facts in order; who else is here and what just happened only when there are any', () => {
     const user = encounterPrompt({
       ...base,

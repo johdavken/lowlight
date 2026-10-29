@@ -56,8 +56,8 @@ export interface CrackTag {
   kind: 'crack';
   length: 5 | 6 | 7 | 8 | 9;
   mods: Mod[];
-  /** A corporate terminal (deck skins spec §3): it shows the ICE look whatever deck you hold. */
-  ice?: true;
+  /** A corporate terminal (deck skins spec §3): it shows the CORP look whatever deck you hold (`ice` in older files). */
+  corp?: true;
 }
 
 export interface Choice {
@@ -408,13 +408,13 @@ function parseTags(raw: string | undefined): Tag[] | string {
       tags.push({ kind: 'check', check: { stat: stat as Check['stat'], base, grid: m[3] !== undefined, crew: extras.crew, red: m[4] !== undefined, mods: extras.mods } });
     } else if (t === 'alarm +1') {
       tags.push({ kind: 'alarm', delta: 1 });
-    } else if ((m = /^crack (\d+)( ice)?((?: · .+)?)$/.exec(t))) {
+    } else if ((m = /^crack (\d+)( corp| ice)?((?: · .+)?)$/.exec(t))) {
       const length = Number(m[1]);
       if (length < 5 || length > 9) return `crack: words are 5–9 letters (this is ${length})`;
       const extras = parseExtras(m[3]);
       if (typeof extras === 'string') return `crack: ${extras}`;
       if (extras.crew.length) return 'crack: crew bonuses go on checks; use · if with=<id> +N "label"';
-      tags.push({ kind: 'crack', length: length as CrackTag['length'], mods: extras.mods, ...(m[2] ? { ice: true as const } : {}) });
+      tags.push({ kind: 'crack', length: length as CrackTag['length'], mods: extras.mods, ...(m[2] ? { corp: true as const } : {}) });
     } else if ((m = /^gig (hack|slip|papers) (easy|medium|hard)((?: · .+)?)$/.exec(t))) {
       const mods = parseGigExtras(m[3]);
       if (typeof mods === 'string') return `gig: ${mods}`;
@@ -423,7 +423,7 @@ function parseTags(raw: string | undefined): Tag[] | string {
       const c = parseCondition(m[1]);
       if (!Array.isArray(c)) return c.message;
       tags.push({ kind: 'needs', all: c });
-    } else return `can't read the tag '${t}' (set flag=value, needs <condition>, clock +6h / +30m, check <stat> <base> [grid] [red] [· <contact> +N] [· if <condition> +N "label"], crack <5–9> [ice], alarm +1, gig <hack|slip|papers> <easy|medium|hard> [· if <condition> -1 "label"])`;
+    } else return `can't read the tag '${t}' (set flag=value, needs <condition>, clock +6h / +30m, check <stat> <base> [grid] [red] [· <contact> +N] [· if <condition> +N "label"], crack <5–9> [corp], alarm +1, gig <hack|slip|papers> <easy|medium|hard> [· if <condition> -1 "label"])`;
   }
   return tags;
 }
@@ -1248,7 +1248,7 @@ export const tagText = (t: Tag): string => {
   if (t.kind === 'clock') return `clock +${t.minutes % 60 === 0 ? `${t.minutes / 60}h` : `${t.minutes}m`}`;
   if (t.kind === 'check') return checkText(t.check);
   if (t.kind === 'alarm') return 'alarm +1';
-  if (t.kind === 'crack') return `crack ${t.length}${t.ice ? ' ice' : ''}${t.mods.map(modText).join('')}`;
+  if (t.kind === 'crack') return `crack ${t.length}${t.corp ? ' corp' : ''}${t.mods.map(modText).join('')}`;
   if (t.kind === 'gig') return gigText(t);
   return `needs ${t.all.map(condText).join(' and ')}`;
 };

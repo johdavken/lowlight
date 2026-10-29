@@ -26,7 +26,7 @@ export const beatLine = (player: string): string =>
 export const ROOM_JOBS_APART =
   "A [job — …] line is a paid job you work together; a [quest — …] line is a story of its own. Keep them apart: a job's people, places and loose ends stay in that job, and nobody from a quest knows about it, unless a line itself ties them together.";
 
-/** The same rule for the scribe and the rolling summary. */
+/** The same rule for the Residual and the rolling summary. */
 export const JOBS_APART =
   "[job — …] lines are paid jobs worked together; [quest — …] lines are a story of their own. Keep them apart: never write a job's people, places or events into a quest, or a quest's into a job, unless the lines themselves tie them together.";
 

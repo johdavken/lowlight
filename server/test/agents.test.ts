@@ -413,7 +413,7 @@ describe('roleplay guide', () => {
     expect(ROLEPLAY_GUIDE).toContain('something to answer');
   });
 
-  it('closes a scene in character, no status report; no recap to save (the scribe writes it)', () => {
+  it('closes a scene in character, no status report; no recap to save (the Residual writes it)', () => {
     expect(ROLEPLAY_GUIDE).toContain('When the user ends the scene in character, close it in character');
     expect(ROLEPLAY_GUIDE).not.toContain('recap');
   });

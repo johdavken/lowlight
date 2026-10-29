@@ -59,7 +59,7 @@ describe('currentStanding and moveStanding', () => {
 });
 
 describe("a job's move (Intake board spec §2)", () => {
-  it("a job's move doesn't hold back the scribe", () => {
+  it("a job's move doesn't hold back the Residual", () => {
     const db = openDb(':memory:', { defaultPlayer: 'hicks' });
     const msg = (id: string, role: 'user' | 'agent', ts: number) => db.insertMessage('hicks', { id, role, text: id, toolLines: [], ts, status: 'ok' });
     msg('u1', 'user', 1);
@@ -69,7 +69,7 @@ describe("a job's move (Intake board spec §2)", () => {
     msg('u2', 'user', 5);
     msg('C', 'agent', 6);
     const start = { trust: 0, warmth: 0 };
-    moveStanding(db, 'hicks', start, null, DEFAULT_SHARED_STANDING, { trust: 1, warmth: 0, reason: 'scribe', at: 2, messageId: 'A', take: 0 });
+    moveStanding(db, 'hicks', start, null, DEFAULT_SHARED_STANDING, { trust: 1, warmth: 0, reason: 'residual', at: 2, messageId: 'A', take: 0 });
     moveStanding(db, 'hicks', start, null, DEFAULT_SHARED_STANDING, { trust: 1, warmth: 0, reason: 'Night job: X, clean', at: 3, messageId: 'R', take: 0, job: true });
     const ctl = standingControl({ db, player: () => 'hicks', start: () => start, config: () => null, shared: () => DEFAULT_SHARED_STANDING });
     expect(ctl.repliesSinceMove('C')).toBe(2);

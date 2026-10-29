@@ -117,7 +117,7 @@ test("she texts when she said she would: unread on the deck, NIX · 1 TEXT in th
   await page.locator('.dk-box').fill('text me in an hour');
   await page.locator('.dk-send').click();
   await expect(page.locator('.dk-her')).toHaveCount(3);
-  // The scribe runs after her reply: give it a moment to record the promise.
+  // The Residual runs after her reply: give it a moment to record the promise.
   await page.waitForTimeout(1500);
   await page.goBack();
   await expect(page.locator('.dk-title')).toHaveText('MESSAGES');
@@ -181,7 +181,7 @@ test('she texts when she gets home: the place path (deck controls)', async ({ pa
   await expect(page.locator('.dk-her')).toHaveCount(3);
   await page.goBack();
   const row = page.locator('.dk-row', { hasText: DIRECT.name.toUpperCase() });
-  // Pass time until her text lands (the scribe records the promise just after her reply).
+  // Pass time until her text lands (the Residual records the promise just after her reply).
   await expect
     .poll(
       async () => {

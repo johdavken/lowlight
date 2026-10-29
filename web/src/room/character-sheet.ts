@@ -88,7 +88,7 @@ export const SHEET_SECTIONS: SheetSection[] = [
     live: false,
     planned: 'What you know how to do. Learned the slow way, or carted in.',
     rows: [
-      { key: 'HACKING', sub: 'Tech · lacquer, ICE, doors' },
+      { key: 'HACKING', sub: 'Tech · lacquer, locks, doors' },
       { key: 'SNEAKING', sub: 'Reflex · guards, cameras, the dead blocks' },
       { key: 'FORGERY', sub: 'Tech · papers, seals, records' },
       { key: 'FAST TALK', sub: 'Cool' },

@@ -19,7 +19,7 @@ import path from 'node:path';
 import WebSocket from 'ws';
 import { earlierOf, flagsOf, summary, type Expect, type TurnRecord } from './analyze';
 import { cleanup, cleanupDetached, inGroup, killGroup, portFree, stopGroup, whoListens } from './scratch';
-import { traceLines, waitForScribe } from './trace';
+import { traceLines, waitForResidual } from './trace';
 
 interface Script {
   contacts: { id: string; player: string }[];
@@ -28,8 +28,8 @@ interface Script {
 
 const REPO = path.resolve(import.meta.dirname, '..', '..');
 const TURN_TIMEOUT_MS = 180_000;
-/** How long a finished turn waits for its scribe to finish before it's recorded (the scribe's own limit is 60 s). */
-const SCRIBE_WAIT_LIMIT_MS = 65_000;
+/** How long a finished turn waits for its Residual to finish before it's recorded (the Residual's own limit is 60 s). */
+const RESIDUAL_WAIT_LIMIT_MS = 65_000;
 /** The game's and Studio's ports: never these. */
 const TAKEN = new Set([7700, 7710]);
 
@@ -126,10 +126,10 @@ async function turn(base: string, origin: Record<string, string>, trace: string,
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      // Her last calls may land just after the reply closes; the scribe's writes come after it (scribe spec), so a
+      // Her last calls may land just after the reply closes; the Residual's writes come after it (scribe spec), so a
       // finished in-character turn waits for its run-end line, so its writes count for this turn and not the next.
-      const scribed = end === 'end' && status === 'ok' && mode !== 'ooc';
-      void (scribed ? waitForScribe(trace, from, SCRIBE_WAIT_LIMIT_MS) : new Promise((r) => setTimeout(r, 1500))).then(() => {
+      const residualRuns = end === 'end' && status === 'ok' && mode !== 'ooc';
+      void (residualRuns ? waitForResidual(trace, from, RESIDUAL_WAIT_LIMIT_MS) : new Promise((r) => setTimeout(r, 1500))).then(() => {
         ws.close();
         resolve({ mode, end, status, text, calls: traceLines(trace, from), ms: Date.now() - started });
       });

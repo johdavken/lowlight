@@ -1,8 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
-import type { ChatMessage, Note, RoomState, ScribeRunInfo, Take } from '../../shared/types';
+import type { ChatMessage, Note, RoomState, ResidualRunInfo, Take } from '../../shared/types';
 
-/** The scribe runs kept per room.db, newest first (scribe spec §8). */
-export const SCRIBE_RUNS_KEPT = 300;
+/** The Residual runs kept per room.db, newest first (scribe spec §8). */
+export const RESIDUAL_RUNS_KEPT = 300;
 import { currentSceneId } from '../../shared/scene-aliases';
 
 /**
@@ -66,6 +66,8 @@ export interface Db {
   vacuumInto(path: string): void;
   /** `[max(messages.rowid), max(writes.seq), sum of take_index]`: changes whenever the saved state would (text edits aside). */
   fingerprint(): [number, number, number];
+  /** How many rows `messages` holds: what fingerprint() misses when an older reply is deleted (cipher minor 5). */
+  messageCount(): number;
   /** The largest story clock stamp in this database (null: none). */
   maxClock(): number | null;
   /**
@@ -100,16 +102,16 @@ export interface Db {
   /** What the next logged write is stamped with: the open reply, else the latest message (any take), else nothing (a starting row). */
   stamp(): Stamp;
   /**
-   * Runs `fn` with its writes stamped to `s` (the scribe's writes belong to the reply it read, even
+   * Runs `fn` with its writes stamped to `s` (the Residual's writes belong to the reply it read, even
    * when a newer reply is open), then puts the previous stamp back, also when `fn` throws.
    */
   withStamp<T>(s: { messageId: string; take: number }, fn: () => T): T;
   /** The write log, oldest first. */
   writes(): WriteRow[];
-  /** Records one scribe run (not story data: rewind leaves it); keeps the newest SCRIBE_RUNS_KEPT. */
-  insertScribeRun(r: ScribeRunInfo): void;
-  /** The newest `limit` scribe runs (only `player`'s when given), newest first. */
-  scribeRuns(limit: number, player?: string): ScribeRunInfo[];
+  /** Records one residual run (not story data: rewind leaves it); keeps the newest RESIDUAL_RUNS_KEPT. */
+  insertResidualRun(r: ResidualRunInfo): void;
+  /** The newest `limit` residual runs (only `player`'s when given), newest first. */
+  residualRuns(limit: number, player?: string): ResidualRunInfo[];
   close(): void;
 }
 
@@ -189,9 +191,9 @@ const RECAP_PARTS = ['text', 'at', 'seen_at'] as const;
 const RECAP_KEY_RE = /^recap\.(.+)\.(?:text|at|seen_at)$/;
 const PAGE_KEY_RE = /^page\.(.+)\.(?:text|at|by)$/;
 
-/** The meta keys that are story state (logged and rebuilt): each pair's recap and dossier page, and the leads they followed. */
+/** The meta keys that are story state (logged and rebuilt): each pair's recap and dossier page, and the leads they followed. `scribe.` is the Residual's old name, kept for saves. */
 const isStoryMeta = (k: string) =>
-  k.startsWith('recap.') || k.startsWith('page.') || k.startsWith('lead.') || k.startsWith('standing.') || k.startsWith('scribe.') || k.startsWith('summary.') || k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('storyMood.') || k.startsWith('cityWeather.') || k.startsWith('plan.') || k.startsWith('promise.');
+  k.startsWith('recap.') || k.startsWith('page.') || k.startsWith('lead.') || k.startsWith('standing.') || k.startsWith('scribe.') || k.startsWith('summary.') || k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('storyMood.') || k.startsWith('cityWeather.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('cipher.');
 /** A shared_contacts row's log key. */
 const shareKey = (contactId: string, player: string) => `${contactId}\u0000${player}`;
 /** A leads row's log key. */
@@ -421,8 +423,9 @@ function migrate(sqlite: DatabaseSync, defaultPlayer: string): void {
     )
   `);
   sqlite.exec('CREATE INDEX IF NOT EXISTS writes_message ON writes (message_id)');
-  // The scribe's runs (scribe spec §8): a record for tuning, never story state.
+  // The Residual's runs (scribe spec §8): a record for tuning, never story state.
   sqlite.exec(`
+    -- The Residual's old name (the scribe), kept for saves.
     CREATE TABLE IF NOT EXISTS scribe_runs (
       seq        INTEGER PRIMARY KEY AUTOINCREMENT,
       at         INTEGER NOT NULL,
@@ -573,6 +576,7 @@ function createDb(sqlite: DatabaseSync): Db {
     // t: which take each reply with takes shows, as text (hashed below): opposite swipes on two lines don't cancel out.
     "SELECT (SELECT COALESCE(MAX(rowid), 0) FROM messages) AS m, (SELECT COALESCE(MAX(seq), 0) FROM writes) AS w, (SELECT COALESCE(group_concat(rowid || ':' || take_index, ','), '') FROM (SELECT rowid, take_index FROM messages WHERE takes IS NOT NULL ORDER BY rowid)) AS t",
   );
+  const messageCountStmt = sqlite.prepare('SELECT COUNT(*) AS n FROM messages');
   const deleteMessageStmt = sqlite.prepare('DELETE FROM messages WHERE id = ? AND player = ?');
   // A line that never reached her (failed) costs nothing; RETRY sets it back to ok.
   const maxClockStmt = sqlite.prepare("SELECT MAX(clock) AS m FROM messages WHERE status != 'failed'");
@@ -595,14 +599,14 @@ function createDb(sqlite: DatabaseSync): Db {
   const latestMessageStmt = sqlite.prepare("SELECT id FROM messages WHERE mode IS NOT 'scene' ORDER BY ts DESC, rowid DESC LIMIT 1");
   const insertWriteStmt = sqlite.prepare('INSERT INTO writes (message_id, take, at, kind, key, value) VALUES (?, ?, ?, ?, ?, ?)');
   const writesStmt = sqlite.prepare('SELECT seq, message_id, take, kind, key, value FROM writes ORDER BY seq');
-  const insertScribeRunStmt = sqlite.prepare(
+  const insertResidualRunStmt = sqlite.prepare(
     'INSERT INTO scribe_runs (at, kind, player, message_id, take, ms, tokens_in, tokens_out, raw, applied, refused, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   );
-  const pruneScribeRunsStmt = sqlite.prepare('DELETE FROM scribe_runs WHERE seq NOT IN (SELECT seq FROM scribe_runs ORDER BY seq DESC LIMIT ?)');
-  const playerScribeRunsStmt = sqlite.prepare(
+  const pruneResidualRunsStmt = sqlite.prepare('DELETE FROM scribe_runs WHERE seq NOT IN (SELECT seq FROM scribe_runs ORDER BY seq DESC LIMIT ?)');
+  const playerResidualRunsStmt = sqlite.prepare(
     'SELECT at, kind, player, message_id, take, ms, tokens_in, tokens_out, raw, applied, refused, error FROM scribe_runs WHERE player = ? ORDER BY seq DESC LIMIT ?',
   );
-  const scribeRunsStmt = sqlite.prepare('SELECT at, kind, player, message_id, take, ms, tokens_in, tokens_out, raw, applied, refused, error FROM scribe_runs ORDER BY seq DESC LIMIT ?');
+  const residualRunsStmt = sqlite.prepare('SELECT at, kind, player, message_id, take, ms, tokens_in, tokens_out, raw, applied, refused, error FROM scribe_runs ORDER BY seq DESC LIMIT ?');
 
   // ── The write log ─────────────────────────────────────────────────────────────────────────
   let replyStamp: { messageId: string; take: number } | null = null;
@@ -672,7 +676,7 @@ function createDb(sqlite: DatabaseSync): Db {
     ORDER BY w.seq`);
   const allNoteRowsStmt = sqlite.prepare(`SELECT ${NOTE_COLS} FROM notes`);
   const storyMetaStmt = sqlite.prepare(
-    "SELECT k, v FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%'",
+    "SELECT k, v FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%'",
   );
   const allLeadsStmt = sqlite.prepare('SELECT id, player, details, message_id, at FROM leads');
   const replaceLeadStmt = sqlite.prepare('INSERT OR REPLACE INTO leads (id, player, details, message_id, at) VALUES (?, ?, ?, ?, ?)');
@@ -735,7 +739,7 @@ function createDb(sqlite: DatabaseSync): Db {
   const rebuild = (show: { messageId: string; take: number } | null): RebuildResult => {
     const before = snapshot();
     sqlite.exec(
-      "DELETE FROM notes; DELETE FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%'; DELETE FROM room_state; DELETE FROM shared_contacts; DELETE FROM leads",
+      "DELETE FROM notes; DELETE FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%'; DELETE FROM room_state; DELETE FROM shared_contacts; DELETE FROM leads",
     );
     const rows = keptWritesStmt.all(show?.messageId ?? null, show?.take ?? null) as { kind: WriteKind; key: string; value: string | null }[];
     for (const r of rows) apply(r.kind, r.key, r.value);
@@ -754,7 +758,7 @@ function createDb(sqlite: DatabaseSync): Db {
     let quests = false;
     for (const k of new Set([...before.meta.keys(), ...after.meta.keys()])) {
       if (before.meta.get(k) === after.meta.get(k)) continue;
-      if (k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('plan.') || k.startsWith('promise.')) quests = true;
+      if (k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('cipher.')) quests = true;
       const r = RECAP_KEY_RE.exec(k);
       if (r) recap.add(r[1]);
       const p = PAGE_KEY_RE.exec(k);
@@ -910,6 +914,10 @@ function createDb(sqlite: DatabaseSync): Db {
     maxClock(): number | null {
       const r = maxClockStmt.get() as { m: number | null } | undefined;
       return r?.m ?? null;
+    },
+
+    messageCount(): number {
+      return Number((messageCountStmt.get() as { n: number }).n);
     },
 
     fingerprint(): [number, number, number] {
@@ -1112,14 +1120,14 @@ function createDb(sqlite: DatabaseSync): Db {
       return rows.map((r) => ({ seq: Number(r.seq), messageId: r.message_id, take: r.take === null ? null : Number(r.take), kind: r.kind, key: r.key, value: r.value }));
     },
 
-    insertScribeRun(r: ScribeRunInfo): void {
-      insertScribeRunStmt.run(r.at, r.kind, r.player, r.messageId, r.take, Math.round(r.ms), r.tokensIn, r.tokensOut, r.raw, JSON.stringify(r.applied), JSON.stringify(r.refused), r.error);
-      pruneScribeRunsStmt.run(SCRIBE_RUNS_KEPT);
+    insertResidualRun(r: ResidualRunInfo): void {
+      insertResidualRunStmt.run(r.at, r.kind, r.player, r.messageId, r.take, Math.round(r.ms), r.tokensIn, r.tokensOut, r.raw, JSON.stringify(r.applied), JSON.stringify(r.refused), r.error);
+      pruneResidualRunsStmt.run(RESIDUAL_RUNS_KEPT);
     },
 
-    scribeRuns(limit: number, player?: string): ScribeRunInfo[] {
-      const rows = (player === undefined ? scribeRunsStmt.all(limit) : playerScribeRunsStmt.all(player, limit)) as {
-        at: number; kind: ScribeRunInfo['kind']; player: string; message_id: string | null; take: number | null; ms: number;
+    residualRuns(limit: number, player?: string): ResidualRunInfo[] {
+      const rows = (player === undefined ? residualRunsStmt.all(limit) : playerResidualRunsStmt.all(player, limit)) as {
+        at: number; kind: ResidualRunInfo['kind']; player: string; message_id: string | null; take: number | null; ms: number;
         tokens_in: number | null; tokens_out: number | null; raw: string | null; applied: string; refused: string; error: string | null;
       }[];
       return rows.map((r) => ({

@@ -40,7 +40,7 @@ describe('promised texts (spec 2026-10-23 §3)', () => {
   });
 });
 
-describe('her day, for the scribe (deck controls spec §1)', () => {
+describe('her day, for the Residual (deck controls spec §1)', () => {
   it('lists her blocks by place and hours, in order from midnight, with days when set', async () => {
     const { dayWords } = await import('./promise');
     const blocks = [

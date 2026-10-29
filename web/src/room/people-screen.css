@@ -87,3 +87,13 @@
 .pe-lead-title { font: 44px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: var(--screen-accent); }
 .pe-lead-text { font-size: calc(17px * var(--text-scale, 1)); line-height: 1.6; color: #ffe1ea; white-space: pre-wrap; }
 .pe-lead-to { font: 20px var(--pixel); letter-spacing: 0.16em; color: var(--screen-accent); }
+
+/* LOOSE ENDS (cipher spec §2.8): unlabelled clusters of what you noticed, then what you solved. */
+.pe-loose-tab { display: flex; flex-direction: column; gap: 18px; padding: 22px 28px; max-width: 900px; overflow-y: auto; }
+.pe-loose-group { display: flex; flex-direction: column; gap: 8px; padding: 0 0 18px; border-bottom: 1px solid rgba(255, 197, 107, 0.18); }
+.pe-loose-line { display: flex; flex-direction: column; gap: 2px; }
+.pe-loose-text { font-size: calc(17px * var(--text-scale, 1)); line-height: 1.5; color: #ffe1ea; }
+.pe-loose-where { font: 12px var(--pixel); letter-spacing: 0.2em; color: rgba(255, 217, 230, 0.45); text-transform: uppercase; }
+.pe-loose-solved { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-left: 2px solid var(--screen-accent); background: rgba(255, 197, 107, 0.05); }
+.pe-loose-truth { font: 28px/1.1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.03em; color: var(--screen-accent); }
+.pe-loose-label { margin-top: 4px; font: 12px var(--pixel); letter-spacing: 0.3em; color: rgba(255, 217, 230, 0.45); }

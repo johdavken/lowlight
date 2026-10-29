@@ -364,7 +364,7 @@ describe('shift_standing', () => {
     };
     return { db, ctx, lines };
   }
-  // The scribe moves standing now; the tool itself still runs from the dev panel (scribe spec).
+  // The Residual moves standing now; the tool itself still runs from the dev panel (scribe spec).
   const shift = (ctx: ToolContext, args: unknown) => dispatchTool(ctx, 'shift_standing', args, 'dev');
 
   it('unavailable when standing does not apply; offered when it does', () => {

@@ -472,6 +472,32 @@ describe('playthrough routes', () => {
     ]);
   });
 
+  it('loose ends: on-page clues and learned truths only, never an open truth (cipher spec §2.8)', async () => {
+    const { api, built, cfg } = await start();
+    const pt = built.world.active()!;
+    const file = path.join(cfg.playthroughsDir, pt.id, 'chars', 'nix', 'room.db');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const nix = openDb(file, { defaultPlayer: pt.player });
+    const learned = (id: string, seq: number) => ({ t: 'learned', id, seq });
+    const tr = (id: string, kind: string, truth: string, seq: number) => ({ t: 'truth', id, kind, truth, knownBy: [], comesOutWhen: 'w', changes: 'c', clueIdeas: 'i', seq });
+    const cl = (id: string, text: string, onPage: boolean, seq: number) => ({ t: 'clue', id, text, messageId: 'm1', at: 1300, place: 'nowhere/known', onPage, seq });
+    nix.setMeta(
+      `cipher.${pt.player}`,
+      JSON.stringify([tr('nix-1', 'self', 'OPEN-SECRET', 1), cl('nix-1', 'a burned receipt', true, 2), cl('nix-1', 'OFF-PAGE', false, 3), tr('nix-2', 'city', 'SOLVED', 4), learned('nix-2', 5)]),
+    );
+    nix.close();
+    const r = await api('GET', '/api/playthroughs/active/loose-ends');
+    expect(r.status).toBe(200);
+    expect(r.body.open).toEqual([[{ text: 'a burned receipt', place: 'nowhere/known', at: 1300 }]]);
+    expect(r.body.solved).toEqual([{ truth: 'SOLVED', clues: [] }]);
+    expect(JSON.stringify(r.body)).not.toMatch(/OPEN-SECRET|OFF-PAGE|nix-1/);
+  });
+
+  it('loose ends with no playthrough is 409', async () => {
+    const { api } = await start({ prepare: (c) => (c.autoPlaythrough = false) });
+    expect(await api('GET', '/api/playthroughs/active/loose-ends')).toEqual({ status: 409, body: { error: 'no-playthrough' } });
+  });
+
   it('leads with no playthrough is 409', async () => {
     const { api } = await start({ prepare: (c) => (c.autoPlaythrough = false) });
     expect(await api('GET', '/api/playthroughs/active/leads')).toEqual({ status: 409, body: { error: 'no-playthrough' } });

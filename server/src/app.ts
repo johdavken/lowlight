@@ -13,6 +13,7 @@ import { encounterPrompt, sceneNow } from './encounter';
 import { outageRates } from './outage-rates';
 import { artNarration, scenePrompt } from './scenario';
 import { loreBlock } from '../../shared/lore';
+import { cipherNarratorBlock } from '../../shared/cipher';
 import { capAtWordBoundary } from '../../shared/persona';
 import { loreGlossary, selectLore } from '../../shared/lore';
 import { cityPlaces } from './places';
@@ -965,6 +966,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
           power: power.outage ? narratorPowerLine(world.districtName(power.district), power.outage.from) : null,
           room: { name: room.name, art: roomArt(room.folder ?? room.id, room.description), timeOfDay, weather },
           lore: loreBlock(picks),
+          // Cipher (spec §2.7): an event may carry a small hint to an open truth.
+          cipher: ((s) => (s ? cipherNarratorBlock(s.truths) : null))(world.cipherOf(you.id)),
           you: you.whosHere ?? `[who's here: ${you.name}]`,
           her: whosHereBlock(rec.info.name, rec.info.pronoun, { tagline: rec.info.tagline, bio: rec.info.bio, facts: rec.info.facts }),
           others,

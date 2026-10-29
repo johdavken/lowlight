@@ -28,15 +28,15 @@ export interface StubOpenRouter {
   key: { status: number; json: unknown };
   /** GET /models answer (mutable). */
   models: { status: number; json: unknown };
-  /** The scribe's calls (scribe spec): answered apart from `steps`, so a test's queued turns stay its own. */
-  scribeRequests: { body: any }[];
-  /** What a scribe call gets (mutable; default: nothing to write), after `delayMs` when set. */
-  scribe: { status: number; json: unknown; delayMs?: number };
+  /** The Residual's calls (scribe spec): answered apart from `steps`, so a test's queued turns stay its own. */
+  residualRequests: { body: any }[];
+  /** What a Residual call gets (mutable; default: nothing to write), after `delayMs` when set. */
+  residual: { status: number; json: unknown; delayMs?: number };
   close(): Promise<void>;
 }
 
-/** The scribe's system message starts with this (server/src/scribe.ts). */
-const SCRIBE_OPENING = 'You keep the records for a roleplay';
+/** The Residual's system message starts with this (server/src/residual.ts). */
+const RESIDUAL_OPENING = 'You keep the records for a roleplay';
 
 /** A chat.completion.chunk with a content delta and/or a finish reason. */
 export const chunk = (content?: string, finish?: string | null, extra: Record<string, unknown> = {}) => ({
@@ -53,8 +53,8 @@ export function startStubOpenRouter(steps: StubOpenRouterStep[], o: { fallback?:
   const stub = {
     key: { status: 200, json: { data: { limit_remaining: 4.12 } } as unknown },
     models: { status: 200, json: { data: [] } as unknown },
-    scribeRequests: [] as { body: any }[],
-    scribe: { status: 200, json: { choices: [{ message: { content: '{"notes":[]}' } }] } as unknown, delayMs: undefined as number | undefined },
+    residualRequests: [] as { body: any }[],
+    residual: { status: 200, json: { choices: [{ message: { content: '{"notes":[]}' } }] } as unknown, delayMs: undefined as number | undefined },
   };
   const open = new Set<http.ServerResponse>();
   const server = http.createServer((req, res) => {
@@ -71,10 +71,10 @@ export function startStubOpenRouter(steps: StubOpenRouterStep[], o: { fallback?:
       }
       const b = body as { stream?: boolean; messages?: { content?: unknown }[] } | undefined;
       const first = b?.messages?.[0]?.content;
-      if (b?.stream === false && typeof first === 'string' && first.startsWith(SCRIBE_OPENING)) {
-        stub.scribeRequests.push({ body });
-        const answer = () => void res.writeHead(stub.scribe.status, { 'Content-Type': 'application/json' }).end(JSON.stringify(stub.scribe.json));
-        if (stub.scribe.delayMs) setTimeout(answer, stub.scribe.delayMs);
+      if (b?.stream === false && typeof first === 'string' && first.startsWith(RESIDUAL_OPENING)) {
+        stub.residualRequests.push({ body });
+        const answer = () => void res.writeHead(stub.residual.status, { 'Content-Type': 'application/json' }).end(JSON.stringify(stub.residual.json));
+        if (stub.residual.delayMs) setTimeout(answer, stub.residual.delayMs);
         else answer();
         return;
       }

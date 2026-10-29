@@ -589,7 +589,7 @@ test('greeting: after END SCENE, back in greets you again, and only once the rec
   await expect(page.locator('.link')).toHaveAttribute('data-status', 'ok');
   const replies = await page.locator('.msg.agent.s-ok').count();
   await page.locator('button.end-scene').click();
-  // Her closing beat, then the scribe (it has no recap to write here, so the player's below stands).
+  // Her closing beat, then the Residual (it has no recap to write here, so the player's below stands).
   await expect(page.locator('.msg.agent.s-ok')).toHaveCount(replies + 1, { timeout: 10_000 });
   await page.waitForTimeout(1_000);
   await send(page, { type: 'dev_action', tool: 'set_recap', args: { text: 'we closed up at dawn' }, as: 'agent' });

@@ -9,7 +9,7 @@ const duds = (t: Terminal) => t.words.map((w) => w.word).filter((w) => w !== t.p
 
 describe('the dump', () => {
   it('the look never moves the draw', () => {
-    expect(make({ skin: 'amber', deck: 'Old Karasu deck' })).toEqual(make({ skin: 'ice', deck: null }));
+    expect(make({ skin: 'amber', deck: 'Old Karasu deck' })).toEqual(make({ skin: 'corp', deck: null }));
   });
   it('words sit in the lines, apart; brackets hold only junk; the password is a candidate', () => {
     const t = make();

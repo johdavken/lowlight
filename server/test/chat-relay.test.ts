@@ -1065,7 +1065,7 @@ describe('ChatRelay end scene mode', () => {
     expect('leave' in db.recentMessages('hicks').find((m) => m.role === 'user')!).toBe(false);
   });
 
-  it('an end turn with no recap emits no notice: the scribe writes the recap after it (scribe spec §2)', async () => {
+  it('an end turn with no recap emits no notice: the Residual writes the recap after it (scribe spec §2)', async () => {
     const stub = await makeStub([okStream('sess1')]);
     const db = makeDb();
     const journal = new Journal(db);
@@ -1153,7 +1153,7 @@ describe('ChatRelay end scene mode', () => {
     expect(live).toBe(beforeSwipes);
   });
 
-  describe('scribePass (time backstop 2026-10-20)', () => {
+  describe('residualPass (time backstop 2026-10-20)', () => {
     /** A relay whose model says `text` each turn and records turnNow() mid-stream. */
     async function timed(text = 'The night goes on.') {
       const db = makeDb();
@@ -1184,7 +1184,7 @@ describe('ChatRelay end scene mode', () => {
       await t.relay.send('hicks', 'wait the night with me');
       expect(t.reply().clock).toBe(1205);
       const before = t.ticks();
-      expect(t.relay.scribePass('hicks', t.reply().id, 0, 365)).toMatchObject({ ok: true });
+      expect(t.relay.residualPass('hicks', t.reply().id, 0, 365)).toMatchObject({ ok: true });
       expect(t.reply().clock).toBe(1570);
       expect(t.ticks()).toBeGreaterThan(before);
     });
@@ -1193,12 +1193,12 @@ describe('ChatRelay end scene mode', () => {
       const t = await timed();
       await t.relay.send('hicks', 'wait the night with me');
       const first = t.reply();
-      expect(t.relay.scribePass('hicks', 'nope', 0, 60)).toEqual({ ok: false, error: 'unknown' });
+      expect(t.relay.residualPass('hicks', 'nope', 0, 60)).toEqual({ ok: false, error: 'unknown' });
       const line = t.db.recentMessages('hicks').find((m) => m.role === 'user')!;
-      expect(t.relay.scribePass('hicks', line.id, 0, 60)).toEqual({ ok: false, error: 'unknown' });
-      expect(t.relay.scribePass('hicks', first.id, 1, 60)).toEqual({ ok: false, error: 'not shown' });
+      expect(t.relay.residualPass('hicks', line.id, 0, 60)).toEqual({ ok: false, error: 'unknown' });
+      expect(t.relay.residualPass('hicks', first.id, 1, 60)).toEqual({ ok: false, error: 'not shown' });
       await t.relay.send('hicks', 'and then?');
-      expect(t.relay.scribePass('hicks', first.id, 0, 60)).toEqual({ ok: false, error: 'too late' });
+      expect(t.relay.residualPass('hicks', first.id, 0, 60)).toEqual({ ok: false, error: 'too late' });
       expect(t.db.getMessage('hicks', first.id)!.clock).toBe(1205);
     });
 
@@ -1206,7 +1206,7 @@ describe('ChatRelay end scene mode', () => {
       const t = await timed();
       await t.relay.send('hicks', 'wait the night with me');
       t.elsewhere.at = 1235;
-      expect(t.relay.scribePass('hicks', t.reply().id, 0, 365)).toEqual({ ok: false, error: 'too late' });
+      expect(t.relay.residualPass('hicks', t.reply().id, 0, 365)).toEqual({ ok: false, error: 'too late' });
       expect(t.reply().clock).toBe(1205);
     });
 
@@ -1214,7 +1214,7 @@ describe('ChatRelay end scene mode', () => {
       const t = await timed();
       await t.relay.send('hicks', 'wait the night with me');
       await t.relay.regenerate('hicks', t.reply().id);
-      expect(t.relay.scribePass('hicks', t.reply().id, 1, 60)).toMatchObject({ ok: true });
+      expect(t.relay.residualPass('hicks', t.reply().id, 1, 60)).toMatchObject({ ok: true });
       expect(t.reply().clock).toBe(1265);
       await t.relay.swipe('hicks', t.reply().id, 0);
       expect(t.reply().clock).toBe(1205);
@@ -1225,7 +1225,7 @@ describe('ChatRelay end scene mode', () => {
     it('a skip on the only take survives a regenerate and a swipe back to it (review of Task 3)', async () => {
       const t = await timed();
       await t.relay.send('hicks', 'wait the night with me');
-      expect(t.relay.scribePass('hicks', t.reply().id, 0, 365)).toMatchObject({ ok: true });
+      expect(t.relay.residualPass('hicks', t.reply().id, 0, 365)).toMatchObject({ ok: true });
       await t.relay.regenerate('hicks', t.reply().id);
       expect(t.reply().clock).toBe(1205);
       await t.relay.swipe('hicks', t.reply().id, 0);
@@ -1235,7 +1235,7 @@ describe('ChatRelay end scene mode', () => {
     it('keep going on a moved reply carries on from the moved clock (Review Focus 1)', async () => {
       const t = await timed();
       await t.relay.send('hicks', 'wait the night with me');
-      t.relay.scribePass('hicks', t.reply().id, 0, 120);
+      t.relay.residualPass('hicks', t.reply().id, 0, 120);
       await t.relay.continueReply('hicks', t.reply().id);
       expect(t.seen.at(-1)).toBe(1325);
       expect(t.reply().clock).toBe(1325);
@@ -2606,7 +2606,7 @@ describe('ChatRelay per pair', () => {
     await waitFor(() => relay.activeMessageId !== null);
     expect(relay.activePlayer).toBe('cass');
     const ctx = { room, journal, player: () => relay.activePlayer, expressions: null };
-    // Her bookkeeping is the scribe's now (scribe spec): the dev panel's call stands in for one.
+    // Her bookkeeping is the Residual's now (scribe spec): the dev panel's call stands in for one.
     const result = dispatchTool(ctx, 'note', { text: 'cass secret' }, 'dev');
     expect(result).toMatchObject({ ok: true });
     expect(journal.notes('cass').map((n) => n.text)).toContain('cass secret');
@@ -2766,6 +2766,22 @@ describe('ChatRelay leads', () => {
     block = null;
     await relay.send('hicks', 'hello');
     expect(asTurn(chats(stub)[2]!.bodyJson).message).not.toContain('[how you feel about');
+  });
+
+  it('the [cipher] block rides after standing in character, not on an OOC turn, and not when there is none (cipher spec §2.6)', async () => {
+    const stub = await makeStub([reply(), reply(), reply()]);
+    const db = makeDb();
+    let block: string | null = "[cipher] Things you know that Hicks doesn't.";
+    const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend(stub.url), db, room: makeRoom(), journal: new Journal(db), emit: () => {}, standing: (p) => `[how you feel about ${p} — "Wary":]`, cipher: () => block });
+    await relay.send('hicks', 'hello');
+    const msg = asTurn(chats(stub)[0]!.bodyJson).message;
+    expect(msg.indexOf('[cipher]')).toBeGreaterThan(msg.indexOf('[how you feel about hicks'));
+    expect(asTurn(chats(stub)[0]!.bodyJson).instructions).not.toContain('[cipher]');
+    await relay.send('hicks', 'quick question', 'ooc');
+    expect(asTurn(chats(stub)[1]!.bodyJson).message).not.toContain('[cipher]');
+    block = null;
+    await relay.send('hicks', 'hello again');
+    expect(asTurn(chats(stub)[2]!.bodyJson).message).not.toContain('[cipher]');
   });
 
   it('a regenerate tells the standing callback which reply it replaces; a new turn says none (final review, Important 1)', async () => {

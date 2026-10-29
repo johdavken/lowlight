@@ -82,12 +82,17 @@ describe('choice tags', () => {
     expect(firstChoice(tagJob('- talk: Crack the panel. → inside / turned [crack 6]')).crack).toEqual({ kind: 'crack', length: 6, mods: [] });
     expect(firstChoice(tagJob('- talk: Crack the panel. → inside / turned [crack 7 · if cased +1 "cased"]')).crack!.mods).toEqual([{ when: [{ kind: 'set', name: 'cased' }], delta: 1, label: 'cased' }]);
   });
-  it('crack … ice: a corporate terminal; tagText prints it back', () => {
-    expect(firstChoice(tagJob('- talk: Crack the panel. → inside / turned [crack 6 ice]')).crack).toEqual({ kind: 'crack', length: 6, mods: [], ice: true });
-    expect(firstChoice(tagJob('- talk: Crack. → inside / turned [crack 7 ice · if cased +1 "cased"]')).crack).toMatchObject({ ice: true, mods: [{ delta: 1, label: 'cased' }] });
-    for (const src of ['crack 6', 'crack 6 ice', 'crack 7 ice · if cased +1 "cased"']) {
+  it('crack … corp: a corporate terminal; tagText prints it back', () => {
+    expect(firstChoice(tagJob('- talk: Crack the panel. → inside / turned [crack 6 corp]')).crack).toEqual({ kind: 'crack', length: 6, mods: [], corp: true });
+    expect(firstChoice(tagJob('- talk: Crack. → inside / turned [crack 7 corp · if cased +1 "cased"]')).crack).toMatchObject({ corp: true, mods: [{ delta: 1, label: 'cased' }] });
+    for (const src of ['crack 6', 'crack 6 corp', 'crack 7 corp · if cased +1 "cased"']) {
       expect(tagText(firstChoice(tagJob(`- talk: Crack. → inside / turned [${src}]`)).crack!)).toBe(src);
     }
+  });
+  it('crack … ice, the old word, still reads as corp', () => {
+    const tag = firstChoice(tagJob('- talk: Crack the panel. → inside / turned [crack 6 ice]')).crack!;
+    expect(tag).toEqual({ kind: 'crack', length: 6, mods: [], corp: true });
+    expect(tagText(tag)).toBe('crack 6 corp');
   });
   it('problems', () => {
     one(tagJob('- talk: Crack. → inside / turned [crack 4]'), /crack/);

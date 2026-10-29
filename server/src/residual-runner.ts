@@ -1,40 +1,42 @@
 /**
- * When the scribe runs (spec §2): after each reply, one run at a time per character, a turn waiting
- * for it at most SCRIBE_WAIT_MS, aborted when the take it reads is replaced. Every run is recorded in
+ * When the Residual runs (spec §2): after each reply, one run at a time per character, a turn waiting
+ * for it at most RESIDUAL_WAIT_MS, aborted when the take it reads is replaced. Every run is recorded in
  * `scribe_runs` and gets one dev-log line.
  */
 import { photoForModel } from '../../shared/photos';
 import { appendFileSync } from 'node:fs';
-import type { ChatMessage, ScribeRunInfo } from '../../shared/types';
-import { SCRIBE_RUNS_KEPT, type Db } from './db';
+import type { ChatMessage, ResidualRunInfo } from '../../shared/types';
+import { RESIDUAL_RUNS_KEPT, type Db } from './db';
 import { HISTORY_WINDOW, toCompletion } from './history';
 import type { Journal } from './journal';
 import type { Result } from './room-state';
-import { applyScribe, parseScribeAnswer, scribeMessages, type ScribeKind } from './scribe';
+import { applyResidual, parseResidualAnswer, residualMessages, type ResidualKind } from './residual';
 import { parsePlan, planKey, planOver, planSeenKey, type Plan } from '../../shared/plan';
 import { parsePromise, promiseKey, promiseSpentKey, promiseTriesKey, type TextPromise } from '../../shared/promise';
 import { hhmmOf, minuteOfDay } from '../../shared/clock';
 import { readSummary, summaryDue, summaryMessages, writeSummary } from './summary';
 import type { StandingControl } from './standing';
 import type { CompletionMessage } from './turn';
+import { CIPHER, cipherDue, cipherKey, parseCipherEvents, storyProse, type CipherEvent, type CipherState } from '../../shared/cipher';
+import { CIPHER_MAX_TOKENS, cipherRunMessages, parseCipherAnswer, type CipherRunInput } from './cipher-run';
 
-export { SCRIBE_RUNS_KEPT };
-/** How long a new turn waits for the last reply's scribe before going ahead without it. */
-export const SCRIBE_WAIT_MS = 8000;
+export { RESIDUAL_RUNS_KEPT };
+/** How long a new turn waits for the last reply's residual before going ahead without it. */
+export const RESIDUAL_WAIT_MS = 8000;
 /** At most this many exchanges per run; an older backlog is skipped (and logged). */
-export const SCRIBE_BACKLOG = 6;
-export const SCRIBE_MAX_TOKENS = { turn: 600, end: 1800 } as const;
+export const RESIDUAL_BACKLOG = 6;
+export const RESIDUAL_MAX_TOKENS = { turn: 600, end: 1800 } as const;
 /**
  * The summary's answer. GLM writes nearly twice SUMMARY_MAX (about 2,900 characters, ~700 tokens) whatever
  * the prompt asks, and 700 failed 10 turns running on 2026-10-20; writeSummary trims to SUMMARY_MAX.
  */
 export const SUMMARY_MAX_TOKENS = 1200;
 /** Low: it's extraction, not story. */
-export const SCRIBE_TEMPERATURE = 0.2;
+export const RESIDUAL_TEMPERATURE = 0.2;
 /** A call that hasn't answered by now has failed (one that never settles would hold every later run). */
-export const SCRIBE_TIMEOUT_MS = 60_000;
+export const RESIDUAL_TIMEOUT_MS = 60_000;
 
-export interface ScribeRunnerDeps {
+export interface ResidualRunnerDeps {
   /** A sent photo's caption by id (photos spec §4): her texts read as what she sent, never the marker. Absent: none. */
   photoCaption?: (id: string) => string | null;
   db: Db;
@@ -56,7 +58,7 @@ export interface ScribeRunnerDeps {
   around?: <T>(player: string, messageId: string, fn: () => T) => T;
   /** Her standing word for `player` changed: the shift line ("Nix · now: warm"). */
   standingShifted?: (player: string, word: string) => void;
-  /** Time backstop (spec 2026-10-20): moves `player`'s finished reply on by `minutes` (the relay's scribePass). Absent: time doesn't apply. */
+  /** Time backstop (spec 2026-10-20): moves `player`'s finished reply on by `minutes` (the relay's residualPass). Absent: time doesn't apply. */
   passTime?: (player: string, reply: { id: string; take: number }, minutes: number) => Result;
   /**
    * Her plans (spec 2026-10-21 §4): the places she can name for `player`'s reply, and who hears a new one
@@ -69,11 +71,21 @@ export interface ScribeRunnerDeps {
   herDay?: () => string | null;
   /** The story clock now: a promised text's reply is read from now, not its past minute (deck controls spec §3.4). */
   storyClock?: () => number | null;
+  /** The playthrough's Cipher for `player` (cipher spec §2.3); absent or null: Cipher doesn't apply. */
+  cipher?: (player: string) => CipherState | null;
+  /** Her room's scene now: where a clue was seen when the job didn't say. */
+  sceneId?: () => string;
+  /** Her character id: her truths are `<selfId>-<n>` (cipher spec §2.1). Default: her name, lowercased. */
+  selfId?: string;
+  /** Who a cipher run may give a truth to (World.cipherCast); absent: no cipher runs. */
+  cipherCast?: (player: string) => CipherRunInput['cast'];
+  /** The lore book's titles, for the cipher run. */
+  loreTitles?: () => string[];
   now?: () => number;
 }
 
 /**
- * Whether the scribe may record a plan from `reply` (her plans spec §4): a stamped in-character reply, off comms —
+ * Whether the Residual may record a plan from `reply` (her plans spec §4): a stamped in-character reply, off comms —
  * and never her goodbye when she leaves, which would replace the plan she left on (final review I2).
  */
 export function plansApply(reply: ChatMessage | undefined, line: ChatMessage | undefined, comms: boolean): boolean {
@@ -82,19 +94,19 @@ export function plansApply(reply: ChatMessage | undefined, line: ChatMessage | u
 }
 
 /**
- * Whether the scribe may record a promise to text from `reply` (promised texts spec §4): a stamped in-character
+ * Whether the Residual may record a promise to text from `reply` (promised texts spec §4): a stamped in-character
  * reply — on comms too — but not her own goodbye as she leaves.
  */
 export function promisesApply(reply: ChatMessage | undefined, line: ChatMessage | undefined): boolean {
   return reply?.clock !== undefined && line?.mode !== 'ooc' && line?.parting !== 'her';
 }
 
-/** A standing promise in words for the scribe's `[your promise: …]` line. */
+/** A standing promise in words for the Residual's `[your promise: …]` line. */
 function promiseWords(p: TextPromise, you: string, placeName: (id: string) => string): string {
   return 'at' in p.when ? `text ${you} at ${hhmmOf(minuteOfDay(p.when.at))}, ${p.about}` : `text ${you} when you're at ${placeName(p.when.place)}, ${p.about}`;
 }
 
-/** A standing plan in words for the scribe's `[her plan: …]` line. */
+/** A standing plan in words for the Residual's `[her plan: …]` line. */
 function planWords(p: Plan, name: (id: string) => string): string {
   const hm = (m: number) => hhmmOf(minuteOfDay(m));
   return [p.going ? `going ${name(p.going.place)} until ${hm(p.going.until)}` : null, p.meet ? `meeting at ${name(p.meet.place)} ${hm(p.meet.at)}` : null].filter(Boolean).join('; ');
@@ -103,16 +115,17 @@ function planWords(p: Plan, name: (id: string) => string): string {
 interface Job {
   player: string;
   reply: { id: string; take: number };
-  kind: ScribeKind;
+  kind: ResidualKind;
   /** Her room's scene when the reply ended (final review M5): a walk in a later turn isn't "here". */
   here?: string;
 }
 
+/** The Residual's old name (the scribe), kept for saves. */
 const throughKey = (player: string) => `scribe.${player}.through`;
 /** Her tool lines that change the room's light (tool-line.ts). */
 const ROOM_LIGHT_LINE = /^\/\/ (SET_LIGHT|APPLY_MOOD|SET_AMBIENT)\b/;
 
-/** `npm run chat-stress` sets NIX_TOOL_TRACE (as for her calls): each write as `scribe:<kind>`, then the run's end as `scribe`. */
+/** `npm run chat-stress` sets NIX_TOOL_TRACE (as for her calls): each write as `residual:<kind>`, then the run's end as `residual`. */
 function trace(name: string, args: string, out: string): void {
   const file = process.env.NIX_TOOL_TRACE;
   if (file) appendFileSync(file, `${JSON.stringify({ at: Date.now(), self: null, name, args, out })}\n`);
@@ -125,48 +138,51 @@ function shortReason(r: string): string {
   if (/^standing/.test(r)) return 'standing';
   if (/^light/.test(r)) return 'light';
   if (/^time/.test(r)) return 'time';
+  if (/^cipher/.test(r)) return 'cipher';
   if (/ignored: not an end turn/.test(r)) return 'end only';
   if (/^(notes|lights|standing|recap|dossier|answer)\b/.test(r)) return 'shape';
   return 'other';
 }
 
-export class ScribeRunner {
+export class ResidualRunner {
   private running: {
     job: Job;
     abort: AbortController;
     done: Promise<void>;
   } | null = null;
+  /** Her replies when a player's cipher call last failed (minor 1): it waits CIPHER.retryGap, not a call every reply. */
+  private cipherFailed = new Map<string, number>();
   /** Waiting jobs, one per player, oldest first. */
   private pending = new Map<string, Job>();
   private idle: Promise<void> = Promise.resolve();
   private settle: () => void = () => {};
-  /** Open while a scribe call runs or waits (not the summary after it): what a new turn waits for. */
-  private scribed: Promise<void> = Promise.resolve();
-  private settleScribed: () => void = () => {};
-  private scribedOpen = false;
+  /** Open while a Residual call runs or waits (not the summary after it): what a new turn waits for. */
+  private writing: Promise<void> = Promise.resolve();
+  private settleWriting: () => void = () => {};
+  private writingOpen = false;
 
-  private openScribed(): void {
-    if (this.scribedOpen) return;
-    this.scribedOpen = true;
-    this.scribed = new Promise((res) => (this.settleScribed = res));
+  private openWriting(): void {
+    if (this.writingOpen) return;
+    this.writingOpen = true;
+    this.writing = new Promise((res) => (this.settleWriting = res));
   }
 
-  private closeScribed(): void {
-    if (!this.scribedOpen) return;
-    this.scribedOpen = false;
-    this.settleScribed();
+  private closeWriting(): void {
+    if (!this.writingOpen) return;
+    this.writingOpen = false;
+    this.settleWriting();
   }
 
-  constructor(private readonly d: ScribeRunnerDeps) {}
+  constructor(private readonly d: ResidualRunnerDeps) {}
 
   private now(): number {
     return (this.d.now ?? Date.now)();
   }
 
-  /** Starts the scribe on `reply` (fire and forget); while one runs, the newest request waits its turn. */
-  afterTurn(player: string, reply: { id: string; take: number }, kind: ScribeKind, here?: string): void {
+  /** Starts the Residual on `reply` (fire and forget); while one runs, the newest request waits its turn. */
+  afterTurn(player: string, reply: { id: string; take: number }, kind: ResidualKind, here?: string): void {
     const job: Job = { player, reply: { ...reply }, kind, ...(here ? { here } : {}) };
-    this.openScribed();
+    this.openWriting();
     if (this.running) {
       // One waiting job per player covers everything up to its reply; an end stays an end (its recap and dossier).
       const waiting = this.pending.get(player);
@@ -179,13 +195,13 @@ export class ScribeRunner {
   }
 
   /**
-   * Resolves once no scribe call runs or waits, or after `ms`, whichever comes first. A summary still
+   * Resolves once no residual call runs or waits, or after `ms`, whichever comes first. A summary still
    * running after it doesn't count: the next turn doesn't need it (its line is still sent).
    */
-  async wait(ms = SCRIBE_WAIT_MS): Promise<void> {
+  async wait(ms = RESIDUAL_WAIT_MS): Promise<void> {
     if (!this.running) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([this.scribed, new Promise<void>((res) => (timer = setTimeout(res, ms)))]);
+    await Promise.race([this.writing, new Promise<void>((res) => (timer = setTimeout(res, ms)))]);
     clearTimeout(timer);
   }
 
@@ -224,18 +240,19 @@ export class ScribeRunner {
     const abort = new AbortController();
     const done = this.run(job, abort.signal)
       .then(() => {
-        if (this.pending.size === 0) this.closeScribed();
+        if (this.pending.size === 0) this.closeWriting();
       })
       .then(() => this.summarize(job, abort.signal))
+      .then(() => this.cipherRun(job, abort.signal))
       // A database closed under it (a load or a branch switched playthroughs) ends the run; nothing to record it in.
-      .catch((err: unknown) => this.d.log(`scribe · failed: ${err instanceof Error ? err.message : String(err)}`))
+      .catch((err: unknown) => this.d.log(`residual · failed: ${err instanceof Error ? err.message : String(err)}`))
       .finally(() => {
         this.running = null;
         const next = this.pending.values().next().value;
         if (next) this.pending.delete(next.player);
         if (next) this.start(next);
         else {
-          this.closeScribed();
+          this.closeWriting();
           this.settle();
         }
       });
@@ -264,22 +281,23 @@ export class ScribeRunner {
     let slice: ChatMessage[] = all.slice(start, end + 1);
     const replies = slice.map((m, i) => (m.role === 'agent' ? i : -1)).filter((i) => i >= 0);
     let skipped = 0;
-    if (replies.length > SCRIBE_BACKLOG) {
-      skipped = replies.length - SCRIBE_BACKLOG;
+    if (replies.length > RESIDUAL_BACKLOG) {
+      skipped = replies.length - RESIDUAL_BACKLOG;
       slice = slice.slice(replies[skipped - 1] + 1);
     }
     const lines = slice
       .map((m) => ({ m, c: toCompletion(m) }))
       .filter((x): x is { m: ChatMessage; c: CompletionMessage } => x.c !== null)
       .map(({ m, c }) => ({
-        speaker: m.role === 'user' ? this.d.playerName(job.player) : this.d.selfName,
+        // An event card isn't the player's line (cipher spec §2.7): the narrator wrote it.
+        speaker: m.mode === 'encounter' ? 'Narrator' : m.role === 'user' ? this.d.playerName(job.player) : this.d.selfName,
         // Texts (deck spec §3) read as texts: what was typed, not what happened in a room.
         text: m.mode === 'text' ? `(by text) ${m.role === 'agent' ? photoForModel(c.content, this.caption) : c.content}` : c.content,
       }));
     return { lines, skipped };
   }
 
-  /** One call on her model, failed after SCRIBE_TIMEOUT_MS even when the call ignores its abort. */
+  /** One call on her model, failed after RESIDUAL_TIMEOUT_MS even when the call ignores its abort. */
   private async call(messages: CompletionMessage[], maxTokens: number, signal: AbortSignal): Promise<{ text: string; tokensIn?: number; tokensOut?: number }> {
     const timeout = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -290,7 +308,7 @@ export class ScribeRunner {
           timer = setTimeout(() => {
             timeout.abort();
             reject(new Error('timeout'));
-          }, SCRIBE_TIMEOUT_MS);
+          }, RESIDUAL_TIMEOUT_MS);
           // An abort ends the wait too, even when the call ignores it.
           signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
         }),
@@ -310,7 +328,7 @@ export class ScribeRunner {
     const due = summaryDue(db.recentMessages(job.player, HISTORY_WINDOW).filter((m) => !m.promised), old?.through ?? null);
     if (due.length === 0) return;
     const t0 = this.now();
-    const row: ScribeRunInfo = {
+    const row: ResidualRunInfo = {
       at: Date.now(),
       kind: 'summary',
       player: job.player,
@@ -326,9 +344,9 @@ export class ScribeRunner {
     };
     const finish = (line: string) => {
       row.ms = this.now() - t0;
-      db.insertScribeRun(row);
+      db.insertResidualRun(row);
       const devLine = `${line} · ${(row.ms / 1000).toFixed(1)} s`;
-      trace('scribe:summary-run', '', devLine);
+      trace('residual:summary-run', '', devLine);
       this.d.log(devLine);
     };
     const read = due.map((m) => (m.mode === 'text' && m.role === 'agent' ? { ...m, text: photoForModel(m.text, this.caption) } : m));
@@ -338,28 +356,100 @@ export class ScribeRunner {
       answer = await this.call(messages, SUMMARY_MAX_TOKENS, signal);
     } catch (err) {
       row.error = signal.aborted ? 'dropped: take replaced' : `call failed: ${err instanceof Error ? err.message : String(err)}`;
-      return finish(`scribe · summary ${row.error}`);
+      return finish(`residual · summary ${row.error}`);
     }
     row.raw = answer.text;
     row.tokensIn = answer.tokensIn ?? null;
     row.tokensOut = answer.tokensOut ?? null;
     if (signal.aborted || !db.getMessage(job.player, job.reply.id)) {
       row.error = 'dropped: take replaced';
-      return finish(`scribe · summary ${row.error}`);
+      return finish(`residual · summary ${row.error}`);
     }
     const text = answer.text.trim();
     if (text === '') {
       row.error = 'answer: empty';
-      return finish('scribe · summary failed: answer: empty');
+      return finish('residual · summary failed: answer: empty');
     }
     db.withStamp({ messageId: job.reply.id, take: job.reply.take }, () => writeSummary(db, job.player, { text, through: due.at(-1)!.id }));
     row.applied = [`summary saved (${due.length} lines)`];
-    finish(`scribe · summary · ${due.length} lines`);
+    finish(`residual · summary · ${due.length} lines`);
+  }
+
+  /** The cipher run (cipher spec §2.2): when the Cipher is due, choose truths and write those that pass under the reply. */
+  private async cipherRun(job: Job, signal: AbortSignal): Promise<void> {
+    if (signal.aborted || !this.d.cipher || !this.d.cipherCast) return;
+    const state = this.d.cipher(job.player);
+    if (!state || !cipherDue(state)) return;
+    const failed = this.cipherFailed.get(job.player);
+    if (failed !== undefined && state.replies - failed < CIPHER.retryGap) return;
+    const { db } = this.d;
+    const t0 = this.now();
+    const row: ResidualRunInfo = { at: Date.now(), kind: 'cipher', player: job.player, messageId: job.reply.id, take: job.reply.take, ms: 0, tokensIn: null, tokensOut: null, raw: null, applied: [], refused: [], error: null };
+    const finish = (line: string) => {
+      row.ms = this.now() - t0;
+      db.insertResidualRun(row);
+      const devLine = `${line} · ${(row.ms / 1000).toFixed(1)} s`;
+      trace('residual:cipher-run', '', devLine);
+      this.d.log(devLine);
+    };
+    const you = this.d.playerName(job.player);
+    const recent = db
+      .allMessages(job.player)
+      .filter((m) => m.mode !== 'ooc' && !m.promised && m.text.trim() !== '')
+      .slice(-24)
+      .map((m) => ({ speaker: m.mode === 'encounter' ? 'Narrator' : m.role === 'user' ? you : this.d.selfName, text: m.text }));
+    const input: CipherRunInput = {
+      player: { id: job.player, name: you },
+      cast: this.d.cipherCast(job.player),
+      lore: this.d.loreTitles?.() ?? [],
+      summary: readSummary(db, job.player)?.text ?? null,
+      recent,
+      state,
+      room: CIPHER.openMax - state.truths.filter((x) => x.state === 'open').length,
+    };
+    let answer: { text: string; tokensIn?: number; tokensOut?: number };
+    try {
+      answer = await this.call(cipherRunMessages(input), CIPHER_MAX_TOKENS, signal);
+    } catch (err) {
+      row.error = signal.aborted ? 'dropped: take replaced' : `call failed: ${err instanceof Error ? err.message : String(err)}`;
+      if (!signal.aborted) this.cipherFailed.set(job.player, state.replies);
+      return finish(`residual · cipher ${row.error}`);
+    }
+    this.cipherFailed.delete(job.player);
+    row.raw = answer.text;
+    row.tokensIn = answer.tokensIn ?? null;
+    row.tokensOut = answer.tokensOut ?? null;
+    if (signal.aborted || !db.getMessage(job.player, job.reply.id)) {
+      row.error = 'dropped: take replaced';
+      return finish(`residual · cipher ${row.error}`);
+    }
+    const parsed = parseCipherAnswer(answer.text, input);
+    row.refused = parsed.refused;
+    const key = cipherKey(job.player);
+    const self = this.d.selfId ?? this.d.selfName.toLowerCase();
+    db.withStamp({ messageId: job.reply.id, take: job.reply.take }, () => {
+      const evs = parseCipherEvents(db.getMeta(key));
+      // Even a run that wrote nothing waits refillGap (spec §2.2).
+      const out: CipherEvent[] = [...evs, { t: 'run', replies: state.replies, seq: Date.now() }];
+      // Named for the take it was written on (final review 1): another take's truth never shares its id, so a swipe
+      // back can't hand this one a learned event written for that one.
+      let n = 0;
+      for (const tr of parsed.truths) {
+        const id = `${self}-${job.reply.id}.${job.reply.take}-${++n}`;
+        out.push({ t: 'truth', id, ...tr, seq: Date.now() });
+        row.applied.push(`truth ${id} (${tr.kind})`);
+      }
+      db.setMeta(key, JSON.stringify(out));
+    });
+    const kinds = parsed.truths.map((x) => x.kind).join(', ');
+    const parts = ['residual · cipher', `${parsed.truths.length} ${parsed.truths.length === 1 ? 'truth' : 'truths'}${kinds ? ` (${kinds})` : ''}`];
+    if (row.refused.length > 0) parts.push(`${row.refused.length} refused`);
+    finish(parts.join(' · '));
   }
 
   private async run(job: Job, signal: AbortSignal): Promise<void> {
     const t0 = this.now();
-    const row: ScribeRunInfo = {
+    const row: ResidualRunInfo = {
       at: Date.now(),
       kind: job.kind,
       player: job.player,
@@ -375,18 +465,18 @@ export class ScribeRunner {
     };
     const finish = (line: string) => {
       row.ms = this.now() - t0;
-      this.d.db.insertScribeRun(row);
+      this.d.db.insertResidualRun(row);
       const devLine = `${line} · ${(row.ms / 1000).toFixed(1)} s`;
-      trace('scribe', '', devLine);
+      trace('residual', '', devLine);
       this.d.log(devLine);
     };
     const ex = this.exchanges(job);
     if (!ex || ex.lines.length === 0) {
       // chat-stress waits for a run's end line, so a run with nothing to read still says so.
-      trace('scribe', '', 'scribe · nothing to read');
+      trace('residual', '', 'residual · nothing to read');
       return;
     }
-    if (ex.skipped > 0) this.d.log(`scribe · backlog: ${ex.skipped} exchanges skipped`);
+    if (ex.skipped > 0) this.d.log(`residual · backlog: ${ex.skipped} exchanges skipped`);
     const { journal, db } = this.d;
     const read = db.getMessage(job.player, job.reply.id);
     const asked = read?.replyTo ? db.getMessage(job.player, read.replyTo) : undefined;
@@ -401,7 +491,11 @@ export class ScribeRunner {
     // Plans name map places; promises also the rooms of her day (her home is often off the map): both lists, once.
     const places = planned || promising ? [...(planned?.places ?? []), ...(promising?.places ?? []).filter((p) => !planned?.places.some((q) => q.id === p.id))] : undefined;
     const placeName = (id: string) => places?.find((p) => p.id === id)?.name ?? id;
-    const messages = scribeMessages({
+    // Cipher (spec §2.3): the open truths as T1…, mapped back to their ids when the answer names them.
+    const cipher = this.d.cipher?.(job.player) ?? null;
+    const openTruths = cipher?.truths.filter((t) => t.state === 'open') ?? [];
+    const labels = new Map(openTruths.map((t, i) => [`T${i + 1}`, t.id]));
+    const messages = residualMessages({
       kind: job.kind,
       self: { name: this.d.selfName, pronoun: this.d.selfPronoun },
       player: { id: job.player, name: this.d.playerName(job.player) },
@@ -422,13 +516,14 @@ export class ScribeRunner {
             herDay: this.d.herDay?.() ?? null,
           }
         : {}),
+      ...(openTruths.length > 0 ? { cipher: openTruths.map((t, i) => ({ label: `T${i + 1}`, truth: t.truth, comesOutWhen: t.comesOutWhen })) } : {}),
     });
     let answer: { text: string; tokensIn?: number; tokensOut?: number };
     try {
-      answer = await this.call(messages, SCRIBE_MAX_TOKENS[job.kind], signal);
+      answer = await this.call(messages, RESIDUAL_MAX_TOKENS[job.kind], signal);
     } catch (err) {
       row.error = signal.aborted ? 'dropped: take replaced' : `call failed: ${err instanceof Error ? err.message : String(err)}`;
-      return finish(`scribe · ${row.error}`);
+      return finish(`residual · ${row.error}`);
     }
     row.raw = answer.text;
     row.tokensIn = answer.tokensIn ?? null;
@@ -438,15 +533,15 @@ export class ScribeRunner {
     const shown = db.getTakes(job.player, job.reply.id)?.index ?? 0;
     if (signal.aborted || !db.getMessage(job.player, job.reply.id) || shown !== job.reply.take) {
       row.error = 'dropped: take replaced';
-      return finish(`scribe · ${row.error}`);
+      return finish(`residual · ${row.error}`);
     }
-    const parsed = parseScribeAnswer(answer.text);
+    const parsed = parseResidualAnswer(answer.text);
     row.refused.push(...parsed.refused);
     if (!parsed.answer) {
       row.error = parsed.refused[0] ?? 'answer: empty';
-      return finish(`scribe · failed: ${row.error}`);
+      return finish(`residual · failed: ${row.error}`);
     }
-    // Her own light change this turn stands: the scribe only backstops a change she wrote but didn't make (hand-check 2026-10-16).
+    // Her own light change this turn stands: the Residual only backstops a change she wrote but didn't make (hand-check 2026-10-16).
     const herLights = (db.getMessage(job.player, job.reply.id)?.toolLines ?? []).some((l) => ROOM_LIGHT_LINE.test(l));
     let answered = herLights ? { ...parsed.answer, lights: [] } : parsed.answer;
     if (herLights) for (const l of parsed.answer.lights) row.refused.push(`light ${l.id} refused: she changed the lights herself this turn`);
@@ -465,7 +560,7 @@ export class ScribeRunner {
     }
     const around = this.d.around ?? (<T>(_p: string, _m: string, fn: () => T) => fn());
     const result = around(job.player, job.reply.id, () => {
-      const r = applyScribe(
+      const r = applyResidual(
         {
           journal,
           player: job.player,
@@ -505,6 +600,19 @@ export class ScribeRunner {
               }
             : {}),
           names: [this.d.selfName, this.d.playerName(job.player)],
+          ...(cipher
+            ? {
+                cipher: {
+                  labels,
+                  open: new Set(openTruths.map((t) => t.id)),
+                  // The page is what she and the narrator wrote, not the player's own line.
+                  prose: storyProse(ex.lines.filter((l) => l.speaker !== this.d.playerName(job.player)).map((l) => l.text).join('\n')),
+                  place: job.here ?? this.d.sceneId?.() ?? '',
+                  clock: clock ?? 0,
+                  append: (e: CipherEvent) => db.setMeta(cipherKey(job.player), JSON.stringify([...parseCipherEvents(db.getMeta(cipherKey(job.player))), e])),
+                },
+              }
+            : {}),
         },
         answered,
         { messageId: job.reply.id, take: job.reply.take, kind: job.kind, clock },
@@ -513,12 +621,12 @@ export class ScribeRunner {
       return r;
     });
     row.applied = result.applied;
-    for (const a of result.applied) trace(`scribe:${a.split(' ')[0]}`, a, 'ok');
+    for (const a of result.applied) trace(`residual:${a.split(' ')[0]}`, a, 'ok');
     row.refused.push(...result.refused);
     const notes = result.applied.filter((a) => a.startsWith('note ')).length;
     const standing = result.applied.find((a) => a.startsWith('standing '));
     const lights = result.applied.filter((a) => a.startsWith('light ')).length;
-    const parts = ['scribe'];
+    const parts = ['residual'];
     if (notes > 0) parts.push(`${notes} ${notes === 1 ? 'note' : 'notes'}`);
     if (standing)
       parts.push(
@@ -530,6 +638,9 @@ export class ScribeRunner {
     if (lights > 0) parts.push(`${lights} ${lights === 1 ? 'light' : 'lights'}`);
     const time = result.applied.find((a) => a.startsWith('time '));
     if (time) parts.push(time.split(' → ')[0]);
+    const clues = result.applied.filter((a) => a.startsWith('clue ')).length;
+    if (clues > 0) parts.push(`${clues} ${clues === 1 ? 'clue' : 'clues'}`);
+    if (result.applied.some((a) => a.startsWith('learned '))) parts.push('learned');
     if (result.applied.includes('recap saved')) parts.push('recap');
     if (result.applied.includes('dossier saved')) parts.push('dossier');
     if (parts.length === 1) parts.push('nothing to write');

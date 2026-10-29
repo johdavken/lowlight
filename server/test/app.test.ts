@@ -1163,21 +1163,21 @@ describe('model routes', () => {
     return { app, baseUrl, wsUrl, or, settings };
   }
 
-  it('the scribe runs after her reply in a playthrough: one call on her model, its note in her journal, a dev line (scribe spec §2)', async () => {
+  it('the Residual runs after her reply in a playthrough: one call on her model, its note in her journal, a dev line (scribe spec §2)', async () => {
     const { wsUrl, or, app } = await startModelApp();
-    or.scribe.json = { choices: [{ message: { content: '{"notes":[{"op":"add","about":"you","text":"said hello first","keys":["hello"],"pin":true}]}' } }], usage: { prompt_tokens: 900, completion_tokens: 40 } };
+    or.residual.json = { choices: [{ message: { content: '{"notes":[{"op":"add","about":"you","text":"said hello first","keys":["hello"],"pin":true}]}' } }], usage: { prompt_tokens: 900, completion_tokens: 40 } };
     const { opened, events, ws } = connectWs(wsUrl);
     await opened;
     ws.send(JSON.stringify({ type: 'user_message', text: 'hello' }));
-    await waitFor(() => events.some((e) => e.type === 'dev_log' && e.text.startsWith('scribe ·')));
-    expect(or.scribeRequests).toHaveLength(1);
-    const body = or.scribeRequests[0].body as { model: string; stream: boolean; max_tokens: number; temperature: number; messages: { content: string }[] };
+    await waitFor(() => events.some((e) => e.type === 'dev_log' && e.text.startsWith('residual ·')));
+    expect(or.residualRequests).toHaveLength(1);
+    const body = or.residualRequests[0].body as { model: string; stream: boolean; max_tokens: number; temperature: number; messages: { content: string }[] };
     expect(body).toMatchObject({ model: 'z-ai/glm-5.2', stream: false, max_tokens: 600, temperature: 0.2 });
     expect(body.messages[1].content).toContain(': hello');
     expect(body.messages[1].content).toContain('Direct: Hi.');
     const rt = (await app.runtime('direct'))!;
     expect(rt.journal.notes(rt.relay.activePlayer).map((n) => n.text)).toEqual(['said hello first']);
-    expect(rt.db.scribeRuns(1)[0]).toMatchObject({ kind: 'turn', tokensIn: 900, tokensOut: 40, error: null });
+    expect(rt.db.residualRuns(1)[0]).toMatchObject({ kind: 'turn', tokensIn: 900, tokensOut: 40, error: null });
   });
 
   it('standing reaches a direct character in a playthrough: the block in her prompt and shift_standing in her tools (deferred minor: runtime wiring)', async () => {
@@ -1192,7 +1192,7 @@ describe('model routes', () => {
     expect(last).toContain('[how you feel about');
     expect(last).toContain('"Sizing you up"');
     expect(body.messages[0].content).not.toContain('[how you feel about');
-    // The scribe moves standing now (scribe spec): never one of her tools.
+    // The Residual moves standing now (scribe spec): never one of her tools.
     expect((body.tools ?? []).map((t) => t.function.name)).not.toContain('shift_standing');
   });
 

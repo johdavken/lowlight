@@ -1,5 +1,5 @@
 /**
- * The scribe (spec 2026-10-15-scribe-design): one small call after her reply that keeps the books —
+ * The Residual (spec 2026-10-15-scribe-design): one small call after her reply that keeps the books —
  * notes, pins, keywords, standing, missed lights, and on END SCENE / LEAVE the recap and her dossier
  * page. This file is the pure part: the messages it's sent, its answer parsed item by item, and the
  * answer applied through the journal, standing and lights under the stamp of the reply it read.
@@ -10,6 +10,7 @@ import type { Note } from '../../shared/types';
 import { formatClock, hhmmOf, minuteOfDay, nextOccurrence, parseHhmm } from '../../shared/clock';
 import { resolvePlan, type Plan, type PlanAnswer } from '../../shared/plan';
 import type { TextPromise } from '../../shared/promise';
+import { CIPHER, clueOnPage, type CipherEvent } from '../../shared/cipher';
 
 /** A promised time this many minutes past is taken as now ("05:40" at 05:40), not tomorrow. */
 const PROMISE_JUST_PASSED = 30;
@@ -23,16 +24,16 @@ import type { StandingControl } from './standing';
 import type { CompletionMessage } from './turn';
 
 /** At most this many unkeyed notes are handed over for keywords per run. */
-export const SCRIBE_KEY_BATCH = 10;
+export const RESIDUAL_KEY_BATCH = 10;
 /** Time backstop (spec 2026-10-20): a skip under this many minutes is drift, ignored… */
 export const TIME_MIN = 30;
 /** …and one over this many is a misread (an earlier hour named in passing), refused. */
 export const TIME_MAX = 720;
 
-export type ScribeKind = 'turn' | 'end';
+export type ResidualKind = 'turn' | 'end';
 
-export interface ScribeInput {
-  kind: ScribeKind;
+export interface ResidualInput {
+  kind: ResidualKind;
   self: { name: string; pronoun: string };
   player: { id: string; name: string };
   /** Her room as it is now: the `[room: …]` line. */
@@ -43,7 +44,7 @@ export interface ScribeInput {
   standing: string | null;
   /** Her journal and this pair's dossier notes. */
   notes: Note[];
-  /** What happened since the last reply the scribe covered, oldest first. */
+  /** What happened since the last reply the Residual covered, oldest first. */
   exchanges: { speaker: string; text: string }[];
   /** Read only on an end turn. */
   recap: string | null;
@@ -60,6 +61,8 @@ export interface ScribeInput {
   promiseLine?: string | null;
   /** Her schedule in words (deck controls spec §1), so "when I'm in bed" can become a time. */
   herDay?: string | null;
+  /** The playthrough's open truths (cipher spec §2.3), labelled T1…; absent or empty: Cipher has nothing open. */
+  cipher?: { label: string; truth: string; comesOutWhen: string }[];
 }
 
 /** A note's text with something in it: a copied template's "…" is not a note. */
@@ -114,9 +117,46 @@ const PromiseShape = z.union([
 ]);
 export type PromiseAnswer = z.infer<typeof PromiseShape>;
 
-export type ScribeNoteOp = z.infer<typeof NoteOp>;
-export interface ScribeAnswer {
-  notes: ScribeNoteOp[];
+/** Clues and learned truths (cipher spec §2.3), by the labels the user turn gave. */
+const CipherShape = z.object({
+  clues: z.array(z.object({ id: z.string(), text: z.string() })).default([]),
+  learned: z.array(z.string()).default([]),
+});
+export type CipherAnswer = z.infer<typeof CipherShape>;
+const ClueItem = z.object({ id: z.string(), text: z.string() });
+
+/** The cipher field item by item (minor 4): a bad clue or learned costs only itself; a learned may come as {"id":…}. */
+function readCipher(v: unknown, refused: string[]): CipherAnswer | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'object' || Array.isArray(v)) {
+    refused.push('cipher: not an object');
+    return null;
+  }
+  const o = v as { clues?: unknown; learned?: unknown };
+  const list = (x: unknown, name: string): unknown[] => {
+    if (x === undefined || x === null) return [];
+    if (Array.isArray(x)) return x;
+    refused.push(`cipher.${name}: not a list`);
+    return [];
+  };
+  const clues = list(o.clues, 'clues').flatMap((c, i) => {
+    const r = ClueItem.safeParse(c);
+    if (r.success) return [r.data];
+    refused.push(`cipher.clues[${i}]: dropped`);
+    return [];
+  });
+  const learned = list(o.learned, 'learned').flatMap((l, i) => {
+    const id = typeof l === 'string' ? l : typeof l === 'object' && l !== null && typeof (l as { id?: unknown }).id === 'string' ? (l as { id: string }).id : null;
+    if (id !== null) return [id];
+    refused.push(`cipher.learned[${i}]: dropped`);
+    return [];
+  });
+  return clues.length > 0 || learned.length > 0 ? { clues, learned } : null;
+}
+
+export type ResidualNoteOp = z.infer<typeof NoteOp>;
+export interface ResidualAnswer {
+  notes: ResidualNoteOp[];
   standing: { trust: number; warmth: number; reason: string } | null;
   lights: { id: string; intensity: number }[];
   /** The hour the story reached by the end of her reply, when it moved past the reply's clock. */
@@ -125,6 +165,8 @@ export interface ScribeAnswer {
   plan: PlanAnswer | { cancel: true } | null;
   /** A promise to text (promised texts spec §4); absent or null: none. */
   promise?: PromiseAnswer | null;
+  /** What the page showed of the Cipher (cipher spec §2.3); absent or null: nothing. */
+  cipher?: CipherAnswer | null;
   recap: string | null;
   dossier: string | null;
 }
@@ -135,7 +177,7 @@ const issue = (e: z.ZodError) => e.issues.map((i) => `${i.path.join('.') || '(ro
  * The answer's JSON: a ```json fence's body if there is one, else the first `{` to the last `}` (the
  * narrator's rule). Only when that doesn't parse, its small slips are repaired (`repaired` names them).
  */
-function jsonOf(raw: string): { v: unknown; repaired: string[] } {
+export function jsonOf(raw: string): { v: unknown; repaired: string[] } {
   const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
   const body = fence ? fence[1] : raw;
   const start = body.indexOf('{');
@@ -190,11 +232,11 @@ function repairJson(s: string): { text: string; repaired: string[] } {
 }
 
 /**
- * Her scribe's answer, checked per item: a bad item is dropped with a reason and the rest stands. An
+ * Her Residual's answer, checked per item: a bad item is dropped with a reason and the rest stands. An
  * answer that isn't a JSON object at all (a refusal, a reply cut off by the cap) is null: nothing is written.
  */
-export function parseScribeAnswer(raw: string): {
-  answer: ScribeAnswer | null;
+export function parseResidualAnswer(raw: string): {
+  answer: ResidualAnswer | null;
   refused: string[];
 } {
   let v: unknown;
@@ -239,6 +281,7 @@ export function parseScribeAnswer(raw: string): {
       time: one('time', Time),
       plan: one('plan', PlanShape),
       ...((promise) => (promise ? { promise } : {}))(one('promise', PromiseShape)),
+      ...((cipher) => (cipher ? { cipher } : {}))(readCipher(o.cipher, refused)),
       recap: one('recap', text),
       dossier: one('dossier', text),
     },
@@ -258,12 +301,17 @@ export interface ApplyDeps {
   names?: readonly string[];
   /** Her word for the player changed: the shift line, as shift_standing shows it. */
   standingShifted?: (word: string) => void;
-  /** Moves her reply's clock on by `minutes` (the relay's scribePass); absent: time doesn't apply. */
+  /** Moves her reply's clock on by `minutes` (the relay's residualPass); absent: time doesn't apply. */
   passTime?: (minutes: number) => Result;
   /** Her plan (her plans spec §4): the scene ids she can name, and where it's stored; absent: plans don't apply. */
   plan?: { places: ReadonlySet<string>; /** Her room's scene after the reply. */ here?: string; set(p: Plan | null): void };
   /** A promise to text (promised texts spec §4): the place ids she can name, and where it's stored; absent: promises don't apply. */
   promise?: { places: ReadonlySet<string>; set(p: TextPromise | null): void };
+  /**
+   * Cipher (spec §2.3): the labels the prompt gave (T1 → truth id), which truths are open, the page the clues are
+   * checked against, where and when the reply happened, and where an event goes; absent: Cipher doesn't apply.
+   */
+  cipher?: { labels: ReadonlyMap<string, string>; open: ReadonlySet<string>; prose: string; place: string; clock: number; append(e: CipherEvent): void };
 }
 
 /** The minutes from her reply's clock to `until`'s next occurrence, behind the guards (spec §4). */
@@ -280,7 +328,7 @@ const signed = (n: number) => (n > 0 ? `+${n}` : String(n));
 const clampStep = (n: number) => Math.max(-STANDING.step, Math.min(STANDING.step, n));
 
 /** Applies the answer under the stamp of the reply it read; says what it wrote and what it refused. */
-export function applyScribe(d: ApplyDeps, a: ScribeAnswer, at: { messageId: string; take: number; kind: ScribeKind; clock?: number | null }): { applied: string[]; refused: string[] } {
+export function applyResidual(d: ApplyDeps, a: ResidualAnswer, at: { messageId: string; take: number; kind: ResidualKind; clock?: number | null }): { applied: string[]; refused: string[] } {
   const applied: string[] = [];
   const refused: string[] = [];
   const { journal, player } = d;
@@ -427,6 +475,38 @@ export function applyScribe(d: ApplyDeps, a: ScribeAnswer, at: { messageId: stri
       }
     }
 
+    // Cipher (spec §2.3): what the page showed, by label; the truths themselves are never the Residual's to change.
+    if (a.cipher && (a.cipher.clues.length > 0 || a.cipher.learned.length > 0)) {
+      const c = d.cipher;
+      if (!c) refused.push("cipher ignored: doesn't apply here");
+      else {
+        const truthOf = (label: string): string | null => {
+          const id = c.labels.get(label.trim());
+          if (id === undefined) refused.push(`cipher: unknown ${label}`);
+          else if (!c.open.has(id)) refused.push(`cipher: ${label} is out`);
+          else return id;
+          return null;
+        };
+        for (const k of a.cipher.clues) {
+          const text = capAtWordBoundary(k.text.trim(), CIPHER.clueMax);
+          if (text === '') {
+            refused.push('cipher: empty clue');
+            continue;
+          }
+          const id = truthOf(k.id);
+          if (id === null) continue;
+          c.append({ t: 'clue', id, text, messageId: at.messageId, at: c.clock, place: c.place, onPage: clueOnPage(text, c.prose), seq: Date.now() });
+          applied.push(`clue ${k.id.trim()}`);
+        }
+        for (const label of a.cipher.learned) {
+          const id = truthOf(label);
+          if (id === null) continue;
+          c.append({ t: 'learned', id, seq: Date.now() });
+          applied.push(`learned ${label.trim()}`);
+        }
+      }
+    }
+
     // The recap on any turn that ends the night (they part without END SCENE too; 2026-10-16); the dossier only on an end.
     if (a.recap) {
       const r = journal.setRecap(player, a.recap, 'agent');
@@ -449,14 +529,15 @@ export function applyScribe(d: ApplyDeps, a: ScribeAnswer, at: { messageId: stri
 const flat = (t: string) => t.replace(/\s*\n\s*/g, ' ');
 const noteLine = (n: Note) => `${n.id} (${n.about})${n.pinned ? ' [pinned]' : ''}${(n.keys?.length ?? 0) > 0 ? ` {${n.keys!.join(', ')}}` : ''} ${flat(n.text)}`;
 
-/** The scribe's system message and its one user message (spec §3). */
-export function scribeMessages(i: ScribeInput): CompletionMessage[] {
+/** The Residual's system message and its one user message (spec §3). */
+export function residualMessages(i: ResidualInput): CompletionMessage[] {
   const her = i.self.name;
   const you = i.player.name;
   const timed = i.clock !== undefined && i.clock !== null;
   const planned = timed && (i.places?.length ?? 0) > 0 && !i.noPlans;
   const promising = timed && (i.places?.length ?? 0) > 0 && i.promises === true;
   const placed = planned || promising;
+  const ciphered = (i.cipher?.length ?? 0) > 0;
   const system = [
     `You keep the records for a roleplay between ${her} (${i.self.pronoun}) and ${you}. You never write story: you read what just happened and answer with one JSON object.`,
     `NOTES are ${her}'s memory. Only lasting facts: what is owed or promised, what was revealed, what changed, where something is. Not moods, not small talk. One fact per note: a new fact is a new note, even about the same person; rewrite a note only when that same fact changed, and forget it once it stops being true. "about": "me" is ${her}'s own journal (her life, her room, her plans); "about": "you" is what ${her} learns about ${you}. Up to ${NOTE_MAX} characters each, in ${her}'s words. Give every note 1–4 keywords, written the way they would be said (\"chrome hand\", not \"chrome-hand\"): names of other people, places, objects, words that would come up again in talk — not ${her}'s or ${you}'s names, not everyday words. Pin only what should matter every scene (at most ${PIN_CAP} pins). Most turns add nothing.`,
@@ -485,19 +566,26 @@ export function scribeMessages(i: ScribeInput): CompletionMessage[] {
       : [
           `RECAP: only if this turn ends the night — they part, say goodnight, one of them leaves: where things stand between ${her} and ${you}, for the next visit (up to ${RECAP_MAX} characters). Otherwise null.`,
         ]),
+    ...(ciphered
+      ? [
+          `CIPHER: secrets the story keeps, listed as [cipher: …]. "clues": only when what just happened showed something small on the page that points at one — what was shown, in a few words, not what it means. "learned": ${you} now knows one — told, found or worked out on the page. Most turns have neither: null. Never put a [cipher: …] truth into notes, a recap or a dossier: only whoever keeps it may know it.`,
+        ]
+      : []),
     'Answer with one JSON object and nothing else. When nothing changed, answer exactly:',
-    planned || promising
+    (planned || promising
       ? `{"notes":[],"standing":null,"lights":[],"time":null,${planned ? '"plan":null,' : ''}${promising ? '"promise":null,' : ''}"recap":null,"dossier":null}`
       : timed
         ? '{"notes":[],"standing":null,"lights":[],"time":null,"recap":null,"dossier":null}'
-        : '{"notes":[],"standing":null,"lights":[],"recap":null,"dossier":null}',
+        : '{"notes":[],"standing":null,"lights":[],"recap":null,"dossier":null}'
+    ).replace('"recap":null', ciphered ? '"cipher":null,"recap":null' : '"recap":null'),
     'Each entry in "notes" is one of: add {"op":"add","about":"me" or "you","text":the note,"keys":[1–4 keywords],"pin":true or false}; rewrite {"op":"rewrite","id":an id from the notes listed,"text":the new text,"keys":[…],"pin":…} (any of text, keys, pin; leave out what stays); forget {"op":"forget","id":an id from the notes listed}. "standing" is null or {"reason":"a few words","trust":n,"warmth":n}. "lights" holds {"id":a light id from the [room: …] line,"intensity":0 to 1}.' +
       (timed ? ' "time" is null or {"until":"HH:MM"}.' : '') +
       (planned ? ' "plan" is null, {"cancel":true}, or {"going":{"place":id,"until":"HH:MM" or null} or null,"meet":{"place":id,"at":"HH:MM"} or null}.' : '') +
-      (promising ? ' "promise" is null, {"cancel":true}, {"at":"HH:MM","about":"…"}, or {"place":id,"about":"…"}.' : ''),
+      (promising ? ' "promise" is null, {"cancel":true}, {"at":"HH:MM","about":"…"}, or {"place":id,"about":"…"}.' : '') +
+      (ciphered ? ' "cipher" is null or {"clues":[{"id":a label from the [cipher: …] line,"text":"what was shown"}],"learned":[labels]}.' : ''),
   ].join('\n\n');
 
-  const unkeyed = i.notes.filter((n) => (n.keys?.length ?? 0) === 0).slice(0, SCRIBE_KEY_BATCH);
+  const unkeyed = i.notes.filter((n) => (n.keys?.length ?? 0) === 0).slice(0, RESIDUAL_KEY_BATCH);
   const user = [
     i.roomLine,
     timed ? `[clock: ${clockWords(i.clock!)}]` : null,
@@ -506,6 +594,7 @@ export function scribeMessages(i: ScribeInput): CompletionMessage[] {
     promising && i.promiseLine ? `[your promise: ${i.promiseLine}]` : null,
     promising && i.herDay ? `[her day: ${i.herDay}]` : null,
     i.standing ? `[standing: ${i.standing}]` : null,
+    ciphered ? `[cipher: ${i.cipher!.map((c) => `${c.label} · ${flat(c.truth)} · comes out when ${flat(c.comesOutWhen)}`).join('; ')}]` : null,
     i.notes.length > 0 ? `${her}'s notes:\n${i.notes.map(noteLine).join('\n')}` : `${her} has no notes yet.`,
     ...(i.kind === 'end' ? [`The recap now: ${i.recap ?? '(none)'}`, `${her}'s dossier page on ${you} now: ${i.page ?? '(empty)'}`] : []),
     `What just happened:\n${i.exchanges.map((e) => `${e.speaker}: ${flat(e.text)}`).join('\n')}`,

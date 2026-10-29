@@ -113,7 +113,7 @@ describe('storage and prompt', () => {
     db.close();
   });
 
-  it('the prompt carries the old summary and the lines, and starts like the scribe', () => {
+  it('the prompt carries the old summary and the lines, and starts like the Residual', () => {
     const [system, user] = summaryMessages('they met', [msg('user', 'hello'), msg('agent', 'hi')], { self: 'Nix', player: 'Hicks' });
     expect(system.content.startsWith('You keep the records for a roleplay')).toBe(true);
     expect(user.content).toContain('they met');

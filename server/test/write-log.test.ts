@@ -138,7 +138,7 @@ describe('the write log', () => {
 });
 
 describe('rebuild', () => {
-  it('a rewind takes scribe.* and summary.* meta back with the reply that wrote them (review C2)', () => {
+  it('a rewind takes scribe.* (the Residual\'s) and summary.* meta back with the reply that wrote them (review C2)', () => {
     const db = openDb(':memory:', { defaultPlayer: 'hicks' });
     db.insertMessage('hicks', makeMessage({ id: 'a', ts: 1000 }));
     db.withStamp({ messageId: 'a', take: 0 }, () => db.setMeta('scribe.hicks.through', '{"id":"a","take":0}'));
@@ -150,6 +150,17 @@ describe('rebuild', () => {
     db.cutAfter('hicks', 'a');
     expect(db.getMeta('scribe.hicks.through')).toBe('{"id":"a","take":0}');
     expect(db.getMeta('summary.hicks')).toBeNull();
+    db.close();
+  });
+
+  it('rewinds cipher.* meta with the reply it was stamped to (cipher spec §2.4)', () => {
+    const db = openDb(':memory:', { defaultPlayer: 'hicks' });
+    db.insertMessage('hicks', makeMessage({ id: 'a', ts: 1000 }));
+    db.withStamp({ messageId: 'a', take: 0 }, () => db.setMeta('cipher.hicks', '[{"t":"run","replies":6,"seq":1}]'));
+    db.insertMessage('hicks', makeMessage({ id: 'b', ts: 2000 }));
+    db.withStamp({ messageId: 'b', take: 0 }, () => db.setMeta('cipher.hicks', '[{"t":"run","replies":6,"seq":1},{"t":"learned","id":"x","seq":2}]'));
+    db.cutAfter('hicks', 'a');
+    expect(db.getMeta('cipher.hicks')).toBe('[{"t":"run","replies":6,"seq":1}]');
     db.close();
   });
 

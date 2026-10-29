@@ -14,7 +14,7 @@
 Lowlight is a rain-soaked port city you play through conversation. Each character is an AI with
 their own model, their own pixel-art rooms and their own hours on the map. They dim the lights,
 move the clock, take work from their clients and remember what you did. You walk the districts,
-take gigs and small jobs, crack ice, hire a crew, and earn trust from people who don't give it easily.
+take jobs and gigs, crack lacquer, hire a crew, and earn trust from people who don't give it easily.
 
 It runs on your own machine. Bring an OpenRouter key; the characters' turns go to the models you pick.
 
@@ -106,7 +106,19 @@ shows there once you've learned it.
   are counted district by district. Nix's own clients bring jobs to the Intake, with her trust as the stake.
 - **Big jobs** take several nights: legwork at the places they name, clues, your read on what's really going
   on, and two or three ways in.
-- **Gigs** are the part you play with your hands: crack ice on a deck, slip past guards, forge papers.
+
+<p align="center">
+  <img src="docs/readme/gigs.webp" alt="Three gig screens: papers on the desk, a grid run on a deck, and a slip across a club floor" width="100%">
+</p>
+
+**Gigs** are the part you play with your hands, and where a big job ends up:
+
+- **Papers:** a desk, a client, and tonight's customs rules. Build them an identity out of permits, stamps
+  and letters that gets past the clerk, before the risk adds up.
+- **Grid:** jack in and work a network node by node toward the target. Probe what you can't see, spend RAM
+  to break lacquer, keep away from sentries, and pull the take before the trace finishes you.
+- **Slip:** cross a floor plan past guards and cameras a step at a time. Wait, hide, make a noise, jam a
+  camera with your kit, and get out with heat at zero if you can.
 
 ### The YOU panel
 
@@ -183,6 +195,16 @@ when it comes up, and there's liar's dice at the Low Roller.
 - **The builds:** Windows and Linux, on [itch.io](https://lowlightgame.itch.io/lowlight). This is the easy way.
 - **In SillyTavern:** the rooms, the cast, the lore book and the map as an extension: [Lowlight for SillyTavern](https://github.com/johdavken/lowlight-sillytavern).
 - **From source:** this repository. It's the same game, every sound included.
+
+## Soundtrack
+
+<p align="center">
+  <a href="https://soundcloud.com/jdecker-23907106/sets/lowlight-original-soundtrack">
+    <img src="docs/readme/soundtrack.webp" alt="Lowlight Original Soundtrack: Nix leaning on a wet wall by the harbour, the city lit up behind her" width="45%">
+  </a>
+</p>
+
+<p align="center"><a href="https://soundcloud.com/jdecker-23907106/sets/lowlight-original-soundtrack"><b>▶ Listen to the Lowlight soundtrack on SoundCloud</b></a></p>
 
 ## Run it from source
 

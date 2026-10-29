@@ -122,7 +122,7 @@ export async function completeOnce(o: CompleteOptions): Promise<string> {
   return (await completeOnceWithUsage(o)).text;
 }
 
-/** completeOnce, plus the tokens the provider counted (null when it didn't say): the scribe logs them. */
+/** completeOnce, plus the tokens the provider counted (null when it didn't say): the Residual logs them. */
 export async function completeOnceWithUsage(o: CompleteOptions): Promise<{ text: string; tokensIn: number | null; tokensOut: number | null }> {
   switch (o.thinking) {
     case undefined:

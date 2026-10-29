@@ -19,7 +19,7 @@ export interface Plan {
   joined?: true;
 }
 
-/** The scribe's answer: places are scene ids, times HH:MM. */
+/** The Residual's answer: places are scene ids, times HH:MM. */
 export interface PlanAnswer {
   going: { place: string; until: string | null } | null;
   meet: { place: string; at: string } | null;

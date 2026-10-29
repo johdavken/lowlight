@@ -1,3 +1,4 @@
+import type { CipherState } from '../../shared/cipher';
 import type { CommsState } from '../../shared/comms';
 import { TRAVEL_LINE_MAX } from '../../shared/arrival';
 import { SCENE_TEXT_MAX } from '../../shared/scenario';
@@ -30,6 +31,8 @@ import { EMPTY_QUEST_STATE } from '../../shared/types';
 import { exitPlaces } from '../../shared/exits';
 
 export interface HubDeps {
+  /** The playthrough's Cipher for `player` (cipher spec §2.9), for the dev panel; absent: none. */
+  cipher?: (player: string) => CipherState | null;
   /** Who is dark now and whether this room is (blackouts phase 3 §4), sent to every tab as it joins. */
   power?: () => { dark: string[]; here: { name: string; since: number } | null };
   /** The admin panel's POWER OUT: this room's district goes dark (blackouts phase 3, for checks). */
@@ -116,7 +119,7 @@ export interface Hub {
   closeAll(code: number): void;
   /** Shows a tool line in `player`'s pair's tabs, on the reply in progress when it's that pair's. */
   appendToolLine(text: string, player: string): void;
-  /** Runs `fn` with its tool lines going to `player`'s reply `messageId` (the scribe writes after the reply it read). */
+  /** Runs `fn` with its tool lines going to `player`'s reply `messageId` (the Residual writes after the reply it read). */
   withToolLineReply<T>(player: string, messageId: string, fn: () => T): T;
 }
 
@@ -125,8 +128,8 @@ export const DEFAULT_PORTRAIT_URL = '/portraits/nix.png';
 
 
 
-/** How many scribe runs the dev panel's SCRIBE section shows. */
-const SCRIBE_RUNS_SHOWN = 50;
+/** How many residual runs the dev panel's RESIDUAL section shows. */
+const RESIDUAL_RUNS_SHOWN = 50;
 const CONTROL_REASONS = ['busy', 'not-latest', 'unknown', 'empty'] as const;
 
 function send(ws: WebSocket, e: ServerEvent): void {
@@ -236,8 +239,8 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
     }
     case 'recap_seen':
       return { type: 'recap_seen' };
-    case 'scribe_runs':
-      return { type: 'scribe_runs' };
+    case 'residual_runs':
+      return { type: 'residual_runs' };
     case 'greet':
       // The opening the arrival screen sets (spec 2026-10-27 §3); the relay keeps it only on a new game.
       if (v.opening !== undefined && (typeof v.opening !== 'string' || v.opening.length > SCENE_TEXT_MAX)) return `greet's 'opening' must be a string of at most ${SCENE_TEXT_MAX} characters`;
@@ -438,7 +441,7 @@ export function createHub(deps: HubDeps): Hub {
     // Her room tool call belongs to the turn in progress (else the last turn's pair); one from
     // the dev panel belongs to the tab that clicked it.
     if (change.source === 'agent') appendToolLine(formatToolLine(change.op, deps.room), toolLinePlayer());
-    // A mood the story applied (story moods spec §4) and the power going or coming back (blackouts phase 3) show too, as MOOD; the world's other changes (the scribe's light fixes) stay quiet.
+    // A mood the story applied (story moods spec §4) and the power going or coming back (blackouts phase 3) show too, as MOOD; the world's other changes (the Residual's light fixes) stay quiet.
     else if (change.source === 'world' && (change.op.tool === 'apply_mood' || change.op.tool === 'power')) appendToolLine(formatToolLine(change.op, deps.room, 'world'), toolLinePlayer());
   });
 
@@ -450,10 +453,10 @@ export function createHub(deps: HubDeps): Hub {
   /** The player of the tab whose dev_action is being dispatched (synchronously), else null. */
   let devOrigin: string | null = null;
 
-  /** While the scribe writes for a reply (withToolLineReply): that pair and reply. */
+  /** While the Residual writes for a reply (withToolLineReply): that pair and reply. */
   let toolLineReply: { player: string; messageId: string } | null = null;
 
-  /** Whose pair an unscoped tool line belongs to: the scribe's reply's, the dev panel tab that caused it, else the running (else last) turn's. */
+  /** Whose pair an unscoped tool line belongs to: the Residual's reply's, the dev panel tab that caused it, else the running (else last) turn's. */
   function toolLinePlayer(): string {
     return toolLineReply?.player ?? devOrigin ?? activePlayer();
   }
@@ -974,8 +977,8 @@ export function createHub(deps: HubDeps): Hub {
       case 'recap_seen':
         deps.journal.markRecapSeen(player);
         break;
-      case 'scribe_runs':
-        send(ws, { type: 'scribe_runs', runs: deps.db.scribeRuns(SCRIBE_RUNS_SHOWN, player) });
+      case 'residual_runs':
+        send(ws, { type: 'residual_runs', runs: deps.db.residualRuns(RESIDUAL_RUNS_SHOWN, player), cipher: deps.cipher?.(player) ?? null });
         break;
       case 'let_her_go':
         if (!deps.getRelay().ready) return rejectNoLink(ws);

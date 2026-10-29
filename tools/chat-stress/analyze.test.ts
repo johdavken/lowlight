@@ -7,11 +7,20 @@ const rec = (over: Partial<TurnRecord>): TurnRecord => ({
 const kinds = (t: TurnRecord, earlier: string[] = []) => flagsOf(t, earlier).map((f) => f.kind);
 
 describe('flagsOf', () => {
-  it("the scribe's writes count: a note, a light and a recap it made are not misses (scribe spec)", () => {
-    expect(kinds(rec({ expect: 'note', calls: [{ name: 'scribe:note', args: 'note n3 added', out: 'ok' }] }))).toEqual([]);
-    expect(kinds(rec({ expect: 'light', calls: [{ name: 'scribe:light', args: 'light lamp 0%', out: 'ok' }] }))).toEqual([]);
-    expect(kinds(rec({ expect: 'recap', calls: [{ name: 'scribe:recap', args: 'recap saved', out: 'ok' }] }))).toEqual([]);
-    expect(kinds(rec({ expect: 'note', calls: [{ name: 'scribe', args: '', out: 'scribe · nothing to write' }] }))).toEqual(['missed-note']);
+  it("the Residual's writes count: a note, a light and a recap it made are not misses (scribe spec)", () => {
+    expect(kinds(rec({ expect: 'note', calls: [{ name: 'residual:note', args: 'note n3 added', out: 'ok' }] }))).toEqual([]);
+    expect(kinds(rec({ expect: 'light', calls: [{ name: 'residual:light', args: 'light lamp 0%', out: 'ok' }] }))).toEqual([]);
+    expect(kinds(rec({ expect: 'recap', calls: [{ name: 'residual:recap', args: 'recap saved', out: 'ok' }] }))).toEqual([]);
+    expect(kinds(rec({ expect: 'note', calls: [{ name: 'residual', args: '', out: 'residual · nothing to write' }] }))).toEqual(['missed-note']);
+  });
+
+  it("counts residual:* and old scribe:* trace names alike (an old run's trace still compares)", () => {
+    for (const p of ['residual', 'scribe']) {
+      expect(kinds(rec({ expect: 'note', calls: [{ name: `${p}:note`, args: 'note n3 added', out: 'ok' }] })), p).toEqual([]);
+      expect(kinds(rec({ expect: 'light', calls: [{ name: `${p}:light`, args: 'light lamp 0%', out: 'ok' }] })), p).toEqual([]);
+      expect(kinds(rec({ expect: 'recap', calls: [{ name: `${p}:recap`, args: 'recap saved', out: 'ok' }] })), p).toEqual([]);
+      expect(kinds(rec({ expect: 'note', calls: [{ name: `${p}:dossier`, args: 'dossier saved', out: 'ok' }] })), p).toEqual([]);
+    }
   });
 
   it('a plain good turn has no flags', () => {

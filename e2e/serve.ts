@@ -243,7 +243,7 @@ async function main(): Promise<void> {
       .replace('starts: haes-noodles', 'starts: lowlight-intake')
       .replace(/\[check cool 50\]/g, '[check cool 50 red]')
       .replace(/(- wait: Wait for the shift change\. → inside \[clock \+1h\]\n)/g, '$1- kick: Kick the door in. → turned [alarm +1]\n')
-      .replace('- grab: Take it all. → paid / part [check reflex 50]', '- grab: Crack the ledger terminal. → paid / part [crack 6 ice]'),
+      .replace('- grab: Take it all. → paid / part [check reflex 50]', '- grab: Crack the ledger terminal. → paid / part [crack 6 corp]'),
   );
   // A big job at the Intake (e2e/big-jobs.spec.ts), played by Cass with Trusted rep in Karasu (a playthrough of its own),
   // so the other specs' player keeps a Nobody's boards. The take marks the ferry and the Tilt; every route's gig resolves clean without its window.

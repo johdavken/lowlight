@@ -6,8 +6,8 @@
 import { rng } from './gig/generate';
 import type { DeckSkin } from './gear';
 
-/** The terminal's look (deck skins spec): the deck's skin, or `ice` for a corporate terminal. */
-export type TerminalSkin = DeckSkin | 'ice';
+/** The terminal's look (deck skins spec): the deck's skin, or `corp` for a corporate terminal. */
+export type TerminalSkin = DeckSkin | 'corp';
 
 export const DUMP_LINES = 32;
 export const DUMP_WIDTH = 12;

@@ -1,6 +1,7 @@
 import { CHANNELS, type Channel, type EngineState } from '../audio/engine';
 import type { PlaylistState } from '../audio/playlist';
-import type { Atmosphere, ClientEvent, Crop, LightDef, LinkStatus, RoomState, SceneDef, ScribeRunInfo } from '../../../shared/types';
+import type { Atmosphere, ClientEvent, Crop, LightDef, LinkStatus, RoomState, SceneDef, ResidualRunInfo } from '../../../shared/types';
+import type { CipherState } from '../../../shared/cipher';
 
 type Send = (e: ClientEvent) => void;
 
@@ -66,10 +67,12 @@ export class DevPanel {
   private readonly fogLevel: Slider;
   private readonly jsonView: HTMLElement;
   private readonly logList: HTMLElement;
-  private readonly scribeList: HTMLElement;
-  private scribeRuns: ScribeRunInfo[] = [];
+  private readonly residualList: HTMLElement;
+  /** The Cipher under the runs (cipher spec §2.9): every truth, read-only. */
+  private readonly cipherBox: HTMLElement;
+  private residualRuns: ResidualRunInfo[] = [];
   /** The row whose details are open; null: none. */
-  private scribeOpen: number | null = null;
+  private residualOpen: number | null = null;
   private readonly linkEl: HTMLElement;
   private readonly modelEl: HTMLElement;
   private readonly fpsEl: HTMLElement;
@@ -203,15 +206,17 @@ export class DevPanel {
     this.logList = el('div', 'dp-log-list');
     logSection.append(this.logList);
 
-    // The scribe's runs (scribe spec §8): what it read, wrote and refused, for tuning and hand-checks.
-    const scribeSection = el('div', 'dp-section dp-scribe');
-    const scribeHead = el('div', 'dp-scribe-head');
-    const refresh = el('button', 'dp-scribe-refresh', 'REFRESH');
+    // The Residual's runs (scribe spec §8): what it read, wrote and refused, for tuning and hand-checks.
+    const residualSection = el('div', 'dp-section dp-residual');
+    const residualHead = el('div', 'dp-residual-head');
+    const refresh = el('button', 'dp-residual-refresh', 'REFRESH');
     refresh.type = 'button';
-    refresh.addEventListener('click', () => this.send({ type: 'scribe_runs' }));
-    scribeHead.append(el('label', 'dp-label', 'SCRIBE'), refresh);
-    this.scribeList = el('div', 'dp-scribe-list');
-    scribeSection.append(scribeHead, this.scribeList);
+    refresh.addEventListener('click', () => this.send({ type: 'residual_runs' }));
+    residualHead.append(el('label', 'dp-label', 'RESIDUAL · BLACK LEDGER'), refresh);
+    this.residualList = el('div', 'dp-residual-list');
+    this.cipherBox = el('div', 'dp-cipher');
+    residualSection.append(residualHead, this.residualList, this.cipherBox);
+    this.renderCipher(null);
 
     const simSection = el('div', 'dp-section dp-simulate');
     simSection.append(el('label', 'dp-label', 'SIMULATE TOOL CALL'));
@@ -236,7 +241,7 @@ export class DevPanel {
       this.stageSection,
       stateSection,
       logSection,
-      scribeSection,
+      residualSection,
       simSection,
     );
 
@@ -396,28 +401,52 @@ export class DevPanel {
   }
 
   log(level: 'info' | 'warn' | 'error', text: string): void {
-    // A scribe run just ended: the SCRIBE section asks for the new list.
-    if (text.startsWith('scribe ·')) this.send({ type: 'scribe_runs' });
+    // A Residual run just ended: the RESIDUAL section asks for the new list.
+    if (text.startsWith('residual ·')) this.send({ type: 'residual_runs' });
     const row = el('div', `dp-log-row dp-log-${level}`, text);
     this.logList.append(row);
     while (this.logList.childElementCount > MAX_LOG_ROWS) this.logList.firstChild?.remove();
     this.logList.scrollTop = this.logList.scrollHeight;
   }
 
-  /** The SCRIBE section's rows, newest first; a row opens its raw answer beside what was applied and refused. */
-  setScribeRuns(runs: ScribeRunInfo[]): void {
-    this.scribeRuns = runs;
-    this.renderScribe();
+  /** The RESIDUAL section's rows, newest first; a row opens its raw answer beside what was applied and refused. */
+  setResidualRuns(runs: ResidualRunInfo[], cipher: CipherState | null = null): void {
+    this.residualRuns = runs;
+    this.renderResidual();
+    this.renderCipher(cipher);
   }
 
-  private renderScribe(): void {
+  /** CIPHER: every truth (open and out), who keeps it, and its clues, off-page ones flagged. */
+  private renderCipher(c: CipherState | null): void {
+    const head = el('label', 'dp-label', 'CIPHER');
+    if (!c || c.truths.length === 0) {
+      this.cipherBox.replaceChildren(head, el('div', 'dp-cipher-none', c ? `none yet · ${c.replies} replies` : 'none yet'));
+      return;
+    }
+    this.cipherBox.replaceChildren(
+      head,
+      el('div', 'dp-cipher-none', `${c.replies} replies · last run at ${c.lastRun ?? '—'}`),
+      ...c.truths.map((t) => {
+        const box = el('div', `dp-cipher-truth ${t.state}`);
+        box.append(
+          el('div', 'dp-cipher-head', `${t.id} · ${t.kind} · ${t.state} · ${t.knownBy.join(', ') || 'nobody here'}`),
+          el('div', 'dp-cipher-text', t.truth),
+          el('div', 'dp-cipher-meta', `comes out when: ${t.comesOutWhen}\nchanges: ${t.changes}\nhints: ${t.clueIdeas}`),
+          ...t.clues.map((k) => el('div', `dp-cipher-clue${k.onPage ? '' : ' off'}`, `${k.onPage ? '' : 'OFF PAGE '}${k.text}`)),
+        );
+        return box;
+      }),
+    );
+  }
+
+  private renderResidual(): void {
     const hhmm = (at: number) => {
       const d = new Date(at);
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     };
-    this.scribeList.replaceChildren(
-      ...this.scribeRuns.map((r, i) => {
-        const row = el('div', 'dp-scribe-row');
+    this.residualList.replaceChildren(
+      ...this.residualRuns.map((r, i) => {
+        const row = el('div', 'dp-residual-row');
         const parts = [hhmm(r.at), r.kind];
         if (r.error) parts.push(`failed: ${r.error}`);
         else {
@@ -425,18 +454,18 @@ export class DevPanel {
           if (r.refused.length > 0) parts.push(`${r.refused.length} refused`);
         }
         parts.push(`${(r.ms / 1000).toFixed(1)} s`);
-        const sum = el('button', 'dp-scribe-sum', parts.join(' · '));
+        const sum = el('button', 'dp-residual-sum', parts.join(' · '));
         sum.type = 'button';
         sum.addEventListener('click', () => {
-          this.scribeOpen = this.scribeOpen === i ? null : i;
-          this.renderScribe();
+          this.residualOpen = this.residualOpen === i ? null : i;
+          this.renderResidual();
         });
         row.append(sum);
-        if (this.scribeOpen === i) {
-          const detail = el('div', 'dp-scribe-detail');
+        if (this.residualOpen === i) {
+          const detail = el('div', 'dp-residual-detail');
           detail.append(
-            el('pre', 'dp-scribe-raw', r.raw ?? '(no answer)'),
-            el('div', 'dp-scribe-lists', [...r.applied.map((a) => `+ ${a}`), ...r.refused.map((x) => `− ${x}`), ...(r.tokensIn !== null ? [`tokens ${r.tokensIn} in · ${r.tokensOut ?? '?'} out`] : [])].join('\n')),
+            el('pre', 'dp-residual-raw', r.raw ?? '(no answer)'),
+            el('div', 'dp-residual-lists', [...r.applied.map((a) => `+ ${a}`), ...r.refused.map((x) => `− ${x}`), ...(r.tokensIn !== null ? [`tokens ${r.tokensIn} in · ${r.tokensOut ?? '?'} out`] : [])].join('\n')),
           );
           row.append(detail);
         }

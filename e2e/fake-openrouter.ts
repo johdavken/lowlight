@@ -108,7 +108,13 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         const ids = [...(/\[places: ([^\]]*)\]/.exec(asked)?.[1] ?? '').matchAll(/(\S+) "[^"]*"/g)].map((m) => m[1]);
         return ids.find((id) => id !== room) ?? ids[0];
       };
-      // The scribe (scribe spec): her bookkeeping after each reply, and the rolling summary. The blue mug line
+      // Cipher (e2e/cipher.spec.ts): the cipher run keeps one place truth, by the first of the cast.
+      if ((body as { stream?: boolean }).stream === false && body.messages?.[0]?.content?.startsWith('You keep the secrets')) {
+        const cast = /\[cast: (\S+) "/.exec(body.messages.at(-1)?.content ?? '')?.[1];
+        const content = JSON.stringify({ truths: [{ kind: 'place', truth: 'The intake is a drop for the Tilt.', knownBy: cast ? [cast] : [], comesOutWhen: 'someone opens the till', changes: 'the Tilt knows your face', clueIdeas: 'an envelope, a chalk mark' }] });
+        return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }));
+      }
+      // The Residual (scribe spec): her bookkeeping after each reply, and the rolling summary. The blue mug line
       // (e2e/branch.spec.ts) gets a note; everything else nothing to write.
       if ((body as { stream?: boolean }).stream === false && body.messages?.[0]?.content?.startsWith('You keep the records')) {
         const asked = body.messages.at(-1)?.content ?? '';
@@ -121,13 +127,18 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
               ? // Promised texts, the place path (e2e/deck.spec.ts): she'll text when she's home (her apartment from 05:00).
                 JSON.stringify({ notes: [], promise: { place: /(\S*nix-apartment)/.exec(asked)![1], about: "that she's home" } })
             : /text me in an hour/i.test(asked) && /\[clock: [^\]]*?(\d{2}):(\d{2})\]/.test(asked)
-              ? // Promised texts (e2e/deck.spec.ts): she'll text in an hour, by the scribe's clock.
+              ? // Promised texts (e2e/deck.spec.ts): she'll text in an hour, by the Residual's clock.
                 (() => {
                   const [, h, m] = /\[clock: [^\]]*?(\d{2}):(\d{2})\]/.exec(asked)!;
                   const t = (Number(h) * 60 + Number(m) + 60) % 1440;
                   const at = `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
                   return JSON.stringify({ notes: [], promise: { at, about: "that she's home" } });
                 })()
+            : /\[cipher: T1/.test(asked) && asked.includes('look under the register')
+              ? // Cipher (e2e/cipher.spec.ts): her reply showed the envelope.
+                JSON.stringify({ notes: [], cipher: { clues: [{ id: 'T1', text: 'a thick envelope under the register' }], learned: [] } })
+            : /\[cipher: T1/.test(asked) && asked.includes('tell me the truth')
+              ? JSON.stringify({ notes: [], cipher: { clues: [], learned: ['T1'] } })
             : asked.includes('remember the blue mug')
               ? JSON.stringify({ notes: [{ op: 'add', about: 'you', text: 'the blue mug is yours now', keys: ['blue mug'], pin: false }] })
               : JSON.stringify({ notes: [] });
@@ -152,6 +163,10 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
       if (last?.role === 'user' && last.content?.includes('[event:')) {
         return sse(res, [choice({ content: '*Nix sets the chopsticks down.* That is not my name.\n\nCourier: Print here or I eat the fine.' }), choice({}, 'stop')]);
       }
+      // Cipher (e2e/cipher.spec.ts): a reply the clue can be on.
+      if (last?.role === 'user' && last.content?.includes('look under the register')) {
+        return sse(res, [choice({ content: '*Nix slides a thick envelope out of sight under the register.* Nothing there.' }), choice({}, 'stop')]);
+      }
       if (last?.role === 'user' && last.content?.includes('a bowl, Hae')) {
         return sse(res, [choice({ content: '*Nix slides onto a stool.*\n\nHae: Pork broth, chili oil, soft egg.' }), choice({}, 'stop')]);
       }
@@ -159,7 +174,7 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         const call = { index: 0, id: 'call_share', type: 'function', function: { name: 'share_contact', arguments: JSON.stringify({ who: 'alpha', how: 'gave you her number' }) } };
         return sse(res, [choice({ tool_calls: [call] }), choice({}, 'tool_calls')]);
       }
-      // Branch from here (e2e/branch.spec.ts): a line the scribe notes (above), one that moves her room.
+      // Branch from here (e2e/branch.spec.ts): a line the Residual notes (above), one that moves her room.
       if (last?.role === 'user' && last.content?.includes('take me up to the roof')) {
         const call = { index: 0, id: 'call_roof', type: 'function', function: { name: 'go_to', arguments: JSON.stringify({ id: 'karasu/ribbon-rooftop' }) } };
         return sse(res, [choice({ tool_calls: [call] }), choice({}, 'tool_calls')]);

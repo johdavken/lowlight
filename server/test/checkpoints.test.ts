@@ -94,15 +94,15 @@ describe('checkpoints', () => {
     s.send({ type: 'user_message', text: '', mode: 'end' });
     await until(() => rt.relay.busy);
     await until(() => !rt.relay.busy);
-    // The save waits for the scribe (its recap): it lands a moment after the turn.
+    // The save waits for the Residual (its recap): it lands a moment after the turn.
     await until(() => saves()[0]?.trigger === 'end');
     expect(saves()[0]).toMatchObject({ kind: 'checkpoint', trigger: 'end', name: 'Talk with Nix ended', location: { contactId: 'nix', sceneId: 'karasu/lowlight-intake' } });
     expect(repliesDone(rt, pt.player, 1)).toBe(true);
   });
 
-  it("the end checkpoint holds the scribe's recap (scribe spec §2)", async () => {
+  it("the end checkpoint holds the Residual's recap (scribe spec §2)", async () => {
     const { cfg, pt, rt, saves, ws, or } = await start();
-    or.scribe.json = { choices: [{ message: { content: '{"notes":[],"recap":"We closed up and said goodnight."}' } }] };
+    or.residual.json = { choices: [{ message: { content: '{"notes":[],"recap":"We closed up and said goodnight."}' } }] };
     const s = await socket(`${ws}/ws/nix`);
     await until(() => !rt.relay.busy);
     s.send({ type: 'user_message', text: '', mode: 'end' });
@@ -116,9 +116,9 @@ describe('checkpoints', () => {
     }
   });
 
-  it('END then REWIND before the scribe answers: the delayed end save never lands after the rewind (final review I5)', async () => {
+  it('END then REWIND before the Residual answers: the delayed end save never lands after the rewind (final review I5)', async () => {
     const { pt, rt, saves, ws, or } = await start();
-    or.scribe.delayMs = 1_500;
+    or.residual.delayMs = 1_500;
     const s = await socket(`${ws}/ws/nix`);
     await until(() => !rt.relay.busy);
     const done = () => rt.db.recentMessages(pt.player).filter((m) => m.role === 'agent' && m.status === 'ok').length;
@@ -127,7 +127,7 @@ describe('checkpoints', () => {
     await until(() => done() === n + 1 && !rt.relay.busy);
     const back = rt.db.recentMessages(pt.player).filter((m) => m.role === 'agent' && m.status === 'ok').at(-1)!.id;
     s.send({ type: 'user_message', text: '', mode: 'end' });
-    // Her end reply waits up to 1.5 s for the hello's scribe first.
+    // Her end reply waits up to 1.5 s for the hello's residual first.
     await new Promise((r) => setTimeout(r, 1_800));
     await until(() => done() === n + 2 && !rt.relay.busy);
     expect((await rt.relay.rewind(pt.player, back)).ok).toBe(true);

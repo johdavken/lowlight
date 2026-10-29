@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Backend } from '../src/backend';
 import { ChatRelay, type ChatRelayDeps } from '../src/chat-relay';
-import { ScribeRunner } from '../src/scribe-runner';
+import { ResidualRunner } from '../src/residual-runner';
 import { fakePlayers } from './fixtures/players';
 import { openDb, type Db, type RebuildResult } from '../src/db';
 import { TurnError } from '../src/turn';
@@ -38,7 +38,7 @@ afterEach(() => {
 type Turn = { act?: () => void; text?: string; fail?: boolean; early?: boolean; cut?: boolean; wrongModel?: boolean };
 
 /** A relay whose backend runs `turns` in order, with the room persisted the way the hub does it and rebuilds applied the way the runtime does. */
-function setup(turns: Turn[], opts: { checkpoint?: () => boolean; scribe?: (db: Db, journal: Journal) => Partial<ChatRelayDeps> } = {}) {
+function setup(turns: Turn[], opts: { checkpoint?: () => boolean; residual?: (db: Db, journal: Journal) => Partial<ChatRelayDeps> } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const room = new Room(registry);
@@ -88,7 +88,7 @@ function setup(turns: Turn[], opts: { checkpoint?: () => boolean; scribe?: (db: 
       order.push(`checkpoint with ${db.allMessages('hicks').length} lines`);
       return opts.checkpoint?.() ?? true;
     },
-    ...(opts.scribe?.(db, journal) ?? {}),
+    ...(opts.residual?.(db, journal) ?? {}),
   });
   const note = (text: string) => () => void journal.note('hicks', { text }, 'agent');
   const ids = () => db.listNotes('hicks').map((x) => x.text).sort();
@@ -98,13 +98,13 @@ function setup(turns: Turn[], opts: { checkpoint?: () => boolean; scribe?: (db: 
 
 const scenes = () => registry.list().map((s) => s.id);
 
-describe('the scribe and takes', () => {
-  it("swipe restores the take's scribe writes", async () => {
+describe('the Residual and takes', () => {
+  it("swipe restores the take's residual writes", async () => {
     const said = ['from take zero', 'from take one'];
-    let runner!: ScribeRunner;
+    let runner!: ResidualRunner;
     const t = setup([{}, {}], {
-      scribe: (db, journal) => {
-        runner = new ScribeRunner({
+      residual: (db, journal) => {
+        runner = new ResidualRunner({
           db,
           journal,
           selfName: 'Nix',
@@ -140,11 +140,11 @@ describe('the scribe and takes', () => {
   });
 });
 
-describe('the relay tells the scribe', () => {
-  it('keep going stops a scribe still reading that reply, and an answer after a regenerate collapses its takes (review I2, C1)', async () => {
+describe('the relay tells the Residual', () => {
+  it('keep going stops a Residual still reading that reply, and an answer after a regenerate collapses its takes (review I2, C1)', async () => {
     const replaced: string[] = [];
     const collapsed: string[] = [];
-    const t = setup([{}, {}, {}, {}], { scribe: () => ({ onTakeReplaced: (id: string) => void replaced.push(id), onTakesCollapsed: (id: string, keep: number) => void collapsed.push(`${id}:${keep}`) }) });
+    const t = setup([{}, {}, {}, {}], { residual: () => ({ onTakeReplaced: (id: string) => void replaced.push(id), onTakesCollapsed: (id: string, keep: number) => void collapsed.push(`${id}:${keep}`) }) });
     await t.relay.send('hicks', 'hello');
     const id = t.reply().id;
     await t.relay.continueReply('hicks', id);

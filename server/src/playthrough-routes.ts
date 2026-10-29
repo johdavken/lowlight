@@ -157,6 +157,11 @@ export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pt
     return world.leads();
   });
 
+  app.get('/api/playthroughs/active/loose-ends', async (_req, reply) => {
+    if (!world.active()) return reply.code(409).send({ error: 'no-playthrough' });
+    return world.looseEnds();
+  });
+
   app.get('/api/playthroughs/active/clock', async (_req, reply) => {
     if (!world.active()) return reply.code(409).send({ error: 'no-playthrough' });
     return { clock: world.clock() };

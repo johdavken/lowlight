@@ -65,7 +65,7 @@ export interface ChatRelayDeps {
   cutPower?: (rowId: string, at: number) => void;
   /** The clock moved (a turn's row was stamped): the world tells every tab. */
   onClock?: () => void;
-  /** The story moved the clock live (a new turn row, her pass_time, the scribe's backstop), never a swipe or rewind: the room may follow the story (story moods spec §3). */
+  /** The story moved the clock live (a new turn row, her pass_time, the Residual's backstop), never a swipe or rewind: the room may follow the story (story moods spec §3). */
   onLiveClock?: () => void;
   /** Her `[your schedule: …]` line for this turn (null: no schedule). */
   scheduleLine?: (clock: number) => string | null;
@@ -131,6 +131,8 @@ export interface ChatRelayDeps {
    * `replaced`: the reply a regenerate rewrites (its old take's move doesn't count), else null. Read every in-character turn.
    */
   standing?: (player: string, replaced: string | null) => string | null;
+  /** Her `[cipher]` block (cipher spec §2.6): the open truths she knows; null when she knows none. In character only. */
+  cipher?: (player: string) => string | null;
   /**
    * Quest lines (spec 2026-10-16): the book, every run `player` has in the playthrough (in whose room),
    * what conditions read for `player` with this contact (null: quests don't apply), and the map place
@@ -179,7 +181,7 @@ export interface ChatRelayDeps {
   streamIdleMs?: number;
   /** A turn settled (the relay is idle again): `mode` is its prompt's, `ok` whether her reply landed. */
   onTurnEnd?(t: { player: string; mode: string | undefined; ok: boolean; leave?: boolean; reply: { id: string; take: number } | null }): void;
-  /** Before a turn asks her model: the last reply's scribe, if it's still running (scribe spec §2). */
+  /** Before a turn asks her model: the last reply's residual, if it's still running (scribe spec §2). */
   beforeTurn?(): Promise<void>;
   /** A reply's shown take is about to change or go (regenerate, swipe, delete): work reading it stops. */
   onTakeReplaced?(messageId: string): void;
@@ -330,11 +332,11 @@ export class ChatRelay {
   }
 
   /**
-   * The scribe's time backstop (spec 2026-10-20): her finished reply `id`, take `take`, told time she
+   * The Residual's time backstop (spec 2026-10-20): her finished reply `id`, take `take`, told time she
    * didn't pass; its clock moves on by `minutes`, the shown take's `passed` with it. Refused once a later
    * row exists or the story clock moved on elsewhere (the next line is already stamped), or while a turn runs.
    */
-  scribePass(player: string, id: string, take: number, minutes: number): Result {
+  residualPass(player: string, id: string, take: number, minutes: number): Result {
     if (this.turnActive) return { ok: false, error: 'busy' };
     this.enter(player);
     const { db } = this.deps;
@@ -1917,7 +1919,7 @@ export class ChatRelay {
     if (this.latestShown(feedOf(m))?.id !== id || m.role !== 'agent') return { ok: false, error: 'not-latest' };
     const prompt = this.promptOf(m);
     if (!prompt) return { ok: false, error: 'unknown' };
-    // A scribe still reading this reply would land inside the keep going (a failure drops it): it stops, and re-reads after.
+    // A Residual still reading this reply would land inside the keep going (a failure drops it): it stops, and re-reads after.
     this.deps.onTakeReplaced?.(id);
     return this.runTurn(prompt, { kind: 'continue', reply: m });
   }
@@ -2605,7 +2607,9 @@ export class ChatRelay {
     const questText = inCharacter ? this.questBlockFor(player.id, userMessage.mode === 'quest' && target.kind !== 'continue') : null;
     // Texts from the last story day (deck spec §3): the scene knows what was said on the deck.
     const textsNote = inCharacter ? this.textsNote(player) : null;
-    const blocks = [modeNote, loreText, page, standingText, leadsText, questText, strangerNote, textsNote].filter((b): b is string => Boolean(b));
+    // Cipher (spec §2.6): what she keeps from them, after how she feels about them.
+    const cipherText = inCharacter ? (this.deps.cipher?.(player.id) ?? null) : null;
+    const blocks = [modeNote, loreText, page, standingText, cipherText, leadsText, questText, strangerNote, textsNote].filter((b): b is string => Boolean(b));
     const turn: Turn =
       target.kind === 'continue'
         ? { kind: 'continue', blocks }

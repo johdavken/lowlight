@@ -70,7 +70,7 @@ import { fetchCrew } from './net/crew';
 import { openPeople, type PeopleHandle, type PeopleTab } from './room/people-screen';
 import { openCharacterSheet, type SheetPage, type SheetPlayer } from './room/character-sheet';
 import { fetchKit } from './net/kit';
-import { ApiError, branchFrom, contacts, goSolo, leads, listPlaythroughs, saveNow, setLocation, setOutfit, wait } from './net/playthroughs';
+import { ApiError, branchFrom, contacts, goSolo, leads, listPlaythroughs, looseEnds, saveNow, setLocation, setOutfit, wait } from './net/playthroughs';
 import { greetAllowed, markWalkedOut, walkedOut, walkOutDue } from './room/walk-out';
 import { resolveRoomPlayer } from './room/room-player';
 import { residentOf } from './room/resident';
@@ -961,6 +961,7 @@ function startRoom(agentId: string): void {
       tab,
       contacts: playthrough(contacts),
       leads: playthrough(leads),
+      looseEnds: playthrough(looseEnds),
       journal,
       current: agentId,
       persona: personaName,
@@ -1085,7 +1086,7 @@ function startRoom(agentId: string): void {
       if (k === 'you') toggleSheet();
       else if (k === 'save') hud.pressSave();
       else if (k === 'people') openPeopleOn(lastPeopleTab);
-      else if (k === 'contacts' || k === 'leads' || k === 'journal') openPeopleOn(k);
+      else if (k === 'contacts' || k === 'leads' || k === 'journal' || k === 'loose') openPeopleOn(k);
       else if (k === 'quest') questList.toggle();
       else if (k === 'crew') openCrewOn();
       else if (k === 'hide') hideUi.toggle();
@@ -1395,8 +1396,8 @@ function startRoom(agentId: string): void {
         greetGate.onRecap(recap.visible);
         break;
       }
-      case 'scribe_runs':
-        devPanel.setScribeRuns(e.runs);
+      case 'residual_runs':
+        devPanel.setResidualRuns(e.runs, e.cipher);
         break;
       case 'dev_log':
         // A refused journal edit comes back as a warning to this tab: show it in the open panel too.

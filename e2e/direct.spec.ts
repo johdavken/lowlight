@@ -16,7 +16,7 @@ declare global {
 
 type OrRequest = { method: string; url: string; body: { stream?: boolean; model?: string; temperature?: number; messages?: { role: string; content: string | null }[] } };
 const orRequests = async (): Promise<OrRequest[]> => (await (await fetch(`http://127.0.0.1:${STUB_OR_LOG_PORT}/`)).json()) as OrRequest[];
-// Her turns only: the scribe's and the narrators' calls are non-streaming.
+// Her turns only: the Residual's and the narrators' calls are non-streaming.
 const completions = async () => (await orRequests()).filter((r) => r.method === 'POST' && r.url.endsWith('/chat/completions') && r.body.stream !== false);
 
 test('nix-direct: a reply on GLM, a tool call, switching model, regenerate, a credit notice', async ({ page }) => {

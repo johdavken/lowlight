@@ -82,7 +82,7 @@ export function summaryDue(history: ChatMessage[], through: string | null): Chat
   return sent.some((x) => x.m.id === through) ? [] : dropping.slice(-SUMMARY_FIRST_MAX);
 }
 
-/** The summary call: the scribe's opening, then the old summary and the lines about to drop. */
+/** The summary call: the Residual's opening, then the old summary and the lines about to drop. */
 export function summaryMessages(old: string | null, dropping: ChatMessage[], names: { self: string; player: string }): CompletionMessage[] {
   const lines = dropping
     .map((m) => ({ m, c: toCompletion(m) }))

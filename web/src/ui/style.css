@@ -1447,13 +1447,13 @@
 .dp-log-warn { color: var(--tool); }
 .dp-log-error { color: var(--alert); }
 
-.dp-scribe-head { display: flex; align-items: center; justify-content: space-between; }
-.dp-scribe-refresh { font: inherit; font-size: 11px; letter-spacing: 0.08em; background: none; border: 1px solid rgba(127, 233, 255, 0.4); color: rgba(127, 233, 255, 0.8); padding: 0 6px; cursor: pointer; }
-.dp-scribe-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
-.dp-scribe-sum { display: block; width: 100%; text-align: left; font: inherit; background: none; border: 0; padding: 0; color: rgba(127, 233, 255, 0.75); cursor: pointer; }
-.dp-scribe-sum:hover, .dp-scribe-sum:focus-visible { outline: none; color: #fff; }
-.dp-scribe-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 2px 0 6px; }
-.dp-scribe-raw, .dp-scribe-lists { margin: 0; font-size: 11px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; color: rgba(255, 217, 230, 0.75); }
+.dp-residual-head { display: flex; align-items: center; justify-content: space-between; }
+.dp-residual-refresh { font: inherit; font-size: 11px; letter-spacing: 0.08em; background: none; border: 1px solid rgba(127, 233, 255, 0.4); color: rgba(127, 233, 255, 0.8); padding: 0 6px; cursor: pointer; }
+.dp-residual-list { max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.dp-residual-sum { display: block; width: 100%; text-align: left; font: inherit; background: none; border: 0; padding: 0; color: rgba(127, 233, 255, 0.75); cursor: pointer; }
+.dp-residual-sum:hover, .dp-residual-sum:focus-visible { outline: none; color: #fff; }
+.dp-residual-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 2px 0 6px; }
+.dp-residual-raw, .dp-residual-lists { margin: 0; font-size: 11px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; color: rgba(255, 217, 230, 0.75); }
 
 .dp-simulate { gap: 6px; }
 .dp-sim-tool { width: 100%; box-sizing: border-box; }
@@ -1998,3 +1998,13 @@ body.ui-hidden > #devpanel {
 /* Comms (spec 2026-10-20 §2): she is not here, so her figure leaves the stage. */
 #stage-figures.on-comms .stage-right { display: none; }
 .key.dice.comms-off { display: none; }
+/* The dev panel's CIPHER (cipher spec §2.9). */
+.dp-cipher { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; font-size: 12px; }
+.dp-cipher-none { color: rgba(127, 233, 255, 0.55); }
+.dp-cipher-truth { padding: 4px 6px; border-left: 2px solid rgba(255, 197, 107, 0.6); }
+.dp-cipher-truth.out { opacity: 0.55; }
+.dp-cipher-head { color: rgba(127, 233, 255, 0.85); }
+.dp-cipher-text { color: #ffe1ea; }
+.dp-cipher-meta { white-space: pre-wrap; color: rgba(255, 217, 230, 0.6); }
+.dp-cipher-clue { color: rgba(255, 217, 230, 0.85); }
+.dp-cipher-clue.off { color: rgba(255, 120, 120, 0.8); }

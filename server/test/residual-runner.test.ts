@@ -6,10 +6,11 @@ import { openDb, type Db } from '../src/db';
 import { Journal } from '../src/journal';
 import { standingControl, storedStanding } from '../src/standing';
 import { DEFAULT_SHARED_STANDING } from '../../shared/standing';
-import { plansApply, ScribeRunner, SCRIBE_BACKLOG, SCRIBE_RUNS_KEPT, SCRIBE_TIMEOUT_MS, SCRIBE_WAIT_MS, type ScribeRunnerDeps } from '../src/scribe-runner';
+import { plansApply, ResidualRunner, RESIDUAL_BACKLOG, RESIDUAL_RUNS_KEPT, RESIDUAL_TIMEOUT_MS, RESIDUAL_WAIT_MS, type ResidualRunnerDeps } from '../src/residual-runner';
 import type { CompletionMessage } from '../src/turn';
 import { readSummary } from '../src/summary';
 import type { ChatMessage } from '../../shared/types';
+import { cipherKey, foldCipher, parseCipherEvents, type CipherState } from '../../shared/cipher';
 
 const P = 'hicks';
 let db: Db;
@@ -39,8 +40,8 @@ const deferred = () => {
 const answer = (o: object) => () => Promise.resolve({ text: JSON.stringify(o), tokensIn: 100, tokensOut: 20 });
 const noteAdd = (text: string, pin = false) => ({ notes: [{ op: 'add', about: 'you', text, keys: [], pin }] });
 
-function runner(over: Partial<ScribeRunnerDeps> = {}) {
-  const d: ScribeRunnerDeps = {
+function runner(over: Partial<ResidualRunnerDeps> = {}) {
+  const d: ResidualRunnerDeps = {
     db,
     journal,
     selfName: 'Nix',
@@ -59,7 +60,7 @@ function runner(over: Partial<ScribeRunnerDeps> = {}) {
     now: () => clock,
     ...over,
   };
-  return new ScribeRunner(d);
+  return new ResidualRunner(d);
 }
 
 beforeEach(() => {
@@ -76,7 +77,7 @@ afterEach(() => {
   db.close();
 });
 
-describe('ScribeRunner', () => {
+describe('ResidualRunner', () => {
   it('runs after a reply, writes its notes and moves through', async () => {
     const r = runner();
     const a1 = exchange('I paid off Teo', 'All of it?');
@@ -105,13 +106,13 @@ describe('ScribeRunner', () => {
     expect(journal.recap(P).text).toBe('We said goodnight.');
   });
 
-  it('late scribe stamps the old reply', async () => {
+  it('late residual stamps the old reply', async () => {
     const d = deferred();
     const r = runner();
     const a1 = exchange('one', 'reply one');
     answers.push(() => d.promise);
     r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
-    // The player answered and her next reply is streaming before the scribe comes back.
+    // The player answered and her next reply is streaming before the Residual comes back.
     const a2 = exchange('two', 'reply two');
     db.setReplyStamp({ messageId: a2.id, take: 0 });
     d.resolve({ text: JSON.stringify(noteAdd('from reply one')) });
@@ -128,7 +129,7 @@ describe('ScribeRunner', () => {
     r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
     let done = false;
     void r.wait().then(() => (done = true));
-    await vi.advanceTimersByTimeAsync(SCRIBE_WAIT_MS - 1);
+    await vi.advanceTimersByTimeAsync(RESIDUAL_WAIT_MS - 1);
     expect(done).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
     expect(done).toBe(true);
@@ -146,7 +147,7 @@ describe('ScribeRunner', () => {
     d.resolve({ text: JSON.stringify(noteAdd('stale')) });
     await r.wait();
     expect(journal.notes(P)).toEqual([]);
-    expect(db.scribeRuns(10)[0]).toMatchObject({ error: 'dropped: take replaced' });
+    expect(db.residualRuns(10)[0]).toMatchObject({ error: 'dropped: take replaced' });
     expect(db.getMeta(`scribe.${P}.through`)).toBeNull();
   });
 
@@ -157,7 +158,7 @@ describe('ScribeRunner', () => {
     r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
     await r.wait();
     expect(db.getMeta(`scribe.${P}.through`)).toBeNull();
-    expect(db.scribeRuns(1)[0]).toMatchObject({ error: 'answer: not JSON' });
+    expect(db.residualRuns(1)[0]).toMatchObject({ error: 'answer: not JSON' });
     const a2 = exchange('second thing', 'reply two');
     r.afterTurn(P, { id: a2.id, take: 0 }, 'turn');
     await r.wait();
@@ -165,7 +166,7 @@ describe('ScribeRunner', () => {
     expect(calls[1].messages[1].content).toContain('Hicks: second thing');
   });
 
-  it(`backlog over ${SCRIBE_BACKLOG} covers the newest ${SCRIBE_BACKLOG} and logs the gap`, async () => {
+  it(`backlog over ${RESIDUAL_BACKLOG} covers the newest ${RESIDUAL_BACKLOG} and logs the gap`, async () => {
     const r = runner();
     let last!: ChatMessage;
     for (let i = 1; i <= 9; i++) last = exchange(`line ${i}`, `reply ${i}`);
@@ -175,7 +176,7 @@ describe('ScribeRunner', () => {
     expect(content).not.toContain('line 3');
     expect(content).toContain('Hicks: line 4');
     expect(content).toContain('Hicks: line 9');
-    expect(logs).toContain('scribe · backlog: 3 exchanges skipped');
+    expect(logs).toContain('residual · backlog: 3 exchanges skipped');
   });
 
   it('continue re-reads the reply', async () => {
@@ -192,16 +193,16 @@ describe('ScribeRunner', () => {
     expect(storedStanding(db, P, null)!.trust).toBe(1);
   });
 
-  it(`keeps the newest ${SCRIBE_RUNS_KEPT} runs`, () => {
-    for (let i = 0; i < SCRIBE_RUNS_KEPT + 5; i++) {
-      db.insertScribeRun({ at: i, kind: 'turn', player: P, messageId: 'm', take: 0, ms: 1, tokensIn: null, tokensOut: null, raw: null, applied: [], refused: [], error: null });
+  it(`keeps the newest ${RESIDUAL_RUNS_KEPT} runs`, () => {
+    for (let i = 0; i < RESIDUAL_RUNS_KEPT + 5; i++) {
+      db.insertResidualRun({ at: i, kind: 'turn', player: P, messageId: 'm', take: 0, ms: 1, tokensIn: null, tokensOut: null, raw: null, applied: [], refused: [], error: null });
     }
-    const runs = db.scribeRuns(1000);
-    expect(runs).toHaveLength(SCRIBE_RUNS_KEPT);
-    expect(runs[0].at).toBe(SCRIBE_RUNS_KEPT + 4);
+    const runs = db.residualRuns(1000);
+    expect(runs).toHaveLength(RESIDUAL_RUNS_KEPT);
+    expect(runs[0].at).toBe(RESIDUAL_RUNS_KEPT + 4);
   });
 
-  it('logs one dev line: scribe · 3 notes · trust +1 · 1 refused (pin cap) · 1.4 s', async () => {
+  it('logs one dev line: residual · 3 notes · trust +1 · 1 refused (pin cap) · 1.4 s', async () => {
     for (let i = 0; i < 8; i++) journal.note(P, { text: `pin ${i}`, pinned: true }, 'agent');
     const r = runner({
       complete: async () => {
@@ -212,7 +213,7 @@ describe('ScribeRunner', () => {
     const a1 = exchange('x', 'y');
     r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
     await r.wait();
-    expect(logs.at(-1)).toBe('scribe · 3 notes · trust +1 · 1 refused (pin cap) · 1.4 s');
+    expect(logs.at(-1)).toBe('residual · 3 notes · trust +1 · 1 refused (pin cap) · 1.4 s');
   });
 
   it('a database closed while the call is out (a load or branch) ends the run quietly', async () => {
@@ -224,7 +225,7 @@ describe('ScribeRunner', () => {
     db.close();
     d.resolve({ text: JSON.stringify(noteAdd('late')) });
     await r.wait();
-    expect(logs.at(-1)).toMatch(/^scribe · failed: /);
+    expect(logs.at(-1)).toMatch(/^residual · failed: /);
     db = openDb(':memory:', { defaultPlayer: P }); // afterEach closes it
   });
 
@@ -253,7 +254,7 @@ describe('ScribeRunner', () => {
     r.afterTurn(P, { id: a1.id, take: 1 }, 'turn');
     await r.wait();
     expect(journal.notes(P)).toEqual([]);
-    expect(db.scribeRuns(1)[0].error).toBe('dropped: take replaced');
+    expect(db.residualRuns(1)[0].error).toBe('dropped: take replaced');
   });
 
   it('jobs queue per player, and a pending end is never replaced by a turn (review I1)', async () => {
@@ -295,14 +296,14 @@ describe('ScribeRunner', () => {
     r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
     const a2 = exchange('two', 'reply two');
     r.afterTurn(P, { id: a2.id, take: 0 }, 'turn');
-    await vi.advanceTimersByTimeAsync(SCRIBE_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(RESIDUAL_TIMEOUT_MS);
     await r.wait();
-    expect(db.scribeRuns(10).map((x) => x.error)).toEqual([null, 'call failed: timeout']);
+    expect(db.residualRuns(10).map((x) => x.error)).toEqual([null, 'call failed: timeout']);
     expect(journal.notes(P).map((n) => n.text)).toEqual(['next']);
   });
 
   it("with NIX_TOOL_TRACE set, every write and the run's end go to the trace (chat-stress)", async () => {
-    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'scribe-trace-')), 'trace.jsonl');
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'residual-trace-')), 'trace.jsonl');
     process.env.NIX_TOOL_TRACE = file;
     try {
       const r = runner();
@@ -314,11 +315,11 @@ describe('ScribeRunner', () => {
       delete process.env.NIX_TOOL_TRACE;
     }
     const lines = fs.readFileSync(file, 'utf8').trim().split('\n').map((l) => JSON.parse(l) as { name: string; args: string; out: string });
-    expect(lines.map((l) => l.name)).toEqual(['scribe:note', 'scribe:light', 'scribe']);
-    expect(lines[2].out).toMatch(/^scribe · 1 note · 1 light · /);
+    expect(lines.map((l) => l.name)).toEqual(['residual:note', 'residual:light', 'residual']);
+    expect(lines[2].out).toMatch(/^residual · 1 note · 1 light · /);
   });
 
-  it('after the scribe, writes the summary when the next turn would drop lines, stamped to that reply (scribe spec §6)', async () => {
+  it('after the Residual, writes the summary when the next turn would drop lines, stamped to that reply (scribe spec §6)', async () => {
     const r = runner();
     let last!: ChatMessage;
     for (let i = 0; i < 20; i++) last = exchange(`line ${i}`, `reply ${i}`);
@@ -333,10 +334,10 @@ describe('ScribeRunner', () => {
     const all = db.allMessages(P);
     expect(readSummary(db, P)).toEqual({ text: 'They talked for a long time.', through: all[19].id });
     expect(db.writes().filter((w) => w.key === `summary.${P}`).at(-1)).toMatchObject({ messageId: last.id, take: 0 });
-    expect(db.scribeRuns(1)[0]).toMatchObject({ kind: 'summary', error: null });
+    expect(db.residualRuns(1)[0]).toMatchObject({ kind: 'summary', error: null });
   });
 
-  it('the scribe and the summary read a sent photo as its caption (photos spec §4)', async () => {
+  it('the Residual and the summary read a sent photo as its caption (photos spec §4)', async () => {
     const r = runner({ photoCaption: (id) => (id === 'roof' ? 'selfie on the roof' : null) });
     let last!: ChatMessage;
     db.insertMessage(P, { id: `m${++seq}`, role: 'agent', text: 'look\n[photo: roof]', toolLines: [], ts: 1000 * seq, status: 'ok', mode: 'text' });
@@ -384,7 +385,7 @@ describe('ScribeRunner', () => {
     expect(dropAt).toBeGreaterThanOrEqual(0);
   });
 
-  it('a turn waits for the scribe only, not the summary after it (final review M2)', async () => {
+  it('a turn waits for the Residual only, not the summary after it (final review M2)', async () => {
     const r = runner();
     let last!: ChatMessage;
     for (let i = 0; i < 20; i++) last = exchange(`line ${i}`, `reply ${i}`);
@@ -399,7 +400,7 @@ describe('ScribeRunner', () => {
   });
 
   it('a run with nothing to read still ends its trace (final review M6)', async () => {
-    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'scribe-trace-')), 'trace.jsonl');
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'residual-trace-')), 'trace.jsonl');
     process.env.NIX_TOOL_TRACE = file;
     try {
       const r = runner();
@@ -409,7 +410,7 @@ describe('ScribeRunner', () => {
     } finally {
       delete process.env.NIX_TOOL_TRACE;
     }
-    expect(fs.readFileSync(file, 'utf8')).toContain('"name":"scribe"');
+    expect(fs.readFileSync(file, 'utf8')).toContain('"name":"residual"');
   });
 
   it('no summary call while nothing would drop', async () => {
@@ -420,7 +421,7 @@ describe('ScribeRunner', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("her own light calls this turn: the scribe's light fixes are refused (hand-check 2026-10-16)", async () => {
+  it("her own light calls this turn: the Residual's light fixes are refused (hand-check 2026-10-16)", async () => {
     const lit: string[] = [];
     const r = runner({ setLight: (_p, id) => (lit.push(id), { ok: true, text: 'applied' }) });
     add('user', 'bring the lights down');
@@ -430,7 +431,7 @@ describe('ScribeRunner', () => {
     r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
     await r.wait();
     expect(lit).toEqual([]);
-    expect(db.scribeRuns(1)[0].refused).toEqual(['light desk_lamp refused: she changed the lights herself this turn']);
+    expect(db.residualRuns(1)[0].refused).toEqual(['light desk_lamp refused: she changed the lights herself this turn']);
   });
 
   it('a second afterTurn while one runs waits its turn, and wait covers both', async () => {
@@ -458,7 +459,7 @@ describe('time backstop (spec 2026-10-20)', () => {
     return a;
   };
   const moves: { id: string; take: number; minutes: number }[] = [];
-  const passTime: ScribeRunnerDeps['passTime'] = (_p, r, minutes) => {
+  const passTime: ResidualRunnerDeps['passTime'] = (_p, r, minutes) => {
     moves.push({ ...r, minutes });
     db.updateMessage(P, r.id, { clock: db.getMessage(P, r.id)!.clock! + minutes });
     return { ok: true, text: '' };
@@ -475,7 +476,7 @@ describe('time backstop (spec 2026-10-20)', () => {
     expect(moves).toEqual([{ id: a.id, take: 0, minutes: 365 }]);
     expect(calls[0].messages[1].content).toContain('[clock: Day 3, Sat 19:10]');
     expect(logs.at(-1)).toContain('time +365');
-    expect(db.scribeRuns(1, P)[0].applied).toContain('time +365 → Day 4, Sun 01:15');
+    expect(db.residualRuns(1, P)[0].applied).toContain('time +365 → Day 4, Sun 01:15');
   });
 
   it('an ordinary turn answering time null moves nothing', async () => {
@@ -489,7 +490,7 @@ describe('time backstop (spec 2026-10-20)', () => {
     expect(logs.at(-1)).toContain('nothing to write');
   });
 
-  it('her own pass_time this turn stands: the scribe only backstops a skip she told but didn\'t pass (chat-stress 2026-10-20)', async () => {
+  it('her own pass_time this turn stands: the Residual only backstops a skip she told but didn\'t pass (chat-stress 2026-10-20)', async () => {
     const r = runner({ passTime });
     const a = stamped(1500);
     // She passed till dawn herself: her reply sits past its line.
@@ -499,7 +500,7 @@ describe('time backstop (spec 2026-10-20)', () => {
     await r.wait();
     expect(moves).toEqual([]);
     expect(db.getMessage(P, a.id)!.clock).toBe(1800);
-    expect(db.scribeRuns(1, P)[0].refused).toContain('time ignored: she passed time herself this turn');
+    expect(db.residualRuns(1, P)[0].refused).toContain('time ignored: she passed time herself this turn');
   });
 
   it('an ignored or refused hour shows in the dev line as time', async () => {
@@ -559,7 +560,7 @@ describe('her plan (her plans spec §4)', () => {
     expect(db.getMeta('promisespent.hicks')).toBeNull();
   });
 
-  it('her day reaches the scribe when promises apply (deck controls spec §1)', async () => {
+  it('her day reaches the Residual when promises apply (deck controls spec §1)', async () => {
     const r = runner({ promise: () => ({ places }), herDay: () => "Nix's flat 05:00–18:00" });
     const a2 = stamped(1440 + 19 * 60);
     answers.push(answer({ notes: [] }));
@@ -595,7 +596,7 @@ describe('her plan (her plans spec §4)', () => {
     await r.wait();
     expect(lit).toEqual([]);
     expect(moved).toEqual([]);
-    expect(db.scribeRuns(1, P)[0].refused).toEqual(expect.arrayContaining([expect.stringContaining('a text')]));
+    expect(db.residualRuns(1, P)[0].refused).toEqual(expect.arrayContaining([expect.stringContaining('a text')]));
   });
 
   it('a plan in the answer is stored under her reply, and onSet hears it once', async () => {
@@ -646,7 +647,7 @@ describe('her plan (her plans spec §4)', () => {
     expect(db.getMeta('plan.hicks.seen')).toBeNull();
   });
 
-  it("'here' is where her room was when the reply ended, not when the scribe runs (final review M5)", async () => {
+  it("'here' is where her room was when the reply ended, not when the Residual runs (final review M5)", async () => {
     const r = runner({ plan: () => ({ places, here: HOME, onSet: () => {} }) });
     const a = stamped(1440 + 19 * 60);
     answers.push(answer({ notes: [], plan: { going: { place: HAES, until: null }, meet: null } }));
@@ -680,5 +681,152 @@ describe('when plans apply (her plans spec §4)', () => {
   });
   it('never her goodbye when she leaves: it would replace the plan she left on (final review I2)', () => {
     expect(plansApply(reply, line({ mode: 'end', leave: true, parting: 'her' }), false)).toBe(false);
+  });
+});
+
+describe('cipher in the turn run (cipher spec §2.3–2.4)', () => {
+  const state = (): CipherState =>
+    foldCipher([parseCipherEvents(db.getMeta(cipherKey(P))), [{ t: 'truth', id: 'nix-1', kind: 'place', truth: 'The stall is a drop.', knownBy: ['nix'], comesOutWhen: 'you see the drop', changes: 'c', clueIdeas: 'i', seq: 1 }]], 7);
+
+  it('sends the open truths as [cipher: …], writes a clue under the reply, and a rewind takes it back', async () => {
+    const r = runner({ cipher: state, sceneId: () => 'karasu/noodle-stall' });
+    const a1 = exchange('look under the register', '*She slides a thick envelope out of sight.*');
+    answers.push(answer({ notes: [], cipher: { clues: [{ id: 'T1', text: 'a thick envelope' }], learned: [] } }));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.wait();
+    expect(calls[0].messages[1].content).toContain('[cipher: T1 · The stall is a drop. · comes out when you see the drop]');
+    const evs = parseCipherEvents(db.getMeta(cipherKey(P)));
+    expect(evs).toEqual([expect.objectContaining({ t: 'clue', id: 'nix-1', messageId: a1.id, place: 'karasu/noodle-stall', onPage: true })]);
+    expect(logs.at(-1)).toContain('1 clue');
+    const a0 = db.allMessages(P)[0];
+    db.cutAfter(P, a0.id);
+    expect(db.getMeta(cipherKey(P))).toBeNull();
+  });
+
+  it('no open truths: no [cipher: …] line', async () => {
+    const r = runner({ cipher: () => foldCipher([], 7) });
+    const a1 = exchange('hi', 'Hey.');
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.wait();
+    expect(calls[0].messages[1].content).not.toContain('[cipher:');
+  });
+
+  it("a clue in the narrator's event is on the page (review I1)", async () => {
+    const r = runner({ cipher: state, sceneId: () => 'karasu/noodle-stall' });
+    db.insertMessage(P, { id: 'e1', role: 'user', text: 'A courier drops a thick envelope at the stall.', toolLines: [], ts: 500, status: 'ok', mode: 'encounter', encounter: { title: 'Parcel' } });
+    const a1 = add('agent', 'Huh.');
+    answers.push(answer({ notes: [], cipher: { clues: [{ id: 'T1', text: 'a thick envelope' }], learned: [] } }));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.wait();
+    expect(parseCipherEvents(db.getMeta(cipherKey(P)))).toEqual([expect.objectContaining({ t: 'clue', onPage: true })]);
+  });
+
+  it("an event card reads as the Narrator's, not the player's", async () => {
+    const r = runner();
+    db.insertMessage(P, { id: 'e1', role: 'user', text: 'A courier drops a parcel at the stall.', toolLines: [], ts: 500, status: 'ok', mode: 'encounter', encounter: { title: 'Parcel' } });
+    const a1 = add('agent', 'Huh.');
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.wait();
+    expect(calls[0].messages[1].content).toMatch(/Narrator: .*courier drops a parcel/);
+    expect(calls[0].messages[1].content).not.toMatch(/Hicks: .*courier/);
+  });
+});
+
+describe('the cipher run (cipher spec §2.2)', () => {
+  const cast = () => [{ id: 'nix', name: 'Nix', pronoun: 'she', about: 'A fixer.', secret: null }, { id: 'hae', name: 'Hae', pronoun: 'she', about: 'The stall.', secret: null }];
+  const live = (replies: () => number) => () => foldCipher([parseCipherEvents(db.getMeta(cipherKey(P)))], replies());
+  const truthAnswer = (truths: object[]) => answer({ truths });
+  const good = { kind: 'place', truth: 'The stall is a drop.', knownBy: ['hae'], comesOutWhen: 'w', changes: 'c', clueIdeas: 'i' };
+  const isCipherCall = (c: { messages: CompletionMessage[] }) => c.messages[0].content.startsWith('You keep the secrets');
+
+  it('not due: no call', async () => {
+    const r = runner({ cipher: live(() => 5), cipherCast: cast, selfId: 'nix' });
+    const a1 = exchange('hi', 'Hey.');
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.waitAll();
+    expect(calls.some(isCipherCall)).toBe(false);
+  });
+
+  it('due: writes a run and the truths that pass under the reply; a rewind takes them back', async () => {
+    const r = runner({ cipher: live(() => 6), cipherCast: cast, selfId: 'nix' });
+    const a0 = add('user', 'first');
+    const a1 = add('agent', 'Hey.');
+    answers.push(answer({ notes: [] }));
+    answers.push(truthAnswer([good, { ...good, kind: 'self', knownBy: ['hicks'] }]));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.waitAll();
+    const call = calls.find(isCipherCall)!;
+    expect(call.maxTokens).toBe(1200);
+    const evs = parseCipherEvents(db.getMeta(cipherKey(P)));
+    expect(evs.map((e) => e.t)).toEqual(['run', 'truth']);
+    expect(evs[1]).toMatchObject({ id: `nix-${a1.id}.0-1`, kind: 'place', knownBy: ['hae'] });
+    const row = db.residualRuns(5).find((x) => x.kind === 'cipher')!;
+    expect(row.applied).toEqual([`truth nix-${a1.id}.0-1 (place)`]);
+    expect(row.refused).toEqual(['truths[1]: knownBy: the player']);
+    expect(logs.some((l) => l.startsWith('residual · cipher · 1 truth (place) · 1 refused'))).toBe(true);
+    db.cutAfter(P, a0.id);
+    expect(db.getMeta(cipherKey(P))).toBeNull();
+  });
+
+  it('a run with every truth refused still waits refillGap', async () => {
+    let replies = 6;
+    const r = runner({ cipher: live(() => replies), cipherCast: cast, selfId: 'nix' });
+    const a1 = exchange('hi', 'Hey.');
+    answers.push(answer({ notes: [] }));
+    answers.push(truthAnswer([{ ...good, knownBy: ['hicks'] }]));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.waitAll();
+    expect(parseCipherEvents(db.getMeta(cipherKey(P))).map((e) => e.t)).toEqual(['run']);
+    replies = 7;
+    const a2 = exchange('again', 'Hm.');
+    r.afterTurn(P, { id: a2.id, take: 0 }, 'turn');
+    await r.waitAll();
+    expect(calls.filter(isCipherCall)).toHaveLength(1);
+  });
+
+  it("a truth's id names the take it was written on, so another take's truth never shares it (final review 1)", async () => {
+    const r = runner({ cipher: live(() => 6), cipherCast: cast, selfId: 'nix' });
+    const a1 = exchange('hi', 'Hey.');
+    answers.push(answer({ notes: [] }));
+    answers.push(truthAnswer([good]));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.waitAll();
+    const ids = parseCipherEvents(db.getMeta(cipherKey(P))).filter((e) => e.t === 'truth').map((e) => (e as { id: string }).id);
+    expect(ids).toEqual([`nix-${a1.id}.0-1`]);
+  });
+
+  it('a failed cipher call waits 3 replies before trying again, not every reply (minor 1)', async () => {
+    let replies = 6;
+    const r = runner({ cipher: live(() => replies), cipherCast: cast, selfId: 'nix' });
+    const turn = async (said: string) => {
+      const a = exchange(said, 'Hm.');
+      r.afterTurn(P, { id: a.id, take: 0 }, 'turn');
+      await r.waitAll();
+    };
+    answers.push(answer({ notes: [] }));
+    answers.push(() => Promise.reject(new Error('provider down')));
+    await turn('one');
+    expect(calls.filter(isCipherCall)).toHaveLength(1);
+    replies = 7;
+    await turn('two');
+    replies = 8;
+    await turn('three');
+    expect(calls.filter(isCipherCall)).toHaveLength(1);
+    // The failure itself writes no run: a provider blip mustn't cost the 10-reply wait.
+    expect(parseCipherEvents(db.getMeta(cipherKey(P))).some((e) => e.t === 'run')).toBe(false);
+    replies = 9;
+    await turn('four');
+    expect(calls.filter(isCipherCall)).toHaveLength(2);
+  });
+
+  it('a second truth from the same contact never reuses an id', async () => {
+    db.setMeta(cipherKey(P), JSON.stringify([{ t: 'truth', id: 'nix-1', kind: 'city', truth: 'x', knownBy: [], comesOutWhen: 'w', changes: 'c', clueIdeas: 'i', seq: 1 }, { t: 'learned', id: 'nix-1', seq: 2 }]));
+    const r = runner({ cipher: live(() => 6), cipherCast: cast, selfId: 'nix' });
+    const a1 = exchange('hi', 'Hey.');
+    answers.push(answer({ notes: [] }));
+    answers.push(truthAnswer([good]));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.waitAll();
+    expect(parseCipherEvents(db.getMeta(cipherKey(P))).filter((e) => e.t === 'truth').map((e) => (e as { id: string }).id)).toEqual(['nix-1', `nix-${a1.id}.0-1`]);
   });
 });

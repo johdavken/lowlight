@@ -59,7 +59,7 @@ function runCall(ctx: ToolContext, call: { name: string; args: string }): string
     }
   }
   if (typeof args !== 'object' || args === null || Array.isArray(args)) return `error: arguments for ${call.name} must be an object`;
-  // Her bookkeeping is the scribe's (scribe spec §1), her face her actions': a call she makes anyway is an unknown tool to her.
+  // Her bookkeeping is the Residual's (scribe spec §1), her face her actions': a call she makes anyway is an unknown tool to her.
   if (NOT_HERS.includes(call.name)) return `error: unknown tool '${call.name}'; available: ${toolsFor(ctx, { agent: true }).map((t) => t.name).join(', ')}`;
   const result = dispatchTool(ctx, call.name, args, 'agent');
   return result.ok ? result.text : `error: ${result.error}`;

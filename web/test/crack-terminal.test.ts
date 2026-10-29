@@ -156,7 +156,8 @@ describe('skins', () => {
     expect(win(open(SETUP).host).classList.contains('ct-skin-green')).toBe(true);
     expect(win(open({ ...SETUP, skin: 'nope' as never }).host).classList.contains('ct-skin-green')).toBe(true);
     expect(skinOf({})).toBe('green');
-    expect(ALL.sort()).toEqual(['amber', 'dock', 'green', 'holo', 'ice', 'meridian', 'meridian-deaf', 'pocket', 'sentinel', 'slab']);
+    expect(skinOf({ skin: 'ice' as TerminalSkin })).toBe('corp');
+    expect(ALL.sort()).toEqual(['amber', 'corp', 'dock', 'green', 'holo', 'meridian', 'meridian-deaf', 'pocket', 'sentinel', 'slab']);
   });
 
   it('green keeps today\'s words', () => {
@@ -191,17 +192,17 @@ describe('skins', () => {
     expect(open({ ...SETUP, skin: 'meridian-deaf' }).host.querySelector('.ct-signal')!.textContent).toContain('NO UPLINK · LOCAL ONLY');
   });
 
-  it('ice: the alarm segments and the deck it linked', () => {
-    const none = open({ ...SETUP, skin: 'ice', deck: null }, { alarm: 1 });
+  it('corp: the alarm segments and the deck it linked', () => {
+    const none = open({ ...SETUP, skin: 'corp', deck: null }, { alarm: 1 });
     expect(none.host.querySelector('.ct-linked')!.textContent).toBe('LINKED · NO DECK');
     expect(none.host.querySelectorAll('.ct-alarm i')).toHaveLength(3);
     expect(none.host.querySelectorAll('.ct-alarm i.on')).toHaveLength(1);
-    expect(open({ ...SETUP, skin: 'ice', deck: 'Chrome deck' }).host.querySelector('.ct-linked')!.textContent).toBe('LINKED · CHROME DECK');
+    expect(open({ ...SETUP, skin: 'corp', deck: 'Chrome deck' }).host.querySelector('.ct-linked')!.textContent).toBe('LINKED · CHROME DECK');
   });
 
   it('a lockout lights the next alarm segment, never past 3', () => {
     for (const [at, lit] of [[0, 1], [2, 3], [3, 3]] as const) {
-      const { host, term } = open({ ...SETUP, skin: 'ice' }, { alarm: at });
+      const { host, term } = open({ ...SETUP, skin: 'corp' }, { alarm: at });
       for (const w of term.words.map((x) => x.word).filter((x) => x !== term.password).slice(0, 4)) wordEl(host, w).click();
       expect(host.querySelectorAll('.ct-alarm i'), `at ${at}`).toHaveLength(3);
       expect(host.querySelectorAll('.ct-alarm i.on'), `at ${at}`).toHaveLength(lit);

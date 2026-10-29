@@ -230,7 +230,7 @@ describe('hub journal', () => {
     db.close();
   });
 
-  it('withToolLineReply puts a tool line on the reply the scribe read, not the one streaming (scribe review I3)', () => {
+  it('withToolLineReply puts a tool line on the reply the Residual read, not the one streaming (residual review I3)', () => {
     const { hub, db, journal } = makeHub('r2');
     db.insertMessage('hicks', { id: 'r1', role: 'agent', text: 'one', toolLines: [], ts: 1, status: 'ok' });
     db.insertMessage('hicks', { id: 'r2', role: 'agent', text: '', toolLines: [], ts: 2, status: 'streaming' });
@@ -325,20 +325,36 @@ describe('hub journal', () => {
     db.close();
   });
 
-  it('answers scribe_runs with that pair\'s runs, newest first, at most 50 (scribe spec §8)', () => {
+  it('answers residual_runs with that pair\'s runs, newest first, at most 50 (scribe spec §8)', () => {
     const { hub, db } = makeHub();
     const run = (at: number, player: string) => ({ at, kind: 'turn' as const, player, messageId: 'm', take: 0, ms: 5, tokensIn: null, tokensOut: null, raw: '{}', applied: [], refused: [], error: null });
-    for (let i = 0; i < 55; i++) db.insertScribeRun(run(i, 'hicks'));
-    db.insertScribeRun(run(99, 'cass'));
+    for (let i = 0; i < 55; i++) db.insertResidualRun(run(i, 'hicks'));
+    db.insertResidualRun(run(99, 'cass'));
     const a = fakeSocket();
     hub.addClient(a.ws, 'hicks');
-    a.client({ type: 'scribe_runs' });
-    const ev = of(a.events, 'scribe_runs').at(-1)! as unknown as { runs: { at: number; player: string }[] };
+    a.client({ type: 'residual_runs' });
+    const ev = of(a.events, 'residual_runs').at(-1)! as unknown as { runs: { at: number; player: string }[] };
     expect(ev.runs).toHaveLength(50);
     expect(ev.runs[0].at).toBe(54);
     expect(ev.runs.every((r) => r.player === 'hicks')).toBe(true);
-    expect(validateClientEvent({ type: 'scribe_runs' })).toEqual({ type: 'scribe_runs' });
+    expect(validateClientEvent({ type: 'residual_runs' })).toEqual({ type: 'residual_runs' });
     db.close();
+  });
+
+  it("residual_runs carries the playthrough's Cipher for the dev panel, null without one (cipher spec §2.9)", () => {
+    const cipher = { truths: [], replies: 3, lastRun: null };
+    const { hub, db } = makeHub(null, 'hicks', { cipher: () => cipher });
+    const a = fakeSocket();
+    hub.addClient(a.ws, 'hicks');
+    a.client({ type: 'residual_runs' });
+    expect((of(a.events, 'residual_runs').at(-1)! as unknown as { cipher: unknown }).cipher).toEqual(cipher);
+    db.close();
+    const none = makeHub();
+    const b = fakeSocket();
+    none.hub.addClient(b.ws, 'hicks');
+    b.client({ type: 'residual_runs' });
+    expect((of(b.events, 'residual_runs').at(-1)! as unknown as { cipher: unknown }).cipher).toBeNull();
+    none.db.close();
   });
 
   it('validates the journal client events', () => {

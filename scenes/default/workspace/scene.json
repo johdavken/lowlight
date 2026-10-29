@@ -1,0 +1,175 @@
+{
+  "id": "workspace",
+  "name": "Workspace",
+  "description": "A quiet workspace at night: a desk, a lamp, a screen and a window onto the city.",
+  "resolution": [
+    480,
+    270
+  ],
+  "layers": [
+    {
+      "id": "back",
+      "src": "back.png",
+      "parallax": 0.1,
+      "emissive": "back_e.png"
+    },
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0.4,
+      "emissive": "room_e.png"
+    },
+    {
+      "id": "fg",
+      "src": "fg.png",
+      "parallax": 1
+    }
+  ],
+  "lights": [
+    {
+      "id": "lamp",
+      "label": "desk lamp",
+      "pos": [
+        93,
+        146
+      ],
+      "color": "#ffb347",
+      "intensity": 0.6,
+      "radius": 110,
+      "flicker": 0
+    },
+    {
+      "id": "window",
+      "label": "city glow through the window",
+      "pos": [
+        339,
+        77
+      ],
+      "color": "#ff3c8a",
+      "intensity": 0.8,
+      "radius": 180,
+      "flicker": 0.15,
+      "outside": true
+    },
+    {
+      "id": "screen",
+      "label": "screen glow",
+      "pos": [
+        150,
+        144
+      ],
+      "color": "#7fe9ff",
+      "intensity": 0.35,
+      "radius": 80,
+      "flicker": 0.05
+    }
+  ],
+  "defaults": {
+    "ambient": "#1a1030",
+    "ambientLevel": 0.35,
+    "weather": "rain",
+    "weatherLevel": 0.7,
+    "fog": 0.2,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "after-hours": {
+      "ambientLevel": 0.2,
+      "lights": {
+        "lamp": {
+          "intensity": 0.4
+        }
+      }
+    },
+    "storm": {
+      "weather": "rain",
+      "weatherLevel": 1,
+      "lights": {
+        "window": {
+          "flicker": 0.6
+        }
+      }
+    },
+    "late": {
+      "ambientLevel": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "lamp": {
+          "intensity": 0.45
+        },
+        "window": {
+          "intensity": 0.6
+        },
+        "screen": {
+          "intensity": 0.25
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#141024",
+      "ambientLevel": 0.25,
+      "weatherLevel": 0.3,
+      "fog": 0.15,
+      "lights": {
+        "lamp": {
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "window": {
+          "intensity": 0.4,
+          "flicker": 0.05
+        },
+        "screen": {
+          "intensity": 0.2
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.2,
+      "fog": 0.35,
+      "lights": {
+        "lamp": {
+          "intensity": 0.35,
+          "flicker": 0.15
+        },
+        "window": {
+          "color": "#ff2d4a",
+          "intensity": 0.9,
+          "flicker": 0.5
+        },
+        "screen": {
+          "flicker": 0.3
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": true,
+    "hum": 0.3,
+    "bed": {
+      "src": "sound/overhead-fan.ogg",
+      "level": 0.35
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        266,
+        67
+      ],
+      [
+        430,
+        67
+      ],
+      [
+        430,
+        157
+      ],
+      [
+        266,
+        157
+      ]
+    ]
+  ]
+}

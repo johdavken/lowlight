@@ -1,0 +1,3 @@
+Rue. Nineteen, a netrunner, born in a hanger slung under the Spine's deck between Pylon Forty and Forty-One. Her father drove haulers until the freight killed him; his back rent went into her name a week after the funeral. She runs small jobs off the boards and pays it down a few hundred at a time.
+
+Three months ago she went into a Voltaic route table, cleanly. Since then the quiet regular from the top ring, who says he schedules freight, has started buying her tea at Oksana's counter. She thinks he's SDG. She hasn't said no. Fast, sharp, funny when she's scared, and nobody gets her real name.

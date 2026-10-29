@@ -1,0 +1,40 @@
+[
+  {
+    "kind": "tower-sign",
+    "at": [
+      84.3,
+      20.6
+    ],
+    "height": 88,
+    "shape": "cat",
+    "color": "#ff4fd8",
+    "strength": 20,
+    "onCliff": true
+  },
+  {
+    "kind": "tower-sign",
+    "at": {
+      "place": "hicks-walkway"
+    },
+    "height": 34,
+    "shape": "planet",
+    "color": "#4fe3ff",
+    "besideStructure": true
+  },
+  {
+    "kind": "freight-lift",
+    "at": {
+      "place": "public-landing"
+    },
+    "carLevel": 6
+  },
+  {
+    "kind": "wall-sign",
+    "at": {
+      "place": "haes-noodles"
+    },
+    "level": 4,
+    "shape": "bowl",
+    "color": "#ff2a3a"
+  }
+]

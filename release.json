@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "packs": [
+    "drownworks",
+    "karasu",
+    "lowlight",
+    "marsh",
+    "nexus",
+    "spine",
+    "strand",
+    "tidal",
+    "velvet"
+  ],
+  "characters": [
+    "adebayo",
+    "cass",
+    "ember",
+    "garro",
+    "hae",
+    "hicks",
+    "ines",
+    "mother-rot",
+    "nix",
+    "nix-direct",
+    "oksana",
+    "rue",
+    "silas",
+    "soren",
+    "tilly",
+    "vesna"
+  ],
+  "defaultPlayer": "hicks",
+  "bugRelay": null,
+  "holdQuests": [
+    "cold-script",
+    "first-cut"
+  ]
+}

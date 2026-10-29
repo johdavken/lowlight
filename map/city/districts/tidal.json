@@ -1,0 +1,133 @@
+{
+  "height": [
+    6,
+    15
+  ],
+  "lot": [
+    20,
+    13
+  ],
+  "streetEvery": [
+    3,
+    3
+  ],
+  "tallGain": 0.4,
+  "brick": 0.2,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0.22,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.01,
+    "roofLights": 0,
+    "fires": 6,
+    "outage": 0.15
+  },
+  "windowLit": 0.62,
+  "windowColors": [
+    "#ffc27a",
+    "#ffb060",
+    "#cfe2ff"
+  ],
+  "pools": {
+    "colors": [
+      "#ffb060"
+    ],
+    "count": 16,
+    "power": 200000,
+    "reach": 110,
+    "radius": 4
+  },
+  "signColors": [
+    "#ffb060",
+    "#cfe2ff"
+  ],
+  "signShare": 0.03,
+  "deepZoom": true,
+  "angleDeg": -30,
+  "isle": {
+    "ridge": {
+      "from": [
+        42.5,
+        79
+      ],
+      "to": [
+        61,
+        76
+      ],
+      "high": 56,
+      "low": 30
+    },
+    "quay": 2.5,
+    "apron": 9,
+    "cliffShare": 0.0,
+    "cliff": 18,
+    "ledge": 6,
+    "face": 10,
+    "pads": 95,
+    "spread": 230,
+    "maxCut": 10,
+    "roads": {
+      "paths": [
+        {
+          "from": [
+            45.8,
+            89.6
+          ],
+          "to": [
+            46.2,
+            81.4
+          ],
+          "turn": 52,
+          "leg": 72
+        },
+        {
+          "from": [
+            57.0,
+            90.9
+          ],
+          "to": [
+            56.1,
+            83.6
+          ],
+          "turn": 52,
+          "leg": 72
+        },
+        {
+          "from": [
+            59,
+            84
+          ]
+        },
+        {
+          "from": [
+            64.5,
+            77
+          ],
+          "to": [
+            57.5,
+            75.5
+          ]
+        }
+      ],
+      "leg": 70
+    },
+    "trees": 900,
+    "qdf": {
+      "at": [
+        42.5,
+        78.5
+      ],
+      "w": 46,
+      "d": 34,
+      "h": 24
+    },
+    "stairs": {
+      "near": "ferry-stairs"
+    },
+    "coast": {
+      "amp": 34
+    }
+  }
+}

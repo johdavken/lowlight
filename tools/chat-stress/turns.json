@@ -1,0 +1,22 @@
+{
+  "contacts": [
+    { "id": "cass", "player": "hicks" },
+    { "id": "ember", "player": "hicks" },
+    { "id": "silas", "player": "hicks" },
+    { "id": "mother-rot", "player": "hicks" },
+    { "id": "nix-direct", "player": "hicks" },
+    { "id": "hicks", "player": "cass" }
+  ],
+  "turns": [
+    { "text": "*comes in out of the rain* Christ, it's bright in here. Bring the lights down low for me?", "expect": "light" },
+    { "text": "Keep this between us: my sister Mira went missing three weeks ago near the Marsh. And I quit synth-gin last month — don't let me order one.", "expect": "note" },
+    { "text": "Who do you know who finds lost people out in the Marsh? Give me a name and how to reach them." },
+    { "text": "Actually — scratch what I said about the gin. I had one last night. Fix whatever you're keeping on me.", "expect": "note" },
+    { "text": "What do you actually remember about me so far? Be honest." },
+    { "text": "*the power cuts out — every light in the place dies at once, leaving only the city glow through the window*", "expect": "light" },
+    { "mode": "ooc", "text": "Quick out-of-character question: how do you think this scene is going so far? Anything you'd want from me as a player?", "expect": "no-room-change" },
+    { "text": "Let's get out of here before the power comes back. Take me to one of your places — somewhere we can get food.", "expect": "scene" },
+    { "text": "*I look around at whoever else is here* Who's your friend? Introduce us." },
+    { "text": "*we end up talking until the sky goes grey* I should go. Same time tomorrow night?", "expect": "recap" }
+  ]
+}

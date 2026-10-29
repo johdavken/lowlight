@@ -1,0 +1,361 @@
+{
+  "id": "soren-hab",
+  "name": "Soren's hab",
+  "description": "Xander Soren's room on the top ring of Pylon Forty, cut into the concrete right under the Spine's deck. Bare grey concrete walls with nothing on them. Overhead, the underside of the highway: a massive girder, a steel expansion joint and a heavy bolted damper, and every hauler that crosses hits the joint like a door slamming. A bare caged bulb hangs from the girder on a short cord. A steel bunk made with military neatness, a tall grey locker, a fold-down table with a kettle, one mug, a closed paper notebook, a small speaker and a clamp lamp, one folding chair. A long slot window looks out under the deck at the next pylons, the habs hung from the girders on cables, and the towers of Nexus on the horizon. By the steel door, a green wall intercom and a grey hard case with a faded bird on it. The branch pays the rent. He has lived here four years.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissiveLights": {
+        "caged_bulb": "room_e_caged_bulb.png",
+        "clamp_lamp": "room_e_clamp_lamp.png",
+        "intercom": "room_e_intercom.png",
+        "hung_habs": "room_e_hung_habs.png",
+        "core_skyline": "room_e_core_skyline.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "caged_bulb",
+      "label": "the bare caged bulb hanging from the girder",
+      "pos": [
+        690,
+        225
+      ],
+      "color": "#f2b25a",
+      "intensity": 0.62,
+      "radius": 440,
+      "flicker": 0
+    },
+    {
+      "id": "clamp_lamp",
+      "label": "the clamp lamp over the fold-down table",
+      "pos": [
+        676,
+        438
+      ],
+      "color": "#f5c46a",
+      "intensity": 0.5,
+      "radius": 300,
+      "flicker": 0
+    },
+    {
+      "id": "intercom",
+      "label": "the green wall intercom by the door",
+      "pos": [
+        1436,
+        440
+      ],
+      "color": "#5cff6a",
+      "intensity": 0.3,
+      "radius": 180,
+      "flicker": 0
+    },
+    {
+      "id": "hung_habs",
+      "label": "the hung habs and pylons through the slot window",
+      "pos": [
+        940,
+        385
+      ],
+      "color": "#e8a850",
+      "intensity": 0.28,
+      "radius": 380,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "core_skyline",
+      "label": "Nexus on the horizon through the window",
+      "pos": [
+        1260,
+        390
+      ],
+      "color": "#8fb4ff",
+      "intensity": 0.3,
+      "radius": 420,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a2e44",
+    "ambientLevel": 0.4,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.06,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1e2236",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.06,
+      "timeOfDay": "late-night",
+      "lights": {
+        "caged_bulb": {
+          "color": "#f2b25a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#f5c46a",
+          "intensity": 0.42,
+          "flicker": 0
+        },
+        "intercom": {
+          "color": "#5cff6a",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "hung_habs": {
+          "color": "#e8a850",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "core_skyline": {
+          "color": "#8fb4ff",
+          "intensity": 0.24,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#262a40",
+      "ambientLevel": 0.32,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.05,
+      "timeOfDay": "night",
+      "lights": {
+        "caged_bulb": {
+          "color": "#f2b25a",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#f5c46a",
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "intercom": {
+          "color": "#5cff6a",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "hung_habs": {
+          "color": "#e8a850",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "core_skyline": {
+          "color": "#8fb4ff",
+          "intensity": 0.26,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1420",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.12,
+      "timeOfDay": "night",
+      "lights": {
+        "caged_bulb": {
+          "color": "#f2b25a",
+          "intensity": 0.4,
+          "flicker": 0.22
+        },
+        "clamp_lamp": {
+          "color": "#f5c46a",
+          "intensity": 0.3,
+          "flicker": 0.1
+        },
+        "intercom": {
+          "color": "#5cff6a",
+          "intensity": 0.3,
+          "flicker": 0.15
+        },
+        "hung_habs": {
+          "color": "#e8a850",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "core_skyline": {
+          "color": "#8fb4ff",
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    },
+    "freight": {
+      "ambient": "#262a40",
+      "ambientLevel": 0.36,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.08,
+      "timeOfDay": "night",
+      "lights": {
+        "caged_bulb": {
+          "color": "#f2b25a",
+          "intensity": 0.62,
+          "flicker": 0.3
+        },
+        "clamp_lamp": {
+          "color": "#f5c46a",
+          "intensity": 0.5,
+          "flicker": 0.08
+        },
+        "intercom": {
+          "color": "#5cff6a",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "hung_habs": {
+          "color": "#e8a850",
+          "intensity": 0.28,
+          "flicker": 0.1
+        },
+        "core_skyline": {
+          "color": "#8fb4ff",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a5470",
+      "ambientLevel": 0.5,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.06,
+      "timeOfDay": "dawn",
+      "lights": {
+        "caged_bulb": {
+          "color": "#f2b25a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#f5c46a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "intercom": {
+          "color": "#5cff6a",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "hung_habs": {
+          "color": "#e8a850",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "core_skyline": {
+          "color": "#8fb4ff",
+          "intensity": 0.18,
+          "flicker": 0
+        }
+      }
+    },
+    "power-cut": {
+      "ambient": "#161a2a",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.06,
+      "timeOfDay": "late-night",
+      "lights": {
+        "caged_bulb": {
+          "color": "#f2b25a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#f5c46a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "intercom": {
+          "color": "#5cff6a",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "hung_habs": {
+          "color": "#e8a850",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "core_skyline": {
+          "color": "#8fb4ff",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        719,
+        295
+      ],
+      [
+        1396,
+        298
+      ],
+      [
+        1401,
+        490
+      ],
+      [
+        718,
+        492
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "hum": 0.2
+  },
+  "effects": [
+    {
+      "kind": "glass",
+      "amount": 3
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.5
+    }
+  ],
+  "exits": [
+    {
+      "to": "spine/oksanas-counter",
+      "way": "down the pylon stair to Oksana's",
+      "door": [
+        1455,
+        250,
+        80,
+        470
+      ]
+    },
+    {
+      "to": "spine/listening-post",
+      "way": "down the pylon stair to the listening post"
+    },
+    {
+      "to": "spine/catwalk",
+      "way": "out the service hatch to the catwalk"
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+/* Pocket deck (mockup I): a phone in your hand in the corner of the room. One column that scrolls with the
+   cursor; small, so harder to read — it's a cheap deck. */
+.ct-window.ct-skin-pocket {
+  inset: 6% 5% auto auto;
+  width: 450px;
+  height: 740px;
+  box-sizing: border-box;
+  padding: 30px 18px 18px;
+  border: 16px solid transparent;
+  border-radius: 46px;
+  gap: 10px;
+  font: 16px/1.25 'IBM Plex Mono', monospace;
+  color: #d6d2de;
+  text-shadow: none;
+  background:
+    linear-gradient(#020203, #020203) padding-box,
+    linear-gradient(#111015, #111015) border-box;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.85), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transform: rotate(4deg);
+}
+.ct-skin-pocket::after { display: none; }
+.ct-skin-pocket .ct-head { font-size: 13px; letter-spacing: 0.12em; color: rgba(214, 210, 222, 0.55); }
+.ct-skin-pocket .ct-tries i { width: 9px; height: 9px; border-radius: 50%; border-color: rgba(255, 79, 139, 0.5); }
+.ct-skin-pocket .ct-tries i.on { background: #ff4f8b; box-shadow: none; }
+.ct-skin-pocket .ct-body { flex-direction: column; gap: 10px; }
+.ct-skin-pocket .ct-dump { position: relative; flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.ct-skin-pocket .ct-addr { color: rgba(214, 210, 222, 0.3); opacity: 1; margin-right: 8px; }
+.ct-skin-pocket .ct-row { color: rgba(214, 210, 222, 0.3); }
+.ct-skin-pocket .ct-word { color: #fff; }
+.ct-skin-pocket .ct-bracket { color: #7fe9ff; }
+.ct-skin-pocket :is(.ct-word, .ct-bracket):is(:hover, :focus) { color: #020203; background: #ff4f8b; }
+.ct-skin-pocket :is(.ct-word.struck, .ct-bracket.used) { opacity: 1; color: rgba(214, 210, 222, 0.4); background: none; }
+.ct-skin-pocket .ct-side { flex: none; min-width: 0; padding-top: 8px; border-top: 1px solid rgba(214, 210, 222, 0.15); font-size: 14px; }
+.ct-skin-pocket .ct-log { max-height: 120px; }
+.ct-skin-pocket .ct-entry-b { color: #ff4f8b; }
+.ct-skin-pocket :is(.ct-ghost, .ct-hint) { color: #ff9cc0; overflow-wrap: anywhere; }
+.ct-skin-pocket .ct-leave { align-self: stretch; padding: 8px 0; border-radius: 14px; font: 14px 'IBM Plex Mono', monospace; color: #d6d2de; border-color: rgba(214, 210, 222, 0.3); }
+.ct-window.ct-skin-pocket.is-locked { color: #ff8aa0; }

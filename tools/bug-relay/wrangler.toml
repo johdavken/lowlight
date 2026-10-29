@@ -1,0 +1,11 @@
+# The bug-report relay (spec 2026-10-11 bug report §4.4). Setup: README.md.
+name = "lowlight-bug-relay"
+main = "worker.ts"
+compatibility_date = "2026-10-11"
+
+[vars]
+REPORT_TO = ""
+
+[[kv_namespaces]]
+binding = "REPORTS"
+id = "17c86a18e3274877a25a7d58829602bf"

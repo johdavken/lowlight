@@ -1,0 +1,152 @@
+{
+  "id": "rooftop",
+  "name": "Rooftop",
+  "description": "A rooftop above the city at night, with the skyline all around.",
+  "resolution": [
+    480,
+    270
+  ],
+  "layers": [
+    {
+      "id": "sky",
+      "src": "sky.png",
+      "parallax": 0.02
+    },
+    {
+      "id": "far",
+      "src": "far.png",
+      "parallax": 0.15,
+      "emissive": "far_e.png"
+    },
+    {
+      "id": "mid",
+      "src": "mid.png",
+      "parallax": 0.4,
+      "emissive": "mid_e.png"
+    },
+    {
+      "id": "fg",
+      "src": "fg.png",
+      "parallax": 1
+    }
+  ],
+  "lights": [
+    {
+      "id": "billboard",
+      "label": "distant billboard",
+      "pos": [
+        350,
+        72
+      ],
+      "color": "#9b5cff",
+      "intensity": 0.7,
+      "radius": 180,
+      "flicker": 0.1,
+      "sound": "neon"
+    },
+    {
+      "id": "signs",
+      "label": "signs in the street below",
+      "pos": [
+        222,
+        236
+      ],
+      "color": "#ff3c8a",
+      "intensity": 0.6,
+      "radius": 200,
+      "flicker": 0.15,
+      "sound": "neon"
+    },
+    {
+      "id": "beacon",
+      "label": "antenna beacon",
+      "pos": [
+        60,
+        91
+      ],
+      "color": "#ff2020",
+      "intensity": 0.5,
+      "radius": 90,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#0d0c24",
+    "ambientLevel": 0.3,
+    "weather": "rain",
+    "weatherLevel": 0.8,
+    "fog": 0.3,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "clear-night": {
+      "weather": "none",
+      "fog": 0.15
+    },
+    "downpour": {
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.5
+    },
+    "late": {
+      "ambientLevel": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "billboard": {
+          "intensity": 0.5
+        },
+        "signs": {
+          "intensity": 0.45
+        },
+        "beacon": {
+          "intensity": 0.5
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0.3,
+      "fog": 0.2,
+      "lights": {
+        "billboard": {
+          "intensity": 0.35,
+          "flicker": 0.02
+        },
+        "signs": {
+          "intensity": 0.4,
+          "flicker": 0.05
+        },
+        "beacon": {
+          "intensity": 0.3
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#24081a",
+      "ambientLevel": 0.22,
+      "fog": 0.45,
+      "weatherLevel": 0.9,
+      "lights": {
+        "billboard": {
+          "color": "#ff2d4a",
+          "intensity": 0.8,
+          "flicker": 0.4
+        },
+        "signs": {
+          "intensity": 0.7,
+          "flicker": 0.35
+        },
+        "beacon": {
+          "intensity": 0.9,
+          "flicker": 0.5
+        }
+      }
+    }
+  },
+  "sound": {
+    "bed": {
+      "src": "sound/industry-night.ogg",
+      "level": 0.45
+    }
+  }
+}

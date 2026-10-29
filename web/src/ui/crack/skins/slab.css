@@ -1,0 +1,46 @@
+/* A homemade slab (mockup C): the Stall build. Gunmetal case tipped back, an LCD, its keys below. */
+.ct-window.ct-skin-slab {
+  inset: 12% 11.5% 3%;
+  padding: 16px 22px;
+  border: 26px solid transparent;
+  border-top-width: 52px;
+  border-bottom-width: 78px;
+  border-radius: 26px 26px 40px 40px;
+  font: 18px/1.15 'Share Tech Mono', monospace;
+  color: #bfe8d6;
+  text-shadow: none;
+  background:
+    linear-gradient(#0b1512, #0b1512) padding-box,
+    linear-gradient(180deg, #34323d, #1c1b22 70%, #131218) border-box;
+  box-shadow: 0 40px 80px rgba(0, 0, 0, 0.85), inset 0 0 30px rgba(0, 0, 0, 0.8);
+  transform: perspective(1400px) rotateX(9deg);
+  transform-origin: 50% 100%;
+}
+.ct-skin-slab::after { display: none; }
+.ct-skin-slab .ct-head { font-family: 'Chakra Petch', sans-serif; font-weight: 600; font-size: 16px; letter-spacing: 0.3em; }
+/* The deck's name sits on the case above the screen. */
+.ct-skin-slab .ct-deck-name { position: absolute; left: 6px; top: -40px; font: 600 16px 'Chakra Petch', sans-serif; letter-spacing: 0.3em; color: rgba(220, 215, 235, 0.5); }
+.ct-skin-slab .ct-addr { color: rgba(191, 232, 214, 0.35); opacity: 1; }
+.ct-skin-slab .ct-word { color: #e9fff6; }
+.ct-skin-slab .ct-bracket { color: #ff4f8b; }
+.ct-skin-slab .ct-word:hover, .ct-skin-slab .ct-word:focus, .ct-skin-slab .ct-bracket:hover, .ct-skin-slab .ct-bracket:focus { color: #0b1512; background: #bfe8d6; }
+.ct-skin-slab .ct-word.struck, .ct-skin-slab .ct-bracket.used { opacity: 1; color: rgba(191, 232, 214, 0.4); background: none; }
+.ct-skin-slab .ct-tries i { width: 36px; height: 10px; border-color: rgba(191, 232, 214, 0.35); }
+.ct-skin-slab .ct-tries i.on { background: #bfe8d6; box-shadow: 0 0 6px rgba(191, 232, 214, 0.6); }
+.ct-skin-slab .ct-ghost, .ct-skin-slab .ct-hint { color: #ff4f8b; }
+.ct-skin-slab .ct-leave { font: 16px 'Chakra Petch', sans-serif; color: #bfe8d6; border-color: rgba(191, 232, 214, 0.5); }
+.ct-skin-slab .ct-keys { position: absolute; left: 0; right: 0; bottom: -60px; display: flex; justify-content: center; gap: 10px; }
+.ct-skin-slab .ct-keys span {
+  width: 86px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font: 14px 'Chakra Petch', sans-serif;
+  letter-spacing: 0.1em;
+  color: rgba(220, 215, 235, 0.45);
+  background: linear-gradient(180deg, #2b2a33, #1a1920);
+  box-shadow: 0 3px 0 #0b0b0f, inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+.ct-window.ct-skin-slab.is-locked { color: #ff7b7b; }

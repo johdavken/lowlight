@@ -1,0 +1,401 @@
+{
+  "id": "deck-market",
+  "name": "The deck market",
+  "description": "The deck market, a night market in the shadow between Pylon Forty and its neighbours under the Spine's deck. Two huge pylons pasted with torn flyers; strings of bulbs and red paper lanterns swagged between them; the city's towers and another highway glimpsed through the gap. A row of stalls under patched tarps: a food stall with a wok, a steel pot and skewers on a grill, plastic stools; a glass-repair booth with an eye banner, shelves of lenses and implants and a bright ring lamp; a pirate radio stall with stacked speakers and a glowing receiver; a rail of second-hand coats and rain shells; a little shrine on a crate with candles in red glass. Cracked concrete underfoot, crates and pallets, a cat asleep on the pallets. Loud, cheap, crowded; the easiest place on the Spine to lose a tail.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "food_stall": "room_e_food_stall.png",
+        "repair_lamp": "room_e_repair_lamp.png",
+        "radio": "room_e_radio.png",
+        "shrine": "room_e_shrine.png",
+        "city": "room_e_city.png",
+        "lanterns": "room_e_lanterns.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "food_stall",
+      "label": "the food stall's grill and lamp",
+      "pos": [
+        300,
+        495
+      ],
+      "color": "#ff8a30",
+      "intensity": 0.45,
+      "radius": 320,
+      "flicker": 0.05
+    },
+    {
+      "id": "repair_lamp",
+      "label": "the ring lamp at the glass-repair booth",
+      "pos": [
+        545,
+        385
+      ],
+      "color": "#dff4ff",
+      "intensity": 0.4,
+      "radius": 240,
+      "flicker": 0
+    },
+    {
+      "id": "radio",
+      "label": "the pirate radio stall's dial and speaker lights",
+      "pos": [
+        985,
+        325
+      ],
+      "color": "#ffa040",
+      "intensity": 0.3,
+      "radius": 220,
+      "flicker": 0.03
+    },
+    {
+      "id": "shrine",
+      "label": "the candles on the little shrine",
+      "pos": [
+        1455,
+        560
+      ],
+      "color": "#ff4030",
+      "intensity": 0.3,
+      "radius": 200,
+      "flicker": 0.15
+    },
+    {
+      "id": "city",
+      "label": "the city's towers between the pylons",
+      "pos": [
+        900,
+        130
+      ],
+      "color": "#7fb0ff",
+      "intensity": 0.25,
+      "radius": 500,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "lanterns",
+      "label": "the paper lanterns and the strings of bulbs over the stalls",
+      "pos": [
+        760,
+        270
+      ],
+      "color": "#ffb050",
+      "intensity": 0.5,
+      "radius": 700,
+      "flicker": 0.03
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a2038",
+    "ambientLevel": 0.38,
+    "weather": "rain",
+    "weatherLevel": 0.35,
+    "fog": 0.12,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1e1830",
+      "ambientLevel": 0.26,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.12,
+      "timeOfDay": "late-night",
+      "lights": {
+        "food_stall": {
+          "color": "#ff8a30",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "repair_lamp": {
+          "color": "#dff4ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.22,
+          "flicker": 0.03
+        },
+        "shrine": {
+          "color": "#ff4030",
+          "intensity": 0.28,
+          "flicker": 0.15
+        },
+        "city": {
+          "color": "#7fb0ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "lanterns": {
+          "color": "#ffb050",
+          "intensity": 0.38,
+          "flicker": 0.03
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#241e34",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "food_stall": {
+          "color": "#ff8a30",
+          "intensity": 0.35,
+          "flicker": 0.03
+        },
+        "repair_lamp": {
+          "color": "#dff4ff",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "shrine": {
+          "color": "#ff4030",
+          "intensity": 0.28,
+          "flicker": 0.12
+        },
+        "city": {
+          "color": "#7fb0ff",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "lanterns": {
+          "color": "#ffb050",
+          "intensity": 0.42,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1020",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.45,
+      "fog": 0.18,
+      "timeOfDay": "night",
+      "lights": {
+        "food_stall": {
+          "color": "#ff8a30",
+          "intensity": 0.3,
+          "flicker": 0.1
+        },
+        "repair_lamp": {
+          "color": "#dff4ff",
+          "intensity": 0.2,
+          "flicker": 0.1
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.15,
+          "flicker": 0.1
+        },
+        "shrine": {
+          "color": "#ff4030",
+          "intensity": 0.3,
+          "flicker": 0.25
+        },
+        "city": {
+          "color": "#7fb0ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "lanterns": {
+          "color": "#ffb050",
+          "intensity": 0.35,
+          "flicker": 0.12
+        }
+      }
+    },
+    "busy": {
+      "ambient": "#2e2440",
+      "ambientLevel": 0.44,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.14,
+      "timeOfDay": "night",
+      "lights": {
+        "food_stall": {
+          "color": "#ff8a30",
+          "intensity": 0.55,
+          "flicker": 0.06
+        },
+        "repair_lamp": {
+          "color": "#dff4ff",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.35,
+          "flicker": 0.05
+        },
+        "shrine": {
+          "color": "#ff4030",
+          "intensity": 0.3,
+          "flicker": 0.15
+        },
+        "city": {
+          "color": "#7fb0ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "lanterns": {
+          "color": "#ffb050",
+          "intensity": 0.6,
+          "flicker": 0.03
+        }
+      }
+    },
+    "packing-up": {
+      "ambient": "#1a1628",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "food_stall": {
+          "color": "#ff8a30",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "repair_lamp": {
+          "color": "#dff4ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "shrine": {
+          "color": "#ff4030",
+          "intensity": 0.25,
+          "flicker": 0.15
+        },
+        "city": {
+          "color": "#7fb0ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "lanterns": {
+          "color": "#ffb050",
+          "intensity": 0.2,
+          "flicker": 0.05
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a4a66",
+      "ambientLevel": 0.5,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.18,
+      "timeOfDay": "dawn",
+      "lights": {
+        "food_stall": {
+          "color": "#ff8a30",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "repair_lamp": {
+          "color": "#dff4ff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "shrine": {
+          "color": "#ff4030",
+          "intensity": 0.2,
+          "flicker": 0.1
+        },
+        "city": {
+          "color": "#7fb0ff",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "lanterns": {
+          "color": "#ffb050",
+          "intensity": 0.1,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        300,
+        10
+      ],
+      [
+        1240,
+        10
+      ],
+      [
+        1240,
+        220
+      ],
+      [
+        300,
+        220
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": false
+  },
+  "effects": [
+    {
+      "kind": "plume",
+      "rect": [
+        110,
+        410,
+        110,
+        80
+      ],
+      "style": "steam",
+      "amount": 0.7
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.5
+    }
+  ],
+  "public": true,
+  "exits": [
+    {
+      "to": "spine/oksanas-counter",
+      "way": "along the pylons to Oksana's"
+    },
+    {
+      "to": "spine/long-haul",
+      "way": "up the service ramp to the Long Haul"
+    }
+  ]
+}

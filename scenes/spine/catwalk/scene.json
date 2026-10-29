@@ -1,0 +1,432 @@
+{
+  "id": "catwalk",
+  "name": "The catwalk",
+  "description": "The catwalk: a narrow steel maintenance gantry along the outside edge of the Spine's deck near Pylon Forty, high above the city. Grating underfoot, a waist-high pipe railing hung with padlocks and a coiled safety line, a crushed can and a folded square of cardboard someone sits on. Behind it, the massive concrete edge of the deck with conduit and drain pipes, and a steel service hatch standing open under a caged lamp: the way back in. Sodium lamps lean out over the edge from the barrier above. On the right, a grey junction box with a red light and a yellow warning beacon. Beyond the rail, everything: the bay and its ship lights on the left, the city stacked up in light below, another highway curving away on its pylons, and the core's towers blazing in the distance. Trespass, a little dangerous, and nobody official ever comes.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "sodium": "room_e_sodium.png",
+        "hatch_lamp": "room_e_hatch_lamp.png",
+        "beacon": "room_e_beacon.png",
+        "core": "room_e_core.png",
+        "city": "room_e_city.png",
+        "bay": "room_e_bay.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "sodium",
+      "label": "the sodium lamps leaning over the deck's edge",
+      "pos": [
+        780,
+        150
+      ],
+      "color": "#ff9a30",
+      "intensity": 0.45,
+      "radius": 600,
+      "flicker": 0
+    },
+    {
+      "id": "hatch_lamp",
+      "label": "the caged lamp over the service hatch",
+      "pos": [
+        245,
+        250
+      ],
+      "color": "#ffb04a",
+      "intensity": 0.4,
+      "radius": 260,
+      "flicker": 0
+    },
+    {
+      "id": "junction",
+      "label": "the junction box's red light",
+      "pos": [
+        1436,
+        330
+      ],
+      "color": "#ff3030",
+      "intensity": 0.2,
+      "radius": 90,
+      "flicker": 0
+    },
+    {
+      "id": "beacon",
+      "label": "the yellow warning beacon",
+      "pos": [
+        1440,
+        240
+      ],
+      "color": "#ffc040",
+      "intensity": 0.3,
+      "radius": 200,
+      "flicker": 0.04
+    },
+    {
+      "id": "core",
+      "label": "the city core's towers below",
+      "pos": [
+        1290,
+        280
+      ],
+      "color": "#a0c8ff",
+      "intensity": 0.3,
+      "radius": 600,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "city",
+      "label": "the lights of the city spread out below",
+      "pos": [
+        1100,
+        500
+      ],
+      "color": "#ffb060",
+      "intensity": 0.28,
+      "radius": 600,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "bay",
+      "label": "the ship lights on the bay",
+      "pos": [
+        250,
+        610
+      ],
+      "color": "#ffd080",
+      "intensity": 0.2,
+      "radius": 400,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#221e3a",
+    "ambientLevel": 0.36,
+    "weather": "rain",
+    "weatherLevel": 0.35,
+    "fog": 0.1,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1a1830",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "sodium": {
+          "color": "#ff9a30",
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "hatch_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ffc040",
+          "intensity": 0.25,
+          "flicker": 0.04
+        },
+        "core": {
+          "color": "#a0c8ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "city": {
+          "color": "#ffb060",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "bay": {
+          "color": "#ffd080",
+          "intensity": 0.15,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#201c36",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.15,
+      "fog": 0.06,
+      "timeOfDay": "night",
+      "lights": {
+        "sodium": {
+          "color": "#ff9a30",
+          "intensity": 0.42,
+          "flicker": 0
+        },
+        "hatch_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ffc040",
+          "intensity": 0.28,
+          "flicker": 0
+        },
+        "core": {
+          "color": "#a0c8ff",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "city": {
+          "color": "#ffb060",
+          "intensity": 0.28,
+          "flicker": 0
+        },
+        "bay": {
+          "color": "#ffd080",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1020",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.14,
+      "timeOfDay": "night",
+      "lights": {
+        "sodium": {
+          "color": "#ff9a30",
+          "intensity": 0.35,
+          "flicker": 0.08
+        },
+        "hatch_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.3,
+          "flicker": 0.1
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ffc040",
+          "intensity": 0.4,
+          "flicker": 0.3
+        },
+        "core": {
+          "color": "#a0c8ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "city": {
+          "color": "#ffb060",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "bay": {
+          "color": "#ffd080",
+          "intensity": 0.12,
+          "flicker": 0
+        }
+      }
+    },
+    "clear-night": {
+      "ambient": "#1e1c3a",
+      "ambientLevel": 0.32,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.03,
+      "timeOfDay": "night",
+      "lights": {
+        "sodium": {
+          "color": "#ff9a30",
+          "intensity": 0.42,
+          "flicker": 0
+        },
+        "hatch_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ffc040",
+          "intensity": 0.28,
+          "flicker": 0.04
+        },
+        "core": {
+          "color": "#a0c8ff",
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "city": {
+          "color": "#ffb060",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "bay": {
+          "color": "#ffd080",
+          "intensity": 0.25,
+          "flicker": 0
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#141428",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.9,
+      "fog": 0.2,
+      "timeOfDay": "night",
+      "lights": {
+        "sodium": {
+          "color": "#ff9a30",
+          "intensity": 0.35,
+          "flicker": 0.12
+        },
+        "hatch_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.28,
+          "flicker": 0.08
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ffc040",
+          "intensity": 0.3,
+          "flicker": 0.1
+        },
+        "core": {
+          "color": "#a0c8ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "city": {
+          "color": "#ffb060",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "bay": {
+          "color": "#ffd080",
+          "intensity": 0.1,
+          "flicker": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a4e70",
+      "ambientLevel": 0.5,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "timeOfDay": "dawn",
+      "lights": {
+        "sodium": {
+          "color": "#ff9a30",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "hatch_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ffc040",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "core": {
+          "color": "#a0c8ff",
+          "intensity": 0.12,
+          "flicker": 0
+        },
+        "city": {
+          "color": "#ffb060",
+          "intensity": 0.08,
+          "flicker": 0
+        },
+        "bay": {
+          "color": "#ffd080",
+          "intensity": 0.08,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": false
+  },
+  "effects": [
+    {
+      "kind": "passing",
+      "rect": [
+        300,
+        100,
+        700,
+        120
+      ],
+      "source": "car",
+      "every": 25,
+      "strength": 0.7
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.8
+    }
+  ],
+  "public": true,
+  "exits": [
+    {
+      "to": "spine/soren-hab",
+      "way": "back in through the service hatch",
+      "door": [
+        200,
+        280,
+        140,
+        130
+      ]
+    },
+    {
+      "to": "spine/rue-hab",
+      "way": "down past the hangers to Rue's hab"
+    }
+  ]
+}

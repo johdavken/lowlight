@@ -1,0 +1,143 @@
+/* Gig runs: the board's screen (spec §5). Amber phosphor under a CRT layer. Every class is gig-
+   prefixed: global class names collide across screens. */
+.gig-screen { position: relative; overflow: hidden; background: #070806; border: 1px solid rgba(255, 197, 107, 0.4); }
+.gig-crt { border-radius: 22px / 18px; box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.8), 0 0 0 4px #0d0e0c, 0 0 0 5px rgba(255, 197, 107, 0.25); }
+.gig-board { position: relative; z-index: 0; }
+.gig-svg { display: block; width: 100%; height: auto; font-family: var(--pixel, 'VT323', ui-monospace, monospace); }
+
+.gig-floor { stroke: rgba(255, 197, 107, 0.07); }
+.gig-link { fill: none; }
+.gig-link.gig-live { stroke: #7dffa0; stroke-width: 2.2; }
+.gig-link.gig-reachable { stroke: rgba(255, 197, 107, 0.65); stroke-width: 1.5; }
+.gig-link.gig-dim { stroke: rgba(255, 197, 107, 0.2); stroke-width: 1; stroke-dasharray: 1 4; }
+.gig-flow { fill: none; stroke: #eafff0; stroke-width: 1.6; stroke-dasharray: 3 21; stroke-linecap: round; }
+.gig-gaze { pointer-events: none; }
+.gig-gaze ellipse { fill: rgba(255, 90, 90, 0.12); stroke: rgba(255, 90, 90, 0.55); stroke-dasharray: 3 3; }
+.gig-gaze path { fill: rgba(255, 90, 90, 0.06); }
+
+.gig-node { cursor: pointer; }
+.gig-node.gig-far { opacity: 0.55; }
+.gig-hit { fill: transparent; }
+.gig-labels { pointer-events: none; paint-order: stroke; stroke: #070806; stroke-width: 3px; stroke-linejoin: round; }
+.gig-node.gig-sel .gig-top { stroke: #fff; stroke-width: 2; }
+.gig-ticks { fill: none; stroke: #fff; stroke-width: 1.2; }
+.gig-node:focus { outline: none; }
+
+/* The CRT: scanlines, an RGB shadow mask, glare, a vignette, a slow rolling band. */
+.gig-fx { position: absolute; inset: 0; pointer-events: none; }
+.gig-fx-scan { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.3) 0 1px, transparent 1px 3px); }
+.gig-fx-mask { background: repeating-linear-gradient(90deg, rgba(255, 0, 0, 0.035) 0 1px, rgba(0, 255, 0, 0.035) 1px 2px, rgba(0, 0, 255, 0.035) 2px 3px); mix-blend-mode: screen; }
+.gig-fx-vig { background: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.55) 85%, rgba(0, 0, 0, 0.85) 100%); }
+.gig-fx-glare { background: radial-gradient(ellipse at 28% 18%, rgba(255, 255, 255, 0.06), transparent 45%); }
+.gig-fx-roll { inset: auto 0 auto 0; height: 18%; top: -20%; background: linear-gradient(180deg, transparent, rgba(255, 220, 160, 0.05), transparent); }
+
+.gig-motion .gig-fx-roll { animation: gig-roll 7s linear infinite; }
+.gig-motion .gig-svg { animation: gig-flicker 4s steps(1) infinite; }
+.gig-motion .gig-flow { animation: gig-flow 1.4s linear infinite; }
+.gig-motion .gig-watch,
+.gig-motion .gig-gaze { animation: gig-pulse 1.2s ease-in-out infinite; }
+@keyframes gig-roll { to { top: 110%; } }
+@keyframes gig-flicker { 0%, 100% { opacity: 1; } 31% { opacity: 0.94; } 32% { opacity: 1; } 67% { opacity: 0.97; } 68% { opacity: 1; } }
+@keyframes gig-flow { to { stroke-dashoffset: -24; } }
+@keyframes gig-pulse { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) {
+  .gig-motion .gig-fx-roll, .gig-motion .gig-svg, .gig-motion .gig-flow, .gig-motion .gig-watch, .gig-motion .gig-gaze { animation: none; }
+}
+
+/* ── the hack window (spec §4): a CRT terminal over the open map ── */
+.gig-window { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(0, 0, 0, 0.62); font-family: var(--mono, 'IBM Plex Mono', ui-monospace, monospace); }
+.gig-term {
+  position: relative;
+  width: min(1100px, 100%);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(900px - 32px);
+  overflow: hidden;
+  color: #ffc56b;
+  background: #0b0c07;
+  border: 1px solid #ffc56b;
+  box-shadow: 0 0 0 1px #000, 0 0 40px rgba(255, 197, 107, 0.16), inset 0 0 80px rgba(0, 0, 0, 0.6);
+}
+.gig-scroll { min-height: 0; overflow: auto; }
+.gig-scan { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px); }
+.gig-tbar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 14px; border-bottom: 1px solid rgba(255, 197, 107, 0.45); font: 20px var(--pixel, 'VT323', monospace); letter-spacing: 0.18em; }
+.gig-where { text-shadow: 0 0 8px rgba(255, 197, 107, 0.5); }
+.gig-esc-prompt { color: #ff5a5a; }
+.gig-jackout { margin-left: auto; padding: 0; background: none; border: 0; color: rgba(255, 197, 107, 0.6); font: inherit; letter-spacing: inherit; cursor: pointer; }
+.gig-jackout:hover { color: #ffc56b; }
+.gig-view { padding: 16px; }
+.gig-boot, .gig-hint, .gig-empty, .gig-empty-close, .gig-error { margin: 0 0 12px; font: 18px var(--pixel, 'VT323', monospace); letter-spacing: 0.1em; color: rgba(255, 197, 107, 0.6); }
+.gig-error { color: #ff5a5a; }
+.gig-hint { margin: 12px 0 0; font-size: 16px; }
+
+.gig-jobs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+.gig-job { display: flex; flex-direction: column; padding: 12px 14px; border: 1px solid rgba(255, 197, 107, 0.45); background: rgba(255, 197, 107, 0.03); }
+.gig-job.gig-on { border-color: #ffc56b; box-shadow: 0 0 12px rgba(255, 197, 107, 0.18); }
+.gig-job-tier { font: 18px var(--pixel, 'VT323', monospace); letter-spacing: 0.2em; }
+.gig-job-kind { font: 15px var(--pixel, 'VT323', monospace); letter-spacing: 0.25em; color: rgba(255, 197, 107, 0.55); }
+.gig-job-title { margin: 4px 0 8px; font: 30px var(--pixel, 'VT323', monospace); font-weight: normal; letter-spacing: 0.06em; color: #ffe2b0; text-shadow: 0 0 10px rgba(255, 197, 107, 0.45); }
+.gig-job-facts { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 0 0 8px; font-size: 12px; }
+.gig-job-facts dt { color: rgba(255, 197, 107, 0.6); letter-spacing: 0.15em; font-size: 11px; }
+.gig-job-facts dd { margin: 0; color: #f3dcb4; }
+.gig-job-brief { flex: 1; margin: 0 0 12px; font-size: calc(12.5px * var(--text-scale, 1)); line-height: 1.55; color: #e9d3ac; }
+.gig-job-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: rgba(255, 197, 107, 0.6); }
+.gig-job-go, .gig-act, .gig-send, .gig-dev button { padding: 3px 12px; background: none; border: 1px solid #ffc56b; color: #ffc56b; font: 18px var(--pixel, 'VT323', monospace); letter-spacing: 0.15em; cursor: pointer; }
+.gig-job-go:hover, .gig-act:hover:not(:disabled), .gig-send:hover:not(:disabled) { background: rgba(255, 197, 107, 0.12); }
+.gig-act:disabled, .gig-send:disabled { opacity: 0.3; cursor: default; }
+
+.gig-run-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 10px; }
+.gig-run-title { margin: 0; font: 28px var(--pixel, 'VT323', monospace); font-weight: normal; color: #ffe2b0; }
+.gig-run-info { font-size: 12px; color: rgba(255, 197, 107, 0.6); }
+.gig-run { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+.gig-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 8px 2px; font-size: 11px; color: rgba(255, 197, 107, 0.6); }
+.gig-legend b { margin-right: 4px; font: 16px var(--pixel, 'VT323', monospace); }
+.gig-legend-keys { margin-left: auto; font: 15px var(--pixel, 'VT323', monospace); letter-spacing: 0.12em; }
+.gig-c-green { color: #7dffa0; } .gig-c-cyan { color: #7fe9ff; } .gig-c-red { color: #ff5a5a; } .gig-c-pink { color: #ff4f8b; } .gig-c-key { color: #fff3a8; }
+.gig-side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.gig-box { padding: 10px 12px; border: 1px solid rgba(255, 197, 107, 0.45); }
+.gig-box h5 { margin: 0 0 6px; font: 17px var(--pixel, 'VT323', monospace); font-weight: normal; letter-spacing: 0.25em; color: rgba(255, 197, 107, 0.6); }
+.gig-num { font: 26px var(--pixel, 'VT323', monospace); line-height: 1; }
+.gig-rambox h5, .gig-rambox .gig-num { color: #7fe9ff; }
+.gig-pips { display: flex; gap: 3px; margin-top: 8px; }
+.gig-pip { flex: 1; height: 14px; border: 1px solid rgba(255, 197, 107, 0.45); }
+.gig-pip-on { background: #ffc56b; border-color: #ffc56b; box-shadow: 0 0 6px rgba(255, 197, 107, 0.5); }
+.gig-rambox .gig-pip { border-color: rgba(127, 233, 255, 0.45); }
+.gig-rambox .gig-pip-on { background: #7fe9ff; border-color: #7fe9ff; box-shadow: 0 0 6px rgba(127, 233, 255, 0.5); }
+.gig-pip-par { border-left: 2px solid #7dffa0; }
+.gig-hot .gig-num { color: #ff5a5a; text-shadow: 0 0 10px rgba(255, 90, 90, 0.5); }
+.gig-hot .gig-pip-on { background: #ff5a5a; border-color: #ff5a5a; }
+.gig-watchline { min-height: 1em; margin-top: 6px; font-size: 11.5px; color: #ff5a5a; }
+.gig-what { font: 24px var(--pixel, 'VT323', monospace); letter-spacing: 0.08em; color: #ffe2b0; }
+.gig-insp p { margin: 4px 0 10px; font-size: 12px; line-height: 1.5; color: #e9d3ac; }
+.gig-acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.gig-act-probe { border-color: #7fe9ff; color: #7fe9ff; }
+.gig-act-pull { border-color: #ff4f8b; color: #ffb3cc; }
+.gig-danger { border-color: #ff5a5a; color: #ff5a5a; }
+.gig-note { width: 100%; font-size: 12px; color: rgba(255, 197, 107, 0.6); }
+.gig-bad, .gig-log .gig-bad { color: #ff5a5a; }
+.gig-good, .gig-log .gig-good { color: #7dffa0; }
+.gig-log { max-height: 150px; overflow: auto; font: 16px/1.25 var(--pixel, 'VT323', monospace); color: rgba(255, 197, 107, 0.6); }
+.gig-log div:first-child:not(.gig-bad):not(.gig-good) { color: #ffc56b; }
+
+.gig-result { padding: 18px 8px 6px; text-align: center; }
+.gig-result-big { font: 72px var(--pixel, 'VT323', monospace); letter-spacing: 0.2em; line-height: 1; }
+.gig-result-big.gig-clean { color: #7dffa0; text-shadow: 0 0 18px rgba(125, 255, 160, 0.5); }
+.gig-result-big.gig-close { color: #ffc56b; text-shadow: 0 0 18px rgba(255, 197, 107, 0.5); }
+.gig-result-big.gig-traced,
+.gig-result-big.gig-caught,
+.gig-result-big.gig-back { color: #ff5a5a; text-shadow: 0 0 18px rgba(255, 90, 90, 0.5); }
+.gig-result-detail { margin: 6px 0 18px; font-size: 13px; color: #e9d3ac; }
+.gig-refusal { margin-bottom: 12px; color: #ff5a5a; font-size: 13px; }
+.gig-dev { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 7px 14px; border-top: 1px dashed rgba(127, 233, 255, 0.3); font-size: 11px; color: rgba(127, 233, 255, 0.65); }
+.gig-dev button { padding: 0 8px; font-size: 15px; border-color: rgba(127, 233, 255, 0.4); color: #7fe9ff; }
+.gig-sp { flex: 1; }
+
+
+/* Papers: WALK AWAY asks first (Papers spec §3.3). */
+.gig-confirm { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; max-width: 360px; padding: 16px 18px; background: #0b0c07; border: 1px solid #ffc56b; box-shadow: 0 0 30px rgba(0, 0, 0, 0.8); text-align: center; }
+.gig-confirm p { flex-basis: 100%; margin: 0 0 6px; font: 15px var(--mono, 'IBM Plex Mono', monospace); color: #f3dcb4; }
+.gig-confirm button { padding: 3px 14px; background: none; border: 1px solid #ffc56b; color: #ffc56b; font: 18px var(--pixel, 'VT323', monospace); letter-spacing: 0.16em; cursor: pointer; }
+.gig-confirm .gig-confirm-go { border-color: #ff5a5a; color: #ff5a5a; }
+
+/* Papers: paper on a desk, no CRT over it (Papers spec §5). */
+.gig-papers-run .gig-scan { display: none; }

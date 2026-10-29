@@ -1,0 +1,65 @@
+/* The speaker portrait (speaker-portrait.ts): a stranger's bust at the left of the subtitle line, framed
+   by two corner brackets (frame A) in their accent. Its foot fades into the subtitle scrim. */
+:root {
+  /* The bust's top sits at the chat panel's full height (--box-max over the line's floor), plus --sp-rise. */
+  --sp-rise: 0px;
+  --sp-h: calc(var(--box-max) + 24px + var(--sp-rise));
+  --sp-w: calc(var(--sp-h) * 176 / 266);
+}
+.sp-portrait {
+  --sp-c: #a9c4d6;
+
+  position: absolute;
+  left: calc(var(--sub-x) - 10px);
+  bottom: calc(var(--feed-bottom, 64px) - 24px);
+  width: var(--sp-w);
+  height: var(--sp-h);
+  pointer-events: none;
+  z-index: 2;
+  animation: sp-in 220ms ease-out;
+}
+.sp-portrait img,
+.sp-portrait .sp-initial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  /* Soft sides and a long fade at the foot, so the bust's own backdrop never shows as a box. */
+  -webkit-mask-image: linear-gradient(180deg, #000 0, #000 72%, transparent 100%), linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(180deg, #000 0, #000 72%, transparent 100%), linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%);
+  mask-composite: intersect;
+}
+.sp-portrait .sp-initial {
+  display: grid;
+  place-items: center;
+  font-family: var(--pixel);
+  font-size: 96px;
+  color: var(--sp-c);
+  background: rgba(10, 6, 20, 0.85);
+}
+/* Frame A: two brackets over the top corners, like the screen's own. */
+.sp-corner {
+  position: absolute;
+  top: -8px;
+  width: 30px;
+  height: 30px;
+  border-top: 2px solid var(--sp-c);
+  opacity: 0.9;
+}
+.sp-tl { left: -8px; border-left: 2px solid var(--sp-c); }
+.sp-tr { right: -8px; border-right: 2px solid var(--sp-c); }
+.sp-portrait.sp-leaving { animation: sp-out 220ms ease-in forwards; }
+@keyframes sp-in { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes sp-out { to { opacity: 0; transform: translateX(-14px); } }
+@media (prefers-reduced-motion: reduce) {
+  .sp-portrait, .sp-portrait.sp-leaving { animation: none; }
+}
+/* Only on the stage's subtitles: the archive and the classic feed don't carry it. */
+.feed-root:not(.feed-stage) .sp-portrait,
+.feed-root.expanded .sp-portrait { display: none; }
+/* The line moves over for the bust while one is up. */
+.feed-root.feed-stage.has-portrait:not(.expanded) .feed {
+  left: calc(var(--sub-x) + var(--sp-w) + 24px);
+  transition: left 220ms ease, height 150ms ease;
+}

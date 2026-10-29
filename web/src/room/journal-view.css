@@ -1,0 +1,130 @@
+/* The journal as the PEOPLE screen's JOURNAL tab (2026-10-18 spec §2): her dossier page on you and her notes,
+   laid out as a case file. Her own accent (--agent) colours it inside PEOPLE's amber frame. */
+.jd-root { display: flex; flex-direction: column; gap: 10px; min-height: 100%; padding: 18px 28px 22px; box-sizing: border-box; font-family: var(--mono); color: #ffe1ea; }
+.jd-who { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; border-bottom: 1px solid color-mix(in srgb, var(--c, var(--agent)) 30%, transparent); }
+.jd-face, .jd-mono { width: 40px; height: 40px; border-radius: 50%; border: 1.5px solid var(--c, var(--agent)); box-shadow: 0 0 8px var(--c, var(--agent)); object-fit: cover; object-position: top; }
+.jd-mono { display: grid; place-items: center; font: 20px var(--pixel); color: var(--c, var(--agent)); background: rgba(12, 3, 20, 0.85); }
+.jd-name { font: 28px/1 var(--pixel); letter-spacing: 0.14em; color: var(--c, var(--agent)); }
+.journal-count { margin-left: auto; font: 15px var(--pixel); letter-spacing: 0.2em; color: rgba(255, 217, 230, 0.45); }
+/* Two columns: the dossier (her page and her notes about you) on the left, her own notes on the right. */
+.journal-list { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+.journal-list > .journal-empty { grid-column: 2; }
+.journal-list { overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--agent) 45%, transparent) transparent; }
+.journal-empty { padding: 18px 0; font-family: var(--pixel); font-size: 17px; letter-spacing: 0.22em; color: rgba(255, 217, 230, 0.45); }
+.journal-section-title {
+  margin: 0 0 4px;
+  font-family: var(--pixel);
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  color: rgba(255, 217, 230, 0.55);
+}
+.journal-section-empty { padding: 6px 0 10px; font-size: 13px; color: rgba(255, 217, 230, 0.4); }
+.journal-row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto 26px;
+  gap: 8px;
+  align-items: start;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.journal-row.pinned { background: color-mix(in srgb, var(--agent) 8%, transparent); }
+.jr-pin, .jr-del {
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.4;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: rgba(255, 217, 230, 0.45);
+}
+.journal-row.pinned .jr-pin { color: var(--agent); text-shadow: 0 0 6px color-mix(in srgb, var(--agent) 70%, transparent); }
+.jr-pin:hover, .jr-pin:focus-visible, .jr-del:hover, .jr-del:focus-visible { outline: none; color: #fff; }
+.jr-del { opacity: 0; transition: opacity 120ms; }
+.journal-row:hover .jr-del, .jr-del:focus-visible { opacity: 1; }
+.jr-toggle {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+  color: rgba(255, 217, 230, 0.35);
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+.journal-row:hover .jr-toggle, .jr-toggle:focus-visible { opacity: 1; }
+.jr-toggle:hover, .jr-toggle:focus-visible { outline: none; color: #fff; }
+.jr-text { font-size: calc(15px * var(--text-scale, 1)); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; cursor: text; }
+.jr-edit {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid color-mix(in srgb, var(--agent) 60%, transparent);
+  outline: none;
+  resize: vertical;
+  padding: 4px 6px;
+}
+.jd-page { margin-bottom: 14px; }
+.jd-text {
+  width: 100%;
+  box-sizing: border-box;
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(127, 233, 255, 0.25);
+  outline: none;
+  resize: vertical;
+  padding: 6px 8px;
+}
+.jd-text:focus { border-color: color-mix(in srgb, var(--agent) 60%, transparent); }
+.jd-foot { display: flex; align-items: center; gap: 10px; margin-top: 4px; font-size: 12px; letter-spacing: 0.08em; }
+.jd-meta { flex: 1; color: rgba(127, 233, 255, 0.55); }
+.jd-count { color: rgba(255, 255, 255, 0.45); font-variant-numeric: tabular-nums; }
+.jd-count.over { color: #ffb36b; }
+.jd-save {
+  font: inherit;
+  letter-spacing: 0.12em;
+  color: var(--agent);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--agent) 50%, transparent);
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.jd-save:hover, .jd-save:focus-visible { outline: none; color: #fff; border-color: var(--agent); }
+.jr-edited { margin-top: 2px; font-size: 12px; letter-spacing: 0.08em; color: rgba(127, 233, 255, 0.55); }
+.jr-keys { display: block; margin-top: 2px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; letter-spacing: 0.08em; color: rgba(127, 233, 255, 0.45); cursor: pointer; text-align: left; }
+.jr-keys:hover, .jr-keys:focus-visible { outline: none; color: rgba(127, 233, 255, 0.9); }
+.jr-keys-edit { display: block; width: 100%; margin-top: 2px; font: inherit; font-size: 12px; background: rgba(0, 0, 0, 0.35); color: #fff; border: 1px solid rgba(127, 233, 255, 0.4); padding: 2px 4px; }
+.journal-error { margin-bottom: 6px; font-size: 13px; color: #ffb36b; }
+.journal-undo {
+  margin-top: 10px;
+  font-family: var(--pixel);
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  color: rgba(255, 217, 230, 0.6);
+}
+.journal-undo-btn {
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--agent);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--agent) 55%, transparent);
+  padding: 0 8px;
+  cursor: pointer;
+}
+
+/* The page as a typed sheet. */
+.jd-text { min-height: 240px; background: rgba(255, 238, 214, 0.05); border-color: rgba(255, 238, 214, 0.18); font-size: calc(15px * var(--text-scale, 1)); }
+.jd-save.flash { color: #000; background: var(--agent); border-color: #fff; }
+/* Notes as cards. */
+.journal-list .journal-row { margin-bottom: 6px; border: 1px solid rgba(255, 255, 255, 0.06); border-bottom-color: rgba(255, 255, 255, 0.06); background: rgba(255, 255, 255, 0.02); }
+.journal-row:focus-within .jr-del, .journal-row:focus-within .jr-toggle { opacity: 1; }

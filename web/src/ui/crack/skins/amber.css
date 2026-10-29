@@ -1,0 +1,38 @@
+/* Amber phosphor (deck skins spec §1, mockup B): the Old Karasu deck. The window's border is the monitor's
+   plastic bezel (the border-box layer), its padding box the glass (the padding-box layer). */
+.ct-window.ct-skin-amber {
+  inset: 4% 13.5% 5%;
+  padding: 18px 26px;
+  border: 30px solid transparent;
+  border-bottom-width: 64px;
+  border-radius: 40px;
+  color: #ffb347;
+  text-shadow: 0 0 6px rgba(255, 160, 40, 0.65);
+  background:
+    radial-gradient(ellipse at 50% 45%, #1d1206 0%, #0d0803 70%, #050301 100%) padding-box,
+    linear-gradient(160deg, #2a2520, #15120f 60%) border-box;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), inset 0 0 50px rgba(0, 0, 0, 0.9);
+}
+.ct-skin-amber::after { border-radius: 12px; }
+.ct-skin-amber .ct-tries i { border-color: rgba(255, 179, 71, 0.5); }
+.ct-skin-amber .ct-tries i.on { background: #ffb347; box-shadow: 0 0 6px rgba(255, 160, 40, 0.7); }
+.ct-skin-amber .ct-word:hover, .ct-skin-amber .ct-word:focus, .ct-skin-amber .ct-bracket:hover, .ct-skin-amber .ct-bracket:focus { color: #0d0803; background: #ffb347; }
+.ct-skin-amber .ct-word.struck, .ct-skin-amber .ct-bracket.used { opacity: 0.25; text-decoration: none; }
+.ct-skin-amber .ct-ghost, .ct-skin-amber .ct-hint { color: #ffd9a0; }
+.ct-skin-amber .ct-leave { color: #ffb347; border-color: rgba(255, 179, 71, 0.6); }
+/* The maker's plate and the power light, down on the bezel. */
+.ct-skin-amber .ct-plate {
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: -46px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font: 16px 'Share Tech Mono', monospace;
+  letter-spacing: 0.3em;
+  color: rgba(232, 220, 200, 0.45);
+  text-shadow: none;
+}
+.ct-skin-amber .ct-plate::after { content: ''; width: 9px; height: 9px; border-radius: 50%; background: #ffb347; box-shadow: 0 0 8px #ffb347; }
+.ct-window.ct-skin-amber.is-locked { color: #ff8a5a; text-shadow: 0 0 6px rgba(255, 110, 60, 0.6); }

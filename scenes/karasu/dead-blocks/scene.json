@@ -1,0 +1,197 @@
+{
+  "id": "dead-blocks",
+  "name": "The Dead Blocks",
+  "description": "The edge of Old Town where the reconstructed blocks stop and the dead blocks begin. On the left, the back of a re-clad apartment block, warm windows behind blinds and a steel service door under a caged bulb. A tall boundary wall runs across, broken through in the middle and hung with a sheet of corrugated metal. Beyond it a condemned hab tower, bricked-up and boarded windows, washing on a line, one lantern high up, an open stairwell with a lit hand lantern, and at its foot a drum fire with a few plastic chairs. Cracked asphalt, weeds and rubble in front; the city's towers far off between the buildings.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "block_windows": "room_e_block_windows.png",
+        "service_bulb": "room_e_service_bulb.png",
+        "brazier": "room_e_brazier.png",
+        "stair_lantern": "room_e_stair_lantern.png",
+        "high_window": "room_e_high_window.png",
+        "skyline": "room_e_skyline.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "block_windows",
+      "label": "the paying block's lit windows",
+      "pos": [
+        200,
+        200
+      ],
+      "color": "#f6b558",
+      "intensity": 0.5,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "service_bulb",
+      "label": "the caged bulb over the service door",
+      "pos": [
+        247,
+        462
+      ],
+      "color": "#ffd080",
+      "intensity": 0.45,
+      "radius": 240,
+      "flicker": 0,
+      "dust": 0.6
+    },
+    {
+      "id": "brazier",
+      "label": "the drum fire at the foot of the tower",
+      "pos": [
+        1045,
+        615
+      ],
+      "color": "#ff8a30",
+      "intensity": 0.55,
+      "radius": 340,
+      "flicker": 0.35
+    },
+    {
+      "id": "stair_lantern",
+      "label": "the hand lantern on the stairwell landing",
+      "pos": [
+        1376,
+        362
+      ],
+      "color": "#ffb050",
+      "intensity": 0.45,
+      "radius": 300,
+      "flicker": 0.05
+    },
+    {
+      "id": "high_window",
+      "label": "a lantern behind sheeting, high in the tower",
+      "pos": [
+        1032,
+        48
+      ],
+      "color": "#ffc070",
+      "intensity": 0.35,
+      "radius": 170,
+      "flicker": 0.04
+    },
+    {
+      "id": "skyline",
+      "label": "the city far off between the buildings",
+      "pos": [
+        600,
+        290
+      ],
+      "color": "#e0a860",
+      "intensity": 0.3,
+      "radius": 600,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a2850",
+    "ambientLevel": 0.4,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.25,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {}
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "lights": {}
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.35,
+      "lights": {}
+    },
+    "blackout": {
+      "ambientLevel": 0.28,
+      "lights": {
+        "block_windows": {
+          "intensity": 0
+        },
+        "service_bulb": {
+          "intensity": 0
+        }
+      }
+    },
+    "empty": {
+      "lights": {
+        "brazier": {
+          "intensity": 0
+        },
+        "stair_lantern": {
+          "intensity": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#5a6080",
+      "ambientLevel": 0.5,
+      "timeOfDay": "dawn",
+      "lights": {
+        "brazier": {
+          "intensity": 0.15
+        },
+        "block_windows": {
+          "intensity": 0.2
+        },
+        "high_window": {
+          "intensity": 0
+        }
+      }
+    }
+  },
+  "effects": [
+    {
+      "kind": "lightning",
+      "strength": 0.6
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        1018,
+        470,
+        54,
+        140
+      ],
+      "style": "smoke",
+      "amount": 1,
+      "lean": 0.1
+    }
+  ],
+  "exits": [
+    {
+      "to": "karasu/hicks-room",
+      "way": "back up the stairs to the Ribbon"
+    },
+    {
+      "to": "karasu/public-landing",
+      "way": "up the long stairs to the public landing"
+    },
+    {
+      "to": "karasu/sixth-floor",
+      "way": "up the open stairwell, six floors"
+    }
+  ]
+}

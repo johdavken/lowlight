@@ -1,0 +1,89 @@
+/* PEOPLE (2026-10-18 spec §2): its tab band in the select screen's slanted-tile language, on the shared frame's
+   amber. Every class is pe- (global names collide). */
+.people-screen .scr-scroll { display: flex; flex-direction: column; }
+.pe-tabs { display: flex; align-items: center; gap: 10px; padding: 16px 28px 0; }
+.pe-tab {
+  padding: 4px 22px;
+  font: 22px/1 var(--pixel);
+  letter-spacing: 0.2em;
+  color: var(--screen-accent);
+  background: rgba(8, 3, 16, 0.85);
+  border: 1px solid color-mix(in srgb, var(--screen-accent) 40%, transparent);
+  transform: skewX(-12deg);
+  cursor: pointer;
+}
+.pe-tab > span { display: inline-block; transform: skewX(12deg); }
+.pe-tab:hover, .pe-tab:focus-visible { outline: none; border-color: var(--screen-accent); }
+.pe-tab.on { color: #000; background: var(--screen-accent); border-color: #fff; box-shadow: 0 0 14px -2px var(--screen-accent); }
+.pe-as { margin-left: auto; font: 13px var(--mono); letter-spacing: 0.3em; color: rgba(255, 217, 230, 0.45); }
+.pe-pane { flex: 1; min-height: 0; }
+.pe-loading, .pe-error, .pe-empty { padding: 40px 28px; font: 18px var(--pixel); letter-spacing: 0.2em; color: rgba(255, 217, 230, 0.5); }
+.pe-error { color: #ffb36b; }
+
+/* CONTACTS: a roster of slanted tiles on the left, her file on the right. */
+.pe-contacts, .pe-leads-tab { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 34px; padding: 22px 28px; }
+.pe-roster, .pe-leadlist { display: flex; flex-direction: column; gap: 8px; }
+.pe-tile, .pe-lead {
+  --c: var(--screen-accent);
+  display: block;
+  width: 100%;
+  padding: 7px 14px;
+  text-align: left;
+  color: #e8dcef;
+  background: rgba(8, 3, 16, 0.85);
+  border: 1px solid #3a2560;
+  transform: skewX(-12deg);
+  cursor: pointer;
+}
+.pe-tile-in, .pe-lead-in { display: flex; align-items: center; gap: 12px; transform: skewX(12deg); }
+.pe-tile:hover, .pe-lead:hover { border-color: color-mix(in srgb, var(--screen-accent) 60%, transparent); }
+.pe-tile.on, .pe-lead.on { border-color: var(--screen-accent); background: color-mix(in srgb, var(--screen-accent) 14%, rgba(8, 3, 16, 0.9)); box-shadow: 0 0 14px -4px var(--screen-accent); }
+.pe-face { width: 38px; height: 38px; flex: none; border-radius: 50%; border: 1.5px solid var(--c); box-shadow: 0 0 6px var(--c); object-fit: cover; object-position: top; }
+.pe-mono { display: grid; place-items: center; font: 18px var(--pixel); color: var(--c); background: rgba(12, 3, 20, 0.85); }
+.pe-tile-text { display: flex; flex-direction: column; gap: 2px; }
+.pe-tile-name { font: 19px/1 var(--pixel); letter-spacing: 0.12em; color: var(--c); font-weight: normal; }
+.pe-tile-standing { font-size: 12px; letter-spacing: 0.1em; color: rgba(255, 217, 230, 0.6); }
+.pe-here { font-size: 11px; letter-spacing: 0.2em; color: var(--map-cyan, #7fe9ff); }
+.pe-file { --c: var(--screen-accent); display: grid; grid-template-columns: minmax(200px, 38%) minmax(0, 1fr); gap: 28px; align-items: start; }
+.pe-fig { display: flex; justify-content: center; align-items: flex-end; height: 520px; }
+.pe-figure { max-height: 100%; max-width: 100%; image-rendering: pixelated; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 35%, transparent)); }
+.pe-big { width: 200px; height: 200px; font-size: 90px; border-radius: 50%; border: 2px solid var(--c); }
+.pe-info { display: flex; flex-direction: column; gap: 10px; padding-top: 20px; }
+.pe-name { font: 64px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: var(--c); text-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent); }
+.pe-standing { font: 18px var(--pixel); letter-spacing: 0.2em; color: #ffe1ea; }
+.pe-where { font-size: calc(15px * var(--text-scale, 1)); line-height: 1.5; color: rgba(255, 217, 230, 0.75); }
+.pe-sub { margin-top: 10px; font: 13px var(--pixel); letter-spacing: 0.3em; color: rgba(255, 217, 230, 0.45); }
+/* Her file (spec 2026-10-28 §4): the select screen's bio and facts; the screen scrolls when it runs long. */
+.pe-bio { max-width: 760px; }
+.pe-bio p { margin: 0 0 8px; font-size: calc(15px * var(--text-scale, 1)); line-height: 1.55; color: rgba(255, 217, 230, 0.85); }
+.pe-facts { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 5px 14px; max-width: 760px; margin: 0; align-items: baseline; }
+.pe-facts dt { font: 15px var(--pixel); letter-spacing: 0.14em; color: var(--c); opacity: 0.8; }
+.pe-facts dd { margin: 0; font-size: 12.5px; line-height: 1.4; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(255, 217, 230, 0.85); }
+.pe-leads { margin: 0; padding: 0; list-style: none; }
+.pe-leads li { padding: 3px 0; color: var(--screen-accent); }
+.pe-leads li::before { content: '→ '; opacity: 0.6; }
+.pe-leads li.followed { opacity: 0.45; }
+.pe-go {
+  align-self: flex-start;
+  margin-top: 14px;
+  padding: 6px 30px;
+  font: 22px/1 var(--pixel);
+  letter-spacing: 0.24em;
+  color: #000;
+  background: var(--screen-accent);
+  border: 1px solid #fff;
+  transform: skewX(-12deg);
+  cursor: pointer;
+}
+.pe-go:disabled { color: rgba(255, 217, 230, 0.4); background: none; border-color: rgba(255, 217, 230, 0.2); cursor: default; }
+
+/* LEADS: cards on the left, the selected lead in full on the right. */
+.pe-lead.followed { opacity: 0.5; }
+.pe-lead-name { font: 17px/1.2 var(--pixel); letter-spacing: 0.08em; color: #ffe1ea; white-space: normal; }
+.pe-unknown { --c: rgba(255, 217, 230, 0.4); }
+.pe-leadlist .pe-sub { margin: 12px 0 2px; }
+.pe-lead-detail { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; max-width: 760px; }
+.pe-lead-detail.followed { opacity: 0.6; }
+.pe-lead-title { font: 44px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: var(--screen-accent); }
+.pe-lead-text { font-size: calc(17px * var(--text-scale, 1)); line-height: 1.6; color: #ffe1ea; white-space: pre-wrap; }
+.pe-lead-to { font: 20px var(--pixel); letter-spacing: 0.16em; color: var(--screen-accent); }

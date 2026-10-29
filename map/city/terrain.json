@@ -1,0 +1,18 @@
+{
+  "plateau": "mirage",
+  "height": 95,
+  "risesFrom": [
+    "velvet",
+    "karasu"
+  ],
+  "faceStart": 0.5,
+  "faceJitter": 0.12,
+  "faceWidth": 0.1,
+  "crags": 22,
+  "gridStep": 3,
+  "forest": -0.05,
+  "stair": true,
+  "funicular": true,
+  "shacks": 18,
+  "shelf": true
+}

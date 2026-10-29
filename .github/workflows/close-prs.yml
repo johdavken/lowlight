@@ -1,0 +1,19 @@
+# The public repo is an export of a private one (docs/BUILDING.md): a PR here can't be merged, so it
+# is closed with a pointer to Issues. Runs only on the public repo.
+name: Close pull requests
+on:
+  pull_request_target:
+    types: [opened]
+permissions:
+  pull-requests: write
+jobs:
+  close:
+    if: github.repository == 'johdavken/lowlight'
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh pr close "$PR" --repo "$REPO" --comment "$TEXT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          TEXT: "This repo is an export of a private one, so PRs can't be merged here. Please open an issue."

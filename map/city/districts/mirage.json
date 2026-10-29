@@ -1,0 +1,87 @@
+{
+  "height": [
+    28.8,
+    73.6
+  ],
+  "lot": [
+    19,
+    14
+  ],
+  "streetEvery": [
+    4,
+    3
+  ],
+  "tallGain": 2.2,
+  "brick": 0.06,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0.05,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.3,
+    "roofLights": 3,
+    "fires": 0,
+    "outage": 0.02
+  },
+  "windowLit": 0.6,
+  "windowColors": [
+    "#ffe2a0",
+    "#fff3d6",
+    "#ffd9a0"
+  ],
+  "pools": {
+    "colors": [
+      "#cfe8ff"
+    ],
+    "count": 10,
+    "power": 450000,
+    "reach": 130,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#d8ecff"
+  ],
+  "signShare": 0.04,
+  "deepZoom": true,
+  "enclave": {
+    "rim": 30,
+    "mall": 30,
+    "chamber": 60,
+    "tower": {
+      "w": 28,
+      "h": 150
+    },
+    "ministry": [
+      50,
+      90
+    ],
+    "windows": [
+      "#ffe2a0",
+      "#fff3d6",
+      "#ffd9a0"
+    ],
+    "parkTrees": 260,
+    "parkRadius": 120,
+    "homes": {
+      "slot": 36,
+      "size": [
+        16,
+        24
+      ]
+    },
+    "posts": 160,
+    "towers": 4,
+    "quarter": 160,
+    "slots": 0.25,
+    "neon": [
+      "#ff2fd0",
+      "#2fe8ff",
+      "#b45cff",
+      "#ff5a3c"
+    ],
+    "boards": 0.4,
+    "neonShare": 0.3,
+    "flood": "#c8d4e8"
+  }
+}

@@ -1,0 +1,85 @@
+{
+  "height": [
+    16,
+    44
+  ],
+  "lot": [
+    30,
+    26
+  ],
+  "streetEvery": [
+    4,
+    4
+  ],
+  "tallGain": 0,
+  "brick": 0,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.25,
+    "roofLights": 5,
+    "fires": 0,
+    "outage": 0.02
+  },
+  "windowLit": 0.55,
+  "windowColors": [
+    "#ffcf7a",
+    "#ffd98a",
+    "#fff3d6",
+    "#bfe0ff"
+  ],
+  "pools": {
+    "colors": [
+      "#ffc65a",
+      "#ffe2a0"
+    ],
+    "count": 3,
+    "power": 240000,
+    "reach": 140,
+    "radius": 4
+  },
+  "signColors": [
+    "#ffcf5a",
+    "#fff1c0"
+  ],
+  "signShare": 0.03,
+  "deepZoom": true,
+  "angleDeg": -6,
+  "arcologies": {
+    "count": 5,
+    "first": [
+      35.6,
+      15.2
+    ],
+    "footprint": [
+      78,
+      104
+    ],
+    "height": [
+      250,
+      350
+    ],
+    "glass": [
+      "#ffcf7a",
+      "#ffd98a",
+      "#fff3d6",
+      "#ffe8c0"
+    ],
+    "emblem": "#ffcf4a",
+    "angleDeg": -6,
+    "bridgeReach": 360,
+    "grounds": 22,
+    "utility": {
+      "slot": 34,
+      "height": [
+        5,
+        12
+      ]
+    },
+    "plan": "square",
+    "crown": "triangle"
+  }
+}

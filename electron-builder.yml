@@ -1,0 +1,54 @@
+# Lowlight desktop packages (spec 2026-10-09 preview build §3.1, §6.1). Inputs come from
+# tools/release/build.ts (dist/desktop, dist/server, dist/web, build/icon.png) and staging
+# (build/stage/content, from release.json).
+appId: games.lowlight.app
+productName: Lowlight
+directories:
+  output: release/${version}
+  buildResources: build
+# Everything the app runs is bundled; no node_modules ship.
+files:
+  - dist/desktop/**
+  - dist/server/**
+  - package.json
+  - "!**/node_modules/**"
+extraMetadata:
+  main: dist/desktop/main.mjs
+  description: A roleplaying cyberpunk city.
+  author: Farban
+  dependencies: {}
+  desktopName: lowlight.desktop
+extraResources:
+  - from: build/stage/content
+    to: content
+  - from: dist/web
+    to: web
+asar: true
+npmRebuild: false
+linux:
+  target: AppImage
+  category: Game
+  executableName: lowlight
+  syncDesktopName: true
+  icon: build/icon.png
+  artifactName: Lowlight-${version}.AppImage
+win:
+  target:
+    - nsis
+    - zip
+  icon: build/icon.png
+  artifactName: Lowlight-${version}-win.${ext}
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  deleteAppDataOnUninstall: false
+  artifactName: Lowlight-Setup-${version}.exe
+# Electron fuses: the shipped app can't be turned into a plain Node runtime or fed NODE_OPTIONS.
+# Inspect arguments stay on: the packaged smoke test drives the app through them (Playwright).
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableCookieEncryption: true
+  onlyLoadAppFromAsar: true

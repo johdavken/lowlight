@@ -1,0 +1,449 @@
+{
+  "id": "cass-apartment",
+  "name": "Cass's Apartment",
+  "description": "Cass's room above the Tilt, up the staff door behind the bar: half bedroom, half the bar's storeroom, warm and untidy. Dark plank walls, pipes along the ceiling, worn floorboards. An unmade bed under a red blanket with a lamp on the night table, and above it an old photograph of her with her younger brother. A worn couch with a plaid throw faces a chunky old TV that only shows static. The one window looks out on the Ribbon's towers, a wall lamp beside it. On the right, the bar's spillover: crates of bottles, a dented keg, a box of glasses, a mop, her apron and a bar towel on hooks, a little sink with a kettle and mugs. In the corner, the narrow wooden door back down to the bar, under a small caged lamp. She works nights and sleeps through the day.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "room_1": "room_e_room_1.png",
+        "room_2": "room_e_room_2.png",
+        "room_3": "room_e_room_3.png",
+        "room_4": "room_e_room_4.png",
+        "tv": "room_e_tv.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "room_1",
+      "label": "bedside lamp",
+      "pos": [
+        48,
+        330
+      ],
+      "color": "#eda95f",
+      "intensity": 0.59,
+      "radius": 346,
+      "flicker": 0
+    },
+    {
+      "id": "room_2",
+      "label": "wall sconce by the window",
+      "pos": [
+        742,
+        220
+      ],
+      "color": "#c4742e",
+      "intensity": 0.6,
+      "radius": 360,
+      "flicker": 0
+    },
+    {
+      "id": "room_3",
+      "label": "city glow through the window",
+      "pos": [
+        555,
+        240
+      ],
+      "color": "#2c2d77",
+      "intensity": 0.28,
+      "radius": 417,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "room_4",
+      "label": "the caged lamp over the door down",
+      "pos": [
+        1385,
+        118
+      ],
+      "color": "#02b1a8",
+      "intensity": 0.6,
+      "radius": 374,
+      "flicker": 0.33
+    },
+    {
+      "id": "tv",
+      "label": "the old TV (static)",
+      "pos": [
+        820,
+        340
+      ],
+      "color": "#a9c4ff",
+      "intensity": 0.5,
+      "radius": 400,
+      "flicker": 0.05
+    }
+  ],
+  "defaults": {
+    "ambient": "#4c367d",
+    "ambientLevel": 0.5,
+    "weather": "rain",
+    "weatherLevel": 0.7,
+    "fog": 0.2,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.3,
+      "timeOfDay": "late-night",
+      "lights": {
+        "room_1": {
+          "intensity": 0.44
+        },
+        "room_2": {
+          "intensity": 0.45
+        },
+        "room_3": {
+          "intensity": 0.21
+        },
+        "room_4": {
+          "intensity": 0.45
+        },
+        "tv": {
+          "intensity": 0.38
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.36,
+      "weatherLevel": 0.32,
+      "fog": 0.15,
+      "lights": {
+        "room_1": {
+          "intensity": 0.44,
+          "flicker": 0
+        },
+        "room_2": {
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "room_3": {
+          "intensity": 0.21,
+          "flicker": 0
+        },
+        "room_4": {
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "tv": {
+          "intensity": 0.38,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.3,
+      "fog": 0.35,
+      "lights": {
+        "room_1": {
+          "intensity": 0.3,
+          "flicker": 0.2
+        },
+        "room_2": {
+          "intensity": 0.3,
+          "flicker": 0.2
+        },
+        "room_3": {
+          "intensity": 0.14,
+          "flicker": 0.2
+        },
+        "room_4": {
+          "intensity": 0.3,
+          "flicker": 0.4
+        },
+        "tv": {
+          "intensity": 0.25,
+          "flicker": 0.25
+        }
+      }
+    },
+    "after-shift": {
+      "ambient": "#4a2e5c",
+      "ambientLevel": 0.42,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "room_1": {
+          "color": "#eda95f",
+          "intensity": 0.75,
+          "flicker": 0
+        },
+        "room_2": {
+          "color": "#c4742e",
+          "intensity": 0.7,
+          "flicker": 0
+        },
+        "room_3": {
+          "color": "#2c2d77",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "room_4": {
+          "color": "#02b1a8",
+          "intensity": 0.5,
+          "flicker": 0.2
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 0.35,
+          "flicker": 0.03
+        }
+      }
+    },
+    "tv-glow": {
+      "ambient": "#1a1c40",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "room_1": {
+          "color": "#eda95f",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "room_2": {
+          "color": "#c4742e",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "room_3": {
+          "color": "#2c2d77",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "room_4": {
+          "color": "#02b1a8",
+          "intensity": 0.45,
+          "flicker": 0.25
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 1,
+          "flicker": 0.12
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#2e2450",
+      "ambientLevel": 0.35,
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.3,
+      "timeOfDay": "night",
+      "lights": {
+        "room_1": {
+          "color": "#eda95f",
+          "intensity": 0.5,
+          "flicker": 0.1
+        },
+        "room_2": {
+          "color": "#c4742e",
+          "intensity": 0.45,
+          "flicker": 0.35
+        },
+        "room_3": {
+          "color": "#2c2d77",
+          "intensity": 0.4,
+          "flicker": 0.5
+        },
+        "room_4": {
+          "color": "#02b1a8",
+          "intensity": 0.6,
+          "flicker": 0.45
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 0.5,
+          "flicker": 0.2
+        }
+      }
+    },
+    "power-cut": {
+      "ambient": "#120c22",
+      "ambientLevel": 0.15,
+      "weather": "rain",
+      "weatherLevel": 0.7,
+      "fog": 0.25,
+      "timeOfDay": "late-night",
+      "lights": {
+        "room_1": {
+          "color": "#eda95f",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "room_2": {
+          "color": "#c4742e",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "room_3": {
+          "color": "#2c2d77",
+          "intensity": 0.35,
+          "flicker": 0.05
+        },
+        "room_4": {
+          "color": "#02b1a8",
+          "intensity": 0.7,
+          "flicker": 0.45
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#5a6280",
+      "ambientLevel": 0.5,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.3,
+      "timeOfDay": "dawn",
+      "lights": {
+        "room_1": {
+          "color": "#eda95f",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "room_2": {
+          "color": "#c4742e",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "room_3": {
+          "color": "#8a9cc8",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "room_4": {
+          "color": "#02b1a8",
+          "intensity": 0.4,
+          "flicker": 0.2
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 0.2,
+          "flicker": 0.05
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        491,
+        147
+      ],
+      [
+        687,
+        145
+      ],
+      [
+        693,
+        342
+      ],
+      [
+        489,
+        342
+      ]
+    ],
+    [
+      [
+        429,
+        150
+      ],
+      [
+        471,
+        150
+      ],
+      [
+        471,
+        263
+      ],
+      [
+        429,
+        263
+      ]
+    ],
+    [
+      [
+        430,
+        274
+      ],
+      [
+        472,
+        274
+      ],
+      [
+        471,
+        340
+      ],
+      [
+        454,
+        307
+      ],
+      [
+        430,
+        306
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "music": {
+      "songs": [
+        "No Light in Lowlight.ogg"
+      ]
+    }
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        782,
+        298,
+        80,
+        80
+      ],
+      "light": "tv",
+      "scroll": 0,
+      "picture": "static"
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.45
+    },
+    {
+      "kind": "glass",
+      "amount": 3
+    }
+  ],
+  "exits": [
+    {
+      "to": "karasu/the-tilt",
+      "way": "back down to the bar",
+      "door": [
+        1325,
+        160,
+        128,
+        355
+      ]
+    }
+  ]
+}

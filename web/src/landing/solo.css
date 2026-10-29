@@ -1,0 +1,100 @@
+/* The solo screen (go solo): you at the side over the splash art, your contacts on the right. */
+.solo-backdrop {
+  position: absolute;
+  inset: 0;
+  background: #05020c center / cover no-repeat;
+  filter: brightness(0.4) saturate(0.85);
+}
+.solo-screen .select-stage::before { z-index: 1; }
+.solo-panel {
+  position: absolute;
+  top: 120px;
+  right: 70px;
+  bottom: 90px;
+  z-index: 20;
+  width: 640px;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 26px;
+  background: rgba(5, 2, 12, 0.82);
+  border-top: 3px solid var(--p1);
+  clip-path: polygon(18px 0, 100% 0, 100% calc(100% - 18px), calc(100% - 18px) 100%, 0 100%, 0 18px);
+  font-family: var(--pixel);
+}
+.solo-head { font-size: 48px; letter-spacing: 0.3em; color: var(--p1); text-shadow: 0 0 16px currentColor; }
+.solo-sub { margin-bottom: 14px; font-size: 20px; letter-spacing: 0.25em; color: var(--ink); opacity: 0.6; }
+.solo-list { flex: 1; min-height: 0; overflow-y: auto; }
+.solo-empty { padding: 12px 0; font-size: 20px; letter-spacing: 0.2em; opacity: 0.6; }
+.solo-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 16px;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 10px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  border-left: 5px solid transparent;
+  cursor: pointer;
+}
+.solo-row:hover,
+.solo-row:focus-visible { outline: none; border-left-color: var(--a); background: rgba(255, 255, 255, 0.06); }
+.solo-face {
+  width: 72px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  background: #120a1c top / cover no-repeat;
+  border: 1px solid var(--a);
+  font-size: 38px;
+  color: var(--a);
+}
+.solo-text { min-width: 0; }
+.solo-name { font-size: 30px; letter-spacing: 0.15em; color: var(--a); }
+.solo-last { margin-left: 12px; font-size: 16px; letter-spacing: 0.25em; color: var(--p1); vertical-align: middle; }
+.solo-line { overflow: hidden; font-family: var(--mono); font-size: 15px; color: #cfc4e6; text-overflow: ellipsis; white-space: nowrap; }
+.solo-error { min-height: 1.2em; margin: 8px 0; font-size: 18px; letter-spacing: 0.15em; color: #ff4f80; }
+.solo-foot { display: flex; align-items: center; gap: 14px; }
+.solo-btn {
+  padding: 2px 16px 0;
+  border: 1px solid rgba(61, 255, 122, 0.6);
+  background: rgba(61, 255, 122, 0.1);
+  color: var(--p1);
+  font: 20px var(--pixel);
+  letter-spacing: 0.15em;
+  cursor: pointer;
+}
+.solo-btn:hover,
+.solo-btn:focus-visible { outline: none; background: rgba(61, 255, 122, 0.22); }
+.solo-hints { margin-left: auto; font-size: 15px; letter-spacing: 0.15em; opacity: 0.55; }
+
+/* AROUND LOWLIGHT: people you haven't met, by place; a silhouette until you walk in. */
+.solo-head2 { margin: 18px 0 8px; font-size: 22px; letter-spacing: 0.3em; color: var(--cyan); opacity: 0.8; }
+.solo-stranger { --a: #8a7fa0; }
+.solo-silhouette {
+  position: relative;
+  overflow: hidden;
+  border-style: dashed;
+  background: #0b0612;
+}
+.solo-silhouette::before,
+.solo-silhouette::after { content: ''; position: absolute; left: 50%; transform: translateX(-50%); background: #2a2238; }
+.solo-silhouette::before { top: 14px; width: 24px; height: 24px; border-radius: 50%; }
+.solo-silhouette::after { bottom: -10px; width: 52px; height: 34px; border-radius: 26px 26px 0 0; }
+
+/* WAIT (between scenes): the story clock runs on; then who's where. */
+.solo-wait { display: flex; align-items: center; gap: 10px; margin: -4px 0 12px; }
+.solo-wait-until {
+  width: 86px;
+  padding: 2px 8px;
+  border: 1px solid rgba(61, 255, 122, 0.4);
+  background: rgba(5, 2, 12, 0.6);
+  color: var(--ink);
+  font: 18px var(--pixel);
+  letter-spacing: 0.1em;
+}
+.solo-wait-until:focus { outline: none; border-color: var(--p1); }

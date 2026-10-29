@@ -1,0 +1,692 @@
+{
+  "version": 1,
+  "image": "/map/lowlight.webp",
+  "panelAt": [
+    62,
+    53.5
+  ],
+  "districts": [
+    {
+      "id": "cloudridge",
+      "name": "Cloudridge",
+      "area": "Executive Terraces",
+      "label": [
+        19.5,
+        10.6
+      ],
+      "border": [
+        [
+          7.7,
+          13.7
+        ],
+        [
+          11.2,
+          9.8
+        ],
+        [
+          23.1,
+          5.9
+        ],
+        [
+          32,
+          5
+        ],
+        [
+          31.1,
+          12.8
+        ],
+        [
+          31.4,
+          16.1
+        ],
+        [
+          25.2,
+          23.4
+        ],
+        [
+          19.1,
+          20.1
+        ],
+        [
+          11.7,
+          19.1
+        ]
+      ]
+    },
+    {
+      "id": "helios",
+      "name": "Helios Towers",
+      "area": "Corp District",
+      "label": [
+        41.5,
+        6.4
+      ],
+      "border": [
+        [
+          32.4,
+          8
+        ],
+        [
+          36.3,
+          3.8
+        ],
+        [
+          45.7,
+          8.4
+        ],
+        [
+          46,
+          23
+        ],
+        [
+          40,
+          27
+        ],
+        [
+          33,
+          24
+        ],
+        [
+          31.3,
+          13.3
+        ]
+      ]
+    },
+    {
+      "id": "nexus",
+      "name": "Nexus",
+      "area": "Central Core",
+      "label": [
+        58.4,
+        23.6
+      ],
+      "border": [
+        [
+          46,
+          0.5
+        ],
+        [
+          58,
+          0.5
+        ],
+        [
+          64,
+          7
+        ],
+        [
+          66,
+          22
+        ],
+        [
+          64,
+          30
+        ],
+        [
+          57,
+          36
+        ],
+        [
+          50,
+          33
+        ],
+        [
+          46,
+          23
+        ]
+      ]
+    },
+    {
+      "id": "mirage",
+      "name": "Mirage Heights",
+      "area": "Luxury Enclave / The Shelf",
+      "label": [
+        90.6,
+        5.2
+      ],
+      "border": [
+        [
+          76,
+          0.5
+        ],
+        [
+          99.5,
+          0.5
+        ],
+        [
+          99.5,
+          22
+        ],
+        [
+          94,
+          24
+        ],
+        [
+          87.9,
+          18
+        ],
+        [
+          82,
+          12
+        ],
+        [
+          76,
+          6
+        ]
+      ]
+    },
+    {
+      "id": "velvet",
+      "name": "Velvet",
+      "area": "Red-Light Quarter",
+      "label": [
+        76.2,
+        13.4
+      ],
+      "border": [
+        [
+          64,
+          7
+        ],
+        [
+          76,
+          6
+        ],
+        [
+          82,
+          12
+        ],
+        [
+          88,
+          18
+        ],
+        [
+          88,
+          26
+        ],
+        [
+          80,
+          29
+        ],
+        [
+          72,
+          30
+        ],
+        [
+          66,
+          22
+        ]
+      ]
+    },
+    {
+      "id": "karasu",
+      "name": "Karasu",
+      "area": "Old Town / The Ribbon",
+      "label": [
+        92.4,
+        25.6
+      ],
+      "border": [
+        [
+          80,
+          29
+        ],
+        [
+          88,
+          26
+        ],
+        [
+          94,
+          24
+        ],
+        [
+          99.5,
+          22
+        ],
+        [
+          99.5,
+          40
+        ],
+        [
+          92,
+          42
+        ],
+        [
+          86,
+          43
+        ],
+        [
+          80,
+          43
+        ],
+        [
+          77,
+          38
+        ]
+      ]
+    },
+    {
+      "id": "strand",
+      "name": "Neon Strand",
+      "area": "Entertainment District",
+      "label": [
+        66,
+        47.6
+      ],
+      "border": [
+        [
+          57,
+          36
+        ],
+        [
+          64,
+          30
+        ],
+        [
+          72,
+          30
+        ],
+        [
+          80,
+          29
+        ],
+        [
+          77,
+          38
+        ],
+        [
+          80,
+          43
+        ],
+        [
+          80,
+          50
+        ],
+        [
+          74,
+          53
+        ],
+        [
+          66,
+          52
+        ],
+        [
+          60,
+          46
+        ]
+      ]
+    },
+    {
+      "id": "spine",
+      "name": "The Spine",
+      "area": "Elevated Rail",
+      "label": [
+        89,
+        43.4
+      ]
+    },
+    {
+      "id": "marsh",
+      "name": "The Marsh",
+      "area": "Lower City",
+      "label": [
+        93.6,
+        58
+      ],
+      "border": [
+        [
+          80,
+          43
+        ],
+        [
+          86,
+          43
+        ],
+        [
+          92,
+          42
+        ],
+        [
+          99.5,
+          40
+        ],
+        [
+          99.5,
+          70
+        ],
+        [
+          90,
+          70
+        ],
+        [
+          80,
+          66
+        ],
+        [
+          72,
+          62
+        ],
+        [
+          68,
+          57
+        ],
+        [
+          74,
+          53
+        ],
+        [
+          80,
+          50
+        ]
+      ]
+    },
+    {
+      "id": "drownworks",
+      "name": "Drownworks",
+      "area": "Waste & Reclamation",
+      "label": [
+        91,
+        82.6
+      ],
+      "border": [
+        [
+          68,
+          68
+        ],
+        [
+          80,
+          66
+        ],
+        [
+          90,
+          70
+        ],
+        [
+          99.5,
+          70
+        ],
+        [
+          99.5,
+          99.5
+        ],
+        [
+          70,
+          99.5
+        ],
+        [
+          66,
+          86
+        ]
+      ]
+    },
+    {
+      "id": "tidal",
+      "name": "Tidal Isle",
+      "area": "Processing & Customs",
+      "label": [
+        52.8,
+        77.5
+      ],
+      "border": [
+        [
+          38,
+          80
+        ],
+        [
+          46,
+          67
+        ],
+        [
+          56,
+          64
+        ],
+        [
+          66,
+          66
+        ],
+        [
+          68,
+          70
+        ],
+        [
+          64,
+          86
+        ],
+        [
+          54,
+          94
+        ],
+        [
+          42,
+          92
+        ]
+      ]
+    },
+    {
+      "id": "dockside",
+      "name": "Dockside",
+      "area": "Freight & Containers",
+      "label": [
+        30.6,
+        43.4
+      ],
+      "border": [
+        [
+          20,
+          38
+        ],
+        [
+          28,
+          30
+        ],
+        [
+          40,
+          28
+        ],
+        [
+          46,
+          34
+        ],
+        [
+          44,
+          46
+        ],
+        [
+          38,
+          58
+        ],
+        [
+          28,
+          72
+        ],
+        [
+          18,
+          80
+        ],
+        [
+          8,
+          74
+        ],
+        [
+          14,
+          56
+        ]
+      ]
+    },
+    {
+      "id": "ironreach",
+      "name": "Iron Reach",
+      "area": "Industrial Zone",
+      "label": [
+        10,
+        47.6
+      ],
+      "border": [
+        [
+          0.5,
+          22
+        ],
+        [
+          8,
+          26
+        ],
+        [
+          18,
+          25
+        ],
+        [
+          28,
+          30
+        ],
+        [
+          20,
+          38
+        ],
+        [
+          14,
+          56
+        ],
+        [
+          8,
+          62
+        ],
+        [
+          0.5,
+          64
+        ]
+      ]
+    },
+    {
+      "id": "bay",
+      "name": "Lowlight Bay",
+      "label": [
+        45.5,
+        60.5
+      ]
+    }
+  ],
+  "places": [
+    {
+      "id": "ribbon-rooftop",
+      "name": "Ribbon Rooftop",
+      "district": "karasu",
+      "pin": [
+        86.6,
+        29.4
+      ],
+      "scene": "karasu/ribbon-rooftop"
+    },
+    {
+      "id": "nix-walk-up",
+      "name": "Nix's walk-up",
+      "district": "karasu",
+      "pin": [
+        88.6,
+        31.6
+      ],
+      "scene": "karasu/nix-apartment",
+      "inviteOnly": true
+    },
+    {
+      "id": "public-landing",
+      "name": "Public landing",
+      "district": "karasu",
+      "pin": [
+        82.9,
+        33.3
+      ],
+      "scene": "karasu/public-landing",
+      "gigs": true
+    },
+    {
+      "id": "lowlight-intake",
+      "name": "Lowlight Intake",
+      "district": "karasu",
+      "pin": [
+        85.4,
+        34
+      ],
+      "scene": "karasu/lowlight-intake"
+    },
+    {
+      "id": "second-socket",
+      "name": "Second Socket",
+      "district": "karasu",
+      "pin": [
+        86.8,
+        35.3
+      ],
+      "scene": "karasu/second-socket"
+    },
+    {
+      "id": "haes-noodles",
+      "name": "Hae's Noodles",
+      "district": "karasu",
+      "pin": [
+        84.7,
+        36.6
+      ],
+      "scene": "karasu/noodle-stall"
+    },
+    {
+      "id": "the-tilt",
+      "name": "The Tilt",
+      "district": "karasu",
+      "pin": [
+        79.8,
+        40.6
+      ],
+      "scene": "karasu/the-tilt",
+      "gigs": true
+    },
+    {
+      "id": "glass-orchid",
+      "name": "Glass Orchid",
+      "district": "velvet",
+      "pin": [
+        73.6,
+        19.8
+      ],
+      "scene": "velvet/glass-orchid",
+      "gigs": true
+    },
+    {
+      "id": "cass-s-backroom",
+      "name": "Cass's Backroom",
+      "district": "karasu",
+      "pin": [
+        78.9,
+        40
+      ],
+      "scene": "karasu/cass-apartment"
+    },
+    {
+      "id": "hicks-room",
+      "name": "Hicks's room",
+      "district": "karasu",
+      "pin": [
+        81.6,
+        38.6
+      ],
+      "scene": "karasu/hicks-room"
+    },
+    {
+      "id": "zhou-flat",
+      "name": "The twins' place",
+      "district": "karasu",
+      "pin": [
+        80.2,
+        40.4
+      ],
+      "scene": "karasu/zhou-flat"
+    },
+    {
+      "id": "customs-booth-009",
+      "name": "Customs, Booth 009",
+      "district": "tidal",
+      "pin": [
+        50,
+        50
+      ]
+    }
+  ]
+}

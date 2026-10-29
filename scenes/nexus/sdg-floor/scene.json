@@ -1,0 +1,564 @@
+{
+  "id": "sdg-floor",
+  "name": "The sixty-first floor",
+  "description": "The sixty-first floor of the Sentinel Tower in Nexus, the branch's floor, with no number on the lift panel. Adebayo's office: a wall of floor-to-ceiling glass in slim dark frames onto the city core, dark towers close by wrapped in lit windows and huge glowing advertisement panels, and the streets far below like a map. A long desk of real dark wood, nearly empty: a slim brass desk lamp, a thin terminal, folders squared at the corner, a tray with a white kettle, a teapot and two china cups. A high-backed black leather chair behind it, two lower visitor chairs in front angled toward each other, a tall fig tree by the glass. On the left, a glass partition and door onto a dim corridor of other glass offices, a built-in coffee machine glowing on its wall. A thin recessed light strip along the ceiling, deep charcoal carpet, nothing out of place. Rain runs down the glass most nights. Nobody raises their voice here.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "desk_lamp": "room_e_desk_lamp.png",
+        "terminal": "room_e_terminal.png",
+        "coffee_machine": "room_e_coffee_machine.png",
+        "corridor": "room_e_corridor.png",
+        "ceiling_strip": "room_e_ceiling_strip.png",
+        "towers": "room_e_towers.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "desk_lamp",
+      "label": "the brass desk lamp on Adebayo's desk",
+      "pos": [
+        700,
+        398
+      ],
+      "color": "#ffc870",
+      "intensity": 0.5,
+      "radius": 360,
+      "flicker": 0
+    },
+    {
+      "id": "terminal",
+      "label": "the slim terminal on the desk",
+      "pos": [
+        805,
+        455
+      ],
+      "color": "#7fd8ff",
+      "intensity": 0.25,
+      "radius": 200,
+      "flicker": 0
+    },
+    {
+      "id": "coffee_machine",
+      "label": "the coffee machine beyond the glass partition",
+      "pos": [
+        45,
+        368
+      ],
+      "color": "#8fb8ff",
+      "intensity": 0.25,
+      "radius": 220,
+      "flicker": 0
+    },
+    {
+      "id": "corridor",
+      "label": "the lights of the offices along the corridor",
+      "pos": [
+        230,
+        300
+      ],
+      "color": "#ffc070",
+      "intensity": 0.2,
+      "radius": 320,
+      "flicker": 0
+    },
+    {
+      "id": "ceiling_strip",
+      "label": "the recessed light strip along the ceiling",
+      "pos": [
+        960,
+        15
+      ],
+      "color": "#ffd890",
+      "intensity": 0.3,
+      "radius": 700,
+      "flicker": 0
+    },
+    {
+      "id": "towers",
+      "label": "the towers and their ad panels through the glass",
+      "pos": [
+        1000,
+        250
+      ],
+      "color": "#d070ff",
+      "intensity": 0.35,
+      "radius": 800,
+      "flicker": 0.02,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#1a1a32",
+    "ambientLevel": 0.32,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.03,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#14142a",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.04,
+      "timeOfDay": "late-night",
+      "lights": {
+        "desk_lamp": {
+          "color": "#ffc870",
+          "intensity": 0.42,
+          "flicker": 0
+        },
+        "terminal": {
+          "color": "#7fd8ff",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "coffee_machine": {
+          "color": "#8fb8ff",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "corridor": {
+          "color": "#ffc070",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "ceiling_strip": {
+          "color": "#ffd890",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "towers": {
+          "color": "#d070ff",
+          "intensity": 0.3,
+          "flicker": 0.02
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#1a1a32",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.03,
+      "timeOfDay": "night",
+      "lights": {
+        "desk_lamp": {
+          "color": "#ffc870",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "terminal": {
+          "color": "#7fd8ff",
+          "intensity": 0.24,
+          "flicker": 0
+        },
+        "coffee_machine": {
+          "color": "#8fb8ff",
+          "intensity": 0.24,
+          "flicker": 0
+        },
+        "corridor": {
+          "color": "#ffc070",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "ceiling_strip": {
+          "color": "#ffd890",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "towers": {
+          "color": "#d070ff",
+          "intensity": 0.32,
+          "flicker": 0.02
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#241226",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.05,
+      "timeOfDay": "night",
+      "lights": {
+        "desk_lamp": {
+          "color": "#ffc870",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "terminal": {
+          "color": "#7fd8ff",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "coffee_machine": {
+          "color": "#8fb8ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "corridor": {
+          "color": "#ffc070",
+          "intensity": 0.08,
+          "flicker": 0
+        },
+        "ceiling_strip": {
+          "color": "#ffd890",
+          "intensity": 0.12,
+          "flicker": 0
+        },
+        "towers": {
+          "color": "#d070ff",
+          "intensity": 0.38,
+          "flicker": 0.08
+        }
+      }
+    },
+    "briefing": {
+      "ambient": "#22223a",
+      "ambientLevel": 0.4,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.03,
+      "timeOfDay": "night",
+      "lights": {
+        "desk_lamp": {
+          "color": "#ffc870",
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "terminal": {
+          "color": "#7fd8ff",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "coffee_machine": {
+          "color": "#8fb8ff",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "corridor": {
+          "color": "#ffc070",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "ceiling_strip": {
+          "color": "#ffd890",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "towers": {
+          "color": "#d070ff",
+          "intensity": 0.32,
+          "flicker": 0.02
+        }
+      }
+    },
+    "after-hours": {
+      "ambient": "#101026",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.04,
+      "timeOfDay": "late-night",
+      "lights": {
+        "desk_lamp": {
+          "color": "#ffc870",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "terminal": {
+          "color": "#7fd8ff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "coffee_machine": {
+          "color": "#8fb8ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "corridor": {
+          "color": "#ffc070",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "ceiling_strip": {
+          "color": "#ffd890",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "towers": {
+          "color": "#d070ff",
+          "intensity": 0.3,
+          "flicker": 0.02
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a4e6a",
+      "ambientLevel": 0.5,
+      "weather": "rain",
+      "weatherLevel": 0.15,
+      "fog": 0.05,
+      "timeOfDay": "dawn",
+      "lights": {
+        "desk_lamp": {
+          "color": "#ffc870",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "terminal": {
+          "color": "#7fd8ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "coffee_machine": {
+          "color": "#8fb8ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "corridor": {
+          "color": "#ffc070",
+          "intensity": 0.12,
+          "flicker": 0
+        },
+        "ceiling_strip": {
+          "color": "#ffd890",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "towers": {
+          "color": "#d070ff",
+          "intensity": 0.12,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        390,
+        62
+      ],
+      [
+        558,
+        65
+      ],
+      [
+        553,
+        488
+      ],
+      [
+        540,
+        496
+      ],
+      [
+        539,
+        533
+      ],
+      [
+        496,
+        526
+      ],
+      [
+        488,
+        461
+      ],
+      [
+        464,
+        432
+      ],
+      [
+        523,
+        390
+      ],
+      [
+        540,
+        259
+      ],
+      [
+        515,
+        171
+      ],
+      [
+        458,
+        201
+      ],
+      [
+        407,
+        179
+      ],
+      [
+        404,
+        392
+      ],
+      [
+        434,
+        457
+      ],
+      [
+        404,
+        469
+      ],
+      [
+        390,
+        536
+      ]
+    ],
+    [
+      [
+        583,
+        63
+      ],
+      [
+        834,
+        63
+      ],
+      [
+        834,
+        428
+      ],
+      [
+        753,
+        428
+      ],
+      [
+        767,
+        479
+      ],
+      [
+        627,
+        473
+      ],
+      [
+        588,
+        486
+      ],
+      [
+        583,
+        428
+      ]
+    ],
+    [
+      [
+        855,
+        63
+      ],
+      [
+        1072,
+        63
+      ],
+      [
+        1072,
+        469
+      ],
+      [
+        1058,
+        474
+      ],
+      [
+        1057,
+        358
+      ],
+      [
+        940,
+        350
+      ],
+      [
+        934,
+        401
+      ],
+      [
+        920,
+        474
+      ],
+      [
+        855,
+        469
+      ]
+    ],
+    [
+      [
+        1086,
+        64
+      ],
+      [
+        1253,
+        64
+      ],
+      [
+        1253,
+        462
+      ],
+      [
+        1086,
+        462
+      ]
+    ],
+    [
+      [
+        1261,
+        67
+      ],
+      [
+        1533,
+        67
+      ],
+      [
+        1533,
+        534
+      ],
+      [
+        1477,
+        531
+      ],
+      [
+        1475,
+        505
+      ],
+      [
+        1406,
+        464
+      ],
+      [
+        1312,
+        466
+      ],
+      [
+        1296,
+        427
+      ],
+      [
+        1262,
+        425
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "hum": 0.15
+  },
+  "effects": [
+    {
+      "kind": "glass",
+      "amount": 3
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.4
+    }
+  ]
+}

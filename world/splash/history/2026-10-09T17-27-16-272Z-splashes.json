@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "splashes": [
+    {
+      "id": "nix-wall",
+      "name": "Nix against the wall",
+      "file": "nix-wall.webp",
+      "width": 1531,
+      "height": 1027,
+      "on": true,
+      "logo": {
+        "x": 67,
+        "y": 117,
+        "width": 727
+      }
+    },
+    {
+      "id": "chatgpt-image-oct-9-2026-12-26-40-pm",
+      "name": "ChatGPT Image Oct 9, 2026, 12 26 40 PM",
+      "file": "chatgpt-image-oct-9-2026-12-26-40-pm.png",
+      "width": 1531,
+      "height": 1027,
+      "on": false,
+      "logo": {
+        "x": 67,
+        "y": 117,
+        "width": 727
+      }
+    }
+  ]
+}

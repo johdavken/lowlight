@@ -1,0 +1,447 @@
+{
+  "id": "hicks-room",
+  "name": "Hicks's room",
+  "description": "Hicks's one room on Level 2 of the Ribbon, behind the plain grey door on the walkway, down where the stack barely sees daylight. Bare concrete patched with sheet metal, pipes and cable everywhere, a drip from one joint into a tin can. A cot under a barred window onto the girders of the level above, and across the gap a wall of small windows and a red neon shape. In the middle, his rig: a battered desk with an open deck wired into a tower of salvaged hardware, three small monitors of green code, sandalwood incense smoking in a cup. A hot plate, a kettle and a sink; a little TV on a crate that only shows static; a dented locker of jackets. The grey steel door out to the walkway, two deadbolts and a chain, a lantern on a hook beside it, and low in the wall by the cot a small steel hatch, the back way down into Old Town. He owns very little, and nothing he'd miss.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "cage_lamp": "room_e_cage_lamp.png",
+        "door_lantern": "room_e_door_lantern.png",
+        "tv": "room_e_tv.png",
+        "neon": "room_e_neon.png",
+        "window": "room_e_window.png",
+        "rig": "room_e_rig.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "cage_lamp",
+      "label": "caged bulb hanging from the ceiling",
+      "pos": [
+        660,
+        175
+      ],
+      "color": "#f2a24a",
+      "intensity": 0.62,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "door_lantern",
+      "label": "the lantern by the steel door",
+      "pos": [
+        1505,
+        215
+      ],
+      "color": "#f0a040",
+      "intensity": 0.55,
+      "radius": 340,
+      "flicker": 0
+    },
+    {
+      "id": "tv",
+      "label": "the little TV (static)",
+      "pos": [
+        1135,
+        485
+      ],
+      "color": "#a9c4ff",
+      "intensity": 0.45,
+      "radius": 300,
+      "flicker": 0.05
+    },
+    {
+      "id": "window",
+      "label": "the windows across the gap through his window",
+      "pos": [
+        300,
+        280
+      ],
+      "color": "#3a2c7a",
+      "intensity": 0.3,
+      "radius": 430,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "neon",
+      "label": "the red neon across the gap",
+      "pos": [
+        430,
+        290
+      ],
+      "color": "#ff3a5a",
+      "intensity": 0.3,
+      "radius": 260,
+      "flicker": 0.15
+    },
+    {
+      "id": "rig",
+      "label": "the monitors on his rig",
+      "pos": [
+        650,
+        440
+      ],
+      "color": "#60ff9a",
+      "intensity": 0.35,
+      "radius": 340,
+      "flicker": 0.03
+    }
+  ],
+  "defaults": {
+    "ambient": "#3e3168",
+    "ambientLevel": 0.45,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.2,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.27,
+      "timeOfDay": "late-night",
+      "lights": {
+        "cage_lamp": {
+          "intensity": 0.47
+        },
+        "door_lantern": {
+          "intensity": 0.41
+        },
+        "tv": {
+          "intensity": 0.34
+        },
+        "window": {
+          "intensity": 0.22
+        },
+        "neon": {
+          "intensity": 0.22
+        },
+        "rig": {
+          "intensity": 0.3
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.32,
+      "weatherLevel": 0.18,
+      "fog": 0.15,
+      "lights": {
+        "cage_lamp": {
+          "intensity": 0.47,
+          "flicker": 0
+        },
+        "door_lantern": {
+          "intensity": 0.41,
+          "flicker": 0
+        },
+        "tv": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "window": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "neon": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "rig": {
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.27,
+      "fog": 0.35,
+      "lights": {
+        "cage_lamp": {
+          "intensity": 0.31,
+          "flicker": 0.2
+        },
+        "door_lantern": {
+          "intensity": 0.28,
+          "flicker": 0.2
+        },
+        "tv": {
+          "intensity": 0.23,
+          "flicker": 0.25
+        },
+        "window": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "neon": {
+          "intensity": 0.15,
+          "flicker": 0.35
+        },
+        "rig": {
+          "intensity": 0.25,
+          "flicker": 0.1
+        }
+      }
+    },
+    "after-the-job": {
+      "ambient": "#45305a",
+      "ambientLevel": 0.42,
+      "weather": "rain",
+      "weatherLevel": 0.45,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "cage_lamp": {
+          "color": "#f2a24a",
+          "intensity": 0.75,
+          "flicker": 0
+        },
+        "door_lantern": {
+          "color": "#f0a040",
+          "intensity": 0.6,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 0.3,
+          "flicker": 0.03
+        },
+        "window": {
+          "color": "#3a2c7a",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "neon": {
+          "color": "#ff3a5a",
+          "intensity": 0.3,
+          "flicker": 0.15
+        },
+        "rig": {
+          "color": "#60ff9a",
+          "intensity": 0.5,
+          "flicker": 0.03
+        }
+      }
+    },
+    "tv-glow": {
+      "ambient": "#1a1c40",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "cage_lamp": {
+          "color": "#f2a24a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lantern": {
+          "color": "#f0a040",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 0.7,
+          "flicker": 0.1
+        },
+        "window": {
+          "color": "#3a2c7a",
+          "intensity": 0.24,
+          "flicker": 0
+        },
+        "neon": {
+          "color": "#ff3a5a",
+          "intensity": 0.25,
+          "flicker": 0.15
+        },
+        "rig": {
+          "color": "#60ff9a",
+          "intensity": 0.1,
+          "flicker": 0
+        }
+      }
+    },
+    "power-cut": {
+      "ambient": "#141030",
+      "ambientLevel": 0.14,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.25,
+      "timeOfDay": "late-night",
+      "lights": {
+        "cage_lamp": {
+          "color": "#f2a24a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lantern": {
+          "color": "#f0a040",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#a9c4ff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "window": {
+          "color": "#3a2c7a",
+          "intensity": 0.32,
+          "flicker": 0
+        },
+        "neon": {
+          "color": "#ff3a5a",
+          "intensity": 0.4,
+          "flicker": 0.3
+        },
+        "rig": {
+          "color": "#60ff9a",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        172,
+        188
+      ],
+      [
+        201,
+        188
+      ],
+      [
+        229,
+        199
+      ],
+      [
+        263,
+        208
+      ],
+      [
+        304,
+        218
+      ],
+      [
+        460,
+        216
+      ],
+      [
+        459,
+        408
+      ],
+      [
+        172,
+        406
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "hum": 0.3,
+    "music": {
+      "songs": [
+        "No Light in Lowlight.ogg"
+      ]
+    },
+    "sounds": [
+      {
+        "name": "door",
+        "src": "sound/keep/door.ogg",
+        "level": 0.6,
+        "onEntry": true
+      }
+    ]
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        1101,
+        452,
+        72,
+        66
+      ],
+      "light": "tv",
+      "scroll": 0,
+      "picture": "static",
+      "grain": 0.85
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        490,
+        398,
+        70,
+        52
+      ],
+      "light": "rig",
+      "scroll": 6
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        605,
+        412,
+        105,
+        66
+      ],
+      "light": "rig",
+      "scroll": 10
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        730,
+        412,
+        72,
+        60
+      ],
+      "light": "rig",
+      "scroll": 4
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.8
+    },
+    {
+      "kind": "glass",
+      "amount": 3
+    }
+  ],
+  "exits": [
+    {
+      "to": "karasu/dead-blocks",
+      "way": "down the back way into Old Town",
+      "door": [
+        338,
+        528,
+        96,
+        104
+      ]
+    },
+    {
+      "to": "karasu/hicks-gallery",
+      "way": "out to the walkway",
+      "door": [
+        1425,
+        125,
+        100,
+        575
+      ]
+    }
+  ]
+}

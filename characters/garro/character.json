@@ -1,0 +1,30 @@
+{
+  "name": "Garro",
+  "pronoun": "he",
+  "accent": "#7f9c6a",
+  "kind": "fixed",
+  "voice": "voice.md",
+  "sprite": {
+    "src": "garro-outfit-work.png",
+    "pixel": true
+  },
+  "expressions": {
+    "happy": "garro-happy.png",
+    "tired": "garro-tired.png",
+    "annoyed": "garro-annoyed.png",
+    "concerned": "garro-concerned.png"
+  },
+  "outfits": {
+    "work": "garro-outfit-work.png"
+  },
+  "outfitByScene": {
+    "spine/listening-post": "work"
+  },
+  "outfitWears": {
+    "work": "faded blue-grey maintenance coverall unzipped to the chest over a stained white undershirt, a headset around his neck, reading glasses in the chest pocket, scuffed steel-toe boots"
+  },
+  "face": {
+    "x": 0.5,
+    "y": 0.08
+  }
+}

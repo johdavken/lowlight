@@ -1,0 +1,51 @@
+/* Doors (doors.ts, clickable doors spec §3): invisible spots over the room's doors. On hover, two corner
+   brackets frame the door (the speaker portrait's style) and a small label says the way. Under the
+   figures (they take no clicks), the party window (19) and the subtitles (20). Every class is door- (global class names
+   collide across screens). */
+.door-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  pointer-events: none;
+}
+.door-spot {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.door-spot::before,
+.door-spot::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  opacity: 0;
+  transition: opacity 150ms ease;
+  border: 0 solid rgba(127, 233, 255, 0.85);
+}
+.door-spot::before { left: 0; top: 0; border-left-width: 2px; border-top-width: 2px; }
+.door-spot::after { right: 0; bottom: 0; border-right-width: 2px; border-bottom-width: 2px; }
+.door-spot.door-hover::before,
+.door-spot.door-hover::after { opacity: 1; }
+.door-label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  max-width: 360px;
+  width: max-content;
+  padding: 4px 10px;
+  font: 12px var(--mono, 'IBM Plex Mono', monospace);
+  letter-spacing: 0.2em;
+  color: #7fe9ff;
+  background: rgba(8, 4, 16, 0.85);
+  opacity: 0;
+  transition: opacity 150ms ease;
+  pointer-events: none;
+}
+.door-spot.door-label-below .door-label { bottom: auto; top: calc(100% + 8px); }
+.door-spot.door-hover .door-label { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .door-spot::before, .door-spot::after, .door-label { transition: none; }
+}

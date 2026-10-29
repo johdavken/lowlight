@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nix Room</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0b0712" />
+    <link rel="apple-touch-icon" href="/icons/relay-180.png" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+      /* The game stage (spec 2026-10-16): 1600×900, zoomed and centred by game-stage.ts. Fixed makes it
+         one stacking layer: above the canvas layer (#stage gets z-index 2 from .splash-stage on the
+         landing), under the dev panel (40). */
+      #game {
+        position: fixed;
+        z-index: 10;
+        left: 0;
+        top: 0;
+        width: 1600px;
+        height: 900px;
+        /* clip, not hidden: hidden still lets focus, scrollIntoView or find scroll it, and the figures hang
+           below the stage, so the whole UI would shift until a reload. */
+        overflow: clip;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="game">
+      <div id="feed"></div>
+      <div id="stage-figures"></div>
+      <div id="doors"></div>
+      <div id="whos-here"></div>
+      <div id="hud"></div>
+      <div id="input"></div>
+      <div id="map"></div>
+      <div id="recap"></div>
+      <div id="district-intro"></div>
+    </div>
+    <div id="devpanel"></div>
+    <script type="module" src="/src/boot.ts"></script>
+  </body>
+</html>

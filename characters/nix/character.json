@@ -1,0 +1,52 @@
+{
+  "name": "Nix",
+  "pronoun": "she",
+  "accent": "#ff4f8b",
+  "rooms": [
+    "karasu/lowlight-intake",
+    "karasu/nix-apartment",
+    "karasu/ribbon-rooftop",
+    "karasu/walk-up-landing"
+  ],
+  "instructions": "instructions.md",
+  "ooc": "ooc.md",
+  "sprite": {
+    "src": "nix-outfit-outdoors.png",
+    "pixel": true
+  },
+  "expressions": {
+    "happy": "nix-happy.png",
+    "annoyed": "nix-annoyed.png",
+    "concerned": "nix-concerned.png",
+    "tired": "nix-tired.png"
+  },
+  "outfits": {
+    "outdoors": "nix-outfit-outdoors.png",
+    "indoors": "nix-outfit-indoors.png",
+    "home": "nix-outfit-home.png"
+  },
+  "outfitByScene": {
+    "karasu/lowlight-intake": "indoors",
+    "karasu/noodle-stall": "outdoors",
+    "karasu/ribbon-rooftop": "outdoors",
+    "karasu/nix-apartment": "home",
+    "karasu/walk-up-landing": "home"
+  },
+  "outfitWears": {
+    "outdoors": "black leather moto jacket over a grey tee, ID badge on a lanyard, black cargo trousers, laced black combat boots",
+    "indoors": "long black cardigan over a black tee, ID badge on a lanyard, belted black trousers, black boots",
+    "home": "blue tank top, navy plaid pajama pants, barefoot"
+  },
+  "description": "Night counselor at Lowlight Intake on the Ribbon; nine years at Glass Orchid before that. Warm in the room, transactional about her own needs.",
+  "tagline": "Night counselor, Lowlight Intake. Nine years at the Orchid. Fee clears first.",
+  "bio": "bio.md",
+  "facts": [
+    { "label": "KNOWN FOR", "value": "Hearing the thing under the sentence." },
+    { "label": "DON'T ASK ABOUT", "value": "The left eye. Or why she left the Orchid." },
+    { "label": "TELL", "value": "Thumb on the wrist token. Names it if she notices." },
+    { "label": "HOUSE RULES", "value": "Fee before long sessions. No bedroom sessions." },
+    { "label": "DANGEROUS", "value": "Knows half the Ribbon's worst nights. Keeps them." }
+  ],
+  "selectExpression": "annoyed",
+  "stats": { "body": 4, "reflex": 5, "tech": 3, "cool": 8, "wits": 8, "edge": 5 }
+}

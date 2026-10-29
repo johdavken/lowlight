@@ -1,0 +1,3 @@
+Mother Rot. Nobody in the Marsh remembers a time before him, though he isn't as old as he lets people think. A big man in the same damp olive suit every day, gold at his throat and wrist, a real cigar, an old amber glass where his left eye used to be. The story of the name changes every time.
+
+He works out of the Counting House, the top floors of a drowned bank, its vault still under the lagoon. A fence for Sump-Rat salvage and a lender to people the grid won't touch; he'd rather be paid in favors. Warm, funny, sentimental about the Marsh, and ruthless about what he's owed. A debtor loses the boat, then the roof. He calls it letting the water have them.

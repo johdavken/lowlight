@@ -1,0 +1,112 @@
+import type { NarratorKind } from '../../../shared/narrator';
+import { forms, type Pronoun } from '../../../shared/pronoun';
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** Every on-screen string for the character-select screen, in one place; words about a character take her pronoun. */
+export const COPY = {
+  /** The opening card before the splash (an 80s film's text card): a title, then lines typed one by one. `accent` words show red. */
+  openingCard: {
+    title: 'LOWLIGHT',
+    lines: [
+      { text: 'The sea came in. The city built up instead of out.' },
+      { text: 'The corps own the streets, the grid and the light.' },
+      { text: 'SDG sells the law. Everything else is for rent.', accent: ['SDG'] },
+      { text: 'Darkness is the only free thing,', dim: true },
+      { text: 'and most people live in it.', dim: true },
+    ] as { text: string; accent?: string[]; dim?: boolean }[],
+    skip: '[ANY KEY] SKIP',
+  },
+  /** The desktop app's corner on the title (spec 2026-10-09 preview build §5.2). */
+  help: {
+    label: (v: string) => `PREVIEW ${v}`,
+    button: '?',
+    buttonLabel: 'Help',
+    saveFolder: 'OPEN SAVE FOLDER',
+    logFolder: 'OPEN LOG FOLDER',
+    version: (v: string) => `VERSION ${v}`,
+    copied: 'COPIED',
+  },
+  titleP1: 'SELECT YOUR OPERATOR',
+  titleP2: 'SELECT YOUR CONTACT',
+  tagP1: '1P · YOU',
+  tagP2: 'CPU · AI',
+  cursorP1: '1P',
+  cursorP2: 'CPU',
+  jackIn: '//JACK IN Y/N',
+  awaiting: 'AWAITING SELECTION',
+  fileHeader: (name: string) => `// FILE ${name}`,
+  modelHeader: 'MODEL',
+  catalogOffline: 'catalog offline',
+  noMind: 'NO MIND ATTACHED',
+  notConnected: 'Not connected',
+  random: 'RANDOM',
+  hintGrid: '[↑↓←→] MOVE · [ENTER] LOCK IN',
+  hintBack: '[ESC] BACK',
+  /** READY's hints with SET THE SCENE's (S SET THE SCENE / S CHANGE THE SCENE). */
+  hintReady: '[Y] JACK IN · [N] BACK',
+  livePreviously: 'PREVIOUSLY',
+  liveLink: 'LINK',
+  /** LINK's value for a broken link (`unreachable`: her model's provider couldn't be reached). */
+  linkStatus: { 'key-rejected': 'KEY REJECTED', 'no-link': 'NO LINK', 'no-credit': 'NO CREDIT', 'unreachable': 'UNREACHABLE', 'room-error': 'ROOM ERROR' },
+  liveLastSeen: 'LAST SEEN',
+  liveBackend: 'BACKEND',
+  liveModel: 'MODEL',
+  backendNames: { direct: 'DIRECT', none: 'NO MIND' },
+  unreachable: '// ROOM SERVER UNREACHABLE',
+  empty: '// NOTHING TO DIAL',
+  dialFailed: (why: string) => `// COULDN'T SET THE MODEL — ${why}`,
+  /** New Game refused (409 busy): another contact's reply is still streaming. */
+  dialBusy: (name: string) => `Wait for ${name} to finish`,
+  newGameFailed: (why: string) => `// COULDN'T START A NEW GAME — ${why}`,
+  /** The link panel and the model step (spec 2026-10-08 §5). */
+  link: {
+    heading: 'LINK A MIND',
+    why: 'Your contacts think through OpenRouter. Paste a key to wake them — it stays on this machine.',
+    fieldLabel: 'OPENROUTER KEY',
+    getKeyLead: 'no key? ',
+    getKey: 'get one → openrouter.ai/keys ↗',
+    button: 'LINK',
+    checking: 'checking…',
+    back: '[ESC] BACK',
+    linked: (credit: number | null) => (credit === null ? 'linked' : `linked · $${credit.toFixed(2)}`),
+    noCredit: 'no credit on this key',
+    errors: {
+      'key-rejected': "key rejected — OpenRouter didn't accept that key. Check you copied all of it.",
+      unreachable: 'OpenRouter unreachable — check your connection.',
+      'bad-key': "that doesn't look like a key — paste the whole thing.",
+    },
+    tileTag: 'NO LINK',
+    stripExtra: (p: Pronoun) => `▶ PICK ${forms(p).her.toUpperCase()} TO LINK A MIND`,
+    titleLink: 'LINK A MIND',
+    titleModel: (p: Pronoun) => `CHOOSE ${forms(p).hers.toUpperCase()} MIND`,
+    linkLine: (last4: string | null, credit: number | null) => `LINK …${last4 ?? '????'}${credit === null ? '' : ` · $${credit.toFixed(2)}`}`,
+    changeKey: 'CHANGE KEY',
+    unlinkFailed: (why: string) => `// COULDN'T UNLINK — ${why}`,
+    unlink: 'UNLINK',
+    unlinkConfirm: 'UNLINK? CLICK AGAIN',
+    groups: { current: 'CURRENT', picks: 'PICKS', recent: 'RECENT', results: 'RESULTS' },
+    reset: (p: Pronoun, label: string) => `↺ reset to ${forms(p).hers} default · ${label}`,
+    search: 'SEARCH',
+    searchEmpty: 'no matches',
+    hint: '[▲▼] CHOOSE · TYPE TO SEARCH · [ENTER] PICK · [ESC] BACK',
+    hintLink: 'PASTE KEY · [ENTER] LINK · [ESC] BACK',
+  },
+  /** The YOU step (spec 2026-10-08 playable persona §2). */
+  you: {
+    title: 'WHO ARE YOU',
+    playAs: (name: string) => `PLAY AS ${name.toUpperCase()}`,
+    edit: 'EDIT',
+    custom: 'CUSTOM',
+    name: 'NAME',
+    pronoun: 'PRONOUN',
+    background: 'BACKGROUND',
+    placeholder: 'Who are you? A line or a few paragraphs.',
+    count: (n: number) => `${n} / 1200`,
+    confirm: 'CONFIRM',
+    back: '[ESC] BACK',
+    tag: 'YOU',
+    hint: '[▲▼] CHOOSE · [ENTER] PICK · [ESC] BACK',
+    hintForm: '[CTRL+ENTER] CONFIRM · [ESC] BACK',
+  },
+};

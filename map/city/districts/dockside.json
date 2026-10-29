@@ -1,0 +1,138 @@
+{
+  "height": [
+    10,
+    26
+  ],
+  "lot": [
+    24,
+    18
+  ],
+  "streetEvery": [
+    3,
+    3
+  ],
+  "tallGain": 0.4,
+  "brick": 0.6,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0.12,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.05,
+    "roofLights": 4,
+    "fires": 4,
+    "outage": 0.1
+  },
+  "windowLit": 0.7,
+  "windowColors": [
+    "#ffb060",
+    "#ffc27a",
+    "#ff9a4a"
+  ],
+  "pools": {
+    "colors": [
+      "#ffb060"
+    ],
+    "count": 48,
+    "power": 220000,
+    "reach": 120,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#ffb060",
+    "#ff5a3c"
+  ],
+  "signShare": 0.02,
+  "deepZoom": true,
+  "angleDeg": -32,
+  "port": {
+    "quay": 22,
+    "yard": [
+      110,
+      300
+    ],
+    "terminals": 0.85,
+    "ships": {
+      "length": [
+        80,
+        140
+      ],
+      "beam": [
+        15,
+        21
+      ],
+      "gap": [
+        16,
+        60
+      ]
+    },
+    "cranes": {
+      "height": 42,
+      "reach": 52,
+      "every": 38
+    },
+    "containers": [
+      "#9a3324",
+      "#b8582a",
+      "#2f5486",
+      "#2c7058",
+      "#6a6e78",
+      "#1f6e7c",
+      "#8a2f4e",
+      "#b08a2e"
+    ],
+    "tiers": [
+      1.5,
+      3.5
+    ],
+    "piers": {
+      "count": 3,
+      "length": [
+        110,
+        190
+      ],
+      "width": 52
+    },
+    "masts": 64,
+    "anchored": 4,
+    "tugs": 6,
+    "stacks": 4,
+    "inlandYards": {
+      "count": 10,
+      "size": [
+        80,
+        280
+      ],
+      "turn": 9
+    },
+    "rail": {
+      "offset": 420,
+      "tracks": 6,
+      "yardLength": 360,
+      "trains": 0.7,
+      "signalEvery": 140,
+      "branchTo": [
+        14,
+        40
+      ]
+    },
+    "warehouses": {
+      "slot": [
+        72,
+        40
+      ],
+      "street": 8,
+      "angleDeg": -32,
+      "lampEvery": 2,
+      "lights": 0.6
+    },
+    "road": {
+      "toward": [
+        10,
+        28.1
+      ],
+      "width": 10
+    }
+  }
+}

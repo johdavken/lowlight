@@ -1,0 +1,73 @@
+{
+  "height": [
+    6,
+    10
+  ],
+  "lot": [
+    30,
+    24
+  ],
+  "streetEvery": [
+    4,
+    4
+  ],
+  "tallGain": 0,
+  "brick": 0.4,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.3,
+    "roofLights": 0,
+    "fires": 0,
+    "outage": 0.02
+  },
+  "windowLit": 0.6,
+  "windowColors": [
+    "#ffcf8a",
+    "#ffd9a0",
+    "#fff3d6"
+  ],
+  "pools": {
+    "colors": [
+      "#ffcf8a"
+    ],
+    "count": 0,
+    "power": 200000,
+    "reach": 120,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#ffcf8a"
+  ],
+  "signShare": 0,
+  "deepZoom": true,
+  "angleDeg": 0,
+  "hill": {
+    "peak": 80,
+    "falloff": 180,
+    "northTilt": 0.45,
+    "ridgeScale": 140,
+    "entries": 4,
+    "road": 5,
+    "lampEvery": 10,
+    "villa": [
+      56,
+      80
+    ],
+    "villaEvery": 30,
+    "villaShare": 0.9,
+    "pools": 0.3,
+    "windows": [
+      "#ffcf8a",
+      "#ffd9a0",
+      "#fff3d6"
+    ],
+    "trees": 1800,
+    "roadApart": 110,
+    "roadLength": 420,
+    "climb": 0.06
+  }
+}

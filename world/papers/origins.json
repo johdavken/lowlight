@@ -1,0 +1,192 @@
+[
+  {
+    "name": "Vrana",
+    "lore": "vrana",
+    "names": {
+      "given": {
+        "f": [
+          "Zofia",
+          "Milena",
+          "Vesna",
+          "Katarina",
+          "Agnieszka",
+          "Hana"
+        ],
+        "m": [
+          "Nikolai",
+          "Tomas",
+          "Jakub",
+          "Ilya",
+          "Pavel",
+          "Marek"
+        ],
+        "x": [
+          "Sasha"
+        ]
+      },
+      "family": [
+        "Varga",
+        "Wójcik",
+        "Zielinski",
+        "Novak",
+        "Kovač",
+        "Petrov",
+        "Volkov",
+        "Horvat",
+        "Dvořák",
+        "Marek"
+      ]
+    }
+  },
+  {
+    "name": "Kalimera Bay",
+    "lore": "kalimera-bay",
+    "names": {
+      "given": {
+        "f": [
+          "Eleni",
+          "Giulia",
+          "Marina",
+          "Chiara",
+          "Sofia",
+          "Ioanna"
+        ],
+        "m": [
+          "Nikos",
+          "Luca",
+          "Teo",
+          "Dario",
+          "Stavros",
+          "Andreas"
+        ]
+      },
+      "family": [
+        "Dimitriou",
+        "Papadakis",
+        "Galanis",
+        "Esposito",
+        "Rossi",
+        "Ferraro",
+        "Kostas",
+        "Marchetti",
+        "Andreou",
+        "Romano"
+      ]
+    }
+  },
+  {
+    "name": "Sundarpur",
+    "lore": "sundarpur",
+    "names": {
+      "given": {
+        "f": [
+          "Priya",
+          "Anjali",
+          "Sana",
+          "Meera",
+          "Devika",
+          "Lakshmi"
+        ],
+        "m": [
+          "Ravi",
+          "Arjun",
+          "Farhan",
+          "Vikram",
+          "Rohan",
+          "Imran"
+        ],
+        "x": [
+          "Kiran"
+        ]
+      },
+      "family": [
+        "Rahman",
+        "Iyer",
+        "Menon",
+        "Chatterjee",
+        "Bose",
+        "Nair",
+        "Reddy",
+        "Hossain",
+        "Kapoor",
+        "Das"
+      ]
+    }
+  },
+  {
+    "name": "Karaköy Deep",
+    "lore": "karakoy-deep",
+    "names": {
+      "given": {
+        "f": [
+          "Elif",
+          "Selin",
+          "Ayşe",
+          "Zeynep",
+          "Defne",
+          "Leyla"
+        ],
+        "m": [
+          "Yusuf",
+          "Emre",
+          "Mert",
+          "Kerem",
+          "Baran",
+          "Murat"
+        ],
+        "x": [
+          "Deniz"
+        ]
+      },
+      "family": [
+        "Yilmaz",
+        "Demir",
+        "Kaya",
+        "Aydın",
+        "Çelik",
+        "Şahin",
+        "Arslan",
+        "Öztürk",
+        "Koç",
+        "Erdem"
+      ]
+    }
+  },
+  {
+    "name": "Skarnholm",
+    "lore": "skarnholm",
+    "names": {
+      "given": {
+        "f": [
+          "Greta",
+          "Kaia",
+          "Ilse",
+          "Lena",
+          "Sigrid",
+          "Freya",
+          "Esme"
+        ],
+        "m": [
+          "Oskar",
+          "Bram",
+          "Henrik",
+          "Anders",
+          "Lars",
+          "Mikkel"
+        ]
+      },
+      "family": [
+        "Lindqvist",
+        "Halvorsen",
+        "Nyberg",
+        "Dahl",
+        "Brennan",
+        "Grieve",
+        "Whitlock",
+        "Teller",
+        "Halloway",
+        "Sørensen"
+      ]
+    }
+  }
+]

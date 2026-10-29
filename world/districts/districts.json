@@ -1,0 +1,15 @@
+{
+  "karasu": { "subtitle": "Old Town · The Ribbon" },
+  "nexus": { "subtitle": "The Core" },
+  "strand": { "subtitle": "Entertainment District" },
+  "velvet": { "subtitle": "The Red-Light Quarter" },
+  "mirage": { "subtitle": "The Shelf" },
+  "cloudridge": { "subtitle": "The Old Money Hills" },
+  "helios": { "subtitle": "The Towers" },
+  "spine": { "subtitle": "The Road Where People Live" },
+  "ironreach": { "subtitle": "Industrial Zone" },
+  "dockside": { "subtitle": "Freight Port" },
+  "tidal": { "subtitle": "The Front Door" },
+  "marsh": { "subtitle": "The Drowned District" },
+  "drownworks": { "subtitle": "The Works" }
+}

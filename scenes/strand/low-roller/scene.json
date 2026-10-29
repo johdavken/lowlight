@@ -1,0 +1,459 @@
+{
+  "id": "low-roller",
+  "name": "The Low Roller",
+  "description": "The ticket gate at the foot of the Low Roller, the Strand's giant Ferris wheel: the rim lights turn over the bay, a Wheel-Man's booth guards the boarding ramp, and the boardwalk stalls run off toward the city.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "arrow": "room_e_arrow.png",
+        "kiosk": "room_e_kiosk.png",
+        "booth": "room_e_booth.png",
+        "food_cart": "room_e_food_cart.png",
+        "prizes": "room_e_prizes.png",
+        "boardwalk": "room_e_boardwalk.png",
+        "wheel": "room_e_wheel.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "arrow",
+      "label": "red arrow sign over the ticket kiosk",
+      "pos": [
+        780,
+        370
+      ],
+      "color": "#ec5643",
+      "intensity": 0.8,
+      "radius": 220,
+      "flicker": 0.1,
+      "sound": "neon"
+    },
+    {
+      "id": "kiosk",
+      "label": "ticket kiosk window",
+      "pos": [
+        755,
+        470
+      ],
+      "color": "#d79548",
+      "intensity": 0.6,
+      "radius": 260,
+      "flicker": 0.03
+    },
+    {
+      "id": "booth",
+      "label": "operator's booth and the waiting car",
+      "pos": [
+        1190,
+        480
+      ],
+      "color": "#d6a057",
+      "intensity": 0.6,
+      "radius": 330,
+      "flicker": 0.02
+    },
+    {
+      "id": "food_cart",
+      "label": "food cart grill",
+      "pos": [
+        310,
+        460
+      ],
+      "color": "#d8a063",
+      "intensity": 0.6,
+      "radius": 240,
+      "flicker": 0.08
+    },
+    {
+      "id": "prizes",
+      "label": "ring-toss stall",
+      "pos": [
+        100,
+        440
+      ],
+      "color": "#cb874d",
+      "intensity": 0.55,
+      "radius": 260,
+      "flicker": 0.03
+    },
+    {
+      "id": "boardwalk",
+      "label": "string bulbs and lamp posts along the boardwalk",
+      "pos": [
+        330,
+        330
+      ],
+      "color": "#cc985e",
+      "intensity": 0.6,
+      "radius": 520,
+      "flicker": 0.02
+    },
+    {
+      "id": "wheel",
+      "label": "the Wheel's rim bulbs and car windows",
+      "pos": [
+        1000,
+        340
+      ],
+      "color": "#e6ae70",
+      "intensity": 0.75,
+      "radius": 800,
+      "flicker": 0.02
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a1c3a",
+    "ambientLevel": 0.4,
+    "weather": "rain",
+    "weatherLevel": 0.3,
+    "fog": 0.25,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "busy": {
+      "ambient": "#2e1e3c",
+      "ambientLevel": 0.45,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "timeOfDay": "dusk",
+      "lights": {
+        "arrow": {
+          "color": "#ec5643",
+          "intensity": 0.8,
+          "flicker": 0.1
+        },
+        "kiosk": {
+          "color": "#d79548",
+          "intensity": 0.7,
+          "flicker": 0.03
+        },
+        "booth": {
+          "color": "#d6a057",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "food_cart": {
+          "color": "#d8a063",
+          "intensity": 0.75,
+          "flicker": 0.08
+        },
+        "prizes": {
+          "color": "#cb874d",
+          "intensity": 0.7,
+          "flicker": 0.03
+        },
+        "boardwalk": {
+          "color": "#cc985e",
+          "intensity": 0.75,
+          "flicker": 0.02
+        },
+        "wheel": {
+          "color": "#e6ae70",
+          "intensity": 0.85,
+          "flicker": 0.02
+        }
+      }
+    },
+    "late": {
+      "ambient": "#221632",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.3,
+      "timeOfDay": "late-night",
+      "lights": {
+        "arrow": {
+          "color": "#ec5643",
+          "intensity": 0.8,
+          "flicker": 0.1
+        },
+        "kiosk": {
+          "color": "#d79548",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "booth": {
+          "color": "#d6a057",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "food_cart": {
+          "color": "#d8a063",
+          "intensity": 0.2,
+          "flicker": 0.15
+        },
+        "prizes": {
+          "color": "#cb874d",
+          "intensity": 0.15,
+          "flicker": 0.03
+        },
+        "boardwalk": {
+          "color": "#cc985e",
+          "intensity": 0.35,
+          "flicker": 0.02
+        },
+        "wheel": {
+          "color": "#e6ae70",
+          "intensity": 0.75,
+          "flicker": 0.02
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#1e1430",
+      "ambientLevel": 0.32,
+      "weather": "rain",
+      "weatherLevel": 0.15,
+      "fog": 0.35,
+      "timeOfDay": "late-night",
+      "lights": {
+        "arrow": {
+          "color": "#ec5643",
+          "intensity": 0.5,
+          "flicker": 0.05
+        },
+        "kiosk": {
+          "color": "#d79548",
+          "intensity": 0.35,
+          "flicker": 0.03
+        },
+        "booth": {
+          "color": "#d6a057",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "food_cart": {
+          "color": "#d8a063",
+          "intensity": 0,
+          "flicker": 0.08
+        },
+        "prizes": {
+          "color": "#cb874d",
+          "intensity": 0,
+          "flicker": 0.03
+        },
+        "boardwalk": {
+          "color": "#cc985e",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "wheel": {
+          "color": "#e6ae70",
+          "intensity": 0.55,
+          "flicker": 0.02
+        }
+      }
+    },
+    "private-ride": {
+      "ambient": "#1a1230",
+      "ambientLevel": 0.28,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.35,
+      "timeOfDay": "late-night",
+      "lights": {
+        "arrow": {
+          "color": "#ec5643",
+          "intensity": 0,
+          "flicker": 0.1
+        },
+        "kiosk": {
+          "color": "#d79548",
+          "intensity": 0,
+          "flicker": 0.03
+        },
+        "booth": {
+          "color": "#d6a057",
+          "intensity": 0.7,
+          "flicker": 0.02
+        },
+        "food_cart": {
+          "color": "#d8a063",
+          "intensity": 0,
+          "flicker": 0.08
+        },
+        "prizes": {
+          "color": "#cb874d",
+          "intensity": 0,
+          "flicker": 0.03
+        },
+        "boardwalk": {
+          "color": "#cc985e",
+          "intensity": 0.25,
+          "flicker": 0.02
+        },
+        "wheel": {
+          "color": "#e6ae70",
+          "intensity": 0.4,
+          "flicker": 0.02
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.25,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.35,
+      "timeOfDay": "late-night",
+      "lights": {
+        "arrow": {
+          "color": "#ff2020",
+          "intensity": 1,
+          "flicker": 0.5
+        },
+        "kiosk": {
+          "color": "#d79548",
+          "intensity": 0.6,
+          "flicker": 0.03
+        },
+        "booth": {
+          "color": "#d6a057",
+          "intensity": 0.5,
+          "flicker": 0.15
+        },
+        "food_cart": {
+          "color": "#d8a063",
+          "intensity": 0.2,
+          "flicker": 0.08
+        },
+        "prizes": {
+          "color": "#cb874d",
+          "intensity": 0.2,
+          "flicker": 0.03
+        },
+        "boardwalk": {
+          "color": "#cc985e",
+          "intensity": 0.4,
+          "flicker": 0.1
+        },
+        "wheel": {
+          "color": "#e6ae70",
+          "intensity": 0.6,
+          "flicker": 0.08
+        }
+      }
+    },
+    "wheel-stops": {
+      "ambient": "#181226",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.3,
+      "timeOfDay": "late-night",
+      "lights": {
+        "arrow": {
+          "color": "#ec5643",
+          "intensity": 0.2,
+          "flicker": 0.6
+        },
+        "kiosk": {
+          "color": "#d79548",
+          "intensity": 0.3,
+          "flicker": 0.03
+        },
+        "booth": {
+          "color": "#d6a057",
+          "intensity": 0.4,
+          "flicker": 0.2
+        },
+        "food_cart": {
+          "color": "#d8a063",
+          "intensity": 0.6,
+          "flicker": 0.08
+        },
+        "prizes": {
+          "color": "#cb874d",
+          "intensity": 0.55,
+          "flicker": 0.03
+        },
+        "boardwalk": {
+          "color": "#cc985e",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "wheel": {
+          "color": "#e6ae70",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#1c1a34",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.9,
+      "fog": 0.45,
+      "timeOfDay": "late-night",
+      "lights": {
+        "arrow": {
+          "color": "#ec5643",
+          "intensity": 0.8,
+          "flicker": 0.4
+        },
+        "kiosk": {
+          "color": "#d79548",
+          "intensity": 0.6,
+          "flicker": 0.03
+        },
+        "booth": {
+          "color": "#d6a057",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "food_cart": {
+          "color": "#d8a063",
+          "intensity": 0,
+          "flicker": 0.08
+        },
+        "prizes": {
+          "color": "#cb874d",
+          "intensity": 0.2,
+          "flicker": 0.3
+        },
+        "boardwalk": {
+          "color": "#cc985e",
+          "intensity": 0.45,
+          "flicker": 0.35
+        },
+        "wheel": {
+          "color": "#e6ae70",
+          "intensity": 0.6,
+          "flicker": 0.12
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": false
+  },
+  "effects": [
+    {
+      "kind": "lightning",
+      "strength": 1
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        295,
+        410,
+        50,
+        70
+      ],
+      "style": "steam",
+      "amount": 0.6
+    }
+  ],
+  "public": true
+}

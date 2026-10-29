@@ -1,0 +1,62 @@
+{
+  "height": [
+    6,
+    22
+  ],
+  "lot": [
+    15,
+    11
+  ],
+  "streetEvery": [
+    4,
+    3
+  ],
+  "tallGain": 2.2,
+  "brick": 0.75,
+  "brokenRoof": 0.35,
+  "ruin": 0.18,
+  "emptyLot": 0.12,
+  "setback": 0,
+  "fireInLot": 0.18,
+  "blackout": {
+    "backup": 0.03,
+    "roofLights": 3,
+    "fires": 10,
+    "outage": 0.15
+  },
+  "windowLit": 0.16,
+  "windowColors": [
+    "#ffb347",
+    "#ff9a3c",
+    "#ffcf7a"
+  ],
+  "pools": {
+    "colors": [
+      "#ff9a3c"
+    ],
+    "count": 24,
+    "power": 90000,
+    "reach": 130,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#ff4f8b",
+    "#ffb347",
+    "#7fe9ff"
+  ],
+  "signShare": 0.04,
+  "deepZoom": true,
+  "angleDeg": -14,
+  "nearStructure": {
+    "id": "ribbon",
+    "boostStart": 26,
+    "boostDistance": 80,
+    "boostPower": 1.5,
+    "boostGain": 2.2,
+    "litGain": 2.6,
+    "brickNear": 0.45,
+    "setbackNear": 0.35,
+    "signShareNear": 0.16,
+    "farScale": 0.8
+  }
+}

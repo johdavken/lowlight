@@ -1,0 +1,30 @@
+{
+  "name": "Tilly",
+  "pronoun": "she",
+  "accent": "#5fae86",
+  "kind": "fixed",
+  "voice": "voice.md",
+  "sprite": {
+    "src": "tilly-outfit-work.png",
+    "pixel": true
+  },
+  "expressions": {
+    "smile": "tilly-smile.png",
+    "amused": "tilly-amused.png",
+    "annoyed": "tilly-annoyed.png",
+    "concerned": "tilly-concerned.png"
+  },
+  "outfits": {
+    "work": "tilly-outfit-work.png"
+  },
+  "outfitByScene": {
+    "strand/breakwater": "work"
+  },
+  "outfitWears": {
+    "work": "cream short-sleeved shirt, stained green bib apron with an order pad in the pocket, towel over the shoulder, black trousers, black work shoes, a pencil in her hair"
+  },
+  "face": {
+    "x": 0.48,
+    "y": 0.12
+  }
+}

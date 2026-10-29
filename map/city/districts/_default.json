@@ -1,0 +1,48 @@
+{
+  "height": [
+    16,
+    48
+  ],
+  "lot": [
+    19,
+    14
+  ],
+  "streetEvery": [
+    4,
+    3
+  ],
+  "tallGain": 2.2,
+  "brick": 0.06,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0.05,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.02,
+    "roofLights": 2,
+    "fires": 4,
+    "outage": 0.1
+  },
+  "windowLit": 0.4,
+  "windowColors": [
+    "#ffb347",
+    "#ffcf7a",
+    "#bfe0ff"
+  ],
+  "pools": {
+    "colors": [
+      "#ffb347"
+    ],
+    "count": 8,
+    "power": 300000,
+    "reach": 130,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#ffb347",
+    "#7fe9ff"
+  ],
+  "signShare": 0.04,
+  "deepZoom": false
+}

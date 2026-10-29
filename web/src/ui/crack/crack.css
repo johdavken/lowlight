@@ -1,0 +1,37 @@
+/* The terminal window (small jobs spec §4): green on black, scanlines, VT323, the dump, the tries, the log. */
+.ct-window {
+  position: absolute;
+  inset: 8% 10%;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+  font: 20px/1.15 var(--pixel, 'VT323', monospace);
+  color: #6dff8f;
+  background: #030a05;
+  border: 1px solid rgba(109, 255, 143, 0.45);
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8), inset 0 0 60px rgba(109, 255, 143, 0.06);
+  text-shadow: 0 0 4px rgba(109, 255, 143, 0.55);
+}
+.ct-window::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px); }
+.ct-head { display: flex; justify-content: space-between; letter-spacing: 0.12em; }
+.ct-tries { display: flex; align-items: center; gap: 6px; }
+.ct-tries-k { margin-right: 6px; letter-spacing: 0.12em; }
+.ct-tries i { width: 14px; height: 18px; border: 1px solid rgba(109, 255, 143, 0.5); }
+.ct-tries i.on { background: #6dff8f; box-shadow: 0 0 6px rgba(109, 255, 143, 0.7); }
+.ct-body { flex: 1; display: flex; gap: 24px; min-height: 0; }
+.ct-dump { display: flex; gap: 28px; }
+.ct-row { white-space: pre; }
+.ct-addr { margin-right: 12px; opacity: 0.55; }
+.ct-word, .ct-bracket { cursor: pointer; outline: none; }
+.ct-word:hover, .ct-word:focus, .ct-bracket:hover, .ct-bracket:focus { color: #030a05; background: #6dff8f; text-shadow: none; }
+.ct-word.struck { cursor: default; opacity: 0.35; text-decoration: line-through; background: none; color: inherit; }
+.ct-bracket.used { cursor: default; opacity: 0.35; background: none; color: inherit; }
+.ct-side { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 180px; }
+.ct-ghost, .ct-hint { color: #b8ffc9; }
+.ct-log { flex: 1; overflow-y: auto; scrollbar-width: thin; }
+.ct-entry { display: flex; justify-content: space-between; gap: 10px; }
+.ct-leave { align-self: flex-start; font: 18px var(--pixel, 'VT323', monospace); letter-spacing: 0.15em; padding: 2px 14px; cursor: pointer; color: #6dff8f; background: transparent; border: 1px solid rgba(109, 255, 143, 0.6); }
+.ct-window.is-granted { border-color: #6dff8f; }
+.ct-window.is-locked { border-color: #ff5a5a; color: #ff7b7b; text-shadow: 0 0 4px rgba(255, 90, 90, 0.55); }

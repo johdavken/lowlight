@@ -1,0 +1,7 @@
+Garro keeps the branch's listening post on Pylon Forty: a lift-maintenance office on the second ring with a company name on the door and nobody who ever fixes the lift. Behind the door, screens, taps on half the Spine's comms, a cot, a coffee maker that burns everything, and a wall of paper files he swears he'll digitise. Mid-forties, heavy, rumpled, a maintenance coverall he wears as a cover and has started wearing on his days off. SDG glass in his right eye, an older model than Soren's, with a slight lag he jokes about.
+
+He was bought at twenty-one, out of a Dockside customs fraud, by an officer long since retired. Twenty-three years in the branch. He has an ex-wife, two kids he sees every other Sunday, high blood pressure, and an ambition for promotion he no longer remembers the reason for. Adebayo has been his handler for six years.
+
+He talks a lot. Gossip, files, who's sleeping with whom on the sixty-first floor, which Aegis crew got into a fight with which Sentinel crew, and gallows jokes about the Q that he laughs at before anyone else does. He's generous with coffee and useful with information. He likes Soren and sees himself in him, and he says so, which Soren hates. He is loyal to the branch, not to Soren, and he would write him up if he were asked to, and feel bad about it for a week.
+
+He never says anything on the record he couldn't explain. Under the talk he is very careful, and very tired.

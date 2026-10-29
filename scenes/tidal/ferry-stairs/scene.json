@@ -1,0 +1,284 @@
+{
+  "id": "ferry-stairs",
+  "name": "The Ferry Stairs",
+  "description": "The ferry landing at the foot of Tidal Isle, where the night boats put people ashore. A wide concrete quay, salt-eaten and patched, with rusted bollards and coiled rope along an iron edge over black water. On the left, a broad flight of worn steps climbs the sea wall between iron handrails to a heavy gate at the top, under an old street lamp, with a small caged lamp at the bottom step. Behind the gate rises the long side of the customs hall, its windows lit all night, and a lit booth window by the gate: booth nine is up there. On the right, a battered little ferry rides at a pontoon beside a weathered ticket hut with a departures board, a clerk in its window. Across the bay, the city's towers, and on the far shore the dark mass of the QDF that new arrivals learn not to look at for long.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissiveLights": {
+        "street_lamp": "room_e_street_lamp.png",
+        "booth": "room_e_booth.png",
+        "hall_windows": "room_e_hall_windows.png",
+        "stair_lamp": "room_e_stair_lamp.png",
+        "ferry": "room_e_ferry.png",
+        "ticket_hut": "room_e_ticket_hut.png",
+        "skyline": "room_e_skyline.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "street_lamp",
+      "label": "the old sodium lamp at the top of the stairs",
+      "pos": [
+        584,
+        68
+      ],
+      "color": "#ffb050",
+      "intensity": 0.6,
+      "radius": 420,
+      "flicker": 0,
+      "dust": 0.4
+    },
+    {
+      "id": "booth",
+      "label": "the booth window by the gate",
+      "pos": [
+        348,
+        236
+      ],
+      "color": "#ffd890",
+      "intensity": 0.45,
+      "radius": 260,
+      "flicker": 0
+    },
+    {
+      "id": "hall_windows",
+      "label": "the customs hall's windows",
+      "pos": [
+        130,
+        110
+      ],
+      "color": "#ffc878",
+      "intensity": 0.3,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "stair_lamp",
+      "label": "the caged lamp at the bottom step",
+      "pos": [
+        213,
+        612
+      ],
+      "color": "#ffc060",
+      "intensity": 0.5,
+      "radius": 300,
+      "flicker": 0.04
+    },
+    {
+      "id": "ferry",
+      "label": "the ferry's cabin",
+      "pos": [
+        1290,
+        515
+      ],
+      "color": "#ffd070",
+      "intensity": 0.45,
+      "radius": 320,
+      "flicker": 0
+    },
+    {
+      "id": "ticket_hut",
+      "label": "the ticket hut's window and departures board",
+      "pos": [
+        806,
+        528
+      ],
+      "color": "#ffd890",
+      "intensity": 0.4,
+      "radius": 280,
+      "flicker": 0
+    },
+    {
+      "id": "skyline",
+      "label": "the city across the bay",
+      "pos": [
+        1150,
+        290
+      ],
+      "color": "#e0a060",
+      "intensity": 0.3,
+      "radius": 700,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#262838",
+    "ambientLevel": 0.32,
+    "weather": "rain",
+    "weatherLevel": 0.35,
+    "fog": 0.12,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.19,
+      "timeOfDay": "late-night",
+      "lights": {
+        "street_lamp": {
+          "intensity": 0.45
+        },
+        "booth": {
+          "intensity": 0.34
+        },
+        "hall_windows": {
+          "intensity": 0.22
+        },
+        "stair_lamp": {
+          "intensity": 0.38
+        },
+        "ferry": {
+          "intensity": 0.34
+        },
+        "ticket_hut": {
+          "intensity": 0.3
+        },
+        "skyline": {
+          "intensity": 0.22
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.23,
+      "weatherLevel": 0.16,
+      "fog": 0.09,
+      "lights": {
+        "street_lamp": {
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "booth": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "hall_windows": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "stair_lamp": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "ferry": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "ticket_hut": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "skyline": {
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.19,
+      "fog": 0.27,
+      "lights": {
+        "street_lamp": {
+          "intensity": 0.3,
+          "flicker": 0.2
+        },
+        "booth": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "hall_windows": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "stair_lamp": {
+          "intensity": 0.25,
+          "flicker": 0.24
+        },
+        "ferry": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "ticket_hut": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "skyline": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        }
+      }
+    },
+    "between-boats": {
+      "lights": {
+        "ferry": {
+          "intensity": 0
+        }
+      }
+    },
+    "shift-change": {
+      "lights": {
+        "booth": {
+          "intensity": 0
+        },
+        "hall_windows": {
+          "intensity": 0.15
+        }
+      }
+    },
+    "fog-on-the-bay": {
+      "fog": 0.45,
+      "lights": {
+        "skyline": {
+          "intensity": 0.1
+        },
+        "street_lamp": {
+          "intensity": 0.45
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": false,
+    "bed": {
+      "src": "sound/dock-berth.ogg",
+      "level": 0.2
+    }
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        844,
+        480,
+        80,
+        49
+      ],
+      "light": "ticket_hut",
+      "scroll": 4
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.5
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        1346,
+        372,
+        40,
+        60
+      ],
+      "style": "smoke",
+      "amount": 0.35,
+      "lean": 0.3
+    }
+  ]
+}

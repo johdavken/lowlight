@@ -1,0 +1,320 @@
+{
+  "id": "bathhouse",
+  "name": "The Bathhouse",
+  "description": "An old public bathhouse on Velvet's street under the Cat: cheap by Velvet's standards, where house workers wash off a shift and people from rival houses can sit in the same water without it meaning anything. A tall hall of worn white and blue tiles under dark beams, tall windows on the night sky to the left. A faded tile mural of a moonlit bay with sailing boats covers the back wall, chipped and patched. A wide sunken bath of still water fills the middle, a brass spout pouring into it. Along the left wall, low washing stations with wooden stools and buckets, mirrors and a row of small lamps; paper lanterns hang from the beams. On the right, a drinks vending machine, a little shelf shrine with a candle, and the curtained doorway back through the changing room to the street.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "lanterns": "room_e_lanterns.png",
+        "mirror_lamps": "room_e_mirror_lamps.png",
+        "shrine": "room_e_shrine.png",
+        "vending": "room_e_vending.png",
+        "changing_room": "room_e_changing_room.png",
+        "bath": "room_e_bath.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "lanterns",
+      "label": "the paper lanterns over the bath",
+      "pos": [
+        775,
+        190
+      ],
+      "color": "#ffd8a0",
+      "intensity": 0.4,
+      "radius": 520,
+      "flicker": 0,
+      "dust": 0.3
+    },
+    {
+      "id": "mirror_lamps",
+      "label": "the lamps over the washing stations",
+      "pos": [
+        180,
+        420
+      ],
+      "color": "#ffd890",
+      "intensity": 0.4,
+      "radius": 380,
+      "flicker": 0
+    },
+    {
+      "id": "shrine",
+      "label": "the candle at the shrine",
+      "pos": [
+        1300,
+        258
+      ],
+      "color": "#ffb060",
+      "intensity": 0.25,
+      "radius": 160,
+      "flicker": 0.12
+    },
+    {
+      "id": "vending",
+      "label": "the drinks machine",
+      "pos": [
+        1275,
+        530
+      ],
+      "color": "#c8e4ff",
+      "intensity": 0.35,
+      "radius": 300,
+      "flicker": 0
+    },
+    {
+      "id": "changing_room",
+      "label": "the changing room through the curtain",
+      "pos": [
+        1420,
+        560
+      ],
+      "color": "#ffb070",
+      "intensity": 0.3,
+      "radius": 260,
+      "flicker": 0
+    },
+    {
+      "id": "bath",
+      "label": "the light in the bath water",
+      "pos": [
+        790,
+        625
+      ],
+      "color": "#40e0d0",
+      "intensity": 0.3,
+      "radius": 420,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#283246",
+    "ambientLevel": 0.36,
+    "weather": "rain",
+    "weatherLevel": 0.25,
+    "fog": 0.22,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.22,
+      "timeOfDay": "late-night",
+      "lights": {
+        "lanterns": {
+          "intensity": 0.3
+        },
+        "mirror_lamps": {
+          "intensity": 0.3
+        },
+        "shrine": {
+          "intensity": 0.19
+        },
+        "vending": {
+          "intensity": 0.26
+        },
+        "changing_room": {
+          "intensity": 0.22
+        },
+        "bath": {
+          "intensity": 0.22
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.26,
+      "weatherLevel": 0.11,
+      "fog": 0.17,
+      "lights": {
+        "lanterns": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "mirror_lamps": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "shrine": {
+          "intensity": 0.19,
+          "flicker": 0
+        },
+        "vending": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "changing_room": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "bath": {
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.22,
+      "fog": 0.37,
+      "lights": {
+        "lanterns": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "mirror_lamps": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "shrine": {
+          "intensity": 0.13,
+          "flicker": 0.32
+        },
+        "vending": {
+          "intensity": 0.18,
+          "flicker": 0.2
+        },
+        "changing_room": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "bath": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        }
+      }
+    },
+    "closing": {
+      "lights": {
+        "lanterns": {
+          "intensity": 0
+        },
+        "mirror_lamps": {
+          "intensity": 0
+        }
+      }
+    },
+    "busy": {
+      "fog": 0.35,
+      "lights": {
+        "lanterns": {
+          "intensity": 0.6
+        },
+        "mirror_lamps": {
+          "intensity": 0.6
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        0,
+        0
+      ],
+      [
+        55,
+        0
+      ],
+      [
+        52,
+        163
+      ],
+      [
+        0,
+        130
+      ]
+    ],
+    [
+      [
+        75,
+        0
+      ],
+      [
+        219,
+        137
+      ],
+      [
+        220,
+        275
+      ],
+      [
+        78,
+        179
+      ]
+    ],
+    [
+      [
+        255,
+        170
+      ],
+      [
+        297,
+        217
+      ],
+      [
+        300,
+        330
+      ],
+      [
+        255,
+        310
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "bed": {
+      "src": "sound/hall-faucets.ogg",
+      "level": 0.2
+    }
+  },
+  "effects": [
+    {
+      "kind": "glass",
+      "amount": 2
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        1033,
+        492,
+        43,
+        120
+      ],
+      "style": "steam",
+      "amount": 0.3
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        494,
+        556,
+        638,
+        98
+      ],
+      "style": "steam",
+      "amount": 0.05
+    }
+  ],
+  "exits": [
+    {
+      "to": "velvet/under-the-cat",
+      "way": "out through the changing room to the street",
+      "door": [
+        1345,
+        330,
+        145,
+        390
+      ]
+    }
+  ]
+}

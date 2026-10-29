@@ -1,0 +1,89 @@
+{
+  "height": [
+    7,
+    20
+  ],
+  "lot": [
+    24,
+    17
+  ],
+  "streetEvery": [
+    4,
+    3
+  ],
+  "tallGain": 0.4,
+  "brick": 0.55,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0.05,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.05,
+    "roofLights": 2,
+    "fires": 4,
+    "outage": 0.1
+  },
+  "windowLit": 0.55,
+  "windowColors": [
+    "#ffb060",
+    "#ffc27a",
+    "#ff9a4a",
+    "#bfe0ff"
+  ],
+  "pools": {
+    "colors": [
+      "#ffb060"
+    ],
+    "count": 32,
+    "power": 240000,
+    "reach": 120,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#2ad6c8",
+    "#ffb060"
+  ],
+  "signShare": 0.02,
+  "deepZoom": true,
+  "angleDeg": -12,
+  "works": {
+    "near": "pump-house-nine",
+    "angleDeg": -12,
+    "bay": {
+      "w": 104,
+      "d": 60
+    },
+    "gap": 30,
+    "share": 0.44,
+    "catwalks": 3,
+    "bayColor": "#2ad6c8",
+    "halls": 0.85,
+    "clarifiers": 0.26,
+    "towers": 6,
+    "neighbourhoods": {
+      "count": 4,
+      "apart": 420,
+      "radius": 140
+    },
+    "zones": {
+      "count": 4,
+      "apart": 380,
+      "turn": [
+        18,
+        38
+      ]
+    },
+    "harbour": {
+      "every": 140,
+      "length": [
+        40,
+        80
+      ]
+    },
+    "highway": {
+      "width": 16,
+      "min": 150
+    }
+  }
+}

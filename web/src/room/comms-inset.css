@@ -1,0 +1,77 @@
+/* The comms inset (comms-inset.ts, mockup C): an old monitor at the left of the subtitle line, tinted
+   cyan with scanlines and a recording light; her face cropped from her sprite. */
+.ci {
+  --ci-c: #ff4fa3;
+  position: absolute;
+  /* Where a stranger's bust stands (speaker-portrait.css), its foot on the subtitle line's floor. */
+  left: calc(var(--sub-x) - 10px);
+  bottom: calc(var(--feed-bottom, 64px) - 4px);
+  width: 190px;
+  height: 150px;
+  border: 2px solid #3a5a66;
+  border-radius: 10px;
+  background: #031014;
+  box-shadow: inset 0 0 30px rgba(127, 233, 255, 0.25);
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 2;
+  animation: ci-in 220ms ease-out;
+}
+.ci-face {
+  position: absolute;
+  inset: 0;
+  background-size: 360% auto;
+  background-position: 50% 8%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  filter: grayscale(1) sepia(1) hue-rotate(130deg) saturate(2.2) brightness(0.9) contrast(1.2);
+  opacity: 0.85;
+}
+.ci-scan {
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.35) 0 2px, transparent 2px 3px);
+}
+.ci-rec {
+  position: absolute;
+  right: 8px;
+  top: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ci-c);
+  box-shadow: 0 0 8px var(--ci-c);
+  animation: ci-rec 1.6s steps(2, end) infinite;
+}
+.ci-cap {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 6px;
+  color: #9ff;
+  font: 11px/1.35 var(--mono, 'IBM Plex Mono', monospace);
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 6px #7fe9ff;
+}
+@keyframes ci-in { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes ci-rec { 50% { opacity: 0.25; } }
+@media (prefers-reduced-motion: reduce) {
+  .ci, .ci-rec { animation: none; }
+}
+.feed-root:not(.feed-stage) .ci,
+.feed-root.expanded .ci { display: none; }
+/* The line moves over for the monitor while she's on the line (as it does for a stranger's bust). */
+.feed-root.feed-stage.has-comms:not(.has-portrait):not(.expanded) .feed {
+  left: calc(var(--sub-x) + 190px + 24px);
+  transition: left 220ms ease, height 150ms ease;
+}
+/* With a stranger's bust up too, the monitor sits above it. */
+.feed-root.feed-stage.has-portrait .ci { bottom: calc(var(--feed-bottom, 64px) + var(--sp-h) + 12px); }
+/* Her pages while she's on the line: tagged COMMS, like a stranger's are tagged STRANGER. */
+.feed-root.comms .msg.agent:not(.other-page):not(.stranger-page) .meta .name::after {
+  content: 'COMMS';
+  margin-left: 12px;
+  color: #7fe9ff;
+  font-size: 0.7em;
+  letter-spacing: 0.2em;
+}

@@ -1,0 +1,7 @@
+Oksana Melnyk runs the counter at the foot of Pylon Forty, cut into the concrete where a maintenance bay used to be, open to the street under the Spine's deck. Six stools, a zinc counter, a steel urn of black tea that is never empty, and dumplings, boiled or fried, with dill whether you want it or not. Late fifties, broad and quick, grey hair tied back under a dark headscarf, forearms like a dock worker's, reading glasses on a cord she never uses.
+
+She talks plain and short and feeds people before she lets them talk. She notices who's missing before their families do. When a heavy hauler hits the joint overhead and the glasses walk along the counter, she puts out a hand without looking.
+
+She never asks anyone what they do. Eleven years ago her husband, Taras, was swept up in a tide and taken to the Q. She never went to ask where or why, because on the Spine asking is how you join someone. She doesn't talk about him. A second glass of tea goes out at closing, and she drinks it herself.
+
+She knows Soren as the quiet regular from the top ring who schedules freight for Kestrel, tips too much and eats what he's given. Four years. She has never asked him anything else, and she has her own reasons not to. She's fed Rue since Rue was small, and she keeps the girl's tab without adding it up. She knows the girl's real name and says it isn't hers to give. Nothing said at her counter reaches the street.

@@ -1,0 +1,51 @@
+/* Cortex Meridian (mockup F): a factory screen. Graphite case, a light corporate UI, a dark title bar with its
+   signal bars. The Deaf Meridian is the same with one bar and no uplink. */
+.ct-window.ct-skin-meridian, .ct-window.ct-skin-meridian-deaf {
+  inset: 6% 9.4%;
+  padding: 0 24px 20px;
+  border: 16px solid transparent;
+  border-radius: 16px;
+  font: 18px/1.2 'IBM Plex Mono', monospace;
+  color: #1b1e23;
+  text-shadow: none;
+  background:
+    linear-gradient(#e9ecef, #e9ecef) padding-box,
+    linear-gradient(180deg, #3a3d44, #24262b) border-box;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75);
+}
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf)::after { display: none; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-head {
+  margin: 0 -24px;
+  padding: 12px 24px;
+  align-items: center;
+  gap: 20px;
+  font: 600 18px 'IBM Plex Sans Condensed', sans-serif;
+  letter-spacing: 0.12em;
+  color: #e9ecef;
+  background: #1b1e23;
+}
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-title::before { content: 'CORTEX MERIDIAN · '; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal { margin-left: auto; display: flex; align-items: flex-end; gap: 4px; font-weight: 400; color: rgba(233, 236, 239, 0.5); }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal i { width: 5px; background: rgba(233, 236, 239, 0.2); }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal i.on { background: #e9ecef; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal i:nth-child(1) { height: 7px; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal i:nth-child(2) { height: 12px; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal i:nth-child(3) { height: 17px; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal i:nth-child(4) { height: 22px; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-signal b { margin-left: 8px; font-weight: 400; }
+.ct-skin-meridian-deaf .ct-signal b { color: #f59e0b; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-tries-k { font: 600 16px 'IBM Plex Sans Condensed', sans-serif; letter-spacing: 0.14em; color: #6b7280; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-tries i { width: 46px; height: 12px; border: 0; border-radius: 3px; background: #c4c9d0; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-tries i.on { background: #1b1e23; box-shadow: none; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-addr { color: #9ca3af; opacity: 1; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-row { color: #9ca3af; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-word { color: #1b1e23; font-weight: 500; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-bracket { color: #2563eb; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) :is(.ct-word, .ct-bracket):is(:hover, :focus) { color: #fff; background: #1b1e23; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) :is(.ct-word.struck, .ct-bracket.used) { opacity: 1; color: #9ca3af; background: none; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-side { margin: 0 -24px -20px 0; padding: 16px 20px; background: #dde1e6; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-entry { padding: 6px 10px; margin-bottom: 6px; border-radius: 4px; background: #fff; font-size: 16px; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-entry-b { color: #c2410c; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) :is(.ct-ghost, .ct-hint) { color: #374151; font-size: 16px; }
+:is(.ct-skin-meridian, .ct-skin-meridian-deaf) .ct-leave { padding: 8px 22px; border: 0; border-radius: 4px; font: 18px 'IBM Plex Sans Condensed', sans-serif; letter-spacing: 0.12em; color: #e9ecef; background: #1b1e23; }
+.ct-window:is(.ct-skin-meridian, .ct-skin-meridian-deaf).is-locked { color: #b91c1c; }

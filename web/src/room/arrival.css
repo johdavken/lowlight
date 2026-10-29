@@ -1,0 +1,109 @@
+/* The arrival screen (spec 2026-10-27; mockup layout A): a 1600×900 stage scaled to fit, art left, place right. Classes prefixed ar- (global class names collide across screens). */
+.ar-root {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  overflow: hidden;
+  background: #05020c;
+  color: #eef4ff;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  cursor: default;
+  transition: opacity 0.3s ease;
+}
+.ar-root.ar-out { opacity: 0; pointer-events: none; }
+.ar-stage { position: absolute; left: 0; top: 0; overflow: hidden; } /* 1600×900, on the game stage */
+.ar-stage::after { content: ''; position: absolute; inset: 0; z-index: 5; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 4px); }
+.ar-art { position: absolute; left: 0; top: 0; height: 900px; width: 680px; object-fit: cover; object-position: center 30%; }
+.ar-fade { position: absolute; left: 440px; top: 0; bottom: 0; width: 260px; background: linear-gradient(90deg, transparent, #05020c); }
+.ar-file { position: absolute; left: 740px; right: 90px; top: 96px; bottom: 60px; display: flex; flex-direction: column; }
+.ar-no-art .ar-file { left: 300px; right: 300px; }
+.ar-rule { font-size: 13px; letter-spacing: 0.42em; color: #7fe9ff; }
+.ar-name {
+  margin: 12px 0 0;
+  font: 400 72px/1 'Tilt Neon', system-ui, sans-serif;
+  letter-spacing: 0.16em;
+  color: #fff;
+  text-shadow: 0 0 6px #fff, 0 0 18px #ff4fb8, 0 0 42px #ff4fb8;
+}
+.ar-sub { margin-top: 12px; font-size: 15px; letter-spacing: 0.5em; text-transform: uppercase; }
+.ar-sub:empty { display: none; }
+.ar-lore-line { margin-top: 12px; font-size: 15px; font-style: italic; color: #a99cc4; }
+.ar-lore-line:empty { display: none; }
+.ar-route { display: flex; gap: 14px; align-items: center; margin-top: 24px; font: 22px 'VT323', ui-monospace, monospace; letter-spacing: 0.2em; color: rgba(127, 233, 255, 0.45); }
+.ar-route[hidden] { display: none; }
+.ar-route b { font-weight: 400; color: #7fe9ff; }
+.ar-route .ar-to { color: #fff; }
+.ar-arrow { position: relative; flex: 0 0 90px; height: 1px; background: linear-gradient(90deg, rgba(127, 233, 255, 0.45), #ff4f8b); }
+.ar-arrow::after { content: '▸'; position: absolute; right: -8px; top: -13px; font-size: 20px; color: #ff4f8b; }
+.ar-meta { margin-top: 8px; font: 20px 'VT323', ui-monospace, monospace; letter-spacing: 0.2em; color: #8d7fb0; }
+.ar-meta:empty { display: none; }
+.ar-with { display: flex; gap: 10px; align-items: center; margin-top: 18px; font: 20px 'VT323', ui-monospace, monospace; letter-spacing: 0.25em; color: #ff4f8b; }
+.ar-with::before { content: ''; width: 8px; height: 8px; background: #ff4f8b; box-shadow: 0 0 8px #ff4f8b; }
+.ar-with[hidden] { display: none; }
+/* A long entry is cut with a fade rather than pushing the keys off the stage. */
+.ar-lore {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  margin-top: 28px;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.ar-lore:empty { display: none; }
+.ar-lore p { margin: 0 0 12px; font-size: 17px; line-height: 1.6; }
+.ar-move { margin-top: 24px; font-size: 16px; font-style: italic; color: #bdb2d6; }
+.ar-move:empty, .ar-move[hidden] { display: none; }
+.ar-box { margin-top: 22px; }
+.ar-label { display: flex; justify-content: space-between; font-size: 12px; letter-spacing: 0.4em; color: #7fe9ff; }
+.ar-label .ar-drafting { color: #ff4f8b; }
+.ar-optional { letter-spacing: 0.2em; color: #6e5a90; }
+.ar-area {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  min-height: 96px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  resize: none;
+  font: 17px/1.6 'IBM Plex Mono', ui-monospace, monospace;
+  color: #7fe9ff;
+  caret-color: #7fe9ff;
+  background: rgba(127, 233, 255, 0.05);
+  border: 1px solid rgba(127, 233, 255, 0.35);
+  border-radius: 0;
+  outline: none;
+  box-shadow: inset 0 0 24px rgba(127, 233, 255, 0.06);
+}
+.ar-area:focus { border-color: rgba(127, 233, 255, 0.7); }
+.ar-hint { margin-top: 8px; font-size: 12px; letter-spacing: 0.08em; color: #6e5a90; }
+.ar-fail, .ar-notice { margin-top: 8px; font-size: 13px; letter-spacing: 0.08em; color: #ff3b5c; }
+.ar-fail:empty, .ar-notice:empty { display: none; }
+.ar-bar { flex: none; height: 6px; margin-top: 26px; background: rgba(127, 233, 255, 0.15); }
+.ar-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fe9ff, #ff4fb8); box-shadow: 0 0 12px #ff4fb8; }
+/* On travel the bar only shows once GO is pressed and the room is still on its way. */
+.ar-travel .ar-bar { visibility: hidden; }
+.ar-root.ar-moving .ar-bar { visibility: visible; }
+.ar-keys { display: flex; gap: 14px; align-items: center; margin-top: 18px; }
+.ar-keys button {
+  padding: 2px 18px;
+  font: 22px 'VT323', ui-monospace, monospace;
+  letter-spacing: 0.3em;
+  color: #000;
+  border: 0;
+  border-radius: 0;
+  transform: skewX(-12deg);
+  cursor: pointer;
+}
+.ar-keys button small { margin-left: 8px; font-size: 15px; letter-spacing: 0.1em; opacity: 0.6; }
+.ar-keys button:disabled { opacity: 0.5; cursor: default; }
+.ar-suggest { color: #ff4f8b !important; background: transparent; outline: 1px solid #ff4f8b; box-shadow: 0 0 12px rgba(255, 79, 139, 0.35); }
+.ar-back { margin-left: auto; color: #b9a8dd !important; background: #2a2140; }
+.ar-go.ar-go-key { background: #7fe9ff; box-shadow: 0 0 16px rgba(127, 233, 255, 0.5); }
+.ar-suggest + .ar-go.ar-go-key, .ar-keys > .ar-go.ar-go-key:first-child { margin-left: auto; }
+/* Resume: the old ENTER TO CONTINUE line. */
+.ar-keys .ar-go:not(.ar-go-key) { padding: 0; font-size: 26px; color: #3dff7a; background: none; transform: none; text-shadow: 0 0 10px currentColor; }
+.ar-go[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .ar-root { transition: none; }
+  .ar-bar i, .ar-go.ar-go-key, .ar-suggest { box-shadow: none; }
+}

@@ -1,0 +1,298 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;1,400&display=swap');
+
+#lowlight-room {
+  position: fixed;
+  top: 0;
+  left: 0;
+  /* SillyTavern's mobile CSS puts perspective on <html>, which turns it (0 px tall) into the containing block. */
+  width: 100vw;
+  height: 100dvh;
+  z-index: 0;
+  pointer-events: none;
+}
+#lowlight-room canvas { width: 100% !important; height: 100% !important; display: block; }
+body.lowlight-room-on #bg1, body.lowlight-room-on #bg_custom { display: none; }
+
+/* ── Lowlight chat (/lowchat): the subtitle band from Lowlight's stage, over SillyTavern's chat ──
+   No frame: the current line sits low over a dark scrim, names in spaced capitals, Plex Mono. */
+
+body.lowlight-chat {
+  --SmartThemeBodyColor: #ffe1ea;
+  --SmartThemeEmColor: color-mix(in srgb, #ff4f8b 38%, #c9b3c4);
+  --SmartThemeQuoteColor: #ffe1ea;
+  --SmartThemeChatTintColor: transparent;
+  --SmartThemeBotMesBlurTintColor: transparent;
+  --SmartThemeUserMesBlurTintColor: transparent;
+  --SmartThemeBorderColor: transparent;
+  --SmartThemeBlurStrength: 0px;
+  --SmartThemeShadowColor: #000;
+}
+/* The band: the bottom of the screen, side margins like Lowlight's corner stacks. */
+body.lowlight-chat #sheld {
+  --sheldWidth: calc(100vw - 260px);
+  height: 38dvh;
+  top: auto;
+  bottom: 0;
+  left: 130px;
+  right: 130px;
+  width: auto;
+  max-width: none;
+}
+/* The scrim rising from the floor under the line. */
+body.lowlight-chat::after {
+  content: '';
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 46dvh;
+  background: linear-gradient(180deg, transparent, rgba(6, 2, 12, 0.72) 40%, rgba(6, 2, 12, 0.94));
+  pointer-events: none;
+  /* Over her sprite (SillyTavern's expression holder is z 2), so the band darkens her waist as in Lowlight. */
+  z-index: 3;
+}
+body.lowlight-chat #sheld { z-index: 30; }
+body.lowlight-chat #chat {
+  border: none;
+  border-radius: 0;
+  background: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  justify-content: flex-end;
+  scrollbar-width: none;
+}
+/* Subtitles: only the newest line shows (switch /lowchat off for the whole log). */
+body.lowlight-chat #chat .mes:not(.last_mes) { display: none; }
+body.lowlight-chat .mes {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0 0 8px;
+}
+body.lowlight-chat .mes .mesAvatarWrapper,
+body.lowlight-chat .mes .avatar { display: none; }
+body.lowlight-chat .mes .name_text {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: #ff4f8b;
+  text-shadow: 0 0 8px rgba(255, 60, 120, 0.8), 0 0 2px rgba(255, 60, 120, 0.9);
+}
+body.lowlight-chat .mes[is_user='true'] .name_text {
+  color: #7fe9ff;
+  text-shadow: 0 0 6px rgba(127, 233, 255, 0.35);
+}
+body.lowlight-chat .mes .timestamp,
+body.lowlight-chat .mes .mesIDDisplay,
+body.lowlight-chat .mes .mes_timer,
+body.lowlight-chat .mes .tokenCounterDisplay {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  color: rgba(127, 233, 255, 0.45);
+}
+body.lowlight-chat .mes_text {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #ffe1ea;
+  text-shadow: 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 10px rgba(0, 0, 0, 0.6);
+}
+body.lowlight-chat .mes[is_user='true'] .mes_text { color: #ddf7ff; }
+body.lowlight-chat .mes[is_user='true'] .mes_text em { color: color-mix(in srgb, #7fe9ff 40%, #a9c3cc); }
+body.lowlight-chat .mes_text em { font-style: italic; }
+body.lowlight-chat .mes_text q::before,
+body.lowlight-chat .mes_text q::after { content: none; }
+/* The prompt line (Lowlight's input): one purple underline, no box; the side buttons quiet until hovered. */
+body.lowlight-chat #form_sheld { background: none; }
+body.lowlight-chat #send_form {
+  /* body.no-blur paints the bar with this colour, !important: emptied here, on the bar itself. */
+  --SmartThemeBlurTintColor: transparent;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(155, 92, 255, 0.7);
+  border-radius: 0;
+  outline: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: box-shadow 200ms, border-color 200ms;
+}
+body.lowlight-chat #send_form:has(#send_textarea:focus-visible) { outline: none; border-color: rgba(155, 92, 255, 0.95); box-shadow: 0 8px 12px -10px rgba(155, 92, 255, 0.7); }
+body.lowlight-chat #send_textarea {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 16px;
+  line-height: 24px;
+  color: #ffd9e6;
+  caret-color: #9b5cff;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding-left: 4px;
+}
+body.lowlight-chat #send_textarea::placeholder { color: rgba(155, 92, 255, 0.55); font-family: 'VT323', ui-monospace, monospace; font-size: 19px; letter-spacing: 0.12em; }
+body.lowlight-chat :is(#leftSendForm, #rightSendForm) > div { color: rgba(127, 233, 255, 0.45); opacity: 0.55; transition: opacity 150ms, color 150ms; }
+body.lowlight-chat :is(#leftSendForm, #rightSendForm) > div:hover,
+body.lowlight-chat #send_form:has(#send_textarea:focus-visible) :is(#leftSendForm, #rightSendForm) > div { opacity: 1; }
+body.lowlight-chat :is(#leftSendForm, #rightSendForm) > div:hover { color: #fff; }
+body.lowlight-chat #send_but { color: #9b5cff; }
+
+/* The room's light on her sprite (Lowlight's stage-light.ts): an SVG filter in the holder; unlit = no change. */
+#expression-holder img.expression,
+#lowlight-persona img { filter: var(--fig-filter, none); }
+#expression-holder .stage-light-fx,
+#lowlight-persona .stage-light-fx { position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Lowlight's stage positions (with /lowchat on): you left, her right, standing from the floor, whole sprites
+   115 % of the screen tall and cut off below it, the band over your waists (style.css --fig-full/-floor/-x at 900 px). */
+#lowlight-persona { display: none; }
+body.lowlight-chat #lowlight-persona:not([hidden]) { display: block; }
+body.lowlight-chat #expression-holder,
+body.lowlight-chat #lowlight-persona {
+  width: auto;
+  max-width: none;
+  max-height: none;
+  height: auto;
+  bottom: -30dvh;
+  margin: 0;
+  overflow: visible;
+  filter: none;
+  z-index: 2;
+}
+body.lowlight-chat #expression-holder img.expression,
+body.lowlight-chat #lowlight-persona img {
+  height: 115dvh;
+  max-height: none;
+  max-width: none;
+  width: auto;
+}
+body.lowlight-chat #expression-holder { left: auto; right: 7vw; }
+body.lowlight-chat #lowlight-persona { position: fixed; left: 7vw; right: auto; pointer-events: none; }
+#lowlight-persona img { display: block; image-rendering: pixelated; }
+
+/* The city map over everything, as in Lowlight (its own rules come in lowlight-room.css and map-game.css). */
+#lowlight-map.map-root { position: fixed; inset: 0; z-index: 6000; }
+/* SillyTavern's global .tag rule (tags.css) would box the map's file-strip chips. */
+#lowlight-map .chip .tag { all: unset; opacity: 0.65; font-size: 0.85em; }
+
+/* ── Lowlight's Keys bar (hud.js), with /lowchat on: Lowlight's HUD values, classes prefixed llh- ── */
+.llh-root { display: none; }
+body.lowlight-chat .llh-root {
+  display: block;
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 0;
+  /* Over SillyTavern's panels (its top bar holder is z 3005), under the map. */
+  z-index: 5000;
+  pointer-events: none;
+  font-family: 'VT323', ui-monospace, monospace;
+  --llh: rgba(127, 233, 255, 0.82);
+  --llh-dim: rgba(127, 233, 255, 0.45);
+  --llh-agent: #ff4f8b;
+}
+.llh-band {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 74px;
+  background: linear-gradient(rgba(5, 2, 12, 0.84), rgba(5, 2, 12, 0.5) 70%, transparent);
+}
+.llh-band::after {
+  content: '';
+  position: absolute;
+  left: 56px;
+  right: 56px;
+  bottom: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(127, 233, 255, 0.45) 12%, rgba(127, 233, 255, 0.45) 88%, transparent);
+}
+.llh-corner { position: absolute; width: 22px; height: 22px; border: 0 solid rgba(127, 233, 255, 0.55); }
+.llh-corner.tl { top: 21.6px; left: 25.6px; border-width: 1px 0 0 1px; }
+.llh-corner.tr { top: 21.6px; right: 25.6px; border-width: 1px 1px 0 0; }
+.llh-bar {
+  position: absolute;
+  top: 33.6px;
+  left: 56px;
+  right: 56px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1.5em;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 0.22em;
+  white-space: nowrap;
+}
+.llh-group { display: flex; align-items: baseline; gap: 1.1em; min-width: 0; color: var(--llh); text-shadow: 0 0 10px rgba(127, 233, 255, 0.35); }
+.llh-place { min-width: 3.5em; overflow: hidden; text-overflow: ellipsis; }
+.llh-dim { color: var(--llh-dim); }
+.llh-clock { font-variant-numeric: tabular-nums; }
+.llh-word { pointer-events: auto; cursor: pointer; }
+.llh-word u { text-decoration: none; }
+.llh-bar.alt-held .llh-word u { text-decoration: underline; text-decoration-color: var(--llh-agent); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.llh-word:hover, .llh-word:focus-visible { outline: none; color: #fff; }
+.llh-word.open, .llh-word.open:hover { color: #05020c; background: var(--llh); box-shadow: 0 0 0 4px var(--llh); text-shadow: none; }
+.llh-sys {
+  pointer-events: auto;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  margin-left: 0.3em;
+  padding: 4px 10px;
+  color: var(--llh);
+  border: 1px solid rgba(127, 233, 255, 0.5);
+  background: rgba(9, 4, 18, 0.7);
+}
+.llh-sys:hover, .llh-sys:focus-visible { outline: none; border-color: var(--llh); color: #fff; }
+.llh-sys.open { color: #05020c; background: var(--llh); border-color: var(--llh); text-shadow: none; }
+.llh-sys.down { color: #ff3b5c; border-color: rgba(255, 59, 92, 0.7); text-shadow: 0 0 8px rgba(255, 59, 92, 0.5); }
+.llh-link::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-bottom: 0.12em; background: currentColor; box-shadow: 0 0 8px currentColor; }
+.llh-link[data-status='ok']::before { animation: llh-breathe 3.2s ease-in-out infinite; }
+.llh-link[data-status='down']::before { animation: llh-blink 1s steps(2, jump-none) infinite; }
+.llh-sys.open .llh-link::before { box-shadow: none; }
+@keyframes llh-breathe { 50% { opacity: 0.35; } }
+@keyframes llh-blink { 50% { opacity: 0; } }
+.llh-menu {
+  position: absolute;
+  top: 71.6px;
+  right: 56px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  padding: 4px 0 0;
+  pointer-events: auto;
+  font: 19px/1 'VT323', ui-monospace, monospace;
+  letter-spacing: 0.1em;
+  color: #e9def9;
+  background: rgba(9, 4, 18, 0.92);
+  border: 1px solid rgba(127, 233, 255, 0.4);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+.llh-menu[hidden] { display: none; }
+.llh-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 16px; cursor: pointer; }
+.llh-row:hover { background: rgba(127, 233, 255, 0.06); }
+.llh-row.on { background: rgba(127, 233, 255, 0.1); box-shadow: inset 3px 0 0 var(--llh); }
+.llh-label { margin-right: auto; color: var(--llh-dim); }
+.llh-value, .llh-note { color: #e9def9; }
+.llh-note { font-size: 16px; color: var(--llh-agent); }
+.llh-meter { display: inline-flex; gap: 3px; }
+.llh-meter i { width: 8px; height: 14px; background: rgba(255, 255, 255, 0.12); }
+.llh-meter i.on { background: var(--llh-agent); box-shadow: 0 0 6px color-mix(in srgb, var(--llh-agent) 50%, transparent); }
+.llh-step { font-style: normal; padding: 2px 4px; cursor: pointer; color: var(--llh-dim); }
+.llh-step:hover { color: #fff; }
+.llh-rule { height: 1px; margin: 4px 0; background: rgba(127, 233, 255, 0.14); }
+.llh-foot { padding: 8px 16px; font-size: 16px; color: #8a7fa0; border-top: 1px solid rgba(127, 233, 255, 0.14); }
+
+/* SillyTavern's top bar steps aside for the Keys bar: its icons hide, its panels still open (under the bar). */
+body.lowlight-chat { --topBarBlockSize: 74px; }
+body.lowlight-chat #top-bar { display: none; }
+body.lowlight-chat #top-settings-holder { pointer-events: none; }
+body.lowlight-chat #top-settings-holder .drawer-toggle,
+body.lowlight-chat #top-settings-holder > #lowlight-map-button,
+body.lowlight-chat #top-settings-holder > #lowlight-sound { visibility: hidden; }
+body.lowlight-chat #top-settings-holder .drawer-content { pointer-events: auto; }
+/* Every panel opens under the bar: the centred ones and the full-height side ones (characters, AI settings). */
+body.lowlight-chat #top-settings-holder .drawer-content { top: 74px !important; max-height: calc(100dvh - 74px - 70px); }
+body.lowlight-chat #top-settings-holder .drawer-content:is(.fillLeft, .fillRight) { height: calc(100dvh - 74px); max-height: calc(100dvh - 74px); }

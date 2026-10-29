@@ -1,0 +1,190 @@
+/* SillyTavern's panels in Lowlight's look (with /lowchat on): the SYS menu's dark glass and cyan hairline,
+   VT323 headings in spaced capitals, Plex Mono text, square corners, pink meters. Most of SillyTavern's
+   panel styling reads its theme variables, so those are set here first; the rest are its shared classes. */
+
+body.lowlight-chat :is(.drawer-content, .popup, #character_popup, .draggable) {
+  --SmartThemeBodyColor: #e9def9;
+  --SmartThemeEmColor: color-mix(in srgb, #ff4f8b 45%, #c9b3c4);
+  --SmartThemeQuoteColor: #7fe9ff;
+  --SmartThemeUnderlineColor: #7fe9ff;
+  --SmartThemeBlurTintColor: rgba(9, 4, 18, 0.97);
+  --SmartThemeChatTintColor: rgba(9, 4, 18, 0.97);
+  --SmartThemeBorderColor: rgba(127, 233, 255, 0.28);
+  --SmartThemeShadowColor: rgba(0, 0, 0, 0.6);
+  --SmartThemeBlurStrength: 0px;
+  --black30a: rgba(127, 233, 255, 0.04);
+  --black50a: rgba(5, 2, 12, 0.6);
+  --black70a: rgba(5, 2, 12, 0.8);
+  --white20a: rgba(127, 233, 255, 0.14);
+  --white30a: rgba(127, 233, 255, 0.22);
+  --white50a: rgba(127, 233, 255, 0.4);
+  --grey50: rgba(127, 233, 255, 0.45);
+  --grey70: rgba(233, 222, 249, 0.7);
+  --mainFontFamily: 'IBM Plex Mono', ui-monospace, monospace;
+  --ll-cyan: #7fe9ff;
+  --ll-dim: rgba(127, 233, 255, 0.45);
+  --ll-pink: #ff4f8b;
+  --ll-purple: #9b5cff;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 14px;
+  color: #e9def9;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(127, 233, 255, 0.35) transparent;
+}
+
+/* The glass: square, a cyan hairline, the menu's shadow. */
+body.lowlight-chat :is(.drawer-content, .popup, #character_popup) {
+  border-radius: 0;
+  border: 1px solid rgba(127, 233, 255, 0.4);
+  background: rgba(9, 4, 18, 0.97);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(127, 233, 255, 0.12);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+/* The full-height side panels sit against the screen's edge: only the inner side has the hairline. */
+/* (#top-settings-holder: the glass rule above counts as an id, through #character_popup in its :is()) */
+body.lowlight-chat #top-settings-holder .drawer-content.fillRight { border-width: 0 0 0 1px; background: #090412; }
+body.lowlight-chat #top-settings-holder .drawer-content.fillLeft { border-width: 0 1px 0 0; background: #090412; }
+
+/* Headings: VT323, spaced capitals, cyan. */
+body.lowlight-chat :is(.drawer-content, .popup) :is(h1, h2, h3, h4, h5, .standoutHeader, .inline-drawer-header b, .range-block-title, .title_restorable > span, .wide100p > b:only-child) {
+  font-family: 'VT323', ui-monospace, monospace;
+  font-weight: normal;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ll-cyan);
+  text-shadow: 0 0 10px rgba(127, 233, 255, 0.3);
+}
+body.lowlight-chat :is(.drawer-content, .popup) :is(h2, h3) { font-size: 24px; }
+body.lowlight-chat :is(.drawer-content, .popup) :is(h4, h5, .standoutHeader, .inline-drawer-header b) { font-size: 20px; }
+body.lowlight-chat :is(.drawer-content, .popup) .range-block-title { font-size: 18px; color: var(--ll-dim); }
+body.lowlight-chat :is(.drawer-content, .popup) small,
+body.lowlight-chat :is(.drawer-content, .popup) .toggle-description,
+body.lowlight-chat :is(.drawer-content, .popup) .notes-link { color: rgba(233, 222, 249, 0.55); }
+body.lowlight-chat :is(.drawer-content, .popup) a { color: var(--ll-cyan); }
+body.lowlight-chat :is(.drawer-content, .popup) hr { border: none; height: 1px; background: rgba(127, 233, 255, 0.14); }
+
+/* Section headers that fold (inline drawers): a hairline under, no box. */
+body.lowlight-chat :is(.drawer-content, .popup) .inline-drawer-header {
+  border-radius: 0;
+  background: none;
+  border-bottom: 1px solid rgba(127, 233, 255, 0.18);
+}
+body.lowlight-chat :is(.drawer-content, .popup) :is(.inline-drawer, .wi-card-entry, .world_entry, .flex-container.wide100p.marginTop10) { border-radius: 0; }
+
+/* Buttons: outlined in cyan, VT323 capitals; filled cyan on hover, like an open SYS. */
+body.lowlight-chat :is(.drawer-content, .popup) :is(.menu_button, .popup-button-ok, .popup-button-cancel, .popup-button-custom) {
+  filter: none;
+  /* (the font is only for text buttons: many icon buttons are the icon itself, below) */
+  border-radius: 0;
+  border: 1px solid rgba(127, 233, 255, 0.45);
+  background: rgba(9, 4, 18, 0.7);
+  color: var(--ll-cyan);
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+/* Text buttons in VT323 capitals; an icon button (fa-* on the button) keeps Font Awesome's font. */
+body.lowlight-chat :is(.drawer-content, .popup) :is(.menu_button, .popup-button-ok, .popup-button-cancel, .popup-button-custom):not([class*='fa-']) {
+  font-family: 'VT323', ui-monospace, monospace;
+  font-size: 18px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+body.lowlight-chat :is(.drawer-content, .popup) :is(.menu_button, .popup-button-ok, .popup-button-cancel, .popup-button-custom):hover {
+  background: var(--ll-cyan);
+  border-color: var(--ll-cyan);
+  color: #05020c;
+}
+body.lowlight-chat :is(.drawer-content, .popup) .menu_button.toggleEnabled,
+body.lowlight-chat :is(.drawer-content, .popup) .menu_button.active { background: rgba(127, 233, 255, 0.16); border-color: var(--ll-cyan); }
+body.lowlight-chat :is(.drawer-content, .popup) :is(.menu_button.redWarningBG, .menu_button.danger_button) { border-color: rgba(255, 59, 92, 0.7); color: #ff3b5c; }
+body.lowlight-chat :is(.drawer-content, .popup) :is(.menu_button.redWarningBG, .menu_button.danger_button):hover { background: #ff3b5c; color: #05020c; }
+/* Icon buttons (the right panel's row, the panels' small tools): cyan, white on hover. */
+body.lowlight-chat :is(.drawer-content, .popup) :is(.right_menu_button, .menu_button_icon, .fa-solid.interactable, .fa-solid.clickable) { color: var(--ll-dim); filter: none; }
+body.lowlight-chat :is(.drawer-content, .popup) :is(.right_menu_button, .fa-solid.interactable, .fa-solid.clickable):hover { color: #fff; }
+
+/* Fields: no box, a cyan underline that turns purple while typing, as the prompt line does. */
+body.lowlight-chat :is(.drawer-content, .popup) :is(.text_pole, input[type='text'], input[type='search'], input[type='number'], input[type='password'], textarea, select) {
+  border-radius: 0;
+  border: 1px solid transparent;
+  border-bottom-color: rgba(127, 233, 255, 0.35);
+  background: rgba(127, 233, 255, 0.04);
+  color: #ffe1ea;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  outline: none;
+  box-shadow: none;
+}
+body.lowlight-chat :is(.drawer-content, .popup) :is(.text_pole, input, textarea, select):focus,
+body.lowlight-chat :is(.drawer-content, .popup) :is(.text_pole, input, textarea, select):focus-visible {
+  border-bottom-color: var(--ll-purple);
+  box-shadow: 0 8px 12px -10px rgba(155, 92, 255, 0.7);
+  caret-color: var(--ll-purple);
+}
+body.lowlight-chat :is(.drawer-content, .popup) select option { background: #0b0516; color: #e9def9; }
+body.lowlight-chat :is(.drawer-content, .popup) ::placeholder { color: rgba(155, 92, 255, 0.55); }
+/* Long text areas keep a faint frame so their edges read. */
+body.lowlight-chat :is(.drawer-content, .popup) textarea { border-color: rgba(127, 233, 255, 0.14); border-bottom-color: rgba(127, 233, 255, 0.35); }
+
+/* Sliders and checkboxes: pink, like SYS's meters. SillyTavern draws its sliders itself: a thin track, a square pink thumb. */
+body.lowlight-chat :is(.drawer-content, .popup) :is(input[type='checkbox'], input[type='radio']) { accent-color: var(--ll-pink); }
+body.lowlight-chat :is(.drawer-content, .popup) input[type='range'] {
+  height: 3px;
+  border-radius: 0;
+  background: rgba(127, 233, 255, 0.22);
+  box-shadow: none;
+  filter: none;
+}
+body.lowlight-chat :is(.drawer-content, .popup) input[type='range']::-webkit-slider-thumb {
+  width: 10px;
+  height: 16px;
+  border-radius: 0;
+  border: none;
+  background: var(--ll-pink);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ll-pink) 50%, transparent);
+}
+body.lowlight-chat :is(.drawer-content, .popup) input[type='range']::-moz-range-thumb {
+  width: 10px;
+  height: 16px;
+  border-radius: 0;
+  border: none;
+  background: var(--ll-pink);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--ll-pink) 50%, transparent);
+}
+body.lowlight-chat :is(.drawer-content, .popup) .neo-range-slider { border-radius: 0; }
+body.lowlight-chat :is(.drawer-content, .popup) input[type='checkbox'] {
+  --SmartThemeCheckboxBgColorR: 9;
+  --SmartThemeCheckboxBgColorG: 4;
+  --SmartThemeCheckboxBgColorB: 18;
+  --SmartThemeCheckboxTickColor: var(--ll-pink);
+  border-radius: 0;
+  border: 1px solid rgba(127, 233, 255, 0.45);
+  box-shadow: none;
+}
+
+/* Tags and tabs: outlined chips, the open one filled. */
+body.lowlight-chat :is(.drawer-content, .popup) .tag { border-radius: 0; background: rgba(127, 233, 255, 0.06); border-color: rgba(127, 233, 255, 0.3); font-family: 'VT323', ui-monospace, monospace; font-size: 17px; letter-spacing: 0.08em; }
+body.lowlight-chat :is(.drawer-content, .popup) :is(.tab, .tabs .menu_button, #right-nav-panel-tabs > div) { border-radius: 0; }
+
+/* The character list: rows on a hairline, the name in VT323, the selected one lit with SYS's left bar. */
+body.lowlight-chat #rm_print_characters_block .character_select,
+body.lowlight-chat #rm_print_characters_block .group_select { border-radius: 0; border-bottom: 1px solid rgba(127, 233, 255, 0.1); }
+body.lowlight-chat #rm_print_characters_block .character_select:hover,
+body.lowlight-chat #rm_print_characters_block .group_select:hover { background: rgba(127, 233, 255, 0.06); }
+body.lowlight-chat #rm_print_characters_block :is(.character_select, .group_select).is_fav,
+body.lowlight-chat #rm_print_characters_block .character_select.selected { background: rgba(127, 233, 255, 0.1); box-shadow: inset 3px 0 0 var(--ll-cyan); }
+body.lowlight-chat #rm_print_characters_block .ch_name { font-family: 'VT323', ui-monospace, monospace; font-size: 22px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ll-cyan); }
+body.lowlight-chat #rm_print_characters_block .avatar img { border-radius: 0; border: 1px solid rgba(127, 233, 255, 0.35); }
+body.lowlight-chat .drawer-content .avatar img,
+body.lowlight-chat .drawer-content img.avatar { border-radius: 0; }
+
+/* Persona cards. */
+body.lowlight-chat #user_avatar_block .avatar-container { border-radius: 0; border: 1px solid rgba(127, 233, 255, 0.14); }
+body.lowlight-chat #user_avatar_block .avatar-container.selected { border-color: var(--ll-cyan); box-shadow: inset 3px 0 0 var(--ll-cyan); background: rgba(127, 233, 255, 0.08); }
+body.lowlight-chat #user_avatar_block .ch_name { font-family: 'VT323', ui-monospace, monospace; font-size: 20px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ll-cyan); }
+
+/* The API connection light in its panel follows SYS's: cyan when connected, red when not. */
+body.lowlight-chat .online_status_indicator { border-radius: 0; }
+
+/* Lowlight is square everywhere: every corner inside the panels (avatars, section boxes, chips, popups). */
+body.lowlight-chat :is(.drawer-content, .popup, #character_popup) *,
+body.lowlight-chat :is(.drawer-content, .popup, #character_popup) *::before,
+body.lowlight-chat :is(.drawer-content, .popup, #character_popup) *::after { border-radius: 0 !important; }

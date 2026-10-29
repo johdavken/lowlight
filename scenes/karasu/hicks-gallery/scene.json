@@ -1,0 +1,432 @@
+{
+  "id": "hicks-gallery",
+  "name": "Hicks's walkway",
+  "description": "The open walkway along the outside of Hicks's block on Level 2 of the Ribbon, down where the stack barely sees daylight. There's no sky: the ceiling is the rusted girders, ducts and cables of the level above, a big fan turning slowly, laundry strung under the beams. On the left, a patched steel railing over the drop to the Level 1 street, its awnings and signs glowing far below, and across the gap the next stack's wall of lit windows, with a sodium lamp hanging off a beam. On the right, the block's stained concrete wall and its row of grilled doors running away to a stair down at the far end. Hicks's door is the nearest, plain grey steel behind a grille, no number and nothing in front of it, only a camera taped above it with a red light and a caged lamp that flickers. Further down, the Zhou twins' door is covered in stickers, boots and a crate of old deck parts beside it, warm light and a screen showing through their barred window.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "camera": "room_e_camera.png",
+        "stair_bulb": "room_e_stair_bulb.png",
+        "neighbour": "room_e_neighbour.png",
+        "twins": "room_e_twins.png",
+        "wall_lamp": "room_e_wall_lamp.png",
+        "sodium": "room_e_sodium.png",
+        "below": "room_e_below.png",
+        "windows": "room_e_windows.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "camera",
+      "label": "the red light on Hicks's taped-up camera",
+      "pos": [
+        1412,
+        15
+      ],
+      "color": "#ff3030",
+      "intensity": 0.2,
+      "radius": 70,
+      "flicker": 0
+    },
+    {
+      "id": "stair_bulb",
+      "label": "the caged bulb at the stair down",
+      "pos": [
+        600,
+        335
+      ],
+      "color": "#ffb050",
+      "intensity": 0.35,
+      "radius": 220,
+      "flicker": 0
+    },
+    {
+      "id": "neighbour",
+      "label": "a neighbour's lit window down the walkway",
+      "pos": [
+        796,
+        398
+      ],
+      "color": "#ffb050",
+      "intensity": 0.3,
+      "radius": 200,
+      "flicker": 0
+    },
+    {
+      "id": "twins",
+      "label": "the twins' window, warm light and a screen",
+      "pos": [
+        1110,
+        360
+      ],
+      "color": "#ffb050",
+      "intensity": 0.45,
+      "radius": 330,
+      "flicker": 0.25
+    },
+    {
+      "id": "wall_lamp",
+      "label": "the caged lamp over Hicks's door",
+      "pos": [
+        1322,
+        72
+      ],
+      "color": "#fff0c0",
+      "intensity": 0.5,
+      "radius": 520,
+      "flicker": 0.12
+    },
+    {
+      "id": "sodium",
+      "label": "the sodium lamp on the beam across the gap",
+      "pos": [
+        115,
+        148
+      ],
+      "color": "#ff9a3c",
+      "intensity": 0.4,
+      "radius": 380,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "below",
+      "label": "the signs on the Level 1 street below",
+      "pos": [
+        200,
+        580
+      ],
+      "color": "#ff50c0",
+      "intensity": 0.4,
+      "radius": 420,
+      "flicker": 0.05,
+      "outside": true
+    },
+    {
+      "id": "windows",
+      "label": "the next stack's windows across the gap",
+      "pos": [
+        280,
+        200
+      ],
+      "color": "#7090ff",
+      "intensity": 0.25,
+      "radius": 500,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#1c2038",
+    "ambientLevel": 0.35,
+    "weather": "rain",
+    "weatherLevel": 0.5,
+    "fog": 0.12,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {
+        "camera": {
+          "intensity": 0.15
+        },
+        "stair_bulb": {
+          "intensity": 0.26
+        },
+        "neighbour": {
+          "intensity": 0.22
+        },
+        "twins": {
+          "intensity": 0.34
+        },
+        "wall_lamp": {
+          "intensity": 0.38
+        },
+        "sodium": {
+          "intensity": 0.3
+        },
+        "below": {
+          "intensity": 0.3
+        },
+        "windows": {
+          "intensity": 0.19
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0.23,
+      "fog": 0.09,
+      "lights": {
+        "camera": {
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "stair_bulb": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "neighbour": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "twins": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "wall_lamp": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "sodium": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "below": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "windows": {
+          "intensity": 0.19,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.27,
+      "lights": {
+        "camera": {
+          "intensity": 0.1,
+          "flicker": 0.2
+        },
+        "stair_bulb": {
+          "intensity": 0.18,
+          "flicker": 0.2
+        },
+        "neighbour": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "twins": {
+          "intensity": 0.23,
+          "flicker": 0.4
+        },
+        "wall_lamp": {
+          "intensity": 0.25,
+          "flicker": 0.32
+        },
+        "sodium": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "below": {
+          "intensity": 0.2,
+          "flicker": 0.25
+        },
+        "windows": {
+          "intensity": 0.13,
+          "flicker": 0.2
+        }
+      }
+    },
+    "twins-out": {
+      "lights": {
+        "twins": {
+          "intensity": 0
+        }
+      }
+    },
+    "lamp-dead": {
+      "ambientLevel": 0.28,
+      "lights": {
+        "wall_lamp": {
+          "intensity": 0.05,
+          "flicker": 0.8
+        }
+      }
+    },
+    "downpour": {
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.25
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        0,
+        0
+      ],
+      [
+        430,
+        0
+      ],
+      [
+        545,
+        250
+      ],
+      [
+        553,
+        439
+      ],
+      [
+        56,
+        651
+      ],
+      [
+        0,
+        674
+      ]
+    ],
+    [
+      [
+        2,
+        761
+      ],
+      [
+        79,
+        722
+      ],
+      [
+        75,
+        758
+      ],
+      [
+        0,
+        811
+      ]
+    ],
+    [
+      [
+        131,
+        692
+      ],
+      [
+        172,
+        665
+      ],
+      [
+        172,
+        704
+      ],
+      [
+        131,
+        723
+      ]
+    ],
+    [
+      [
+        210,
+        642
+      ],
+      [
+        271,
+        611
+      ],
+      [
+        273,
+        648
+      ],
+      [
+        211,
+        687
+      ]
+    ],
+    [
+      [
+        307,
+        590
+      ],
+      [
+        366,
+        559
+      ],
+      [
+        364,
+        587
+      ],
+      [
+        304,
+        628
+      ]
+    ],
+    [
+      [
+        410,
+        530
+      ],
+      [
+        441,
+        517
+      ],
+      [
+        440,
+        532
+      ],
+      [
+        407,
+        556
+      ]
+    ]
+  ],
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        1117,
+        383,
+        25,
+        33
+      ],
+      "light": "twins",
+      "scroll": 0
+    },
+    {
+      "kind": "passing",
+      "rect": [
+        0,
+        70,
+        520,
+        60
+      ],
+      "source": "drone",
+      "every": 70,
+      "strength": 0.6
+    }
+  ],
+  "exits": [
+    {
+      "to": "karasu/hicks-room",
+      "way": "through the grey door into his room",
+      "door": [
+        1250,
+        130,
+        174,
+        660
+      ]
+    },
+    {
+      "to": "karasu/zhou-flat",
+      "way": "through the stickered door into the twins' place",
+      "door": [
+        974,
+        270,
+        66,
+        340
+      ]
+    }
+  ]
+}

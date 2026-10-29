@@ -1,0 +1,556 @@
+{
+  "id": "nix-apartment",
+  "name": "Nix's Apartment",
+  "description": "Nix's one room, four flights up behind the blue door on the walk-up landing: an old block's two-tone walls, green below and cream above, pipes along the ceiling and worn floorboards, made hers on top. On the left, the bed with too many pillows half hidden behind a folding paper screen painted with cherry branches, a paper lantern on the night table, and the one tall window with heavy curtains drawn shut, a gap down the middle where the Ribbon shows through, because she works nights and sleeps through the day. In the middle, the kitchenette she rarely cooks in: open shelves of jars and mugs, a strip light under them, a stovetop espresso pot, an old fridge covered in notes, and a little table buried in takeout cartons and cans. On the right, her desk crowded with old screens she keeps running long after newer hardware would be cheaper, maps and code on them, humming boxes, a bent-arm lamp, and the paper folders of what she won't put on the grid. By the front door, two locks and a chain, a long coat on the hook, boots on the mat. Plants that somehow survive, prints of skylines and moons, clothes on the floor. Lived in rather than kept; the one place in Lowlight nobody needs anything from her.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "lantern": "room_e_lantern.png",
+        "desk_lamp": "room_e_desk_lamp.png",
+        "screens": "room_e_screens.png",
+        "kitchen": "room_e_kitchen.png",
+        "hall": "room_e_hall.png",
+        "curtains": "room_e_curtains.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "lantern",
+      "label": "paper lantern by the bed",
+      "pos": [
+        405,
+        365
+      ],
+      "color": "#ff9741",
+      "intensity": 0.6,
+      "radius": 330,
+      "flicker": 0.05,
+      "dust": true
+    },
+    {
+      "id": "desk_lamp",
+      "label": "desk lamp over the screens",
+      "pos": [
+        1267,
+        204
+      ],
+      "color": "#ffb347",
+      "intensity": 0.5,
+      "radius": 280,
+      "flicker": 0,
+      "dust": true
+    },
+    {
+      "id": "screens",
+      "label": "the screens on her desk",
+      "pos": [
+        1125,
+        260
+      ],
+      "color": "#7fe9ff",
+      "intensity": 0.4,
+      "radius": 340,
+      "flicker": 0.05
+    },
+    {
+      "id": "kitchen",
+      "label": "the strip light under the kitchen shelf",
+      "pos": [
+        655,
+        216
+      ],
+      "color": "#ffe2b0",
+      "intensity": 0.35,
+      "radius": 280,
+      "flicker": 0,
+      "dust": true
+    },
+    {
+      "id": "hall",
+      "label": "the landing light under the front door",
+      "pos": [
+        1480,
+        655
+      ],
+      "color": "#a8ffb8",
+      "intensity": 0.3,
+      "radius": 170,
+      "flicker": 0.04
+    },
+    {
+      "id": "curtains",
+      "label": "the city through the gap in the curtains",
+      "pos": [
+        311,
+        140
+      ],
+      "color": "#d060ff",
+      "intensity": 0.3,
+      "radius": 260,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#1a1030",
+    "ambientLevel": 0.35,
+    "weather": "none",
+    "weatherLevel": 0,
+    "fog": 0.2,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1a1030",
+      "ambientLevel": 0.22,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0.45,
+          "flicker": 0.05
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.35,
+          "flicker": 0.05
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.25,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#d060ff",
+          "intensity": 0.25,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#161028",
+      "ambientLevel": 0.26,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.25,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#d060ff",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.2,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.35,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0.25,
+          "flicker": 0.2
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.55,
+          "flicker": 0.3
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0.2,
+          "flicker": 0.15
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.3,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#d060ff",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "working": {
+      "ambient": "#181434",
+      "ambientLevel": 0.3,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0.25,
+          "flicker": 0.03
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.7,
+          "flicker": 0.06
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0.75,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.25,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#d060ff",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "screens-only": {
+      "ambient": "#0e0c22",
+      "ambientLevel": 0.16,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.65,
+          "flicker": 0.08
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.2,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#d060ff",
+          "intensity": 0.15,
+          "flicker": 0
+        }
+      }
+    },
+    "lights-out": {
+      "ambient": "#0c0a1a",
+      "ambientLevel": 0.14,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0.2,
+          "flicker": 0.08
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.06,
+          "flicker": 0
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.15,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#d060ff",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#16122c",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.25,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0.45,
+          "flicker": 0.12
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.4,
+          "flicker": 0.15
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.25,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#d060ff",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a5070",
+      "ambientLevel": 0.45,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.3,
+      "timeOfDay": "dawn",
+      "lights": {
+        "lantern": {
+          "color": "#ff9741",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "screens": {
+          "color": "#7fe9ff",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "desk_lamp": {
+          "color": "#ffb347",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffe2b0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "hall": {
+          "color": "#a8ffb8",
+          "intensity": 0.1,
+          "flicker": 0.04
+        },
+        "curtains": {
+          "color": "#8090c0",
+          "intensity": 0.35,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        294,
+        5
+      ],
+      [
+        329,
+        5
+      ],
+      [
+        329,
+        272
+      ],
+      [
+        294,
+        272
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "hum": 0.3,
+    "music": {
+      "songs": [
+        "Nix.ogg"
+      ],
+      "level": 1
+    }
+  },
+  "weatherHidden": true,
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        995,
+        226,
+        53,
+        80
+      ],
+      "light": "screens",
+      "scroll": 12
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        1121,
+        195,
+        82,
+        51
+      ],
+      "light": "screens",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        1071,
+        262,
+        94,
+        66
+      ],
+      "light": "screens",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        1195,
+        251,
+        64,
+        56
+      ],
+      "light": "screens",
+      "scroll": 0
+    },
+    {
+      "kind": "leds",
+      "rect": [
+        1036,
+        171,
+        48,
+        70
+      ],
+      "rate": 1
+    },
+    {
+      "kind": "leds",
+      "rect": [
+        1262,
+        297,
+        26,
+        28
+      ],
+      "rate": 1.4
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.45
+    },
+    {
+      "kind": "glass",
+      "amount": 3
+    },
+    {
+      "kind": "passing",
+      "rect": [
+        294,
+        5,
+        35,
+        267
+      ],
+      "source": "car",
+      "every": 90,
+      "strength": 0.6
+    }
+  ],
+  "exits": [
+    {
+      "to": "karasu/walk-up-landing",
+      "way": "out to the landing"
+    }
+  ]
+}

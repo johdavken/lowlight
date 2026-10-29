@@ -1,0 +1,66 @@
+{
+  "id": "splash",
+  "name": "Lowlight",
+  "description": "The city at night from high above the Ribbon: the splash behind the logo.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png"
+    }
+  ],
+  "lights": [
+    {
+      "id": "tower_sign",
+      "label": "tower sign",
+      "pos": [
+        1072,
+        367
+      ],
+      "color": "#9b5cff",
+      "intensity": 0.5,
+      "radius": 240,
+      "flicker": 0.1,
+      "sound": "neon"
+    },
+    {
+      "id": "street_signs",
+      "label": "signs in the street below",
+      "pos": [
+        312,
+        579
+      ],
+      "color": "#ff3c8a",
+      "intensity": 0.45,
+      "radius": 180,
+      "flicker": 0.15,
+      "sound": "neon"
+    },
+    {
+      "id": "spire_beacon",
+      "label": "spire beacon",
+      "pos": [
+        472,
+        250
+      ],
+      "color": "#ff2020",
+      "intensity": 0.5,
+      "radius": 96,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#120a20",
+    "ambientLevel": 0.3,
+    "weather": "rain",
+    "weatherLevel": 0.35,
+    "fog": 0.25,
+    "timeOfDay": "late-night"
+  },
+  "presets": {}
+}

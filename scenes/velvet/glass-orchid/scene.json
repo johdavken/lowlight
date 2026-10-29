@@ -1,0 +1,608 @@
+{
+  "id": "glass-orchid",
+  "name": "Glass Orchid",
+  "description": "The Glass Orchid's ground floor: a low, close house in Velvet where money is spent quietly. Paper lanterns over a black lacquer bar under the orchid neon, curtained booths behind gold lattice, the back stair up to the rooms, and the front door glowing pink from the street.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissiveLights": {
+        "neon_orchid": "room_e_neon_orchid.png",
+        "back_bar": "room_e_back_bar.png",
+        "bar_lanterns": "room_e_bar_lanterns.png",
+        "stair_lantern": "room_e_stair_lantern.png",
+        "booths": "room_e_booths.png",
+        "door_lamp": "room_e_door_lamp.png",
+        "city_window": "room_e_city_window.png",
+        "street_glass": "room_e_street_glass.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "neon_orchid",
+      "label": "orchid neon over the back bar",
+      "pos": [
+        792,
+        220
+      ],
+      "color": "#ff5cc8",
+      "intensity": 0.6,
+      "radius": 380,
+      "flicker": 0.04,
+      "sound": "neon"
+    },
+    {
+      "id": "back_bar",
+      "label": "shelf lights under the bottles",
+      "pos": [
+        795,
+        300
+      ],
+      "color": "#ffb860",
+      "intensity": 0.45,
+      "radius": 320,
+      "flicker": 0.02
+    },
+    {
+      "id": "bar_lanterns",
+      "label": "paper lanterns over the bar",
+      "pos": [
+        780,
+        250
+      ],
+      "color": "#ffd29a",
+      "intensity": 0.8,
+      "radius": 640,
+      "flicker": 0.02
+    },
+    {
+      "id": "stair_lantern",
+      "label": "red lantern on the back stair up to the rooms",
+      "pos": [
+        117,
+        45
+      ],
+      "color": "#ff4a3a",
+      "intensity": 0.55,
+      "radius": 300,
+      "flicker": 0.03
+    },
+    {
+      "id": "booths",
+      "label": "candles in the curtained booths",
+      "pos": [
+        300,
+        400
+      ],
+      "color": "#ffb050",
+      "intensity": 0.45,
+      "radius": 280,
+      "flicker": 0.1
+    },
+    {
+      "id": "door_lamp",
+      "label": "shaded lamp by the front door",
+      "pos": [
+        1330,
+        215
+      ],
+      "color": "#ffcf90",
+      "intensity": 0.5,
+      "radius": 260,
+      "flicker": 0.02
+    },
+    {
+      "id": "city_window",
+      "label": "the red-light street through the leaded window",
+      "pos": [
+        1235,
+        250
+      ],
+      "color": "#ff3a5a",
+      "intensity": 0.4,
+      "radius": 240,
+      "flicker": 0.06,
+      "outside": true
+    },
+    {
+      "id": "street_glass",
+      "label": "the street glowing through the frosted door",
+      "pos": [
+        1470,
+        330
+      ],
+      "color": "#ff7ab0",
+      "intensity": 0.4,
+      "radius": 300,
+      "flicker": 0.05,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a1626",
+    "ambientLevel": 0.42,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.1,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#24121f",
+      "ambientLevel": 0.38,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff5cc8",
+          "intensity": 0.55,
+          "flicker": 0.04
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.02
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0.7,
+          "flicker": 0.02
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0.45,
+          "flicker": 0.1
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.4,
+          "flicker": 0.06
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.4,
+          "flicker": 0.05
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#24121f",
+      "ambientLevel": 0.38,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.08,
+      "timeOfDay": "night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff5cc8",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0.7,
+          "flicker": 0
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.35,
+          "flicker": 0.04
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.35,
+          "flicker": 0.03
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0812",
+      "ambientLevel": 0.34,
+      "weather": "rain",
+      "weatherLevel": 0.7,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff2d5a",
+          "intensity": 0.7,
+          "flicker": 0.3
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0.35,
+          "flicker": 0.2
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0.6,
+          "flicker": 0.25
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0.6,
+          "flicker": 0.3
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0.3,
+          "flicker": 0.3
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0.4,
+          "flicker": 0.3
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.5,
+          "flicker": 0.3
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.5,
+          "flicker": 0.3
+        }
+      }
+    },
+    "busy": {
+      "ambient": "#2e1a2a",
+      "ambientLevel": 0.48,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff5cc8",
+          "intensity": 0.7,
+          "flicker": 0.04
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0.55,
+          "flicker": 0.02
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0.9,
+          "flicker": 0.02
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0.6,
+          "flicker": 0.03
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0.6,
+          "flicker": 0.12
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0.55,
+          "flicker": 0.02
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.5,
+          "flicker": 0.08
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.5,
+          "flicker": 0.06
+        }
+      }
+    },
+    "last-call": {
+      "ambient": "#20101c",
+      "ambientLevel": 0.36,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff5cc8",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0.5,
+          "flicker": 0.02
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0.25,
+          "flicker": 0.08
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.35,
+          "flicker": 0.05
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.35,
+          "flicker": 0.04
+        }
+      }
+    },
+    "after-hours": {
+      "ambient": "#160a14",
+      "ambientLevel": 0.32,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff5cc8",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0.6,
+          "flicker": 0.03
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.3,
+          "flicker": 0.04
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#1c0e1c",
+      "ambientLevel": 0.38,
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff5cc8",
+          "intensity": 0.55,
+          "flicker": 0.15
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.05
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0.7,
+          "flicker": 0.08
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0.5,
+          "flicker": 0.08
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0.4,
+          "flicker": 0.15
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0.45,
+          "flicker": 0.1
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.3,
+          "flicker": 0.25
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.3,
+          "flicker": 0.2
+        }
+      }
+    },
+    "blackout": {
+      "ambient": "#100814",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "neon_orchid": {
+          "color": "#ff5cc8",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "back_bar": {
+          "color": "#ffb860",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "bar_lanterns": {
+          "color": "#ffd29a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "stair_lantern": {
+          "color": "#ff4a3a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "booths": {
+          "color": "#ffb050",
+          "intensity": 0.55,
+          "flicker": 0.15
+        },
+        "door_lamp": {
+          "color": "#ffcf90",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "city_window": {
+          "color": "#ff3a5a",
+          "intensity": 0.2,
+          "flicker": 0.05
+        },
+        "street_glass": {
+          "color": "#ff7ab0",
+          "intensity": 0.2,
+          "flicker": 0.05
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        1200,
+        87
+      ],
+      [
+        1265,
+        88
+      ],
+      [
+        1261,
+        411
+      ],
+      [
+        1204,
+        408
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        1072,
+        349,
+        38,
+        16
+      ],
+      "light": "bar_lanterns",
+      "scroll": 0
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.6
+    },
+    {
+      "kind": "glass",
+      "amount": 3
+    }
+  ],
+  "resident": {
+    "character": "vesna",
+    "scale": 0.78
+  },
+  "public": true,
+  "exits": [
+    {
+      "to": "velvet/orchid-room",
+      "way": "up the back stairs to the rooms",
+      "door": [
+        0,
+        150,
+        140,
+        500
+      ]
+    },
+    {
+      "to": "velvet/under-the-cat",
+      "way": "out the front door to the street under the Cat",
+      "door": [
+        1410,
+        80,
+        126,
+        640
+      ]
+    }
+  ]
+}

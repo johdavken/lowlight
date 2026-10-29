@@ -1,0 +1,24 @@
+{
+  "name": "Hae",
+  "pronoun": "she",
+  "kind": "fixed",
+  "accent": "#ff8a3c",
+  "voice": "voice.md",
+  "sprite": {
+    "src": "hae-outfit-work2.png",
+    "pixel": true
+  },
+  "outfits": { "work": "hae-outfit-work.png", "work2": "hae-outfit-work2.png" },
+  "outfitByScene": { "karasu/noodle-stall": "work2" },
+  "outfitWears": {
+    "work": "rust long-sleeve shirt pushed up, black quilted vest, stained green canvas apron with a striped towel tucked in, black cargo trousers, rubber boots",
+    "work2": "rust long-sleeve shirt pushed up, black quilted vest, stained green canvas apron with a striped towel tucked in, black cargo trousers, rubber boots, order pad and pen in hand"
+  },
+  "expressions": {
+    "happy": "hae-happy.png",
+    "annoyed": "hae-annoyed.png",
+    "concerned": "hae-concerned.png",
+    "angry": "hae-angry.png"
+  },
+  "face": { "x": 0.47, "y": 0.16 }
+}

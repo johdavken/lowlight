@@ -1,0 +1,46 @@
+/* The title's and LOAD's tile band: select's .tile / .cursor / .tile-name in one row (select.css styles those). */
+.band {
+  position: absolute;
+  left: 50%;
+  bottom: 110px;
+  z-index: 15;
+  transform: translateX(-50%);
+  /* Clips the scrolled-away tiles but lets the skewed edges and the cursor glow show. */
+  clip-path: inset(-10px -32px);
+}
+.band-track { position: absolute; inset: 0; transition: transform 0.18s steps(3); }
+.band-tile { position: absolute; top: 0; }
+.cursor[hidden] { display: none; }
+.band .cursor { position: absolute; top: 0; }
+
+.band-tile > .tile-face,
+.band-tile > .tile-mosaic,
+.band-tile > .tile-mark {
+  position: absolute;
+  inset: 0 -14px;
+  transform: skewX(12deg);
+}
+.band-tile > .tile-art { position: absolute; inset: 0 -14px; width: calc(100% + 28px); height: 100%; transform: skewX(12deg); }
+.tile-face { background: center 4% / 300% no-repeat; image-rendering: pixelated; }
+.tile-mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 6px 18px 30px; box-sizing: border-box; }
+.tile-mosaic i { background: center / cover no-repeat; image-rendering: pixelated; opacity: 0.85; }
+.tile-mark { display: grid; place-items: center; font: 64px var(--pixel); color: #a58cd6; }
+.band-tag {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+  padding: 0 5px;
+  transform: skewX(12deg);
+  font: 14px var(--pixel);
+  letter-spacing: 0.1em;
+  color: #000;
+  background: #ffb347;
+}
+.band-tag.now { background: var(--p1); }
+
+/* More tiles off either side: a fade, like the grid's more-above/below. */
+.band.more-left::before,
+.band.more-right::after { content: ''; position: absolute; top: -6px; bottom: -6px; width: 40px; z-index: 6; pointer-events: none; }
+.band.more-left::before { left: -32px; background: linear-gradient(90deg, rgba(5, 2, 12, 0.9), transparent); }
+.band.more-right::after { right: -32px; background: linear-gradient(270deg, rgba(5, 2, 12, 0.9), transparent); }

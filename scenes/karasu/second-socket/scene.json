@@ -1,0 +1,734 @@
+{
+  "id": "second-socket",
+  "name": "Second Socket",
+  "description": "Second Socket from inside, at Silas's counter on Ribbon Level 4: salvaged monitors to the ceiling, a repair bench with cedar burning, booth decks behind curtains in the back, and the shutter up on the street.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "displays": "room_e_displays.png",
+        "shelf_monitors": "room_e_shelf_monitors.png",
+        "jobs_lamp": "room_e_jobs_lamp.png",
+        "chip_neon": "room_e_chip_neon.png",
+        "booths": "room_e_booths.png",
+        "shop_lights": "room_e_shop_lights.png",
+        "street": "room_e_street.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "displays",
+      "label": "display terminals on the counter",
+      "pos": [
+        770,
+        420
+      ],
+      "color": "#7ce0a0",
+      "intensity": 0.45,
+      "radius": 300,
+      "flicker": 0.04
+    },
+    {
+      "id": "shelf_monitors",
+      "label": "monitors on the shelves",
+      "pos": [
+        900,
+        170
+      ],
+      "color": "#8ab8ff",
+      "intensity": 0.4,
+      "radius": 320,
+      "flicker": 0.06
+    },
+    {
+      "id": "bench_lamp",
+      "label": "magnifier lamp on the repair bench",
+      "pos": [
+        1150,
+        360
+      ],
+      "color": "#eef4ff",
+      "intensity": 0.55,
+      "radius": 240,
+      "flicker": 0
+    },
+    {
+      "id": "jobs_lamp",
+      "label": "clip lamp over the JOBS board",
+      "pos": [
+        363,
+        165
+      ],
+      "color": "#ffd8a0",
+      "intensity": 0.45,
+      "radius": 220,
+      "flicker": 0.02
+    },
+    {
+      "id": "chip_neon",
+      "label": "chip neon in the window",
+      "pos": [
+        420,
+        135
+      ],
+      "color": "#39e0e0",
+      "intensity": 0.6,
+      "radius": 260,
+      "flicker": 0.06,
+      "sound": "neon"
+    },
+    {
+      "id": "booths",
+      "label": "the back corridor and its booth decks",
+      "pos": [
+        1380,
+        300
+      ],
+      "color": "#ffb860",
+      "intensity": 0.4,
+      "radius": 260,
+      "flicker": 0.05
+    },
+    {
+      "id": "shop_lights",
+      "label": "the two pendant lamps over the counter",
+      "pos": [
+        800,
+        200
+      ],
+      "color": "#ffcf8a",
+      "intensity": 0.85,
+      "radius": 620,
+      "flicker": 0.02
+    },
+    {
+      "id": "street",
+      "label": "Level 4's signs through the open shutter",
+      "pos": [
+        140,
+        320
+      ],
+      "color": "#c060ff",
+      "intensity": 0.5,
+      "radius": 380,
+      "flicker": 0.08,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#1e1836",
+    "ambientLevel": 0.42,
+    "weather": "rain",
+    "weatherLevel": 0.5,
+    "fog": 0.15,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "open": {
+      "ambient": "#1e1638",
+      "ambientLevel": 0.46,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.12,
+      "timeOfDay": "night",
+      "lights": {
+        "displays": {
+          "color": "#7ce0a0",
+          "intensity": 0.5,
+          "flicker": 0.04
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.45,
+          "flicker": 0.06
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0.6,
+          "flicker": 0
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0.5,
+          "flicker": 0.02
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0.65,
+          "flicker": 0.05
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.05
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0.95,
+          "flicker": 0.02
+        },
+        "street": {
+          "color": "#c060ff",
+          "intensity": 0.55,
+          "flicker": 0.08
+        }
+      }
+    },
+    "late": {
+      "ambient": "#161230",
+      "ambientLevel": 0.36,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "displays": {
+          "color": "#7ce0a0",
+          "intensity": 0.4,
+          "flicker": 0.04
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.4,
+          "flicker": 0.06
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0.55,
+          "flicker": 0
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0.4,
+          "flicker": 0.02
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0.55,
+          "flicker": 0.06
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0.45,
+          "flicker": 0.05
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0.7,
+          "flicker": 0.02
+        },
+        "street": {
+          "color": "#c060ff",
+          "intensity": 0.45,
+          "flicker": 0.1
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#161230",
+      "ambientLevel": 0.38,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "displays": {
+          "color": "#7ce0a0",
+          "intensity": 0.35,
+          "flicker": 0.02
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.3,
+          "flicker": 0.03
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0.5,
+          "flicker": 0.02
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0.75,
+          "flicker": 0
+        },
+        "street": {
+          "color": "#c060ff",
+          "intensity": 0.4,
+          "flicker": 0.05
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#240a1c",
+      "ambientLevel": 0.34,
+      "weather": "rain",
+      "weatherLevel": 0.8,
+      "fog": 0.25,
+      "timeOfDay": "night",
+      "lights": {
+        "displays": {
+          "color": "#ff6a5a",
+          "intensity": 0.55,
+          "flicker": 0.3
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.5,
+          "flicker": 0.4
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0.5,
+          "flicker": 0.2
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0.35,
+          "flicker": 0.3
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0.6,
+          "flicker": 0.4
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.3
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0.6,
+          "flicker": 0.25
+        },
+        "street": {
+          "color": "#ff3050",
+          "intensity": 0.6,
+          "flicker": 0.3
+        }
+      }
+    },
+    "closing-up": {
+      "ambient": "#141028",
+      "ambientLevel": 0.34,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.12,
+      "timeOfDay": "late-night",
+      "lights": {
+        "displays": {
+          "color": "#7ce0a0",
+          "intensity": 0.2,
+          "flicker": 0.02
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.2,
+          "flicker": 0.04
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0.6,
+          "flicker": 0
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0.6,
+          "flicker": 0.06
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "street": {
+          "color": "#c060ff",
+          "intensity": 0.4,
+          "flicker": 0.08
+        }
+      }
+    },
+    "after-hours": {
+      "ambient": "#100c22",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "displays": {
+          "color": "#7ce0a0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.15,
+          "flicker": 0.06
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0.55,
+          "flicker": 0.08
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "street": {
+          "color": "#c060ff",
+          "intensity": 0.35,
+          "flicker": 0.08
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#120f2a",
+      "ambientLevel": 0.36,
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.35,
+      "timeOfDay": "night",
+      "lights": {
+        "displays": {
+          "color": "#7ce0a0",
+          "intensity": 0.45,
+          "flicker": 0.15
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.4,
+          "flicker": 0.2
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0.55,
+          "flicker": 0.05
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0.45,
+          "flicker": 0.1
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0.55,
+          "flicker": 0.25
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.15
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0.8,
+          "flicker": 0.12
+        },
+        "street": {
+          "color": "#c060ff",
+          "intensity": 0.4,
+          "flicker": 0.25
+        }
+      }
+    },
+    "blackout": {
+      "ambient": "#0c0a1c",
+      "ambientLevel": 0.28,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "displays": {
+          "color": "#7ce0a0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "shelf_monitors": {
+          "color": "#8ab8ff",
+          "intensity": 0.2,
+          "flicker": 0.1
+        },
+        "bench_lamp": {
+          "color": "#eef4ff",
+          "intensity": 0.45,
+          "flicker": 0.03
+        },
+        "jobs_lamp": {
+          "color": "#ffd8a0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "chip_neon": {
+          "color": "#39e0e0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "booths": {
+          "color": "#ffb860",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "shop_lights": {
+          "color": "#ffcf8a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "street": {
+          "color": "#c060ff",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        0,
+        15
+      ],
+      [
+        279,
+        108
+      ],
+      [
+        277,
+        501
+      ],
+      [
+        254,
+        508
+      ],
+      [
+        236,
+        576
+      ],
+      [
+        231,
+        614
+      ],
+      [
+        118,
+        646
+      ],
+      [
+        104,
+        468
+      ],
+      [
+        2,
+        429
+      ]
+    ]
+  ],
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        645,
+        392,
+        70,
+        50
+      ],
+      "light": "displays",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        737,
+        392,
+        62,
+        50
+      ],
+      "light": "displays",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        833,
+        392,
+        66,
+        48
+      ],
+      "light": "displays",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        752,
+        100,
+        58,
+        45
+      ],
+      "light": "shelf_monitors",
+      "scroll": 0,
+      "picture": "static"
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        862,
+        118,
+        60,
+        50
+      ],
+      "light": "shelf_monitors",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        1025,
+        156,
+        56,
+        42
+      ],
+      "light": "shelf_monitors",
+      "scroll": 0,
+      "picture": "static"
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        783,
+        200,
+        44,
+        40
+      ],
+      "light": "shelf_monitors",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        893,
+        210,
+        40,
+        36
+      ],
+      "light": "shelf_monitors",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        398,
+        542,
+        42,
+        46
+      ],
+      "light": "shelf_monitors",
+      "scroll": 0,
+      "picture": "static"
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        1290,
+        314,
+        22,
+        22
+      ],
+      "light": "booths",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        1382,
+        324,
+        20,
+        18
+      ],
+      "light": "booths",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        1442,
+        324,
+        20,
+        18
+      ],
+      "light": "booths",
+      "scroll": 0
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        1094,
+        350,
+        26,
+        70
+      ],
+      "style": "smoke",
+      "amount": 0.4,
+      "lean": 0.1
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.5
+    }
+  ],
+  "public": true,
+  "hours": {
+    "open": "12:00",
+    "close": "02:00"
+  }
+}

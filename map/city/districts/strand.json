@@ -1,0 +1,96 @@
+{
+  "height": [
+    16,
+    64
+  ],
+  "lot": [
+    19,
+    14
+  ],
+  "streetEvery": [
+    4,
+    3
+  ],
+  "tallGain": 2.2,
+  "brick": 0.06,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0.05,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.02,
+    "roofLights": 2,
+    "fires": 8,
+    "outage": 0.15
+  },
+  "windowLit": 0.42,
+  "windowColors": [
+    "#4fe3ff",
+    "#ff5fb0",
+    "#ffd76b",
+    "#ffb347"
+  ],
+  "pools": {
+    "colors": [
+      "#4fe3ff",
+      "#ff5fb0"
+    ],
+    "count": 26,
+    "power": 450000,
+    "reach": 130,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#4fe3ff",
+    "#ff5fb0",
+    "#ffd76b"
+  ],
+  "signShare": 0.22,
+  "deepZoom": true,
+  "nearStructure": {
+    "id": "ribbon",
+    "boostStart": 4,
+    "boostDistance": 60,
+    "boostPower": 1.2,
+    "boostGain": 1.3,
+    "litGain": 1.4,
+    "brickNear": 0,
+    "setbackNear": 0,
+    "signShareNear": 0.6,
+    "farScale": 0.85
+  },
+  "waterfront": {
+    "boardwalk": {
+      "width": 14,
+      "stallEvery": 12,
+      "colors": [
+        "#4fe3ff",
+        "#ff5fb0",
+        "#ffd76b",
+        "#ffb347"
+      ]
+    },
+    "wheel": {
+      "near": "low-roller",
+      "height": 80,
+      "pier": -9,
+      "color": "#ff4fa8"
+    },
+    "pier": {
+      "near": "breakwater",
+      "length": 110,
+      "width": 7
+    }
+  },
+  "details": {
+    "roofNeon": 0.3,
+    "boards": 0.15,
+    "marquees": 0.45
+  },
+  "angleDeg": 17,
+  "gridRoads": {
+    "width": 6,
+    "lampEvery": 2
+  }
+}

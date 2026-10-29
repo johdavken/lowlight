@@ -1,0 +1,31 @@
+/* A holo pane (mockup E): the Chrome deck. Glass over the room, pink edges, no scanlines; the room shows through. */
+.ct-window.ct-skin-holo {
+  inset: 8% 5% 10% 26%;
+  padding: 26px 34px;
+  font: 17px/1.32 'IBM Plex Mono', monospace;
+  color: #ffd9e6;
+  text-shadow: 0 0 6px rgba(255, 79, 139, 0.4);
+  background: linear-gradient(135deg, rgba(255, 79, 139, 0.14), rgba(127, 233, 255, 0.06) 60%, rgba(9, 4, 18, 0.35));
+  backdrop-filter: blur(6px) brightness(0.55);
+  border: 1px solid rgba(255, 79, 139, 0.45);
+  box-shadow: 0 0 30px rgba(255, 79, 139, 0.25), inset 0 0 40px rgba(255, 79, 139, 0.08);
+  transform: perspective(1600px) rotateY(-8deg);
+  transform-origin: 100% 50%;
+}
+.ct-skin-holo::after { display: none; }
+.ct-skin-holo .ct-head { font: 22px 'VT323', monospace; letter-spacing: 0.24em; color: #ff4f8b; }
+.ct-skin-holo .ct-addr { display: none; }
+.ct-skin-holo .ct-word { color: #fff; }
+.ct-skin-holo .ct-bracket { color: #7fe9ff; }
+.ct-skin-holo .ct-word:hover, .ct-skin-holo .ct-word:focus, .ct-skin-holo .ct-bracket:hover, .ct-skin-holo .ct-bracket:focus { color: #fff; background: rgba(255, 79, 139, 0.55); box-shadow: 0 0 12px rgba(255, 79, 139, 0.8); }
+.ct-skin-holo .ct-word.struck, .ct-skin-holo .ct-bracket.used { opacity: 1; color: rgba(255, 217, 230, 0.4); background: none; box-shadow: none; }
+.ct-skin-holo .ct-tries-k { color: rgba(255, 217, 230, 0.55); }
+.ct-skin-holo .ct-tries i { width: 12px; height: 12px; border-radius: 50%; border-color: rgba(255, 79, 139, 0.5); }
+.ct-skin-holo .ct-tries i.on { background: #ff4f8b; box-shadow: 0 0 8px #ff4f8b; }
+.ct-skin-holo .ct-entry { padding-bottom: 8px; border-bottom: 1px solid rgba(255, 79, 139, 0.2); }
+.ct-skin-holo .ct-entry-b { color: #7fe9ff; }
+.ct-skin-holo .ct-ghost, .ct-skin-holo .ct-hint { color: rgba(255, 217, 230, 0.7); font-style: italic; }
+.ct-skin-holo .ct-leave { font: 18px 'VT323', monospace; color: #ff4f8b; border-color: rgba(255, 79, 139, 0.5); }
+.ct-skin-holo .ct-corner { position: absolute; left: -1px; top: -1px; width: 28px; height: 28px; border-left: 3px solid #ff4f8b; border-top: 3px solid #ff4f8b; }
+.ct-skin-holo .ct-corner + .ct-corner { left: auto; top: auto; right: -1px; bottom: -1px; border: 0; border-right: 3px solid #ff4f8b; border-bottom: 3px solid #ff4f8b; }
+.ct-window.ct-skin-holo.is-locked { border-color: #ff3b5c; color: #ff9aa8; }

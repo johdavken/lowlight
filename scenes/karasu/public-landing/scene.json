@@ -1,0 +1,603 @@
+{
+  "id": "public-landing",
+  "name": "Public Landing",
+  "description": "The public landing high on the Ribbon: the freight lift, a public jack post where runners plug in, a bench at the rail, and the long stairs dropping into Old Town, with the Wheel turning pink across the bay.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "lantern_left": "room_e_lantern_left.png",
+        "lift": "room_e_lift.png",
+        "jack": "room_e_jack.png",
+        "ferris_wheel": "room_e_ferris_wheel.png",
+        "neon_sign": "room_e_neon_sign.png",
+        "stair_lamp": "room_e_stair_lamp.png",
+        "stack_below": "room_e_stack_below.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "lantern_left",
+      "label": "caged lamp by the lift",
+      "pos": [
+        45,
+        232
+      ],
+      "color": "#ffa040",
+      "intensity": 0.55,
+      "radius": 260,
+      "flicker": 0.04
+    },
+    {
+      "id": "lift",
+      "label": "the freight lift, lit inside",
+      "pos": [
+        225,
+        420
+      ],
+      "color": "#ffb860",
+      "intensity": 0.55,
+      "radius": 300,
+      "flicker": 0.03
+    },
+    {
+      "id": "jack",
+      "label": "the public jack terminal",
+      "pos": [
+        487,
+        380
+      ],
+      "color": "#60ff9a",
+      "intensity": 0.35,
+      "radius": 150,
+      "flicker": 0.05
+    },
+    {
+      "id": "ferris_wheel",
+      "label": "the Wheel across the bay",
+      "pos": [
+        1362,
+        220
+      ],
+      "color": "#ff4fc0",
+      "intensity": 0.45,
+      "radius": 220,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "neon_sign",
+      "label": "pink neon on the facing building",
+      "pos": [
+        855,
+        230
+      ],
+      "color": "#ff3c96",
+      "intensity": 0.6,
+      "radius": 360,
+      "flicker": 0.08,
+      "sound": "neon"
+    },
+    {
+      "id": "stair_lamp",
+      "label": "lamp at the head of the stairs down to Old Town",
+      "pos": [
+        1408,
+        335
+      ],
+      "color": "#ffb050",
+      "intensity": 0.55,
+      "radius": 320,
+      "flicker": 0.03
+    },
+    {
+      "id": "stack_below",
+      "label": "the stack's signs and windows below",
+      "pos": [
+        1000,
+        520
+      ],
+      "color": "#c05cff",
+      "intensity": 0.45,
+      "radius": 420,
+      "flicker": 0.1,
+      "outside": true
+    },
+    {
+      "id": "ceiling_lights",
+      "label": "caged tube lights under the level above",
+      "pos": [
+        880,
+        60
+      ],
+      "color": "#dfe8ff",
+      "intensity": 0.6,
+      "radius": 420,
+      "flicker": 0.02
+    }
+  ],
+  "defaults": {
+    "ambient": "#1e1838",
+    "ambientLevel": 0.46,
+    "weather": "rain",
+    "weatherLevel": 0.5,
+    "fog": 0.25,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#161230",
+      "ambientLevel": 0.37,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.25,
+      "timeOfDay": "late-night",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0.5,
+          "flicker": 0.04
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.03
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0.35,
+          "flicker": 0.05
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff3c96",
+          "intensity": 0.55,
+          "flicker": 0.08
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "stack_below": {
+          "color": "#c05cff",
+          "intensity": 0.4,
+          "flicker": 0.1
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0.45,
+          "flicker": 0.03
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#161230",
+      "ambientLevel": 0.39,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0.3,
+          "flicker": 0.02
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff3c96",
+          "intensity": 0.45,
+          "flicker": 0.03
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "stack_below": {
+          "color": "#c05cff",
+          "intensity": 0.35,
+          "flicker": 0.04
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0.35,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#24081a",
+      "ambientLevel": 0.35,
+      "weather": "rain",
+      "weatherLevel": 0.85,
+      "fog": 0.4,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0.45,
+          "flicker": 0.3
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.35
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0.4,
+          "flicker": 0.3
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff2d4a",
+          "intensity": 0.75,
+          "flicker": 0.4
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0.45,
+          "flicker": 0.3
+        },
+        "stack_below": {
+          "color": "#ff3050",
+          "intensity": 0.55,
+          "flicker": 0.3
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0.4,
+          "flicker": 0.45
+        }
+      }
+    },
+    "busy": {
+      "ambient": "#1e1838",
+      "ambientLevel": 0.49,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0.6,
+          "flicker": 0.03
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0.6,
+          "flicker": 0.03
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0.45,
+          "flicker": 0.06
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0.55,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff3c96",
+          "intensity": 0.7,
+          "flicker": 0.06
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "stack_below": {
+          "color": "#c05cff",
+          "intensity": 0.6,
+          "flicker": 0.12
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0.7,
+          "flicker": 0.02
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#120f2a",
+      "ambientLevel": 0.37,
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.45,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0.5,
+          "flicker": 0.12
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0.45,
+          "flicker": 0.1
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0.35,
+          "flicker": 0.15
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff3c96",
+          "intensity": 0.55,
+          "flicker": 0.25
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0.5,
+          "flicker": 0.15
+        },
+        "stack_below": {
+          "color": "#c05cff",
+          "intensity": 0.35,
+          "flicker": 0.2
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0.5,
+          "flicker": 0.15
+        }
+      }
+    },
+    "blackout": {
+      "ambient": "#0c0a1e",
+      "ambientLevel": 0.31,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.25,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff3c96",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0.5,
+          "flicker": 0.05
+        },
+        "stack_below": {
+          "color": "#c05cff",
+          "intensity": 0.45,
+          "flicker": 0.1
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    },
+    "fog-bank": {
+      "ambient": "#2a2840",
+      "ambientLevel": 0.47,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.85,
+      "timeOfDay": "night",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0.55,
+          "flicker": 0.03
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0.45,
+          "flicker": 0.03
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0.35,
+          "flicker": 0.04
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff3c96",
+          "intensity": 0.45,
+          "flicker": 0.06
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0.55,
+          "flicker": 0.02
+        },
+        "stack_below": {
+          "color": "#c05cff",
+          "intensity": 0.2,
+          "flicker": 0.05
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0.5,
+          "flicker": 0.02
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#3a2e4e",
+      "ambientLevel": 0.59,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.3,
+      "timeOfDay": "dawn",
+      "lights": {
+        "lantern_left": {
+          "color": "#ffa040",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "lift": {
+          "color": "#ffb860",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "jack": {
+          "color": "#60ff9a",
+          "intensity": 0.25,
+          "flicker": 0.03
+        },
+        "ferris_wheel": {
+          "color": "#ff4fc0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "neon_sign": {
+          "color": "#ff3c96",
+          "intensity": 0.2,
+          "flicker": 0.03
+        },
+        "stair_lamp": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "stack_below": {
+          "color": "#c05cff",
+          "intensity": 0.1,
+          "flicker": 0.03
+        },
+        "ceiling_lights": {
+          "color": "#dfe8ff",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        470,
+        50
+      ],
+      [
+        1536,
+        45
+      ],
+      [
+        1536,
+        864
+      ],
+      [
+        1250,
+        864
+      ],
+      [
+        1240,
+        670
+      ],
+      [
+        1180,
+        590
+      ],
+      [
+        1180,
+        460
+      ],
+      [
+        470,
+        460
+      ]
+    ]
+  ],
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        470,
+        363,
+        30,
+        38
+      ],
+      "light": "jack",
+      "scroll": 6
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.8
+    }
+  ],
+  "public": true,
+  "exits": [
+    {
+      "to": "karasu/dead-blocks",
+      "way": "down the long stairs into Old Town",
+      "door": [
+        1250,
+        310,
+        286,
+        520
+      ]
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+/* SAVE (2026-10-18 PEOPLE spec §3): a card in the screen language, centred 40 % down, clear of the top bar:
+   the room's picture, the line LOAD shows (place · time · who's with you), the name field. Every class is sc-. */
+.save-card {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  /* The individual translate: the glitch-in's keyframes animate transform, which would knock it off centre. */
+  translate: -50% -50%;
+  z-index: 45;
+  width: min(620px, calc(1600px - 32px));
+  overflow: hidden;
+  background: #07030f;
+  border: 1px solid color-mix(in srgb, #ffc56b 55%, transparent);
+  border-radius: 12px / 10px;
+  box-shadow: 0 0 40px -8px color-mix(in srgb, #ffc56b 50%, transparent), inset 0 0 0 2px rgba(0, 0, 0, 0.8);
+  font-family: var(--pixel);
+}
+.save-card.sc-glitch-in { animation: map-glitch-in 0.7s steps(1, end) backwards; }
+.sc-picture { display: block; width: 100%; height: 170px; object-fit: cover; object-position: center 40%; image-rendering: pixelated; -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent); mask-image: linear-gradient(to bottom, #000 60%, transparent); }
+.sc-body { position: relative; padding: 4px 26px 20px; }
+.sc-picture + .sc-body { margin-top: -38px; }
+.sc-line { font: 15px var(--mono); letter-spacing: 0.22em; color: rgba(255, 217, 230, 0.7); }
+.sc-with { font-weight: bold; }
+.sc-title { margin-top: 6px; font-size: 34px; letter-spacing: 0.2em; color: #ffc56b; text-shadow: 0 0 10px color-mix(in srgb, #ffc56b 70%, transparent); }
+.sc-field {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 8px;
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 17px;
+  color: #e9defa;
+  caret-color: #ffc56b;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #6b5f85;
+}
+.sc-field:focus { outline: none; border-color: #ffc56b; }
+.save-card .error { min-height: 1em; margin-top: 6px; font-size: 16px; letter-spacing: 0.15em; color: var(--alert); }
+.sc-hint { margin-top: 4px; font-size: 16px; letter-spacing: 0.25em; color: #e9defa; opacity: 0.6; }
+.sc-scan { position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0) 0 2px, rgba(0, 0, 0, 0.16) 2px 3px); mix-blend-mode: multiply; }
+@media (prefers-reduced-motion: reduce) { .save-card.sc-glitch-in { animation: none; } }

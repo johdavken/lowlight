@@ -1,0 +1,184 @@
+/* Lowlight's character select (select.js), on a 1600×900 stage scaled to the window, over the live room:
+   Lowlight's select.css values — fighters 860 px tall from the floor, edge files in slanted strips, the
+   skewed tile band bottom-centre, 1P green and CPU magenta, VT323 and Teko. */
+.lls-root {
+  --p1: #3dff7a;
+  --p2: #ff2bd6;
+  --ink: #e9defa;
+  --cyan: #7fe9ff;
+  position: fixed;
+  inset: 0;
+  z-index: 7000;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  /* The room behind dims, as Lowlight's backdrop does under a contact's room. */
+  background: rgba(5, 2, 12, 0.42);
+}
+.lls-root[hidden] { display: none; }
+.lls-stage { position: absolute; left: 50%; top: 50%; width: 1600px; height: 900px; transform-origin: 50% 50%; overflow: hidden; }
+/* Vignette and scanlines over everything on the stage. */
+.lls-stage::before,
+.lls-stage::after { content: ''; position: absolute; inset: 0; pointer-events: none; }
+.lls-stage::before { z-index: 39; background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.75)); }
+.lls-stage::after { z-index: 40; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 4px); }
+
+.lls-title {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  text-align: center;
+  pointer-events: none;
+  font: 56px 'VT323', monospace;
+  letter-spacing: 0.3em;
+  color: var(--p2);
+  text-shadow: 0 0 18px currentColor;
+}
+.lls-root[data-phase='p1'] .lls-title { color: var(--p1); }
+.lls-root[data-phase='ready'] .lls-title { visibility: hidden; }
+.lls-hint {
+  position: absolute;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  text-align: center;
+  font: 20px 'VT323', monospace;
+  letter-spacing: 0.3em;
+  opacity: 0.65;
+}
+
+/* Fighters: whole sprites from the floor; CPU's faces 1P (mirrored). */
+.lls-fighter { position: absolute; bottom: -40px; height: 860px; z-index: 10; image-rendering: pixelated; pointer-events: none; animation: lls-swap 0.24s steps(3); }
+.lls-fighter[hidden] { display: none; }
+.lls-fighter.lls-p1 { left: 510px; transform: translateX(-50%); }
+.lls-fighter.lls-p2 { left: 1090px; transform: translateX(-50%) scaleX(-1); }
+@keyframes lls-swap { 0% { opacity: 0.2; } 50% { opacity: 0.6; } }
+
+/* The edge files: slanted strips down each side, the tag over them. */
+.lls-file {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 12;
+  width: 420px;
+  display: flex;
+  flex-direction: column;
+  padding: 112px 68px 40px 22px;
+  box-sizing: border-box;
+  background: linear-gradient(90deg, rgba(5, 2, 12, 0.92), rgba(5, 2, 12, 0.7));
+  border-left: 4px solid var(--p1);
+  clip-path: polygon(0 0, 100% 0, 84% 100%, 0 100%);
+  --side: var(--p1);
+}
+.lls-file.lls-p2 {
+  right: 0;
+  padding: 112px 22px 40px 68px;
+  background: linear-gradient(270deg, rgba(5, 2, 12, 0.92), rgba(5, 2, 12, 0.7));
+  border-left: 0;
+  border-right: 4px solid var(--p2);
+  clip-path: polygon(16% 0, 100% 0, 100% 100%, 0 100%);
+  --side: var(--p2);
+  text-align: right;
+}
+.lls-tag { position: absolute; top: 70px; padding: 2px 12px; font: 28px 'VT323', monospace; letter-spacing: 0.3em; color: #000; background: var(--side); }
+.lls-p1 .lls-tag { left: 22px; }
+.lls-p2 .lls-tag { right: 22px; }
+.lls-name { flex: none; font: 700 84px/0.8 'Teko', 'VT323', sans-serif; letter-spacing: 0.02em; color: var(--side); overflow-wrap: anywhere; }
+.lls-name.long { font-size: 60px; line-height: 0.85; }
+.lls-tagline { flex: none; margin: 6px 0 8px; font-size: 12px; line-height: 1.4; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.65; }
+.lls-awaiting { margin-top: 8px; font: 18px 'VT323', monospace; letter-spacing: 0.3em; opacity: 0.4; }
+.lls-dh { flex: none; margin: 10px 0 4px; font: 18px 'VT323', monospace; letter-spacing: 0.3em; color: var(--side); opacity: 0.7; }
+.lls-about {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #d9cdee;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.lls-about p { margin: 0 0 6px; }
+.lls-facts { flex: none; display: grid; grid-template-columns: 96px 1fr; gap: 3px 10px; margin: 10px 0 0; align-items: baseline; text-align: left; }
+.lls-facts dt { font: 14px/1.1 'VT323', monospace; letter-spacing: 0.12em; opacity: 0.55; }
+.lls-facts dd { margin: 0; font-size: 11px; line-height: 1.35; text-transform: uppercase; letter-spacing: 0.04em; }
+.lls-p2 .lls-facts { grid-template-columns: 1fr 96px; grid-auto-flow: row dense; }
+.lls-p2 .lls-facts dt { grid-column: 2; grid-row: auto; text-align: right; }
+.lls-p2 .lls-facts dd { grid-column: 1; text-align: right; }
+
+/* The tile band: skewed faces, six to a row, bottom-centre; the cursor in its side's colour. */
+.lls-grid {
+  position: absolute;
+  left: 50%;
+  bottom: 110px;
+  z-index: 15;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(6, 104px);
+  gap: 8px;
+}
+.lls-root[data-phase='ready'] .lls-grid { opacity: 0.25; filter: grayscale(1); }
+.lls-tile {
+  position: relative;
+  width: 104px;
+  height: 120px;
+  box-sizing: border-box;
+  overflow: hidden;
+  cursor: pointer;
+  transform: skewX(-12deg);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  background: #120a22;
+}
+.lls-tile img { position: absolute; inset: 0 -14px; width: calc(100% + 28px); height: 100%; object-fit: cover; transform: skewX(12deg); image-rendering: pixelated; opacity: 0.8; }
+.lls-tile-name {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 4px;
+  z-index: 2;
+  transform: skewX(12deg);
+  text-align: center;
+  font: 17px/1 'VT323', monospace;
+  letter-spacing: 0.14em;
+  color: #fff;
+  text-shadow: 0 0 4px #000, 0 1px 2px #000;
+}
+.lls-tile:hover img { opacity: 1; }
+.lls-tile.on { border: 3px solid var(--c); box-shadow: 0 0 14px var(--c); animation: lls-pulse 0.5s steps(2) infinite; }
+.lls-tile.on img { opacity: 1; }
+.lls-tile.p1 { --c: var(--p1); }
+.lls-tile.p2 { --c: var(--p2); }
+@keyframes lls-pulse { 50% { box-shadow: 0 0 4px var(--c); } }
+.lls-tile-tag { position: absolute; top: -1px; z-index: 3; padding: 0 6px; transform: skewX(12deg); font: 16px 'VT323', monospace; letter-spacing: 0.1em; color: #000; background: var(--c); }
+.lls-tile.p1 .lls-tile-tag { left: -2px; }
+.lls-tile.p2 .lls-tile-tag { right: -2px; }
+
+/* //JACK IN Y/N: typed out, a block cursor waiting. */
+.lls-banner {
+  position: absolute;
+  left: 50%;
+  top: 42%;
+  z-index: 25;
+  padding: 10px 26px;
+  font: 72px 'VT323', monospace;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: var(--p1);
+  text-shadow: 0 0 14px currentColor;
+  background: rgba(5, 2, 12, 0.8);
+  border-left: 4px solid currentColor;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  animation: lls-type 0.5s steps(14) backwards;
+}
+.lls-banner[hidden] { display: none; }
+.lls-banner::after { content: '█'; margin-left: 0.15em; animation: lls-caret 1s steps(1) infinite; }
+@keyframes lls-type { from { clip-path: inset(0 100% 0 0); } }
+@keyframes lls-caret { 50% { opacity: 0; } }
+
+/* While the select is up only the room shows behind it: SillyTavern's page, the Keys bar and the stage figures step out. */
+body.lls-open :is(#sheld, #form_sheld, #expression-wrapper, #lowlight-persona, .llh-root, #top-settings-holder, #top-bar) { visibility: hidden; }
+body.lls-open::after { display: none; }

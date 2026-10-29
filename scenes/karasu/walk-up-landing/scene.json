@@ -1,0 +1,371 @@
+{
+  "id": "walk-up-landing",
+  "name": "Nix's Walk-up",
+  "description": "The top-floor landing of the old walk-up on the Ribbon where Nix lives, four flights up with no lift. Two-tone walls, green below and cream above, chipped and patched; pipes and wiring along the ceiling under a caged fluorescent tube that buzzes. On the left the stairwell drops away behind a worn wooden rail and a black newel post, its handrail running down past a caged bulb on the wall and a green exit sign above; a mop bucket waits by the rail. Ahead, a tall window with a cracked, taped pane over a radiator looks out on the Ribbon's towers, beside a red fire-hose cabinet. A long worn runner carpet leads down the hall. Her door is deep blue and worn at the handle: a brass plate, two locks, a doormat, a takeout bag on the handle, a potted plant and a stack of flattened delivery boxes, a line of warm light underneath. The neighbour's dark door has slippers on the mat, an umbrella stand and a little shrine with a candle, and TV light flickering under it.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissiveLights": {
+        "shrine": "room_e_shrine.png",
+        "her_door": "room_e_her_door.png",
+        "neighbour_tv": "room_e_neighbour_tv.png",
+        "stair_bulb": "room_e_stair_bulb.png",
+        "exit_sign": "room_e_exit_sign.png",
+        "tube": "room_e_tube.png",
+        "ribbon": "room_e_ribbon.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "shrine",
+      "label": "the neighbour's shrine candle",
+      "pos": [
+        1455,
+        242
+      ],
+      "color": "#ffb050",
+      "intensity": 0.35,
+      "radius": 140,
+      "flicker": 0.1
+    },
+    {
+      "id": "her_door",
+      "label": "the warm line under Nix's door",
+      "pos": [
+        1100,
+        660
+      ],
+      "color": "#ffb060",
+      "intensity": 0.35,
+      "radius": 220,
+      "flicker": 0
+    },
+    {
+      "id": "neighbour_tv",
+      "label": "TV light flickering under the neighbour's door",
+      "pos": [
+        1350,
+        755
+      ],
+      "color": "#c060ff",
+      "intensity": 0.35,
+      "radius": 220,
+      "flicker": 0.6
+    },
+    {
+      "id": "stair_bulb",
+      "label": "the caged bulb on the landing below",
+      "pos": [
+        100,
+        375
+      ],
+      "color": "#ffb050",
+      "intensity": 0.4,
+      "radius": 300,
+      "flicker": 0
+    },
+    {
+      "id": "exit_sign",
+      "label": "the green emergency-exit sign",
+      "pos": [
+        237,
+        37
+      ],
+      "color": "#40ff80",
+      "intensity": 0.35,
+      "radius": 220,
+      "flicker": 0
+    },
+    {
+      "id": "tube",
+      "label": "the caged fluorescent tube, going at one end",
+      "pos": [
+        745,
+        30
+      ],
+      "color": "#c8ffd8",
+      "intensity": 0.5,
+      "radius": 700,
+      "flicker": 0.08
+    },
+    {
+      "id": "ribbon",
+      "label": "the Ribbon's lights through the end window",
+      "pos": [
+        637,
+        250
+      ],
+      "color": "#ff70c0",
+      "intensity": 0.35,
+      "radius": 420,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#1e2234",
+    "ambientLevel": 0.35,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.06,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {
+        "shrine": {
+          "intensity": 0.26
+        },
+        "her_door": {
+          "intensity": 0.26
+        },
+        "neighbour_tv": {
+          "intensity": 0.26
+        },
+        "stair_bulb": {
+          "intensity": 0.3
+        },
+        "exit_sign": {
+          "intensity": 0.26
+        },
+        "tube": {
+          "intensity": 0.38
+        },
+        "ribbon": {
+          "intensity": 0.26
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0.18,
+      "fog": 0.05,
+      "lights": {
+        "shrine": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "her_door": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "neighbour_tv": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "stair_bulb": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "exit_sign": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "tube": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "ribbon": {
+          "intensity": 0.26,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.21,
+      "lights": {
+        "shrine": {
+          "intensity": 0.18,
+          "flicker": 0.3
+        },
+        "her_door": {
+          "intensity": 0.18,
+          "flicker": 0.2
+        },
+        "neighbour_tv": {
+          "intensity": 0.18,
+          "flicker": 0.4
+        },
+        "stair_bulb": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "exit_sign": {
+          "intensity": 0.18,
+          "flicker": 0.2
+        },
+        "tube": {
+          "intensity": 0.25,
+          "flicker": 0.28
+        },
+        "ribbon": {
+          "intensity": 0.18,
+          "flicker": 0.2
+        }
+      }
+    },
+    "nobody-home": {
+      "lights": {
+        "her_door": {
+          "intensity": 0
+        }
+      }
+    },
+    "tube-dying": {
+      "ambientLevel": 0.28,
+      "lights": {
+        "tube": {
+          "intensity": 0.2,
+          "flicker": 0.7
+        }
+      }
+    },
+    "4am": {
+      "ambientLevel": 0.28,
+      "lights": {
+        "neighbour_tv": {
+          "intensity": 0
+        },
+        "tube": {
+          "intensity": 0.25
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        523,
+        127
+      ],
+      [
+        597,
+        125
+      ],
+      [
+        596,
+        246
+      ],
+      [
+        525,
+        244
+      ]
+    ],
+    [
+      [
+        621,
+        125
+      ],
+      [
+        744,
+        129
+      ],
+      [
+        742,
+        202
+      ],
+      [
+        695,
+        201
+      ],
+      [
+        725,
+        220
+      ],
+      [
+        710,
+        244
+      ],
+      [
+        623,
+        245
+      ]
+    ],
+    [
+      [
+        524,
+        260
+      ],
+      [
+        594,
+        260
+      ],
+      [
+        594,
+        386
+      ],
+      [
+        524,
+        386
+      ]
+    ],
+    [
+      [
+        622,
+        258
+      ],
+      [
+        743,
+        258
+      ],
+      [
+        743,
+        384
+      ],
+      [
+        622,
+        384
+      ]
+    ],
+    [
+      [
+        729,
+        225
+      ],
+      [
+        742,
+        225
+      ],
+      [
+        742,
+        241
+      ],
+      [
+        729,
+        241
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true
+  },
+  "effects": [
+    {
+      "kind": "glass",
+      "amount": 2
+    },
+    {
+      "kind": "passing",
+      "rect": [
+        505,
+        105,
+        265,
+        285
+      ],
+      "source": "car",
+      "every": 60,
+      "strength": 0.6
+    }
+  ]
+}

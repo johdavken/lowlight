@@ -1,0 +1,413 @@
+{
+  "id": "listening-post",
+  "name": "The listening post",
+  "description": "The branch's listening post on Pylon Forty's second ring. The front is a lift-maintenance office nobody uses: a buzzing fluorescent tube, a pegboard of clean tools, a workbench with a lift parts binder, grey coveralls on a rail, and a door with a frosted glass panel out to the stair. Through a half-open steel partition, the real room: a long desk under six monitors of grainy camera feeds of the streets under the Spine, a waveform and a signal map; a headset, an overflowing ashtray, a chipped mug and a green-shaded desk lamp; a tall comms rack of blinking green and amber lights. Floor-to-ceiling shelves of brown file boxes, a filing cabinet with a coffee maker and a scorched pot on it, and a narrow cot with a rumpled blanket in the corner. Bare concrete, pipes and cable trays overhead, no windows at all.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "monitors": "room_e_monitors.png",
+        "rack": "room_e_rack.png",
+        "desk_lamp": "room_e_desk_lamp.png",
+        "coffee": "room_e_coffee.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "monitors",
+      "label": "the bank of six camera monitors",
+      "pos": [
+        860,
+        288
+      ],
+      "color": "#b8c8e8",
+      "intensity": 0.5,
+      "radius": 520,
+      "flicker": 0.03
+    },
+    {
+      "id": "rack",
+      "label": "the comms rack's blinking lights",
+      "pos": [
+        1175,
+        320
+      ],
+      "color": "#7cff70",
+      "intensity": 0.25,
+      "radius": 220,
+      "flicker": 0.1
+    },
+    {
+      "id": "desk_lamp",
+      "label": "the green-shaded desk lamp",
+      "pos": [
+        1075,
+        345
+      ],
+      "color": "#ffd27a",
+      "intensity": 0.4,
+      "radius": 280,
+      "flicker": 0
+    },
+    {
+      "id": "coffee",
+      "label": "the coffee maker's red light",
+      "pos": [
+        1515,
+        322
+      ],
+      "color": "#ff3030",
+      "intensity": 0.18,
+      "radius": 100,
+      "flicker": 0
+    },
+    {
+      "id": "front_tube",
+      "label": "the fluorescent tube in the front office",
+      "pos": [
+        200,
+        70
+      ],
+      "color": "#e8f0ff",
+      "intensity": 0.5,
+      "radius": 460,
+      "flicker": 0.06
+    }
+  ],
+  "defaults": {
+    "ambient": "#20222e",
+    "ambientLevel": 0.32,
+    "weather": "none",
+    "weatherLevel": 0,
+    "fog": 0.08,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1a1c28",
+      "ambientLevel": 0.24,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "monitors": {
+          "color": "#b8c8e8",
+          "intensity": 0.45,
+          "flicker": 0.03
+        },
+        "rack": {
+          "color": "#7cff70",
+          "intensity": 0.22,
+          "flicker": 0.1
+        },
+        "desk_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0.32,
+          "flicker": 0
+        },
+        "coffee": {
+          "color": "#ff3030",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "front_tube": {
+          "color": "#e8f0ff",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#20222e",
+      "ambientLevel": 0.3,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.08,
+      "timeOfDay": "night",
+      "lights": {
+        "monitors": {
+          "color": "#b8c8e8",
+          "intensity": 0.42,
+          "flicker": 0
+        },
+        "rack": {
+          "color": "#7cff70",
+          "intensity": 0.22,
+          "flicker": 0.08
+        },
+        "desk_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0.36,
+          "flicker": 0
+        },
+        "coffee": {
+          "color": "#ff3030",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "front_tube": {
+          "color": "#e8f0ff",
+          "intensity": 0.4,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1420",
+      "ambientLevel": 0.22,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.14,
+      "timeOfDay": "night",
+      "lights": {
+        "monitors": {
+          "color": "#b8c8e8",
+          "intensity": 0.5,
+          "flicker": 0.15
+        },
+        "rack": {
+          "color": "#7cff70",
+          "intensity": 0.25,
+          "flicker": 0.25
+        },
+        "desk_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0.28,
+          "flicker": 0.1
+        },
+        "coffee": {
+          "color": "#ff3030",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "front_tube": {
+          "color": "#e8f0ff",
+          "intensity": 0.35,
+          "flicker": 0.25
+        }
+      }
+    },
+    "surveillance": {
+      "ambient": "#141826",
+      "ambientLevel": 0.2,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.08,
+      "timeOfDay": "late-night",
+      "lights": {
+        "monitors": {
+          "color": "#b8c8e8",
+          "intensity": 0.65,
+          "flicker": 0.06
+        },
+        "rack": {
+          "color": "#7cff70",
+          "intensity": 0.28,
+          "flicker": 0.12
+        },
+        "desk_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "coffee": {
+          "color": "#ff3030",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "front_tube": {
+          "color": "#e8f0ff",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    },
+    "day-shift": {
+      "ambient": "#2a2c38",
+      "ambientLevel": 0.42,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.06,
+      "timeOfDay": "dusk",
+      "lights": {
+        "monitors": {
+          "color": "#b8c8e8",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "rack": {
+          "color": "#7cff70",
+          "intensity": 0.2,
+          "flicker": 0.08
+        },
+        "desk_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "coffee": {
+          "color": "#ff3030",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "front_tube": {
+          "color": "#e8f0ff",
+          "intensity": 0.55,
+          "flicker": 0.04
+        }
+      }
+    },
+    "power-cut": {
+      "ambient": "#121420",
+      "ambientLevel": 0.18,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.08,
+      "timeOfDay": "late-night",
+      "lights": {
+        "monitors": {
+          "color": "#b8c8e8",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "rack": {
+          "color": "#7cff70",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "desk_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "coffee": {
+          "color": "#ff3030",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "front_tube": {
+          "color": "#e8f0ff",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": true,
+    "hum": 0.35
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        630,
+        186,
+        145,
+        92
+      ],
+      "light": "monitors",
+      "scroll": 0,
+      "grain": 0.3
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        787,
+        186,
+        145,
+        92
+      ],
+      "light": "monitors",
+      "scroll": 0,
+      "grain": 0.3
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        944,
+        186,
+        145,
+        92
+      ],
+      "light": "monitors",
+      "scroll": 0,
+      "grain": 0.3
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        630,
+        296,
+        145,
+        90
+      ],
+      "light": "monitors",
+      "scroll": 0,
+      "grain": 0.3
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        787,
+        296,
+        145,
+        90
+      ],
+      "light": "monitors",
+      "scroll": 0,
+      "grain": 0.3
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        946,
+        295,
+        145,
+        90
+      ],
+      "light": "monitors",
+      "scroll": 0,
+      "grain": 0.3
+    },
+    {
+      "kind": "leds",
+      "rect": [
+        1123,
+        188,
+        93,
+        85
+      ],
+      "rate": 4
+    }
+  ],
+  "resident": {
+    "character": "garro",
+    "scale": 0.78
+  },
+  "exits": [
+    {
+      "to": "spine/oksanas-counter",
+      "way": "out the front door and down to Oksana's",
+      "door": [
+        400,
+        168,
+        100,
+        375
+      ]
+    },
+    {
+      "to": "spine/soren-hab",
+      "way": "up the pylon stair to Soren's hab"
+    }
+  ]
+}

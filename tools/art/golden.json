@@ -1,0 +1,13 @@
+{
+  "scenes/karasu/lowlight-intake-art/back.png": "e0650a03c2e49a405055259491ac3cc2e198315a150771ab2ae898a00718b606",
+  "scenes/karasu/lowlight-intake-art/back_e_desk_lamp.png": "b92851e7b7a2251792fa8bb866ba66cfc7d7829524b4f7a6af380929fd14a09b",
+  "scenes/karasu/lowlight-intake-art/fg.png": "d687f1f4c0ceb9acfbc0ed38b3a06c18e7518e351b00ee625725207a61cdbc56",
+  "scenes/karasu/lowlight-intake-art/room.png": "f95eeef95a9e74bcfc52b32c4491dbec7e4d468bf3e867cb78efb2827c94893b",
+  "scenes/karasu/lowlight-intake-art/scene.json": "fe2d68f12e160b32fa5fcdcfbeb1c113201c91cf04d01dbf201a4f83a23d5bb0",
+  "art/work/lowlight-intake/glow-preview-back.png": "3be0869de04e3de4a87bf0eddbeaaa4cf129c2d4086f153b64c89fd710ab473e",
+  "art/work/lowlight-intake/glow-preview-fg.png": "d687f1f4c0ceb9acfbc0ed38b3a06c18e7518e351b00ee625725207a61cdbc56",
+  "art/work/lowlight-intake/glow-preview-room.png": "f95eeef95a9e74bcfc52b32c4491dbec7e4d468bf3e867cb78efb2827c94893b",
+  "art/work/lowlight-intake/layer-back.png": "e0650a03c2e49a405055259491ac3cc2e198315a150771ab2ae898a00718b606",
+  "art/work/lowlight-intake/layer-fg.png": "d687f1f4c0ceb9acfbc0ed38b3a06c18e7518e351b00ee625725207a61cdbc56",
+  "art/work/lowlight-intake/layer-room.png": "f95eeef95a9e74bcfc52b32c4491dbec7e4d468bf3e867cb78efb2827c94893b"
+}

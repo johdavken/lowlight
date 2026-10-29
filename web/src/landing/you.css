@@ -1,0 +1,58 @@
+/* The YOU step's panel: in 1P's widened file strip, styled like the model step's list (link.css). */
+.you-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  min-height: 0;
+  font: 14px/1.55 var(--mono);
+  color: var(--ink);
+  pointer-events: auto;
+}
+.yp-list { display: flex; flex-direction: column; gap: 4px; }
+.yp-row {
+  padding: 6px 10px;
+  font: 22px var(--pixel);
+  letter-spacing: 0.25em;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+.yp-row:hover { background: rgba(255, 255, 255, 0.04); }
+.yp-row.on { background: rgba(61, 255, 122, 0.1); border-left-color: var(--p1); color: var(--p1); }
+.yp-form { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.yp-label { font: 16px var(--pixel); letter-spacing: 0.3em; color: var(--p1); opacity: 0.85; }
+.yp-name,
+.yp-background {
+  padding: 7px 10px;
+  font: 15px var(--mono);
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--p1);
+  outline: none;
+}
+.yp-background { min-height: 9em; resize: vertical; }
+.yp-count { align-self: flex-end; font-size: 12px; color: #a99cc4; }
+.yp-buttons { display: flex; gap: 10px; margin-top: 6px; }
+.yp-confirm,
+.yp-back {
+  padding: 2px 12px;
+  font: 18px var(--pixel);
+  letter-spacing: 0.25em;
+  color: #b8acd0;
+  cursor: pointer;
+  background: none;
+  border: 1px solid #6b5f85;
+}
+.yp-confirm:not(:disabled) { color: var(--p1); border-color: var(--p1); }
+.yp-confirm:disabled { cursor: default; opacity: 0.5; }
+/* SHE · HE · THEY: the persona's pronoun, pressed like a lit row. */
+.yp-pronoun { display: flex; gap: 8px; }
+.yp-pronoun-btn {
+  padding: 2px 12px;
+  font: 18px var(--pixel);
+  letter-spacing: 0.25em;
+  color: #b8acd0;
+  cursor: pointer;
+  background: none;
+  border: 1px solid #6b5f85;
+}
+.yp-pronoun-btn[aria-pressed='true'] { color: var(--p1); border-color: var(--p1); background: rgba(61, 255, 122, 0.1); }

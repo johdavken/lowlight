@@ -1,0 +1,36 @@
+.superpowers/
+node_modules/
+.env*
+!.env.example
+.claude/*
+!.claude/skills/
+.playwright-mcp/
+*.db
+*.db-*
+dist/
+test-results/
+playwright-report/
+art/work/
+data/
+
+# Legacy files left by the multi-agent migration (Nix's old room DB and its WAL/SHM)
+*.migrated
+
+# Your persona (personal): only the example is committed
+persona/*
+!persona/persona.example.json
+.worktrees/
+
+# Krita backups and autosaves (the .kra itself is committed)
+*.kra~
+*-autosave.kra
+
+# Desktop builds (npm run release)
+/build/
+/release/
+tools/map3d/out/
+web/public/map/tiles/
+web/public/map/tiles-dark/
+web/public/map/tiles-mask/
+web/public/map/tiles.json
+web/public/map/windows.json

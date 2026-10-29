@@ -1,0 +1,281 @@
+{
+  "id": "intake-back-alley",
+  "name": "The Intake Back Alley",
+  "description": "The service alley behind Lowlight Intake and Hae's Noodles on Level 4, roofed by the girders and pipes of the level above. A steel stair climbs the brick to the Intake's back door under a caged lamp, beside a small lit window. Below, Hae's kitchen door stands propped open a hand's width on crates of greens and noodles, stockpots drying beside it, a fan unit humming above. Further down, dumpsters, pallets, an upturned crate with a tin-can ashtray and a folding stool under the red neon bowl-and-chopsticks; past the girders, a slice of the city's towers.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "door_lamp": "room_e_door_lamp.png",
+        "intake_window": "room_e_intake_window.png",
+        "kitchen_door": "room_e_kitchen_door.png",
+        "neon_bowl": "room_e_neon_bowl.png",
+        "skyline": "room_e_skyline.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "door_lamp",
+      "label": "the caged lamp over the Intake's back door",
+      "pos": [
+        300,
+        55
+      ],
+      "color": "#ffc070",
+      "intensity": 0.5,
+      "radius": 360,
+      "flicker": 0,
+      "dust": 0.8
+    },
+    {
+      "id": "intake_window",
+      "label": "the Intake's small back window",
+      "pos": [
+        480,
+        165
+      ],
+      "color": "#eaaf6f",
+      "intensity": 0.45,
+      "radius": 300,
+      "flicker": 0
+    },
+    {
+      "id": "kitchen_door",
+      "label": "the warm strip from Hae's propped kitchen door",
+      "pos": [
+        748,
+        520
+      ],
+      "color": "#f8af56",
+      "intensity": 0.5,
+      "radius": 340,
+      "flicker": 0.02
+    },
+    {
+      "id": "neon_bowl",
+      "label": "the red bowl-and-chopsticks neon",
+      "pos": [
+        1390,
+        312
+      ],
+      "color": "#ff3a2a",
+      "intensity": 0.6,
+      "radius": 420,
+      "flicker": 0.04,
+      "sound": "neon"
+    },
+    {
+      "id": "skyline",
+      "label": "the city through the gap in the girders",
+      "pos": [
+        1300,
+        90
+      ],
+      "color": "#e8c070",
+      "intensity": 0.3,
+      "radius": 520,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a2238",
+    "ambientLevel": 0.35,
+    "weather": "rain",
+    "weatherLevel": 0.3,
+    "fog": 0.15,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {
+        "door_lamp": {
+          "intensity": 0.38
+        },
+        "intake_window": {
+          "intensity": 0.34
+        },
+        "kitchen_door": {
+          "intensity": 0.38
+        },
+        "neon_bowl": {
+          "intensity": 0.45
+        },
+        "skyline": {
+          "intensity": 0.22
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0.14,
+      "fog": 0.11,
+      "lights": {
+        "door_lamp": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "intake_window": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "kitchen_door": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "neon_bowl": {
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "skyline": {
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.3,
+      "lights": {
+        "door_lamp": {
+          "intensity": 0.25,
+          "flicker": 0.2
+        },
+        "intake_window": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "kitchen_door": {
+          "intensity": 0.25,
+          "flicker": 0.22
+        },
+        "neon_bowl": {
+          "color": "#ff2d4a",
+          "intensity": 0.9,
+          "flicker": 0.5
+        },
+        "skyline": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        }
+      }
+    },
+    "closed": {
+      "lights": {
+        "intake_window": {
+          "intensity": 0
+        },
+        "kitchen_door": {
+          "intensity": 0
+        }
+      }
+    },
+    "smoke-break": {
+      "ambientLevel": 0.3,
+      "lights": {
+        "door_lamp": {
+          "intensity": 0.25
+        },
+        "kitchen_door": {
+          "intensity": 0.2
+        }
+      }
+    },
+    "raid": {
+      "ambientLevel": 0.25,
+      "lights": {
+        "door_lamp": {
+          "intensity": 0
+        },
+        "intake_window": {
+          "intensity": 0
+        },
+        "kitchen_door": {
+          "intensity": 0
+        },
+        "neon_bowl": {
+          "flicker": 0.5
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        1184,
+        19
+      ],
+      [
+        1206,
+        3
+      ],
+      [
+        1532,
+        0
+      ],
+      [
+        1535,
+        859
+      ],
+      [
+        1073,
+        858
+      ],
+      [
+        1076,
+        91
+      ],
+      [
+        1123,
+        27
+      ]
+    ]
+  ],
+  "effects": [
+    {
+      "kind": "plume",
+      "rect": [
+        850,
+        110,
+        70,
+        120
+      ],
+      "style": "steam",
+      "amount": 1,
+      "lean": -0.2
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        742,
+        390,
+        36,
+        80
+      ],
+      "style": "steam",
+      "amount": 0.6,
+      "lean": 0.1
+    }
+  ],
+  "exits": [
+    {
+      "to": "karasu/lowlight-intake",
+      "way": "up the back stairs to the Intake"
+    },
+    {
+      "to": "karasu/noodle-stall",
+      "way": "round the corner to Hae's counter"
+    }
+  ]
+}

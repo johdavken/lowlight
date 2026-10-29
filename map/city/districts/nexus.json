@@ -1,0 +1,152 @@
+{
+  "height": [
+    14,
+    40
+  ],
+  "lot": [
+    30,
+    26
+  ],
+  "streetEvery": [
+    4,
+    4
+  ],
+  "tallGain": 0,
+  "brick": 0,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.25,
+    "roofLights": 6,
+    "fires": 0,
+    "outage": 0.02
+  },
+  "windowLit": 0.55,
+  "windowColors": [
+    "#ffb347",
+    "#ffcf7a",
+    "#fff3d6"
+  ],
+  "pools": {
+    "colors": [
+      "#c06bff",
+      "#6bb8ff"
+    ],
+    "count": 4,
+    "power": 260000,
+    "reach": 150,
+    "radius": 4
+  },
+  "signColors": [
+    "#ff4fd8",
+    "#7fe9ff",
+    "#b07bff"
+  ],
+  "signShare": 0.04,
+  "deepZoom": true,
+  "angleDeg": -8,
+  "core": {
+    "tower": {
+      "near": "sdg-floor",
+      "w": 58,
+      "d": 46,
+      "h": 380,
+      "emblem": "#ff4fd8"
+    },
+    "second": {
+      "offset": [
+        86,
+        62
+      ],
+      "w": 34,
+      "d": 30,
+      "h": 250,
+      "emblem": "#e04fff"
+    },
+    "plaza": {
+      "radius": 38,
+      "gap": 70,
+      "ring": "#ff4fd8",
+      "spire": "#5fd0ff",
+      "squash": 0.6
+    },
+    "peak": 210,
+    "falloff": 240,
+    "fill": 0.95,
+    "crowns": 0.1,
+    "spires": 0.3,
+    "strips": 0.6,
+    "neon": [
+      "#ff4fd8",
+      "#b04fff",
+      "#4fc3ff",
+      "#7f8bff"
+    ],
+    "avenue": {
+      "width": 9,
+      "lampEvery": 14
+    },
+    "quarters": [
+      {
+        "name": "blue",
+        "colors": [
+          "#7fb2ff",
+          "#6fd0ff",
+          "#d8ecff"
+        ],
+        "weight": 1.2
+      },
+      {
+        "name": "violet",
+        "colors": [
+          "#9a8cff",
+          "#c39bff",
+          "#e08cff"
+        ],
+        "weight": 1
+      },
+      {
+        "name": "warm",
+        "colors": [
+          "#ffcf7a",
+          "#ffb347",
+          "#fff3d6"
+        ],
+        "warm": true,
+        "weight": 0.9
+      },
+      {
+        "name": "teal",
+        "colors": [
+          "#5fe0d0",
+          "#9fe8ff",
+          "#d8ecff"
+        ],
+        "weight": 0.7
+      }
+    ],
+    "quarterCount": 9,
+    "lean": "violet",
+    "boulevard": {
+      "angleDeg": -28,
+      "width": 12
+    },
+    "broad": 0.12,
+    "blend": [
+      {
+        "with": "helios",
+        "reach": 260,
+        "step": "warm"
+      },
+      {
+        "with": "velvet",
+        "reach": 150,
+        "step": "violet",
+        "lanterns": true
+      }
+    ]
+  }
+}

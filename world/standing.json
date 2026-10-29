@@ -1,0 +1,23 @@
+{
+  "words": {
+    "low-low": "Hostile",
+    "low-mid": "Wary",
+    "low-high": "Fond of you, doesn't trust you",
+    "mid-low": "Cold",
+    "mid-mid": "Sizing you up",
+    "mid-high": "Warming to you",
+    "high-low": "Respects you, keeps distance",
+    "high-mid": "Trusts you",
+    "high-high": "Close"
+  },
+  "trust": {
+    "low": "you don't believe much of what they say, and you check it.",
+    "mid": "you take what they say with a pinch of salt until it's proven.",
+    "high": "you believe them, and you'd tell them things you keep from others."
+  },
+  "warmth": {
+    "low": "you don't like them, and it shows.",
+    "mid": "they're neither a friend nor a problem yet.",
+    "high": "you like having them around and it shows."
+  }
+}

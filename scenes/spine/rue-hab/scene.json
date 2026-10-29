@@ -1,0 +1,535 @@
+{
+  "id": "rue-hab",
+  "name": "Rue's hab",
+  "description": "Rue's hanger: a shipping container converted into a one-room hab, open along its front and slung from the Spine's deck girders on heavy chains between Pylon Forty and Forty-One, a long way above the street. Chipped dark-green corrugated steel walls, an open grating floor. A narrow steel bunk with a tangle of blankets and a sleeping bag, and on a hook above it her dead father's olive hauler's jacket with its reflective stripe. A space heater glowing orange by the bunk. A desk of plastic crates and a plank: her deck, two cheap monitors of green code, a clamp lamp, a kettle, cups of instant noodles. A round porthole looks out at the next concrete pylon and its lit windows. Her boots, a coil of cable and a toolbox by the steel door, and outside the door the cable stair zigzags down toward Oksana's. Above and around, the underside of the highway and the lit windows of other hung habs.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "monitors": "room_e_monitors.png",
+        "clamp_lamp": "room_e_clamp_lamp.png",
+        "heater": "room_e_heater.png",
+        "porthole": "room_e_porthole.png",
+        "city_above": "room_e_city_above.png",
+        "city_right": "room_e_city_right.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "monitors",
+      "label": "her two monitors of green code",
+      "pos": [
+        715,
+        355
+      ],
+      "color": "#5cff8a",
+      "intensity": 0.45,
+      "radius": 420,
+      "flicker": 0.04
+    },
+    {
+      "id": "clamp_lamp",
+      "label": "the clamp lamp over the desk",
+      "pos": [
+        790,
+        262
+      ],
+      "color": "#ffd27a",
+      "intensity": 0.4,
+      "radius": 260,
+      "flicker": 0
+    },
+    {
+      "id": "heater",
+      "label": "the space heater by the bunk",
+      "pos": [
+        140,
+        528
+      ],
+      "color": "#ff5a20",
+      "intensity": 0.45,
+      "radius": 320,
+      "flicker": 0.03
+    },
+    {
+      "id": "porthole",
+      "label": "the next pylon's windows through the porthole",
+      "pos": [
+        1055,
+        320
+      ],
+      "color": "#ffb050",
+      "intensity": 0.25,
+      "radius": 300,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "city_above",
+      "label": "the lit windows of the habs and the deck above",
+      "pos": [
+        760,
+        40
+      ],
+      "color": "#ffb050",
+      "intensity": 0.22,
+      "radius": 500,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "city_right",
+      "label": "the hung habs' windows past the stair",
+      "pos": [
+        1450,
+        350
+      ],
+      "color": "#ffb050",
+      "intensity": 0.25,
+      "radius": 360,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#221e36",
+    "ambientLevel": 0.34,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.12,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1c1830",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.12,
+      "timeOfDay": "late-night",
+      "lights": {
+        "monitors": {
+          "color": "#5cff8a",
+          "intensity": 0.38,
+          "flicker": 0.04
+        },
+        "clamp_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "heater": {
+          "color": "#ff5a20",
+          "intensity": 0.4,
+          "flicker": 0.03
+        },
+        "porthole": {
+          "color": "#ffb050",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "city_above": {
+          "color": "#ffb050",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "city_right": {
+          "color": "#ffb050",
+          "intensity": 0.18,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#221e36",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "monitors": {
+          "color": "#5cff8a",
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "heater": {
+          "color": "#ff5a20",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "porthole": {
+          "color": "#ffb050",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "city_above": {
+          "color": "#ffb050",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "city_right": {
+          "color": "#ffb050",
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1020",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.2,
+      "timeOfDay": "night",
+      "lights": {
+        "monitors": {
+          "color": "#5cff8a",
+          "intensity": 0.4,
+          "flicker": 0.2
+        },
+        "clamp_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0.25,
+          "flicker": 0.1
+        },
+        "heater": {
+          "color": "#ff5a20",
+          "intensity": 0.35,
+          "flicker": 0.08
+        },
+        "porthole": {
+          "color": "#ffb050",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "city_above": {
+          "color": "#ffb050",
+          "intensity": 0.14,
+          "flicker": 0
+        },
+        "city_right": {
+          "color": "#ffb050",
+          "intensity": 0.16,
+          "flicker": 0
+        }
+      }
+    },
+    "running": {
+      "ambient": "#141a24",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.12,
+      "timeOfDay": "late-night",
+      "lights": {
+        "monitors": {
+          "color": "#5cff8a",
+          "intensity": 0.65,
+          "flicker": 0.12
+        },
+        "clamp_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "heater": {
+          "color": "#ff5a20",
+          "intensity": 0.35,
+          "flicker": 0.03
+        },
+        "porthole": {
+          "color": "#ffb050",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "city_above": {
+          "color": "#ffb050",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "city_right": {
+          "color": "#ffb050",
+          "intensity": 0.18,
+          "flicker": 0
+        }
+      }
+    },
+    "asleep": {
+      "ambient": "#18162a",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "monitors": {
+          "color": "#5cff8a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "heater": {
+          "color": "#ff5a20",
+          "intensity": 0.45,
+          "flicker": 0.04
+        },
+        "porthole": {
+          "color": "#ffb050",
+          "intensity": 0.16,
+          "flicker": 0
+        },
+        "city_above": {
+          "color": "#ffb050",
+          "intensity": 0.14,
+          "flicker": 0
+        },
+        "city_right": {
+          "color": "#ffb050",
+          "intensity": 0.16,
+          "flicker": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a4a66",
+      "ambientLevel": 0.48,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "timeOfDay": "dawn",
+      "lights": {
+        "monitors": {
+          "color": "#5cff8a",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "heater": {
+          "color": "#ff5a20",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "porthole": {
+          "color": "#ffb050",
+          "intensity": 0.08,
+          "flicker": 0
+        },
+        "city_above": {
+          "color": "#ffb050",
+          "intensity": 0.06,
+          "flicker": 0
+        },
+        "city_right": {
+          "color": "#ffb050",
+          "intensity": 0.08,
+          "flicker": 0
+        }
+      }
+    },
+    "power-cut": {
+      "ambient": "#141222",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.12,
+      "timeOfDay": "late-night",
+      "lights": {
+        "monitors": {
+          "color": "#5cff8a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "clamp_lamp": {
+          "color": "#ffd27a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "heater": {
+          "color": "#ff5a20",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "porthole": {
+          "color": "#ffb050",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "city_above": {
+          "color": "#ffb050",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "city_right": {
+          "color": "#ffb050",
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        0,
+        0
+      ],
+      [
+        1536,
+        0
+      ],
+      [
+        1536,
+        108
+      ],
+      [
+        0,
+        108
+      ]
+    ],
+    [
+      [
+        1362,
+        108
+      ],
+      [
+        1536,
+        108
+      ],
+      [
+        1536,
+        660
+      ],
+      [
+        1362,
+        660
+      ]
+    ],
+    [
+      [
+        982,
+        205
+      ],
+      [
+        1055,
+        190
+      ],
+      [
+        1122,
+        206
+      ],
+      [
+        1150,
+        239
+      ],
+      [
+        1177,
+        276
+      ],
+      [
+        1184,
+        326
+      ],
+      [
+        1154,
+        408
+      ],
+      [
+        1106,
+        438
+      ],
+      [
+        1054,
+        452
+      ],
+      [
+        992,
+        443
+      ],
+      [
+        951,
+        399
+      ],
+      [
+        926,
+        361
+      ],
+      [
+        917,
+        312
+      ],
+      [
+        932,
+        256
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": false
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        601,
+        314,
+        112,
+        69
+      ],
+      "light": "monitors",
+      "scroll": 8
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        751,
+        344,
+        82,
+        53
+      ],
+      "light": "monitors",
+      "scroll": 5
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.6
+    }
+  ],
+  "exits": [
+    {
+      "to": "spine/oksanas-counter",
+      "way": "down the cable stair to Oksana's",
+      "door": [
+        1232,
+        185,
+        125,
+        415
+      ]
+    },
+    {
+      "to": "spine/catwalk",
+      "way": "up past the hangers to the catwalk"
+    }
+  ]
+}

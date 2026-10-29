@@ -1,0 +1,92 @@
+/*
+ * The model step's panels (mockup: docs/superpowers/specs/2026-10-08-in-game-link-mockup/): LINK A MIND
+ * (key entry) and the model list. They sit in her widened file strip, on the select stage's 1600×900.
+ */
+.link-panel,
+.model-panel {
+  --warn: #ffb347;
+  --bad: #ff6b8a;
+  font: 14px/1.55 var(--mono);
+  color: var(--ink);
+  pointer-events: auto;
+}
+
+/* ---------- LINK A MIND ---------- */
+.lp-h { margin-bottom: 6px; font: 30px var(--pixel); letter-spacing: 0.3em; color: var(--cyan); text-shadow: 0 0 10px rgba(127, 233, 255, 0.5); }
+.lp-why { margin-bottom: 22px; color: #cfc4e6; }
+.lp-lbl { margin-bottom: 6px; font: 16px var(--pixel); letter-spacing: 0.25em; opacity: 0.6; }
+.lp-key {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  font: 16px var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid #6b5f85;
+  outline: none;
+}
+.lp-key:focus { border-color: var(--p2); }
+.lp-key:disabled { opacity: 0.6; }
+.lp-get { margin-top: 8px; font-size: 13px; color: var(--cyan); }
+.lp-get a { color: var(--cyan); text-decoration: none; border-bottom: 1px dotted var(--cyan); }
+.lp-msg { min-height: 1.5em; margin-top: 14px; font-size: 14px; }
+.lp-msg:empty { visibility: hidden; }
+.lp-msg[data-kind='error'] { padding: 6px 12px; color: var(--bad); background: rgba(255, 107, 138, 0.07); border-left: 3px solid var(--bad); }
+.lp-msg[data-kind='warn'] { padding: 6px 12px; color: var(--warn); border-left: 3px solid var(--warn); }
+.lp-msg[data-kind='ok'] { color: var(--p1); }
+.lp-row { display: flex; gap: 12px; align-items: center; margin-top: 22px; }
+.lp-link,
+.lp-back,
+.mp-change,
+.mp-unlink { cursor: pointer; font-family: var(--pixel); letter-spacing: 0.3em; background: none; }
+.lp-link { padding: 4px 18px; font-size: 22px; color: #000; background: var(--p2); border: 1px solid var(--p2); }
+.lp-back { padding: 2px 12px; font-size: 18px; color: #b8acd0; border: 1px solid #6b5f85; }
+
+/* ---------- the model list ---------- */
+.model-panel { display: flex; flex-direction: column; max-height: 100%; min-height: 0; }
+.mp-link {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 4px;
+  font: 18px var(--pixel);
+  letter-spacing: 0.2em;
+  border-bottom: 1px solid #3a2f50;
+}
+.mp-dot { color: var(--p1); }
+.mp-dot[data-state] { color: var(--warn); }
+.mp-sp { flex: 1; }
+.mp-change,
+.mp-unlink { padding: 0 8px; font-size: 15px; letter-spacing: 0.2em; color: #b8acd0; border: 1px solid #6b5f85; }
+.mp-warn { margin: 6px 0; font: 15px var(--pixel); letter-spacing: 0.2em; color: var(--warn); }
+.mp-list { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.mp-grp { margin: 12px 0 4px; font: 16px var(--pixel); letter-spacing: 0.3em; color: var(--p2); opacity: 0.8; }
+.mp-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+}
+.mp-row:hover { background: rgba(255, 255, 255, 0.04); }
+.mp-row.on { background: rgba(255, 43, 214, 0.13); border-left-color: var(--p2); }
+.mp-price { font-size: 12.5px; color: #a99cc4; white-space: nowrap; }
+.mp-why { grid-column: 1 / -1; font-size: 12px; color: #a99cc4; }
+.mp-current .mp-label { color: var(--p1); }
+.mp-current .mp-label::before { content: '● '; }
+.mp-reset { font-size: 13px; color: #a99cc4; }
+.mp-empty { padding: 4px 10px; font-size: 12px; color: #8a7fa0; }
+.mp-search {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 7px 10px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--cyan);
+}
+.mp-ic { font: 18px var(--pixel); letter-spacing: 0.2em; color: var(--cyan); }
+.mp-search input { flex: 1; min-width: 0; font: 15px var(--mono); color: var(--ink); background: none; border: 0; outline: none; caret-color: transparent; }

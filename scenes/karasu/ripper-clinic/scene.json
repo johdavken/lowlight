@@ -1,0 +1,261 @@
+{
+  "id": "ripper-clinic",
+  "name": "The Open Hand",
+  "description": "A back-room ripperdoc low on the Ribbon, down where the levels barely see daylight: a converted repair shop behind a half-down steel shutter, a red neon open hand in the door's window. In the middle, a salvaged surgical chair in cracked black vinyl with leather straps hanging loose, a ring lamp on a jointed arm over it, a steel instrument trolley half under a green cloth, an IV stand, a plastic curtain on a ceiling rail. Along the back wall, a lit glass cabinet of second-hand chrome (mechanical hands, an eye in a jar, a chrome skull, spinal plates, coiled neural cable), a pale-blue fridge racked with vials of MiraGen script, a violet UV steriliser. On the left, three old monitors with heartbeat traces and a skull scan, a cluttered desk under a warm lamp (a mug, a soldering iron, an ashtray), a steel sink. Hospital-green walls gone stained, pipes and cable overhead, a drain in the floor. A waiting bench by the door with someone's jacket left on it. Clean around the chair, cluttered everywhere else. It's what people get instead of Chiron.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "surgical_lamp": "room_e_surgical_lamp.png",
+        "chrome_cabinet": "room_e_chrome_cabinet.png",
+        "script_fridge": "room_e_script_fridge.png",
+        "steriliser": "room_e_steriliser.png",
+        "monitors": "room_e_monitors.png",
+        "desk_lamp": "room_e_desk_lamp.png",
+        "hand_sign": "room_e_hand_sign.png",
+        "street": "room_e_street.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "surgical_lamp",
+      "label": "the ring lamp over the chair",
+      "pos": [
+        669,
+        190
+      ],
+      "color": "#e6f0ff",
+      "intensity": 0.2,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "chrome_cabinet",
+      "label": "the lit cabinet of second-hand chrome",
+      "pos": [
+        952,
+        300
+      ],
+      "color": "#9fd0ff",
+      "intensity": 0.4,
+      "radius": 380,
+      "flicker": 0
+    },
+    {
+      "id": "script_fridge",
+      "label": "the fridge of MiraGen script vials",
+      "pos": [
+        1126,
+        368
+      ],
+      "color": "#80b8ff",
+      "intensity": 0.45,
+      "radius": 340,
+      "flicker": 0
+    },
+    {
+      "id": "steriliser",
+      "label": "the UV steriliser on the wall",
+      "pos": [
+        1214,
+        325
+      ],
+      "color": "#a35cff",
+      "intensity": 0.35,
+      "radius": 240,
+      "flicker": 0
+    },
+    {
+      "id": "monitors",
+      "label": "the three monitors over the desk",
+      "pos": [
+        226,
+        180
+      ],
+      "color": "#4dff9a",
+      "intensity": 0.35,
+      "radius": 340,
+      "flicker": 0.03
+    },
+    {
+      "id": "desk_lamp",
+      "label": "the warm lamp on the doc's desk",
+      "pos": [
+        112,
+        356
+      ],
+      "color": "#ffb060",
+      "intensity": 0.45,
+      "radius": 280,
+      "flicker": 0
+    },
+    {
+      "id": "hand_sign",
+      "label": "the red open-hand neon in the door's window",
+      "pos": [
+        1344,
+        262
+      ],
+      "color": "#ff3c3c",
+      "intensity": 0.5,
+      "radius": 360,
+      "flicker": 0.02
+    },
+    {
+      "id": "street",
+      "label": "the street outside, through the transom and under the shutter",
+      "pos": [
+        1400,
+        420
+      ],
+      "color": "#ffb070",
+      "intensity": 0.3,
+      "radius": 420,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2e2a4a",
+    "ambientLevel": 0.4,
+    "weather": "rain",
+    "weatherLevel": 0.35,
+    "fog": 0.1,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {}
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "lights": {}
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.35,
+      "lights": {}
+    },
+    "in-surgery": {
+      "lights": {
+        "surgical_lamp": {
+          "intensity": 0.85
+        },
+        "monitors": {
+          "intensity": 0.6,
+          "flicker": 0.08
+        },
+        "desk_lamp": {
+          "intensity": 0
+        }
+      }
+    },
+    "closed": {
+      "ambientLevel": 0.3,
+      "lights": {
+        "surgical_lamp": {
+          "intensity": 0
+        },
+        "monitors": {
+          "intensity": 0
+        },
+        "desk_lamp": {
+          "intensity": 0
+        },
+        "hand_sign": {
+          "intensity": 0
+        }
+      }
+    },
+    "blackout": {
+      "ambientLevel": 0.22,
+      "lights": {
+        "surgical_lamp": {
+          "intensity": 0
+        },
+        "chrome_cabinet": {
+          "intensity": 0
+        },
+        "steriliser": {
+          "intensity": 0
+        },
+        "monitors": {
+          "intensity": 0
+        },
+        "desk_lamp": {
+          "intensity": 0
+        },
+        "hand_sign": {
+          "intensity": 0
+        },
+        "street": {
+          "intensity": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        1283,
+        55
+      ],
+      [
+        1378,
+        55
+      ],
+      [
+        1378,
+        205
+      ],
+      [
+        1283,
+        205
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "hum": 0.4,
+    "music": {
+      "songs": [
+        "No Light in Lowlight.ogg"
+      ]
+    },
+    "sounds": [
+      {
+        "name": "door",
+        "src": "sound/keep/door.ogg",
+        "level": 0.6,
+        "onEntry": true
+      }
+    ]
+  },
+  "effects": [
+    {
+      "kind": "passing",
+      "rect": [
+        1405,
+        585,
+        131,
+        60
+      ],
+      "source": "car",
+      "every": 70,
+      "strength": 0.7
+    }
+  ]
+}

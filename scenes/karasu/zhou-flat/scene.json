@@ -1,0 +1,519 @@
+{
+  "id": "zhou-flat",
+  "name": "The twins' place",
+  "description": "Silas and Ember Zhou's place on Level 2 of the Ribbon, behind the stickered door down Hicks's walkway: one main room split down the middle. Her half: a heaped bed under a wall of band posters and fairy lights, a winged star among them, and her rig of mismatched old screens on milk crates around a stickered deck. Between them, a patched couch Hicks has slept on, under a barred window onto the girders and somebody else's neon, and a table buried in takeout, cans and cable. His half: a workbench under a magnifier lamp, parts drawers, a shelf with a boxy CRT playing an old detective show, Halloran-style holovid posters and a photo of their mother's repair stall. Through a doorway, a cramped kitchen with a kettle, an open fridge and a lantern. The front door is stickered and tagged on the inside too.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "ember_rig": "room_e_ember_rig.png",
+        "fairy_lights": "room_e_fairy_lights.png",
+        "silas_lamp": "room_e_silas_lamp.png",
+        "tv": "room_e_tv.png",
+        "window": "room_e_window.png",
+        "lantern": "room_e_lantern.png",
+        "fridge": "room_e_fridge.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "ember_rig",
+      "label": "Ember's rig: four old screens",
+      "pos": [
+        320,
+        400
+      ],
+      "color": "#60d8ff",
+      "intensity": 0.5,
+      "radius": 380,
+      "flicker": 0.03
+    },
+    {
+      "id": "fairy_lights",
+      "label": "fairy lights over her bed and posters",
+      "pos": [
+        150,
+        200
+      ],
+      "color": "#ff8a6a",
+      "intensity": 0.45,
+      "radius": 420,
+      "flicker": 0.06
+    },
+    {
+      "id": "silas_lamp",
+      "label": "Silas's magnifier lamp over the workbench",
+      "pos": [
+        930,
+        420
+      ],
+      "color": "#f0f4ff",
+      "intensity": 0.6,
+      "radius": 400,
+      "flicker": 0
+    },
+    {
+      "id": "tv",
+      "label": "the old CRT on his shelf",
+      "pos": [
+        1010,
+        290
+      ],
+      "color": "#c8d4ff",
+      "intensity": 0.4,
+      "radius": 300,
+      "flicker": 0.05
+    },
+    {
+      "id": "window",
+      "label": "stack glow through the barred window",
+      "pos": [
+        640,
+        280
+      ],
+      "color": "#5a3aa8",
+      "intensity": 0.32,
+      "radius": 460,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "lantern",
+      "label": "lantern on the kitchen wall",
+      "pos": [
+        1323,
+        205
+      ],
+      "color": "#ffc070",
+      "intensity": 0.5,
+      "radius": 340,
+      "flicker": 0
+    },
+    {
+      "id": "fridge",
+      "label": "the little fridge's light",
+      "pos": [
+        1310,
+        520
+      ],
+      "color": "#fff2d0",
+      "intensity": 0.22,
+      "radius": 130,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#3e3168",
+    "ambientLevel": 0.42,
+    "weather": "rain",
+    "weatherLevel": 0.35,
+    "fog": 0.15,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#33295a",
+      "ambientLevel": 0.32,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "ember_rig": {
+          "color": "#60d8ff",
+          "intensity": 0.42,
+          "flicker": 0.03
+        },
+        "fairy_lights": {
+          "color": "#ff8a6a",
+          "intensity": 0.38,
+          "flicker": 0.06
+        },
+        "silas_lamp": {
+          "color": "#f0f4ff",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#c8d4ff",
+          "intensity": 0.32,
+          "flicker": 0.05
+        },
+        "window": {
+          "color": "#5a3aa8",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffc070",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "fridge": {
+          "color": "#fff2d0",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#2e2650",
+      "ambientLevel": 0.28,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "ember_rig": {
+          "color": "#60d8ff",
+          "intensity": 0.25,
+          "flicker": 0.03
+        },
+        "fairy_lights": {
+          "color": "#ff8a6a",
+          "intensity": 0.4,
+          "flicker": 0.02
+        },
+        "silas_lamp": {
+          "color": "#f0f4ff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#c8d4ff",
+          "intensity": 0,
+          "flicker": 0.05
+        },
+        "window": {
+          "color": "#5a3aa8",
+          "intensity": 0.28,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffc070",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "fridge": {
+          "color": "#fff2d0",
+          "intensity": 0.18,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1f45",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "ember_rig": {
+          "color": "#60d8ff",
+          "intensity": 0.6,
+          "flicker": 0.08
+        },
+        "fairy_lights": {
+          "color": "#ff8a6a",
+          "intensity": 0,
+          "flicker": 0.06
+        },
+        "silas_lamp": {
+          "color": "#f0f4ff",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#c8d4ff",
+          "intensity": 0.2,
+          "flicker": 0.15
+        },
+        "window": {
+          "color": "#5a3aa8",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffc070",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "fridge": {
+          "color": "#fff2d0",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "run-night": {
+      "ambient": "#1f2a3a",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "ember_rig": {
+          "color": "#60d8ff",
+          "intensity": 0.85,
+          "flicker": 0.05
+        },
+        "fairy_lights": {
+          "color": "#ff8a6a",
+          "intensity": 0.15,
+          "flicker": 0.06
+        },
+        "silas_lamp": {
+          "color": "#f0f4ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#c8d4ff",
+          "intensity": 0,
+          "flicker": 0.05
+        },
+        "window": {
+          "color": "#5a3aa8",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffc070",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "fridge": {
+          "color": "#fff2d0",
+          "intensity": 0.15,
+          "flicker": 0
+        }
+      }
+    },
+    "movie-night": {
+      "ambient": "#2b2350",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "ember_rig": {
+          "color": "#60d8ff",
+          "intensity": 0,
+          "flicker": 0.03
+        },
+        "fairy_lights": {
+          "color": "#ff8a6a",
+          "intensity": 0.4,
+          "flicker": 0.03
+        },
+        "silas_lamp": {
+          "color": "#f0f4ff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#c8d4ff",
+          "intensity": 0.75,
+          "flicker": 0.08
+        },
+        "window": {
+          "color": "#5a3aa8",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffc070",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "fridge": {
+          "color": "#fff2d0",
+          "intensity": 0.18,
+          "flicker": 0
+        }
+      }
+    },
+    "lights-out": {
+      "ambient": "#1d1a33",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "ember_rig": {
+          "color": "#60d8ff",
+          "intensity": 0,
+          "flicker": 0.03
+        },
+        "fairy_lights": {
+          "color": "#ff8a6a",
+          "intensity": 0,
+          "flicker": 0.06
+        },
+        "silas_lamp": {
+          "color": "#f0f4ff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "tv": {
+          "color": "#c8d4ff",
+          "intensity": 0,
+          "flicker": 0.05
+        },
+        "window": {
+          "color": "#5a3aa8",
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffc070",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "fridge": {
+          "color": "#fff2d0",
+          "intensity": 0.25,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        430,
+        130
+      ],
+      [
+        850,
+        130
+      ],
+      [
+        850,
+        420
+      ],
+      [
+        430,
+        420
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "hum": 0.3,
+    "music": {
+      "songs": [
+        "No Light in Lowlight.ogg"
+      ]
+    },
+    "sounds": [
+      {
+        "name": "door",
+        "src": "sound/keep/door.ogg",
+        "level": 0.6,
+        "onEntry": true
+      }
+    ]
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        245,
+        322,
+        82,
+        72
+      ],
+      "light": "ember_rig",
+      "scroll": 6
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        336,
+        346,
+        60,
+        48
+      ],
+      "light": "ember_rig",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        292,
+        407,
+        58,
+        66
+      ],
+      "light": "ember_rig",
+      "scroll": 9
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        360,
+        414,
+        64,
+        58
+      ],
+      "light": "ember_rig",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        230,
+        440,
+        52,
+        36
+      ],
+      "light": "ember_rig",
+      "scroll": 4
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        968,
+        255,
+        72,
+        62
+      ],
+      "light": "tv",
+      "scroll": 0,
+      "grain": 0.4
+    },
+    {
+      "kind": "glass",
+      "amount": 3
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.6
+    }
+  ],
+  "exits": [
+    {
+      "to": "karasu/hicks-gallery",
+      "way": "out to the walkway",
+      "door": [
+        1430,
+        170,
+        106,
+        570
+      ]
+    }
+  ]
+}

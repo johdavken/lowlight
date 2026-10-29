@@ -1,0 +1,8 @@
+{
+  "name": "lowlight-bug-relay",
+  "private": true,
+  "type": "module",
+  "scripts": { "deploy": "wrangler deploy" },
+  "dependencies": { "zod": "^4.6.5" },
+  "devDependencies": { "wrangler": "^4.0.0" }
+}

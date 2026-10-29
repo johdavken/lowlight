@@ -1,0 +1,30 @@
+{
+  "name": "Oksana",
+  "pronoun": "she",
+  "accent": "#b5533c",
+  "kind": "fixed",
+  "voice": "voice.md",
+  "sprite": {
+    "src": "oksana-outfit-work.png",
+    "pixel": true
+  },
+  "expressions": {
+    "smile": "oksana-smile.png",
+    "amused": "oksana-amused.png",
+    "annoyed": "oksana-annoyed.png",
+    "concerned": "oksana-concerned.png"
+  },
+  "outfits": {
+    "work": "oksana-outfit-work.png"
+  },
+  "outfitByScene": {
+    "spine/oksanas-counter": "work"
+  },
+  "outfitWears": {
+    "work": "dark headscarf, grey cardigan with the sleeves pushed up over a faded flowered blouse, long white apron dusted with flour, reading glasses on a cord, black rubber clogs"
+  },
+  "face": {
+    "x": 0.52,
+    "y": 0.08
+  }
+}

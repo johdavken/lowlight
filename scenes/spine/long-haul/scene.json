@@ -1,0 +1,508 @@
+{
+  "id": "long-haul",
+  "name": "The Long Haul",
+  "description": "The Long Haul, a 24-hour hauler stop built into a Spine pylon at deck level, up a service ramp drivers use and nobody else is supposed to. A long cream counter with chrome-edged stools, a flat-top griddle, two steel coffee urns, a pie case with a few sad slices, a kitchen pass with a warm light, three green-shaded pendant lamps. An old jukebox glowing amber by the door, a coat rack with a trucker's cap and a hi-vis vest, a mop bucket at the end of the counter. A long run of windows onto the deck: parked heavy haulers with their marker lights on, sodium lamps, the highway curving off on its legs and the core's towers beyond. A pink neon cup glows in the window. Oxblood booths along the glass, each with a little lamp; the corner booth on the right is the private one. A checkered floor, bad coffee, real eggs, and drivers who never look up.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "pendants": "room_e_pendants.png",
+        "kitchen": "room_e_kitchen.png",
+        "pie_case": "room_e_pie_case.png",
+        "booth_lamps": "room_e_booth_lamps.png",
+        "jukebox": "room_e_jukebox.png",
+        "neon_cup": "room_e_neon_cup.png",
+        "deck_lamps": "room_e_deck_lamps.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "pendants",
+      "label": "the three green-shaded pendant lamps over the counter",
+      "pos": [
+        470,
+        215
+      ],
+      "color": "#ffc870",
+      "intensity": 0.55,
+      "radius": 460,
+      "flicker": 0
+    },
+    {
+      "id": "kitchen",
+      "label": "the kitchen pass-through window",
+      "pos": [
+        300,
+        280
+      ],
+      "color": "#ffc060",
+      "intensity": 0.35,
+      "radius": 280,
+      "flicker": 0
+    },
+    {
+      "id": "pie_case",
+      "label": "the light in the pie case",
+      "pos": [
+        595,
+        385
+      ],
+      "color": "#ffe8c0",
+      "intensity": 0.25,
+      "radius": 180,
+      "flicker": 0
+    },
+    {
+      "id": "booth_lamps",
+      "label": "the little lamps on the booth tables",
+      "pos": [
+        1100,
+        460
+      ],
+      "color": "#ffc070",
+      "intensity": 0.4,
+      "radius": 320,
+      "flicker": 0
+    },
+    {
+      "id": "jukebox",
+      "label": "the jukebox's glowing front",
+      "pos": [
+        90,
+        450
+      ],
+      "color": "#ff9a40",
+      "intensity": 0.4,
+      "radius": 280,
+      "flicker": 0.05
+    },
+    {
+      "id": "neon_cup",
+      "label": "the pink neon cup in the window",
+      "pos": [
+        1450,
+        320
+      ],
+      "color": "#ff4fd0",
+      "intensity": 0.35,
+      "radius": 300,
+      "flicker": 0.03
+    },
+    {
+      "id": "deck_lamps",
+      "label": "the sodium lamps and haulers' marker lights on the deck outside",
+      "pos": [
+        900,
+        300
+      ],
+      "color": "#ffa040",
+      "intensity": 0.3,
+      "radius": 600,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a2234",
+    "ambientLevel": 0.38,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.04,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1e1a2a",
+      "ambientLevel": 0.26,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.04,
+      "timeOfDay": "late-night",
+      "lights": {
+        "pendants": {
+          "color": "#ffc870",
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffc060",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "pie_case": {
+          "color": "#ffe8c0",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "booth_lamps": {
+          "color": "#ffc070",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "jukebox": {
+          "color": "#ff9a40",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "neon_cup": {
+          "color": "#ff4fd0",
+          "intensity": 0.3,
+          "flicker": 0.03
+        },
+        "deck_lamps": {
+          "color": "#ffa040",
+          "intensity": 0.25,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#241e30",
+      "ambientLevel": 0.32,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.03,
+      "timeOfDay": "night",
+      "lights": {
+        "pendants": {
+          "color": "#ffc870",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffc060",
+          "intensity": 0.28,
+          "flicker": 0
+        },
+        "pie_case": {
+          "color": "#ffe8c0",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "booth_lamps": {
+          "color": "#ffc070",
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "jukebox": {
+          "color": "#ff9a40",
+          "intensity": 0.32,
+          "flicker": 0
+        },
+        "neon_cup": {
+          "color": "#ff4fd0",
+          "intensity": 0.32,
+          "flicker": 0
+        },
+        "deck_lamps": {
+          "color": "#ffa040",
+          "intensity": 0.28,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1020",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.06,
+      "timeOfDay": "night",
+      "lights": {
+        "pendants": {
+          "color": "#ffc870",
+          "intensity": 0.4,
+          "flicker": 0.12
+        },
+        "kitchen": {
+          "color": "#ffc060",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "pie_case": {
+          "color": "#ffe8c0",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "booth_lamps": {
+          "color": "#ffc070",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "jukebox": {
+          "color": "#ff9a40",
+          "intensity": 0.25,
+          "flicker": 0.1
+        },
+        "neon_cup": {
+          "color": "#ff4fd0",
+          "intensity": 0.3,
+          "flicker": 0.2
+        },
+        "deck_lamps": {
+          "color": "#ffa040",
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    },
+    "rush": {
+      "ambient": "#2e2638",
+      "ambientLevel": 0.44,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.04,
+      "timeOfDay": "night",
+      "lights": {
+        "pendants": {
+          "color": "#ffc870",
+          "intensity": 0.6,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffc060",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "pie_case": {
+          "color": "#ffe8c0",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "booth_lamps": {
+          "color": "#ffc070",
+          "intensity": 0.42,
+          "flicker": 0
+        },
+        "jukebox": {
+          "color": "#ff9a40",
+          "intensity": 0.42,
+          "flicker": 0.06
+        },
+        "neon_cup": {
+          "color": "#ff4fd0",
+          "intensity": 0.36,
+          "flicker": 0.03
+        },
+        "deck_lamps": {
+          "color": "#ffa040",
+          "intensity": 0.32,
+          "flicker": 0
+        }
+      }
+    },
+    "corner-booth": {
+      "ambient": "#1c1828",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.03,
+      "timeOfDay": "late-night",
+      "lights": {
+        "pendants": {
+          "color": "#ffc870",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffc060",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "pie_case": {
+          "color": "#ffe8c0",
+          "intensity": 0.12,
+          "flicker": 0
+        },
+        "booth_lamps": {
+          "color": "#ffc070",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "jukebox": {
+          "color": "#ff9a40",
+          "intensity": 0.28,
+          "flicker": 0.04
+        },
+        "neon_cup": {
+          "color": "#ff4fd0",
+          "intensity": 0.38,
+          "flicker": 0.03
+        },
+        "deck_lamps": {
+          "color": "#ffa040",
+          "intensity": 0.25,
+          "flicker": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a4e6a",
+      "ambientLevel": 0.5,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.06,
+      "timeOfDay": "dawn",
+      "lights": {
+        "pendants": {
+          "color": "#ffc870",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "kitchen": {
+          "color": "#ffc060",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "pie_case": {
+          "color": "#ffe8c0",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "booth_lamps": {
+          "color": "#ffc070",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "jukebox": {
+          "color": "#ff9a40",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "neon_cup": {
+          "color": "#ff4fd0",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "deck_lamps": {
+          "color": "#ffa040",
+          "intensity": 0.1,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        447,
+        159
+      ],
+      [
+        666,
+        157
+      ],
+      [
+        668,
+        285
+      ],
+      [
+        666,
+        290
+      ],
+      [
+        666,
+        293
+      ],
+      [
+        468,
+        260
+      ]
+    ],
+    [
+      [
+        1193,
+        135
+      ],
+      [
+        1536,
+        54
+      ],
+      [
+        1536,
+        414
+      ],
+      [
+        1190,
+        414
+      ]
+    ],
+    [
+      [
+        685,
+        155
+      ],
+      [
+        842,
+        155
+      ],
+      [
+        842,
+        405
+      ],
+      [
+        685,
+        405
+      ]
+    ],
+    [
+      [
+        861,
+        154
+      ],
+      [
+        1116,
+        154
+      ],
+      [
+        1116,
+        403
+      ],
+      [
+        861,
+        403
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "hum": 0.25
+  },
+  "effects": [
+    {
+      "kind": "glass",
+      "amount": 3
+    },
+    {
+      "kind": "passing",
+      "rect": [
+        445,
+        300,
+        1091,
+        120
+      ],
+      "source": "car",
+      "every": 40,
+      "strength": 0.8
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.4
+    }
+  ],
+  "public": true,
+  "exits": [
+    {
+      "to": "spine/deck-market",
+      "way": "down the service ramp to the deck market"
+    }
+  ]
+}

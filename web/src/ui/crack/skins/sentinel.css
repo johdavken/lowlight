@@ -1,0 +1,34 @@
+/* Sentinel field deck (mockup G): olive, screwed together, stencilled; a reflective grey-green LCD. */
+.ct-window.ct-skin-sentinel {
+  inset: 5% 8.3%;
+  padding: 16px 22px;
+  border: 34px solid transparent;
+  border-top-width: 58px;
+  border-radius: 10px;
+  font: 18px/1.15 'Share Tech Mono', monospace;
+  color: #1d2014;
+  text-shadow: none;
+  background:
+    linear-gradient(#a9ad8c, #a9ad8c) padding-box,
+    radial-gradient(circle at 16px 16px, #8a8d7a 0 4px, #2b2d22 5px 7px, transparent 8px) border-box,
+    radial-gradient(circle at calc(100% - 16px) 16px, #8a8d7a 0 4px, #2b2d22 5px 7px, transparent 8px) border-box,
+    radial-gradient(circle at 16px calc(100% - 16px), #8a8d7a 0 4px, #2b2d22 5px 7px, transparent 8px) border-box,
+    radial-gradient(circle at calc(100% - 16px) calc(100% - 16px), #8a8d7a 0 4px, #2b2d22 5px 7px, transparent 8px) border-box,
+    linear-gradient(180deg, #4d5236, #3a3e28) border-box;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.8), inset 0 0 0 4px #1d1f16, inset 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+.ct-skin-sentinel::after { display: none; }
+.ct-skin-sentinel .ct-stencil { position: absolute; left: 0; top: -46px; font: 22px 'Saira Stencil One', sans-serif; letter-spacing: 0.16em; color: #d8d4b0; }
+.ct-skin-sentinel .ct-head { letter-spacing: 0.1em; }
+.ct-skin-sentinel .ct-row { color: rgba(29, 32, 20, 0.55); }
+.ct-skin-sentinel .ct-addr { opacity: 0.6; }
+.ct-skin-sentinel .ct-word { color: #1d2014; font-weight: bold; }
+.ct-skin-sentinel .ct-bracket { color: #1d2014; }
+.ct-skin-sentinel :is(.ct-word, .ct-bracket):is(:hover, :focus) { color: #a9ad8c; background: #1d2014; }
+.ct-skin-sentinel :is(.ct-word.struck, .ct-bracket.used) { opacity: 1; color: rgba(29, 32, 20, 0.45); background: none; }
+.ct-skin-sentinel .ct-tries i { border-color: #1d2014; }
+.ct-skin-sentinel .ct-tries i.on { background: #1d2014; box-shadow: none; }
+.ct-skin-sentinel .ct-side { padding-left: 16px; border-left: 2px solid rgba(29, 32, 20, 0.5); }
+.ct-skin-sentinel :is(.ct-ghost, .ct-hint) { padding: 4px 8px; border: 1px solid #1d2014; color: #1d2014; }
+.ct-skin-sentinel .ct-leave { font: 16px 'Saira Stencil One', sans-serif; letter-spacing: 0.14em; color: #d8d4b0; background: #22241a; border: 0; box-shadow: 0 3px 0 #111209; }
+.ct-window.ct-skin-sentinel.is-locked { color: #6b1d10; }

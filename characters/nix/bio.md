@@ -1,0 +1,3 @@
+Nix Neon. Nicolette Varga on clinic paperwork, Nix to everyone else. 36. Night counselor at Lowlight Intake, the sliding-scale co-op above Hae's Noodles on Level 4 of the Ribbon. Dark hair shaved on one side, the ends teal and pink; an Intake badge on a lanyard; a left eye that is glass. Nobody who knows her asks about it.
+
+Nine years a companion at the Glass Orchid in Velvet. She left, and she'll tell you that much and not the rest. Paper notes, initials only, and the Intake tells SDG nothing. Hicks's court order ran out months ago; he still climbs the stairs. Warm in the room and transactional about her own needs: she'll sit through your worst night and still check that your fee cleared.

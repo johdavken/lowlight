@@ -1,0 +1,65 @@
+{
+  "height": [
+    7,
+    32
+  ],
+  "lot": [
+    17,
+    13
+  ],
+  "streetEvery": [
+    3,
+    3
+  ],
+  "tallGain": 1.3,
+  "brick": 0.55,
+  "brokenRoof": 0.45,
+  "ruin": 0.16,
+  "emptyLot": 0.15,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.01,
+    "roofLights": 0,
+    "fires": 14,
+    "outage": 0.25
+  },
+  "windowLit": 0.45,
+  "windowColors": [
+    "#ffb347",
+    "#ff9a4a",
+    "#ffcf7a"
+  ],
+  "pools": {
+    "colors": [
+      "#ff9a4a"
+    ],
+    "count": 4,
+    "power": 120000,
+    "reach": 110,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#ffb347"
+  ],
+  "signShare": 0.01,
+  "deepZoom": true,
+  "angleDeg": -8,
+  "flooded": {
+    "waterline": 3.6,
+    "boats": 0.3,
+    "bridges": 0.25,
+    "roofFires": 0.05,
+    "choir": 7,
+    "pumps": 6,
+    "bank": {
+      "near": "counting-house",
+      "w": 30,
+      "d": 24,
+      "h": 30
+    },
+    "ridgeWith": [
+      "drownworks"
+    ]
+  }
+}

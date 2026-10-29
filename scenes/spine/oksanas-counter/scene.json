@@ -1,0 +1,582 @@
+{
+  "id": "oksanas-counter",
+  "name": "Oksana's",
+  "description": "Oksana's counter at the foot of Pylon Forty, cut into the concrete where a maintenance bay used to be, raised on a concrete step and open to the street under the Spine's deck behind a rolled-up steel shutter. Six steel stools, a zinc counter worn bright, a tall steel tea urn with a red light, a range with a big pot and a frying pan, shelves of tea glasses and jars, an old radio with an amber dial, fluorescent tubes, and a string of plain bulbs along the shutter. Beside it, a steel door under a caged lamp leads up into the pylon's hab rings. Overhead, the underside of the highway: girders, pipes and two orange sodium lamps. To the right, the street goes on under the deck past more pylons, and habs built from shipping containers hang from the girders on cables, their small windows lit, a cable stair climbing up to them. A parked three-wheeled delivery cart. Every heavy hauler overhead makes the glasses walk along the counter.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "shutter_bulbs": "room_e_shutter_bulbs.png",
+        "radio": "room_e_radio.png",
+        "door_lamp": "room_e_door_lamp.png",
+        "sodium_left": "room_e_sodium_left.png",
+        "sodium_right": "room_e_sodium_right.png",
+        "hangers": "room_e_hangers.png",
+        "counter_tube": "room_e_counter_tube.png",
+        "left_habs": "room_e_left_habs.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "shutter_bulbs",
+      "label": "the string of bulbs along the raised shutter",
+      "pos": [
+        435,
+        392
+      ],
+      "color": "#ffb347",
+      "intensity": 0.45,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "radio",
+      "label": "the old radio's amber dial",
+      "pos": [
+        650,
+        433
+      ],
+      "color": "#ffa040",
+      "intensity": 0.25,
+      "radius": 160,
+      "flicker": 0
+    },
+    {
+      "id": "door_lamp",
+      "label": "the caged lamp over the pylon door",
+      "pos": [
+        853,
+        397
+      ],
+      "color": "#ffb04a",
+      "intensity": 0.5,
+      "radius": 300,
+      "flicker": 0
+    },
+    {
+      "id": "sodium_left",
+      "label": "the left sodium lamp under the deck",
+      "pos": [
+        295,
+        42
+      ],
+      "color": "#ff9a30",
+      "intensity": 0.45,
+      "radius": 520,
+      "flicker": 0
+    },
+    {
+      "id": "sodium_right",
+      "label": "the right sodium lamp under the deck",
+      "pos": [
+        1300,
+        42
+      ],
+      "color": "#ff9a30",
+      "intensity": 0.45,
+      "radius": 520,
+      "flicker": 0
+    },
+    {
+      "id": "hangers",
+      "label": "the hung habs and the street beyond the deck",
+      "pos": [
+        1250,
+        330
+      ],
+      "color": "#ffa64a",
+      "intensity": 0.3,
+      "radius": 500,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "left_habs",
+      "label": "the hung habs' windows past the pylon on the left",
+      "pos": [
+        60,
+        420
+      ],
+      "color": "#ffa64a",
+      "intensity": 0.28,
+      "radius": 360,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "counter_tube",
+      "label": "the fluorescent tubes over Oksana's counter",
+      "pos": [
+        410,
+        300
+      ],
+      "color": "#dfeeff",
+      "intensity": 0.55,
+      "radius": 460,
+      "flicker": 0.04
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a2240",
+    "ambientLevel": 0.4,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.15,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#1e1830",
+      "ambientLevel": 0.26,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "shutter_bulbs": {
+          "color": "#ffb347",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "sodium_left": {
+          "color": "#ff9a30",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "sodium_right": {
+          "color": "#ff9a30",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "hangers": {
+          "color": "#ffa64a",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "counter_tube": {
+          "color": "#dfeeff",
+          "intensity": 0.4,
+          "flicker": 0.04
+        },
+        "left_habs": {
+          "color": "#ffa64a",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#241e38",
+      "ambientLevel": 0.32,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "shutter_bulbs": {
+          "color": "#ffb347",
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "sodium_left": {
+          "color": "#ff9a30",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "sodium_right": {
+          "color": "#ff9a30",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "hangers": {
+          "color": "#ffa64a",
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "counter_tube": {
+          "color": "#dfeeff",
+          "intensity": 0.48,
+          "flicker": 0
+        },
+        "left_habs": {
+          "color": "#ffa64a",
+          "intensity": 0.26,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a1020",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.25,
+      "timeOfDay": "night",
+      "lights": {
+        "shutter_bulbs": {
+          "color": "#ffb347",
+          "intensity": 0.3,
+          "flicker": 0.1
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.35,
+          "flicker": 0.15
+        },
+        "sodium_left": {
+          "color": "#ff9a30",
+          "intensity": 0.32,
+          "flicker": 0.12
+        },
+        "sodium_right": {
+          "color": "#ff9a30",
+          "intensity": 0.2,
+          "flicker": 0.3
+        },
+        "hangers": {
+          "color": "#ffa64a",
+          "intensity": 0.18,
+          "flicker": 0
+        },
+        "counter_tube": {
+          "color": "#dfeeff",
+          "intensity": 0.4,
+          "flicker": 0.2
+        },
+        "left_habs": {
+          "color": "#ffa64a",
+          "intensity": 0.18,
+          "flicker": 0
+        }
+      }
+    },
+    "rush": {
+      "ambient": "#2a2240",
+      "ambientLevel": 0.42,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.12,
+      "timeOfDay": "night",
+      "lights": {
+        "shutter_bulbs": {
+          "color": "#ffb347",
+          "intensity": 0.55,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "sodium_left": {
+          "color": "#ff9a30",
+          "intensity": 0.48,
+          "flicker": 0
+        },
+        "sodium_right": {
+          "color": "#ff9a30",
+          "intensity": 0.48,
+          "flicker": 0
+        },
+        "hangers": {
+          "color": "#ffa64a",
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "counter_tube": {
+          "color": "#dfeeff",
+          "intensity": 0.62,
+          "flicker": 0.03
+        },
+        "left_habs": {
+          "color": "#ffa64a",
+          "intensity": 0.34,
+          "flicker": 0
+        }
+      }
+    },
+    "closing-up": {
+      "ambient": "#1a1628",
+      "ambientLevel": 0.24,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.12,
+      "timeOfDay": "late-night",
+      "lights": {
+        "shutter_bulbs": {
+          "color": "#ffb347",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "sodium_left": {
+          "color": "#ff9a30",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "sodium_right": {
+          "color": "#ff9a30",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "hangers": {
+          "color": "#ffa64a",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "counter_tube": {
+          "color": "#dfeeff",
+          "intensity": 0.3,
+          "flicker": 0.06
+        },
+        "left_habs": {
+          "color": "#ffa64a",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4a4a66",
+      "ambientLevel": 0.5,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.2,
+      "timeOfDay": "dawn",
+      "lights": {
+        "shutter_bulbs": {
+          "color": "#ffb347",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "sodium_left": {
+          "color": "#ff9a30",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "sodium_right": {
+          "color": "#ff9a30",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "hangers": {
+          "color": "#ffa64a",
+          "intensity": 0.1,
+          "flicker": 0
+        },
+        "counter_tube": {
+          "color": "#dfeeff",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "left_habs": {
+          "color": "#ffa64a",
+          "intensity": 0.1,
+          "flicker": 0
+        }
+      }
+    },
+    "power-cut": {
+      "ambient": "#141222",
+      "ambientLevel": 0.22,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.15,
+      "timeOfDay": "late-night",
+      "lights": {
+        "shutter_bulbs": {
+          "color": "#ffb347",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "radio": {
+          "color": "#ffa040",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffb04a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "sodium_left": {
+          "color": "#ff9a30",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "sodium_right": {
+          "color": "#ff9a30",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "hangers": {
+          "color": "#ffa64a",
+          "intensity": 0.28,
+          "flicker": 0
+        },
+        "counter_tube": {
+          "color": "#dfeeff",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "left_habs": {
+          "color": "#ffa64a",
+          "intensity": 0.28,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        1016,
+        363
+      ],
+      [
+        1180,
+        374
+      ],
+      [
+        1214,
+        214
+      ],
+      [
+        1329,
+        198
+      ],
+      [
+        1511,
+        208
+      ],
+      [
+        1536,
+        210
+      ],
+      [
+        1536,
+        740
+      ],
+      [
+        975,
+        740
+      ],
+      [
+        976,
+        209
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": false
+  },
+  "effects": [
+    {
+      "kind": "plume",
+      "rect": [
+        412,
+        440,
+        60,
+        70
+      ],
+      "style": "steam",
+      "amount": 0.7
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.6
+    }
+  ],
+  "resident": {
+    "character": "oksana",
+    "scale": 0.78
+  },
+  "public": true,
+  "exits": [
+    {
+      "to": "spine/soren-hab",
+      "way": "up the pylon stair to the top ring",
+      "door": [
+        810,
+        425,
+        95,
+        225
+      ]
+    },
+    {
+      "to": "spine/rue-hab",
+      "way": "up the cable stair to the hung habs",
+      "door": [
+        1180,
+        330,
+        140,
+        120
+      ]
+    },
+    {
+      "to": "spine/listening-post",
+      "way": "up the pylon stair to the second ring"
+    },
+    {
+      "to": "spine/deck-market",
+      "way": "along the pylons to the deck market"
+    }
+  ]
+}

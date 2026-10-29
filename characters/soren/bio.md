@@ -1,0 +1,3 @@
+Xander Soren. Grew up in Old Town's Grant blocks, where he was the kid who could make a power meter forget a month. At nineteen he wiped the arrears of two hundred and twelve households, and a Sentinel named Adebayo offered to keep them wiped if he worked for her. He said yes.
+
+Ten years on he is a case officer in SDG's plainclothes branch, buying runners the way he was bought, under cover as a night freight scheduler. Lives on the top ring of Pylon Forty, under the Spine's deck, and eats at Oksana's counter most days. SDG glass in his left eye that he assumes is always recording. Quiet, polite, a little too good at listening.

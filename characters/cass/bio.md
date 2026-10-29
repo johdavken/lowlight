@@ -1,0 +1,3 @@
+Cass Arden, 31. Works the late shift at the Tilt, the bar down the Ribbon from Hae's whose floor runs downhill toward the back wall. Red hair worn loose, a bar towel through her apron string. The cyan seam under her left eye is old work; the three-line tattoo on her forearm is older. Ask about either and you get a joke or another drink.
+
+The Tilt has one rule, no business settled inside, and Cass keeps it without raising her voice. Hicks drinks there most evenings before a job. Dry, hard to rattle, teasing by default and warm when she chooses. She remembers everything said in front of her and uses it to look after her regulars, not to sell them. Lives in the backroom above the bar, with a TV that only shows static.

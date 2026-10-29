@@ -1,0 +1,327 @@
+{
+  "id": "orchid-room",
+  "name": "An Orchid Room",
+  "description": "One of the private rooms upstairs at the Glass Orchid: plum walls with a woven orchid pattern, dark lacquer and gold lattice. A wide low bed in black and plum silk under a long window, its sheer curtain half drawn on Velvet's pink neon. A dressing table with a ring of mirror bulbs, perfume bottles and a glass orchid, beside a gold-painted lacquer screen with a silk robe over it. Two velvet armchairs and tea for two under a pink orchid-bud lamp. Paper lanterns on either side of the bed. By the door, a brass call panel with a red light; high in the corner, a camera dome with a green pinpoint. Everything is the house's.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "call_light": "room_e_call_light.png",
+        "dome": "room_e_dome.png",
+        "orchid_lamp": "room_e_orchid_lamp.png",
+        "mirror": "room_e_mirror.png",
+        "lantern_l": "room_e_lantern_l.png",
+        "lantern_r": "room_e_lantern_r.png",
+        "neon": "room_e_neon.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "call_light",
+      "label": "the red light on the call panel by the door",
+      "pos": [
+        1462,
+        268
+      ],
+      "color": "#ff2a2a",
+      "intensity": 0.3,
+      "radius": 60,
+      "flicker": 0
+    },
+    {
+      "id": "dome",
+      "label": "the camera dome's green pinpoint",
+      "pos": [
+        1470,
+        40
+      ],
+      "color": "#40ff70",
+      "intensity": 0.3,
+      "radius": 50,
+      "flicker": 0
+    },
+    {
+      "id": "orchid_lamp",
+      "label": "the pink orchid-bud lamp on the tea table",
+      "pos": [
+        1440,
+        470
+      ],
+      "color": "#ff7aa8",
+      "intensity": 0.45,
+      "radius": 300,
+      "flicker": 0.02
+    },
+    {
+      "id": "mirror",
+      "label": "the bulbs around the dressing-table mirror",
+      "pos": [
+        70,
+        310
+      ],
+      "color": "#ffd890",
+      "intensity": 0.5,
+      "radius": 360,
+      "flicker": 0
+    },
+    {
+      "id": "lantern_l",
+      "label": "the paper lantern left of the bed",
+      "pos": [
+        452,
+        180
+      ],
+      "color": "#ffc890",
+      "intensity": 0.4,
+      "radius": 280,
+      "flicker": 0
+    },
+    {
+      "id": "lantern_r",
+      "label": "the paper lantern right of the bed",
+      "pos": [
+        1124,
+        180
+      ],
+      "color": "#ffc890",
+      "intensity": 0.4,
+      "radius": 280,
+      "flicker": 0
+    },
+    {
+      "id": "neon",
+      "label": "Velvet's neon through the curtain",
+      "pos": [
+        800,
+        190
+      ],
+      "color": "#ff3a8c",
+      "intensity": 0.45,
+      "radius": 600,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a1830",
+    "ambientLevel": 0.35,
+    "weather": "rain",
+    "weatherLevel": 0.3,
+    "fog": 0.06,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {
+        "call_light": {
+          "intensity": 0.22
+        },
+        "dome": {
+          "intensity": 0.22
+        },
+        "orchid_lamp": {
+          "intensity": 0.34
+        },
+        "mirror": {
+          "intensity": 0.38
+        },
+        "lantern_l": {
+          "intensity": 0.3
+        },
+        "lantern_r": {
+          "intensity": 0.3
+        },
+        "neon": {
+          "intensity": 0.34
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0.14,
+      "fog": 0.05,
+      "lights": {
+        "call_light": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "dome": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "orchid_lamp": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "mirror": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "lantern_l": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "lantern_r": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "neon": {
+          "intensity": 0.34,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.21,
+      "lights": {
+        "call_light": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "dome": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "orchid_lamp": {
+          "intensity": 0.23,
+          "flicker": 0.22
+        },
+        "mirror": {
+          "intensity": 0.25,
+          "flicker": 0.2
+        },
+        "lantern_l": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "lantern_r": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "neon": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        }
+      }
+    },
+    "the-bell": {
+      "lights": {
+        "call_light": {
+          "intensity": 0.7,
+          "flicker": 0.9
+        },
+        "lantern_l": {
+          "intensity": 0.2
+        },
+        "lantern_r": {
+          "intensity": 0.2
+        }
+      }
+    },
+    "after": {
+      "ambientLevel": 0.28,
+      "lights": {
+        "mirror": {
+          "intensity": 0
+        },
+        "lantern_r": {
+          "intensity": 0
+        },
+        "orchid_lamp": {
+          "intensity": 0.2
+        }
+      }
+    },
+    "house-lights": {
+      "ambientLevel": 0.6,
+      "lights": {
+        "mirror": {
+          "intensity": 0.9
+        },
+        "lantern_l": {
+          "intensity": 0.9
+        },
+        "lantern_r": {
+          "intensity": 0.9
+        },
+        "orchid_lamp": {
+          "intensity": 0.8
+        },
+        "dome": {
+          "intensity": 0.9
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        629,
+        83
+      ],
+      [
+        1078,
+        91
+      ],
+      [
+        1084,
+        275
+      ],
+      [
+        629,
+        275
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true
+  },
+  "effects": [
+    {
+      "kind": "glass",
+      "amount": 2
+    },
+    {
+      "kind": "passing",
+      "rect": [
+        480,
+        90,
+        610,
+        200
+      ],
+      "source": "car",
+      "every": 45,
+      "strength": 0.6
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        1370,
+        380,
+        30,
+        70
+      ],
+      "style": "steam",
+      "amount": 0.4,
+      "lean": 0.1
+    }
+  ],
+  "exits": [
+    {
+      "to": "velvet/glass-orchid",
+      "way": "down the back stairs to the floor"
+    }
+  ]
+}

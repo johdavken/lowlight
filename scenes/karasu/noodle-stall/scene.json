@@ -1,0 +1,547 @@
+{
+  "id": "noodle-stall",
+  "name": "Noodle Stall",
+  "description": "Hae's Noodles, a street stall built into the ground floor of an old building on Level 4 of the Ribbon, right under Lowlight Intake. A deep worn wooden counter with five stools, a striped dark-red awning with red paper lanterns, and behind it the cramped kitchen: the stockpot that's never off, ladles and strainers on hooks, stacked bowls, jars of chilli and pickles. A red neon bowl-and-chopsticks sign with no words, because everyone on the level knows what it is. Above the awning, the Intake's big window glows late behind half-drawn blinds, a desk lamp and a shelf of binders, and a narrow stair climbs the side of the building to its door. An old vending machine hums at the foot of the stairs; beside the stall, an alley runs round the back past Hae's kitchen door. Overhead, the walkway of the level above, and far up through the gap, a cyan planet sign on a tower.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "kitchen": "room_e_kitchen.png",
+        "sign_noodles": "room_e_sign_noodles.png",
+        "stall_lantern": "room_e_stall_lantern.png",
+        "neon_tube_left": "room_e_neon_tube_left.png",
+        "neon_tube_right": "room_e_neon_tube_right.png",
+        "vending": "room_e_vending.png",
+        "planet_sign": "room_e_planet_sign.png",
+        "intake_window": "room_e_intake_window.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "kitchen",
+      "label": "the work light over Hae's stockpot",
+      "pos": [
+        865,
+        440
+      ],
+      "color": "#ffe0a0",
+      "intensity": 0.45,
+      "radius": 300,
+      "flicker": 0
+    },
+    {
+      "id": "sign_noodles",
+      "label": "red noodle sign",
+      "pos": [
+        770,
+        255
+      ],
+      "color": "#ff2d4a",
+      "intensity": 0.9,
+      "radius": 407,
+      "flicker": 0.2,
+      "sound": "neon"
+    },
+    {
+      "id": "stall_lantern",
+      "label": "paper lanterns over the counter",
+      "pos": [
+        770,
+        425
+      ],
+      "color": "#ff8a3c",
+      "intensity": 0.7,
+      "radius": 465,
+      "flicker": 0.05
+    },
+    {
+      "id": "neon_tube_left",
+      "label": "red neon tube, left of the stall",
+      "pos": [
+        520,
+        370
+      ],
+      "color": "#ff2a3a",
+      "intensity": 0.7,
+      "radius": 220,
+      "flicker": 0.1
+    },
+    {
+      "id": "neon_tube_right",
+      "label": "red neon tube, right of the stall",
+      "pos": [
+        1020,
+        370
+      ],
+      "color": "#ff2a3a",
+      "intensity": 0.7,
+      "radius": 220,
+      "flicker": 0.1
+    },
+    {
+      "id": "vending",
+      "label": "vending machine",
+      "pos": [
+        100,
+        520
+      ],
+      "color": "#d8e6ff",
+      "intensity": 0.6,
+      "radius": 260,
+      "flicker": 0.03
+    },
+    {
+      "id": "planet_sign",
+      "label": "cyan planet sign",
+      "pos": [
+        1325,
+        115
+      ],
+      "color": "#2fd8ff",
+      "intensity": 0.6,
+      "radius": 300,
+      "flicker": 0.1
+    },
+    {
+      "id": "intake_window",
+      "label": "the Intake's window upstairs",
+      "pos": [
+        655,
+        100
+      ],
+      "color": "#ffc878",
+      "intensity": 0.4,
+      "radius": 420,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#241020",
+    "ambientLevel": 0.4,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.4,
+    "timeOfDay": "late-night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#241020",
+      "ambientLevel": 0.25,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.4,
+      "timeOfDay": "late-night",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.5,
+          "flicker": 0.05
+        },
+        "sign_noodles": {
+          "color": "#ff2d4a",
+          "intensity": 0.7,
+          "flicker": 0.2
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0.55,
+          "flicker": 0.1
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0.55,
+          "flicker": 0.1
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.5,
+          "flicker": 0.1
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#1e0e1c",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.3,
+      "timeOfDay": "late-night",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "sign_noodles": {
+          "color": "#ff2d4a",
+          "intensity": 0.5,
+          "flicker": 0.05
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.4,
+          "flicker": 0.05
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0c14",
+      "ambientLevel": 0.25,
+      "weather": "rain",
+      "weatherLevel": 0.5,
+      "fog": 0.5,
+      "timeOfDay": "late-night",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.4,
+          "flicker": 0.2
+        },
+        "sign_noodles": {
+          "color": "#ff2020",
+          "intensity": 1,
+          "flicker": 0.6
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0.8,
+          "flicker": 0.5
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0.8,
+          "flicker": 0.5
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.5,
+          "flicker": 0.2
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.6,
+          "flicker": 0.4
+        }
+      }
+    },
+    "rush": {
+      "ambient": "#2a1428",
+      "ambientLevel": 0.5,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.45,
+      "timeOfDay": "night",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.9,
+          "flicker": 0.05
+        },
+        "sign_noodles": {
+          "color": "#ff2d4a",
+          "intensity": 1,
+          "flicker": 0.15
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0.85,
+          "flicker": 0.1
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0.85,
+          "flicker": 0.1
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.65,
+          "flicker": 0.03
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.7,
+          "flicker": 0.1
+        },
+        "kitchen": {
+          "intensity": 0.6
+        }
+      }
+    },
+    "last-call": {
+      "ambient": "#20101c",
+      "ambientLevel": 0.25,
+      "weather": "rain",
+      "weatherLevel": 0.4,
+      "fog": 0.4,
+      "timeOfDay": "late-night",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.45,
+          "flicker": 0.05
+        },
+        "sign_noodles": {
+          "color": "#ff2d4a",
+          "intensity": 0.8,
+          "flicker": 0.5
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0.5,
+          "flicker": 0.35
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0.5,
+          "flicker": 0.35
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.5,
+          "flicker": 0.03
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.5,
+          "flicker": 0.15
+        },
+        "kitchen": {
+          "intensity": 0.3
+        }
+      }
+    },
+    "closing-up": {
+      "ambient": "#160a18",
+      "ambientLevel": 0.2,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.35,
+      "timeOfDay": "late-night",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.15,
+          "flicker": 0.1
+        },
+        "sign_noodles": {
+          "color": "#ff2d4a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.55,
+          "flicker": 0.05
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.45,
+          "flicker": 0.1
+        },
+        "kitchen": {
+          "intensity": 0.2
+        },
+        "intake_window": {
+          "intensity": 0.15
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#1a1430",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.5,
+      "timeOfDay": "night",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.6,
+          "flicker": 0.15
+        },
+        "sign_noodles": {
+          "color": "#ff2d4a",
+          "intensity": 0.9,
+          "flicker": 0.45
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0.7,
+          "flicker": 0.4
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0.7,
+          "flicker": 0.4
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.55,
+          "flicker": 0.1
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.55,
+          "flicker": 0.35
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#4e5878",
+      "ambientLevel": 0.5,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.45,
+      "timeOfDay": "dawn",
+      "lights": {
+        "stall_lantern": {
+          "color": "#ff8a3c",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "sign_noodles": {
+          "color": "#ff2d4a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "neon_tube_left": {
+          "color": "#ff2a3a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "neon_tube_right": {
+          "color": "#ff2a3a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "vending": {
+          "color": "#d8e6ff",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "planet_sign": {
+          "color": "#2fd8ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "kitchen": {
+          "intensity": 0.1
+        },
+        "intake_window": {
+          "intensity": 0
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": false,
+    "bed": {
+      "src": "sound/street-crowd-sizzle.ogg",
+      "level": 0.5
+    },
+    "music": {
+      "songs": [
+        "What Hae Serves.ogg"
+      ],
+      "level": 0.48
+    }
+  },
+  "effects": [
+    {
+      "kind": "lightning",
+      "strength": 1
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        735,
+        410,
+        55,
+        60
+      ],
+      "style": "steam",
+      "amount": 0.8
+    },
+    {
+      "kind": "passing",
+      "rect": [
+        100,
+        560,
+        1300,
+        260
+      ],
+      "source": "drone",
+      "every": 50,
+      "strength": 1
+    }
+  ],
+  "resident": {
+    "character": "hae",
+    "scale": 0.78
+  },
+  "public": true,
+  "exits": [
+    {
+      "to": "karasu/intake-back-alley",
+      "way": "round the back, past Hae's kitchen door",
+      "door": [
+        1160,
+        400,
+        260,
+        310
+      ]
+    },
+    {
+      "to": "karasu/lowlight-intake",
+      "way": "up the stairs to the Intake",
+      "door": [
+        150,
+        70,
+        210,
+        630
+      ]
+    }
+  ],
+  "hours": {
+    "open": "17:00",
+    "close": "07:00"
+  }
+}

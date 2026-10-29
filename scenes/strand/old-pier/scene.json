@@ -1,0 +1,516 @@
+{
+  "id": "old-pier",
+  "name": "The Old Pier",
+  "description": "The far end of the Strand's old pier, under the Breakwater's lit windows: a bench at the rail, an old fisherman's rods and lantern left by his stool, the Wheel turning pink on the next pier and Dockside's cranes across the black bay.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "grill_windows": "room_e_grill_windows.png",
+        "stair_lamp": "room_e_stair_lamp.png",
+        "lantern": "room_e_lantern.png",
+        "globe_lamp": "room_e_globe_lamp.png",
+        "wheel": "room_e_wheel.png",
+        "fairground": "room_e_fairground.png",
+        "cranes": "room_e_cranes.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "grill_windows",
+      "label": "the Breakwater's lit upstairs windows",
+      "pos": [
+        1200,
+        560
+      ],
+      "color": "#ffb868",
+      "intensity": 0.65,
+      "radius": 420,
+      "flicker": 0.02
+    },
+    {
+      "id": "stair_lamp",
+      "label": "caged lamp over the stair door",
+      "pos": [
+        1432,
+        32
+      ],
+      "color": "#ffc070",
+      "intensity": 0.5,
+      "radius": 260,
+      "flicker": 0.02
+    },
+    {
+      "id": "lantern",
+      "label": "the fisherman's lantern on the boards",
+      "pos": [
+        890,
+        610
+      ],
+      "color": "#ffb050",
+      "intensity": 0.55,
+      "radius": 260,
+      "flicker": 0.06
+    },
+    {
+      "id": "globe_lamp",
+      "label": "the old globe lamp on its post",
+      "pos": [
+        150,
+        560
+      ],
+      "color": "#ffe2a0",
+      "intensity": 0.65,
+      "radius": 400,
+      "flicker": 0.03
+    },
+    {
+      "id": "wheel",
+      "label": "the Wheel turning on the next pier",
+      "pos": [
+        100,
+        250
+      ],
+      "color": "#ff4fc8",
+      "intensity": 0.45,
+      "radius": 300,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "fairground",
+      "label": "the fairground lights at the foot of the Wheel",
+      "pos": [
+        160,
+        350
+      ],
+      "color": "#ffb050",
+      "intensity": 0.3,
+      "radius": 260,
+      "flicker": 0.08,
+      "outside": true
+    },
+    {
+      "id": "cranes",
+      "label": "Dockside's cranes and the far towers across the bay",
+      "pos": [
+        720,
+        320
+      ],
+      "color": "#ff3a2a",
+      "intensity": 0.3,
+      "radius": 300,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#1e1a3c",
+    "ambientLevel": 0.44,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.2,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#161430",
+      "ambientLevel": 0.38,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0.55,
+          "flicker": 0.06
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0.6,
+          "flicker": 0.03
+        },
+        "wheel": {
+          "color": "#ff4fc8",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0.25,
+          "flicker": 0.08
+        },
+        "cranes": {
+          "color": "#ff3a2a",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "clear-night": {
+      "ambient": "#1a1838",
+      "ambientLevel": 0.44,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.08,
+      "timeOfDay": "night",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0.65,
+          "flicker": 0.02
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0.5,
+          "flicker": 0.02
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0.55,
+          "flicker": 0.05
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0.65,
+          "flicker": 0.03
+        },
+        "wheel": {
+          "color": "#ff4fc8",
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0.35,
+          "flicker": 0.06
+        },
+        "cranes": {
+          "color": "#ff3a2a",
+          "intensity": 0.35,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#161430",
+      "ambientLevel": 0.4,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.15,
+      "timeOfDay": "night",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0.55,
+          "flicker": 0
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "wheel": {
+          "color": "#ff4fc8",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0.2,
+          "flicker": 0.04
+        },
+        "cranes": {
+          "color": "#ff3a2a",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "closed": {
+      "ambient": "#121028",
+      "ambientLevel": 0.34,
+      "weather": "rain",
+      "weatherLevel": 0.3,
+      "fog": 0.2,
+      "timeOfDay": "late-night",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0.4,
+          "flicker": 0.02
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0.6,
+          "flicker": 0.04
+        },
+        "wheel": {
+          "color": "#ff4fc8",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "cranes": {
+          "color": "#ff3a2a",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "fog": {
+      "ambient": "#2a2840",
+      "ambientLevel": 0.48,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.85,
+      "timeOfDay": "night",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0.6,
+          "flicker": 0.02
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0.5,
+          "flicker": 0.05
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0.7,
+          "flicker": 0.03
+        },
+        "wheel": {
+          "color": "#ff4fc8",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0.05,
+          "flicker": 0
+        },
+        "cranes": {
+          "color": "#ff3a2a",
+          "intensity": 0,
+          "flicker": 0
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#100e24",
+      "ambientLevel": 0.36,
+      "weather": "rain",
+      "weatherLevel": 1,
+      "fog": 0.45,
+      "timeOfDay": "night",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0.55,
+          "flicker": 0.08
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0.45,
+          "flicker": 0.15
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0.45,
+          "flicker": 0.35
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0.6,
+          "flicker": 0.12
+        },
+        "wheel": {
+          "color": "#ff4fc8",
+          "intensity": 0.3,
+          "flicker": 0.05
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0.15,
+          "flicker": 0.15
+        },
+        "cranes": {
+          "color": "#ff3a2a",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#24081a",
+      "ambientLevel": 0.34,
+      "weather": "rain",
+      "weatherLevel": 0.6,
+      "fog": 0.35,
+      "timeOfDay": "night",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0.45,
+          "flicker": 0.2
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0.45,
+          "flicker": 0.35
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0.4,
+          "flicker": 0.3
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0.55,
+          "flicker": 0.35
+        },
+        "wheel": {
+          "color": "#ff2d5a",
+          "intensity": 0.45,
+          "flicker": 0.1
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "cranes": {
+          "color": "#ff3a2a",
+          "intensity": 0.4,
+          "flicker": 0.1
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#3a3050",
+      "ambientLevel": 0.58,
+      "weather": "rain",
+      "weatherLevel": 0.15,
+      "fog": 0.35,
+      "timeOfDay": "dawn",
+      "lights": {
+        "grill_windows": {
+          "color": "#ffb868",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "stair_lamp": {
+          "color": "#ffc070",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "lantern": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "globe_lamp": {
+          "color": "#ffe2a0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "wheel": {
+          "color": "#ff4fc8",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "fairground": {
+          "color": "#ffb050",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "cranes": {
+          "color": "#ff6a4a",
+          "intensity": 0.15,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "effects": [
+    {
+      "kind": "plume",
+      "rect": [
+        1262,
+        258,
+        44,
+        72
+      ],
+      "style": "steam",
+      "amount": 0.6,
+      "lean": -0.2
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.7
+    }
+  ],
+  "public": true,
+  "exits": [
+    {
+      "to": "strand/breakwater",
+      "way": "up the outside stairs to the Breakwater",
+      "door": [
+        1350,
+        50,
+        186,
+        630
+      ]
+    }
+  ]
+}

@@ -1,0 +1,754 @@
+{
+  "id": "pump-house-nine",
+  "name": "Pump House Nine",
+  "description": "The main floor of Pump House Nine on the edge of Drownworks' Fourth Settling Bay, where Ines's night crew keeps the mains under half the Ribbon steady. Two big old cast-iron pumps in faded teal-green stand on concrete plinths, valve wheels and pressure dials on their casings, thick pipes rising into the ceiling. Behind them a wall of tall steel-framed windows looks out on the settling bay glowing teal at night, catwalks across it, filtration halls and the city's towers beyond. On the left, steel steps up to a control desk with switches, indicator lamps, a green CRT flow graph, a wall phone, a cork board and an amber warning beacon. On the right, the crew corner: lockers, a bench, an oilcloth coat on a hook, a kettle and mugs, a first-aid cabinet, and a heavy door to the stairs. Caged lamps hang from the crane rail overhead.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "bay": "room_e_bay.png",
+        "crane_lamps": "room_e_crane_lamps.png",
+        "gauges": "room_e_gauges.png",
+        "crt": "room_e_crt.png",
+        "control": "room_e_control.png",
+        "beacon": "room_e_beacon.png",
+        "door_lamp": "room_e_door_lamp.png",
+        "crew_lamp": "room_e_crew_lamp.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "bay",
+      "label": "the Fourth Settling Bay through the windows, glowing teal",
+      "pos": [
+        830,
+        340
+      ],
+      "color": "#2fb8a8",
+      "intensity": 0.45,
+      "radius": 620,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "crane_lamps",
+      "label": "caged lamps hanging from the crane rail",
+      "pos": [
+        893,
+        95
+      ],
+      "color": "#f0cc80",
+      "intensity": 0.45,
+      "radius": 520,
+      "flicker": 0,
+      "dust": 0.8
+    },
+    {
+      "id": "gauges",
+      "label": "pressure dials on the pumps",
+      "pos": [
+        900,
+        450
+      ],
+      "color": "#e8d2a0",
+      "intensity": 0.3,
+      "radius": 260,
+      "flicker": 0
+    },
+    {
+      "id": "crt",
+      "label": "the green CRT flow graph on the control desk",
+      "pos": [
+        183,
+        302
+      ],
+      "color": "#6fe0a0",
+      "intensity": 0.4,
+      "radius": 300,
+      "flicker": 0.03
+    },
+    {
+      "id": "control",
+      "label": "switches and indicator lamps on the control desk",
+      "pos": [
+        190,
+        345
+      ],
+      "color": "#c8b070",
+      "intensity": 0.3,
+      "radius": 280,
+      "flicker": 0.26
+    },
+    {
+      "id": "beacon",
+      "label": "the amber warning beacon above the desk",
+      "pos": [
+        77,
+        100
+      ],
+      "color": "#ff8a1a",
+      "intensity": 0,
+      "radius": 520,
+      "flicker": 0
+    },
+    {
+      "id": "door_lamp",
+      "label": "caged lamp by the stair door",
+      "pos": [
+        1436,
+        341
+      ],
+      "color": "#ffbe60",
+      "intensity": 0.45,
+      "radius": 340,
+      "flicker": 0.02,
+      "dust": 1.15
+    },
+    {
+      "id": "crew_lamp",
+      "label": "the small lamp over the crew corner and the kettle",
+      "pos": [
+        1367,
+        453
+      ],
+      "color": "#ffb860",
+      "intensity": 0.4,
+      "radius": 300,
+      "flicker": 0.02,
+      "dust": 1.05
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a3450",
+    "ambientLevel": 0.4,
+    "weather": "rain",
+    "weatherLevel": 0.25,
+    "fog": 0.12,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "night-shift": {
+      "ambient": "#2a3450",
+      "ambientLevel": 0.4,
+      "weather": "rain",
+      "weatherLevel": 0.25,
+      "fog": 0.12,
+      "timeOfDay": "night",
+      "lights": {
+        "bay": {
+          "color": "#2fb8a8",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "crane_lamps": {
+          "color": "#f0cc80",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "gauges": {
+          "color": "#e8d2a0",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "crt": {
+          "color": "#6fe0a0",
+          "intensity": 0.4,
+          "flicker": 0.03
+        },
+        "control": {
+          "color": "#c8b070",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ff8a1a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffbe60",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "crew_lamp": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.02
+        }
+      }
+    },
+    "quiet-hour": {
+      "ambient": "#232a44",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.15,
+      "fog": 0.1,
+      "timeOfDay": "late-night",
+      "lights": {
+        "bay": {
+          "color": "#2fb8a8",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "crane_lamps": {
+          "color": "#f0cc80",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "gauges": {
+          "color": "#e8d2a0",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "crt": {
+          "color": "#6fe0a0",
+          "intensity": 0.3,
+          "flicker": 0.03
+        },
+        "control": {
+          "color": "#c8b070",
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ff8a1a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffbe60",
+          "intensity": 0.5,
+          "flicker": 0.02
+        },
+        "crew_lamp": {
+          "color": "#ffb860",
+          "intensity": 0.55,
+          "flicker": 0.02
+        }
+      }
+    },
+    "surge": {
+      "ambient": "#2e2236",
+      "ambientLevel": 0.34,
+      "weather": "rain",
+      "weatherLevel": 0.35,
+      "fog": 0.16,
+      "timeOfDay": "night",
+      "lights": {
+        "bay": {
+          "color": "#2fb8a8",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "crane_lamps": {
+          "color": "#f0cc80",
+          "intensity": 0.4,
+          "flicker": 0.25
+        },
+        "gauges": {
+          "color": "#e8d2a0",
+          "intensity": 0.6,
+          "flicker": 0.1
+        },
+        "crt": {
+          "color": "#6fe0a0",
+          "intensity": 0.55,
+          "flicker": 0.12
+        },
+        "control": {
+          "color": "#c8b070",
+          "intensity": 0.5,
+          "flicker": 0.15
+        },
+        "beacon": {
+          "color": "#ff8a1a",
+          "intensity": 0.75,
+          "flicker": 0.6
+        },
+        "door_lamp": {
+          "color": "#ffbe60",
+          "intensity": 0.45,
+          "flicker": 0.02
+        },
+        "crew_lamp": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.02
+        }
+      }
+    },
+    "storm": {
+      "ambient": "#1e2640",
+      "ambientLevel": 0.3,
+      "weather": "rain",
+      "weatherLevel": 0.9,
+      "fog": 0.22,
+      "timeOfDay": "night",
+      "lights": {
+        "bay": {
+          "color": "#2fb8a8",
+          "intensity": 0.28,
+          "flicker": 0.15
+        },
+        "crane_lamps": {
+          "color": "#f0cc80",
+          "intensity": 0.35,
+          "flicker": 0.2
+        },
+        "gauges": {
+          "color": "#e8d2a0",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "crt": {
+          "color": "#6fe0a0",
+          "intensity": 0.4,
+          "flicker": 0.03
+        },
+        "control": {
+          "color": "#c8b070",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ff8a1a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffbe60",
+          "intensity": 0.4,
+          "flicker": 0.1
+        },
+        "crew_lamp": {
+          "color": "#ffb860",
+          "intensity": 0.4,
+          "flicker": 0.02
+        }
+      }
+    },
+    "strike": {
+      "ambient": "#1c2236",
+      "ambientLevel": 0.26,
+      "weather": "rain",
+      "weatherLevel": 0.2,
+      "fog": 0.14,
+      "timeOfDay": "late-night",
+      "lights": {
+        "bay": {
+          "color": "#2fb8a8",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "crane_lamps": {
+          "color": "#f0cc80",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "gauges": {
+          "color": "#e8d2a0",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "crt": {
+          "color": "#6fe0a0",
+          "intensity": 0,
+          "flicker": 0.03
+        },
+        "control": {
+          "color": "#c8b070",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ff8a1a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffbe60",
+          "intensity": 0.5,
+          "flicker": 0.02
+        },
+        "crew_lamp": {
+          "color": "#ffb860",
+          "intensity": 0,
+          "flicker": 0.02
+        }
+      }
+    },
+    "shift-change": {
+      "ambient": "#34405e",
+      "ambientLevel": 0.5,
+      "weather": "rain",
+      "weatherLevel": 0.15,
+      "fog": 0.08,
+      "timeOfDay": "night",
+      "lights": {
+        "bay": {
+          "color": "#2fb8a8",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "crane_lamps": {
+          "color": "#f0cc80",
+          "intensity": 0.65,
+          "flicker": 0
+        },
+        "gauges": {
+          "color": "#e8d2a0",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "crt": {
+          "color": "#6fe0a0",
+          "intensity": 0.4,
+          "flicker": 0.03
+        },
+        "control": {
+          "color": "#c8b070",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "beacon": {
+          "color": "#ff8a1a",
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "color": "#ffbe60",
+          "intensity": 0.55,
+          "flicker": 0.02
+        },
+        "crew_lamp": {
+          "color": "#ffb860",
+          "intensity": 0.55,
+          "flicker": 0.02
+        }
+      }
+    },
+    "late": {
+      "ambientLevel": 0.24,
+      "timeOfDay": "late-night",
+      "lights": {
+        "bay": {
+          "intensity": 0.34
+        },
+        "crane_lamps": {
+          "intensity": 0.34
+        },
+        "gauges": {
+          "intensity": 0.22
+        },
+        "crt": {
+          "intensity": 0.3
+        },
+        "control": {
+          "intensity": 0.22
+        },
+        "beacon": {
+          "intensity": 0
+        },
+        "door_lamp": {
+          "intensity": 0.34
+        },
+        "crew_lamp": {
+          "intensity": 0.3
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.29,
+      "weatherLevel": 0.11,
+      "fog": 0.09,
+      "lights": {
+        "bay": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "crane_lamps": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "gauges": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "crt": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "control": {
+          "intensity": 0.22,
+          "flicker": 0
+        },
+        "beacon": {
+          "intensity": 0,
+          "flicker": 0
+        },
+        "door_lamp": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "crew_lamp": {
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.24,
+      "fog": 0.27,
+      "lights": {
+        "bay": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "crane_lamps": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "gauges": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "crt": {
+          "intensity": 0.2,
+          "flicker": 0.23
+        },
+        "control": {
+          "intensity": 0.15,
+          "flicker": 0.4
+        },
+        "beacon": {
+          "intensity": 0,
+          "flicker": 0.2
+        },
+        "door_lamp": {
+          "intensity": 0.23,
+          "flicker": 0.22
+        },
+        "crew_lamp": {
+          "intensity": 0.2,
+          "flicker": 0.22
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        262,
+        72
+      ],
+      [
+        362,
+        78
+      ],
+      [
+        384,
+        112
+      ],
+      [
+        408,
+        76
+      ],
+      [
+        532,
+        72
+      ],
+      [
+        532,
+        340
+      ],
+      [
+        486,
+        342
+      ],
+      [
+        473,
+        349
+      ],
+      [
+        467,
+        406
+      ],
+      [
+        401,
+        412
+      ],
+      [
+        396,
+        119
+      ],
+      [
+        377,
+        119
+      ],
+      [
+        376,
+        341
+      ],
+      [
+        337,
+        324
+      ],
+      [
+        282,
+        302
+      ],
+      [
+        262,
+        340
+      ]
+    ],
+    [
+      [
+        628,
+        72
+      ],
+      [
+        998,
+        72
+      ],
+      [
+        998,
+        340
+      ],
+      [
+        941,
+        339
+      ],
+      [
+        943,
+        371
+      ],
+      [
+        787,
+        390
+      ],
+      [
+        784,
+        373
+      ],
+      [
+        782,
+        75
+      ],
+      [
+        763,
+        74
+      ],
+      [
+        761,
+        390
+      ],
+      [
+        657,
+        403
+      ],
+      [
+        661,
+        390
+      ],
+      [
+        658,
+        381
+      ],
+      [
+        629,
+        380
+      ]
+    ],
+    [
+      [
+        1092,
+        72
+      ],
+      [
+        1394,
+        79
+      ],
+      [
+        1402,
+        272
+      ],
+      [
+        1357,
+        286
+      ],
+      [
+        1358,
+        401
+      ],
+      [
+        1286,
+        410
+      ],
+      [
+        1286,
+        77
+      ],
+      [
+        1269,
+        81
+      ],
+      [
+        1266,
+        409
+      ],
+      [
+        1126,
+        413
+      ],
+      [
+        1092,
+        340
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true,
+    "bed": {
+      "src": "sound/29_Industrial_Gas_Boiler_room_pipes_instalations_room_in_front_near.ogg",
+      "level": 0.31
+    },
+    "hum": 0.35,
+    "music": {
+      "songs": [
+        "Clean Water.ogg"
+      ],
+      "level": 0.68
+    }
+  },
+  "effects": [
+    {
+      "kind": "screen",
+      "rect": [
+        160,
+        284,
+        47,
+        39
+      ],
+      "light": "crt",
+      "scroll": 16
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.6
+    },
+    {
+      "kind": "glass",
+      "amount": 3
+    }
+  ]
+}

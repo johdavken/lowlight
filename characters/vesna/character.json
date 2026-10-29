@@ -1,0 +1,32 @@
+{
+  "name": "Vesna",
+  "pronoun": "she",
+  "accent": "#e58ad0",
+  "kind": "fixed",
+  "voice": "voice.md",
+  "sprite": {
+    "src": "vesna-outfit-work.png",
+    "pixel": true
+  },
+  "expressions": {
+    "smile": "vesna-smile.png",
+    "amused": "vesna-amused.png",
+    "annoyed": "vesna-annoyed.png",
+    "concerned": "vesna-concerned.png"
+  },
+  "outfits": {
+    "afterhours": "vesna-outfit-afterhours.png",
+    "work": "vesna-outfit-work.png"
+  },
+  "outfitByScene": {
+    "velvet/glass-orchid": "work"
+  },
+  "outfitWears": {
+    "afterhours": "oxblood brocade robe belted over a black turtleneck and wide black trousers, black slippers, a flower pin in her hair",
+    "work": "sleeveless oxblood silk qipao slit to the thigh, long black gloves, black lace shawl, black heels, a flower pin in her hair"
+  },
+  "face": {
+    "x": 0.52,
+    "y": 0.1
+  }
+}

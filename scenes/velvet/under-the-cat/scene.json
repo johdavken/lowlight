@@ -1,0 +1,234 @@
+{
+  "id": "under-the-cat",
+  "name": "Under the Cat",
+  "description": "Velvet's street at the foot of the cliffs, quieter and cleaner than outsiders expect. High on the cliff face above it sits the Cat, a giant neon cat in pink and violet tubes on a girder frame, looking out over the city, and on the cliff top above the Cat, the pale government buildings of the Shelf. Along the street: a bathhouse under a curved tiled roof, paper lanterns either side of its split curtain and steam from a vent; a narrow old hotel with a violet neon strip and a lit lobby behind its glass door; a little all-night tea counter with two stools; and the Glass Orchid's discreet front, a heavy dark door under a brass lamp with a glowing glass orchid in the round window above it. Paper lanterns are strung across the street, and an old street lamp stands at the corner.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "cat": "room_e_cat.png",
+        "shelf": "room_e_shelf.png",
+        "street_lamp": "room_e_street_lamp.png",
+        "lanterns": "room_e_lanterns.png",
+        "bathhouse": "room_e_bathhouse.png",
+        "hotel": "room_e_hotel.png",
+        "tea_counter": "room_e_tea_counter.png",
+        "house_door": "room_e_house_door.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "cat",
+      "label": "the Cat, the giant neon cat on the cliff",
+      "pos": [
+        1010,
+        140
+      ],
+      "color": "#ff4fd8",
+      "intensity": 0.5,
+      "radius": 700,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "shelf",
+      "label": "the Shelf's windows on the cliff top",
+      "pos": [
+        1100,
+        90
+      ],
+      "color": "#dfe6ff",
+      "intensity": 0.15,
+      "radius": 600,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "street_lamp",
+      "label": "the old street lamp at the corner",
+      "pos": [
+        1488,
+        440
+      ],
+      "color": "#ffc070",
+      "intensity": 0.5,
+      "radius": 380,
+      "flicker": 0
+    },
+    {
+      "id": "lanterns",
+      "label": "the paper lanterns strung over the street",
+      "pos": [
+        890,
+        450
+      ],
+      "color": "#ffb070",
+      "intensity": 0.35,
+      "radius": 420,
+      "flicker": 0.05
+    },
+    {
+      "id": "bathhouse",
+      "label": "the bathhouse's lanterns and windows",
+      "pos": [
+        210,
+        600
+      ],
+      "color": "#ffb070",
+      "intensity": 0.5,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "hotel",
+      "label": "the hotel's lobby and its violet neon",
+      "pos": [
+        560,
+        600
+      ],
+      "color": "#ffc070",
+      "intensity": 0.4,
+      "radius": 360,
+      "flicker": 0
+    },
+    {
+      "id": "tea_counter",
+      "label": "the tea counter's window",
+      "pos": [
+        830,
+        680
+      ],
+      "color": "#ffc878",
+      "intensity": 0.45,
+      "radius": 320,
+      "flicker": 0
+    },
+    {
+      "id": "house_door",
+      "label": "the Glass Orchid's brass lamp and orchid window",
+      "pos": [
+        1296,
+        560
+      ],
+      "color": "#ffb488",
+      "intensity": 0.45,
+      "radius": 360,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#2c2440",
+    "ambientLevel": 0.34,
+    "weather": "rain",
+    "weatherLevel": 0.25,
+    "fog": 0.1,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {}
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0,
+      "fog": 0.15,
+      "lights": {}
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.35,
+      "lights": {}
+    },
+    "last-call": {
+      "lights": {
+        "lanterns": {
+          "intensity": 0
+        },
+        "bathhouse": {
+          "intensity": 0
+        },
+        "house_door": {
+          "intensity": 0.2
+        }
+      }
+    },
+    "shelf-blackout": {
+      "lights": {
+        "shelf": {
+          "intensity": 0
+        }
+      }
+    },
+    "dusk": {
+      "ambient": "#4a3c5c",
+      "ambientLevel": 0.42,
+      "timeOfDay": "dusk",
+      "lights": {
+        "lanterns": {
+          "intensity": 0.15
+        },
+        "bathhouse": {
+          "intensity": 0.25
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": false,
+    "bed": {
+      "src": "sound/quiet-street.ogg",
+      "level": 0.2
+    }
+  },
+  "effects": [
+    {
+      "kind": "lightning",
+      "strength": 0.4
+    },
+    {
+      "kind": "passing",
+      "rect": [
+        0,
+        690,
+        1536,
+        150
+      ],
+      "source": "car",
+      "every": 60,
+      "strength": 0.8
+    }
+  ],
+  "exits": [
+    {
+      "to": "velvet/glass-orchid",
+      "way": "through the orchid door into the Glass Orchid",
+      "door": [
+        1230,
+        490,
+        132,
+        302
+      ]
+    },
+    {
+      "to": "velvet/bathhouse",
+      "way": "in through the bathhouse curtain",
+      "door": [
+        118,
+        395,
+        194,
+        385
+      ]
+    }
+  ]
+}

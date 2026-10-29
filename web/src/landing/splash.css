@@ -1,0 +1,146 @@
+/* The splash (front-end restyle §2; splash library §4.2): imported by splash.ts, so Studio's preview can use it without select.css. */
+/* ---------- splash (front-end restyle §2): Nix against the wall, the logo to her left, a blinking prompt ---------- */
+.splash {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  cursor: pointer;
+}
+/* The art's own stage (1531×1027, the art's size), scaled to cover the window: the logo and prompt are placed on the picture. */
+.splash-stage { position: absolute; left: 0; top: 0; z-index: 2; transform-origin: 0 0; }
+.splash-art { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* A soft shade from the left of the art, so the logo and prompt read over the street. */
+.splash-stage::before { content: ''; position: absolute; inset: 0; z-index: 1; pointer-events: none; background: linear-gradient(90deg, rgba(5, 2, 12, 0.55), transparent 55%); }
+/* The scanlines over everything, as on the select stage. */
+.splash::after { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 4px); }
+.splash.no-art .splash-art { display: none; }
+.splash.no-art.no-scene { background: radial-gradient(ellipse at 50% 40%, #1a0f2c, #040209 70%); }
+/* Dismissed: the art, logo and prompt glitch out over 0.6 s (with reduced motion the overlay just goes). */
+.splash.out { pointer-events: none; }
+.splash.still.out { opacity: 0; }
+
+/* The logo in the image: dimmed a touch, glowing in the street's light, with CRT texture. */
+/* In the art's px: the mockup's (70, 70) and 760 px on the 1600×900 stage, through the art's cover there. The group shrinks on narrow windows (markScale). */
+.splash-mark { position: absolute; z-index: 3; transform-origin: 0 0; } /* left/top: the art's logo spot, set inline */
+/* Its height follows the logo's own shape, set inline (splash.ts showLogo). */
+.splash-logo { position: absolute; left: 0; top: 0; width: 727px; }
+.splash-logo img { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* The logo's effects (logo effects §2): each layer shows only while its fx- class is on (splash.ts showLogo). */
+.splash-logo .base { filter: brightness(0.9) saturate(0.92); }
+.splash-logo.fx-glow .base { filter: brightness(0.9) saturate(0.92) drop-shadow(0 0 14px rgba(255, 170, 60, 0.28)) drop-shadow(0 0 30px rgba(255, 60, 160, 0.18)) drop-shadow(0 6px 18px rgba(0, 0, 0, 0.6)); }
+/* Colour fringing: pink and cyan copies, 2 px apart (not .ghost: the room UI's style.css hides that). */
+.splash-logo .fringe { display: none; opacity: 0.35; mix-blend-mode: screen; }
+.splash-logo.fx-fringe .fringe { display: block; }
+.splash-logo .fringe.pk { transform: translateX(-2px); filter: brightness(0) saturate(100%) invert(38%) sepia(98%) saturate(4000%) hue-rotate(305deg); }
+.splash-logo .fringe.cy { transform: translateX(2px); filter: brightness(0) saturate(100%) invert(85%) sepia(40%) saturate(1500%) hue-rotate(140deg); }
+/* Scanlines, the shine and the hologram's band, inside the letters only. */
+.splash-logo .crt,
+.splash-logo .shine,
+.splash-logo .holo-band { display: none; position: absolute; inset: 0; -webkit-mask: var(--logo) center / 100% 100% no-repeat; mask: var(--logo) center / 100% 100% no-repeat; }
+.splash-logo.fx-scanlines .crt,
+.splash-logo.fx-shine .shine,
+.splash-logo.fx-hologram .holo-band { display: block; }
+.splash-logo .crt { background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.38) 0 2px, transparent 2px 4px); }
+/* A shine: a bright diagonal glint sweeps across the letters, then rests (masked to the logo, normal blend so it reads on the yellow). */
+.splash-logo .shine { background: linear-gradient(110deg, transparent 42%, rgba(255, 255, 235, 0.75) 50%, transparent 58%) 0 0 / 300% 100% no-repeat; animation: logo-scan 4.8s ease-in-out infinite; }
+@keyframes logo-scan {
+  0% { background-position: 100% 0; }
+  35%, 100% { background-position: 0% 0; }
+}
+/* A light glitch, about every 6 s: the logo stays whole; two thin slices of it jump sideways for a beat. */
+.splash-logo .slice { display: none; position: absolute; inset: 0; opacity: 0; animation: logo-slice 6.2s steps(1, end) infinite; }
+.splash-logo.fx-glitch .slice { display: block; }
+.splash-logo .slice img { filter: brightness(1.15); }
+.splash-logo .slice.b { animation-name: logo-slice-b; }
+@keyframes logo-slice {
+  0%, 90.6%, 100% { opacity: 0; }
+  91% { opacity: 1; clip-path: inset(22% 0 66% 0); transform: translateX(10px); }
+  92.2% { opacity: 1; clip-path: inset(30% 0 62% 0); transform: translateX(-6px); }
+  93.2% { opacity: 0; }
+}
+@keyframes logo-slice-b {
+  0%, 91.4%, 100% { opacity: 0; }
+  91.8% { opacity: 1; clip-path: inset(64% 0 22% 0); transform: translateX(-9px); }
+  92.8% { opacity: 1; clip-path: inset(70% 0 18% 0); transform: translateX(4px); }
+  93.6% { opacity: 0; }
+}
+/* Pulse: a blurred, brightened copy behind the logo breathes, 3 s each way (at rest, 0.4). */
+.splash-logo .halo { display: none; filter: blur(14px) brightness(1.5) saturate(1.4); opacity: 0.4; }
+.splash-logo.fx-pulse .halo { display: block; animation: logo-pulse 3s ease-in-out infinite alternate; }
+@keyframes logo-pulse {
+  from { opacity: 0.1; }
+  to { opacity: 0.65; }
+}
+/* Hologram: cyan and see-through (its tint replaces the glow), a band rolling down, a small sideways wobble. */
+.splash-logo.fx-hologram .base { filter: brightness(1.15) sepia(1) hue-rotate(140deg) saturate(3.2); opacity: 0.72; }
+.splash-logo .holo-band { background: linear-gradient(180deg, transparent 0 40%, rgba(160, 250, 255, 0.55) 48%, transparent 56%) 0 0 / 100% 300% no-repeat; animation: logo-band 3.2s linear infinite; }
+.splash-logo.fx-hologram { animation: logo-wobble 4.1s steps(1, end) infinite; }
+@keyframes logo-band {
+  0% { background-position: 0 100%; }
+  100% { background-position: 0 0%; }
+}
+@keyframes logo-wobble {
+  0%, 46%, 50%, 100% { transform: none; }
+  47% { transform: translateX(3px) skewX(-2deg); }
+  48.5% { transform: translateX(-2px); }
+}
+/* Power-on: once as the logo appears (its `intro` class, which splash.ts clears when it ends), a bright CRT line opens out and stutters on. Listed last so it wins over the
+   wobble while it runs; `backwards`, not `both`, so the wobble takes over when it ends. */
+.splash-logo.fx-power-on.intro { animation: logo-poweron 1.8s ease-out 1 backwards; }
+.splash-logo.fx-hologram.fx-power-on.intro { animation: logo-wobble 4.1s steps(1, end) infinite, logo-poweron 1.8s ease-out 1 backwards; }
+/* Back from Esc, landing.ts glitches the logo in (select.css .glitch-in): that wins over the logo's own animations
+   while it runs, so its animationend cleanup still fires. */
+.splash .splash-logo.glitch-in { animation: glitch-in 0.7s steps(1, end) backwards; }
+@keyframes logo-poweron {
+  0% { opacity: 0; transform: scale(1.04, 0.01); filter: brightness(3); }
+  12% { opacity: 1; transform: scale(1.04, 0.01); filter: brightness(3); }
+  24% { transform: scale(1, 1); filter: brightness(1.8); }
+  34% { opacity: 0.2; }
+  40% { opacity: 1; filter: brightness(1.2); }
+  52% { opacity: 0.45; }
+  58% { opacity: 1; }
+  100% { opacity: 1; transform: none; filter: none; }
+}
+.splash-wordmark {
+  position: absolute;
+  left: 0;
+  top: 19px;
+  font: 153px var(--pixel);
+  letter-spacing: 0.12em;
+  background: linear-gradient(90deg, #ff3c8a, #9a5cff, #3ff0ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 18px rgba(255, 60, 138, 0.4));
+}
+.splash-prompt {
+  position: absolute;
+  left: 46px;
+  top: 210px;
+  font: 29px var(--pixel);
+  letter-spacing: 0.32em;
+  white-space: nowrap;
+  color: #e9defa;
+  text-shadow: 0 0 10px rgba(127, 233, 255, 0.6);
+  animation: splash-blink 1.1s steps(1) infinite;
+}
+/* Before the theme can play: a quiet, steady ask for sound. */
+.splash-prompt.quiet { animation: none; font-size: 22px; letter-spacing: 0.22em; color: rgba(233, 222, 250, 0.6); text-shadow: none; }
+@keyframes splash-blink {
+  50% { opacity: 0; }
+}
+.splash.still *,
+.splash.still { animation: none; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .splash, .splash * { animation: none; transition: none; }
+}
+/* The logo's effects are more specific than the two rules above: still and reduced motion stop them too
+   (the pulse's halo rests at 0.4, the band and wobble stand, power-on shows the logo at once). */
+.splash.still .splash-logo,
+.splash.still .splash-logo * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .splash .splash-logo,
+  .splash .splash-logo * { animation: none !important; }
+}
+

@@ -1,0 +1,77 @@
+/* The opening card before the splash: black, a red title, pale lines typed with a red cursor. */
+.opening-card {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  background: #000;
+  font-family: var(--pixel);
+  cursor: pointer;
+  overflow: hidden;
+}
+/* Scanlines and a vignette, like the CRT screens elsewhere. */
+.opening-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.75)),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 4px);
+}
+.oc-text { margin-left: 260px; width: 1100px; }
+.oc-title {
+  font-size: 96px;
+  letter-spacing: 22px;
+  margin-bottom: 34px;
+  color: #ff2a2a;
+  text-shadow: 0 0 22px rgba(255, 30, 30, 0.8);
+}
+.oc-line {
+  font-size: 44px;
+  line-height: 1.45;
+  letter-spacing: 1px;
+  white-space: pre;
+  color: #ddd6d4;
+  text-shadow: 0 0 6px rgba(255, 200, 190, 0.25);
+}
+.oc-line.dim { opacity: 0.6; }
+.oc-accent { color: #ff2a2a; text-shadow: 0 0 8px rgba(255, 30, 30, 0.55); }
+.oc-cursor {
+  display: inline-block;
+  width: 22px;
+  height: 40px;
+  margin-left: 6px;
+  vertical-align: -6px;
+  background: #ff2a2a;
+  box-shadow: 0 0 10px #ff2a2a;
+  animation: oc-blink 1s steps(1, end) infinite;
+}
+@keyframes oc-blink { 50% { opacity: 0; } }
+.opening-card.still .oc-cursor { animation: none; }
+.oc-skip {
+  position: absolute;
+  right: 56px;
+  bottom: 40px;
+  font-size: 24px;
+  letter-spacing: 6px;
+  color: #ff2a2a;
+  opacity: 0.45;
+}
+/* Waiting for sound: only the prompt, blinking; the title and skip hint wait. */
+.opening-card.waiting .oc-text,
+.opening-card.waiting .oc-skip { visibility: hidden; }
+.oc-sound {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  font-size: 32px;
+  letter-spacing: 8px;
+  color: #ddd6d4;
+  animation: oc-blink 1.4s steps(1, end) infinite;
+}
+.opening-card.still .oc-sound { animation: none; }

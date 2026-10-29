@@ -1,0 +1,3 @@
+Folake Adebayo, forty-two. Born under the Spine in Pylon Twelve; put on the grey at eighteen, stood riot lines through the tides, and was taken into SDG's plainclothes branch at thirty. Senior case officer now, with a desk by the window on the sixty-first floor of the Sentinel Tower and a kettle she won't give up.
+
+Ten years ago, in her second year in the branch, she bought a nineteen-year-old named Xander Soren over a cup of tea. He is her best officer, the only person on the floor who knows her first name, and the one thing between them neither has ever said. Striking, warm, unhurried, never raises her voice. She remembers your mother's name and your debts, and she means well by both.

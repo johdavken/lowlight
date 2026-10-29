@@ -1,0 +1,299 @@
+[
+ {
+  "match": {
+   "kind": "ban",
+   "f": "origin"
+  },
+  "text": "MiraGen's quarantine on {v} hulls, day 9.",
+  "lore": "miragen-pharmaceuticals"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "origin"
+  },
+  "text": "SDG wants {v} boats held for questioning.",
+  "lore": "sentinel-defense-group"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "district",
+   "v": "the Strand"
+  },
+  "text": "SDG is sweeping the boardwalk.",
+  "lore": "neon-strand"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "district",
+   "v": "the Marsh"
+  },
+  "text": "The city lists the Marsh as uninhabited. Nobody gets a permit for it.",
+  "lore": "the-marsh"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "district",
+   "v": "Velvet"
+  },
+  "text": "The Velvet houses closed their books this week.",
+  "lore": "velvet"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "district",
+   "v": "Dockside"
+  },
+  "text": "Voltaic says Dockside has all the hands it needs.",
+  "lore": "voltaic-logistics"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "district",
+   "v": "Karasu"
+  },
+  "text": "Reconstruction froze new residence in Old Town.",
+  "lore": "karasu"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "trade",
+   "v": "dock labor"
+  },
+  "text": "Voltaic's manifests are under audit. No new hands near the cranes.",
+  "lore": "voltaic-logistics"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "trade",
+   "v": "freight"
+  },
+  "text": "Voltaic's manifests are under audit. No new hands near the cranes.",
+  "lore": "voltaic-logistics"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "trade",
+   "v": "house work"
+  },
+  "text": "The houses asked customs to pause placements while they renegotiate.",
+  "lore": "the-houses"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "trade",
+   "v": "clinic"
+  },
+  "text": "Chiron filed against new street-clinic permits again.",
+  "lore": "chiron-medical"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "trade",
+   "v": "none"
+  },
+  "text": "No one comes ashore without work to go to.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "age",
+   "v": "under 25"
+  },
+  "text": "A house got caught placing minors. Everyone young gets held.",
+  "lore": "the-houses"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "age",
+   "v": "over 40"
+  },
+  "text": "Labor quota: working age only, this month.",
+  "lore": "the-houses"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "sponsor",
+   "v": "none"
+  },
+  "text": "Every arrival needs someone to answer for them.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "sponsor",
+   "v": "a co-op"
+  },
+  "text": "SDG calls co-op sponsorships unverifiable. Co-ops keep paper records.",
+  "lore": "the-co-ops"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "sponsor",
+   "v": "a corp"
+  },
+  "text": "The corps filled this month's sponsored quota.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "sponsor",
+   "v": "a House"
+  },
+  "text": "The houses are between contracts with customs.",
+  "lore": "the-houses"
+ },
+ {
+  "match": {
+   "kind": "ban",
+   "f": "arrival"
+  },
+  "text": "Old slips are being purged. Anyone that old goes to the holding blocks.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "f": "trade",
+   "v": "clinic",
+   "doc": "medical"
+  },
+  "text": "Chiron wants a health record on anyone near patients.",
+  "lore": "chiron-medical"
+ },
+ {
+  "match": {
+   "doc": "medical"
+  },
+  "text": "MiraGen's quarantine order, day 9.",
+  "lore": "miragen-pharmaceuticals"
+ },
+ {
+  "match": {
+   "doc": "renewal"
+  },
+  "text": "Their slips are past the window. The holding-block office renews them, for a fee.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "g": "sponsor",
+   "op": "not"
+  },
+  "text": "Someone has to answer for them.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "g": "sponsor",
+   "w": "a House"
+  },
+  "text": "The houses hold the placement contracts.",
+  "lore": "the-houses"
+ },
+ {
+  "match": {
+   "g": "sponsor",
+   "w": "a co-op"
+  },
+  "text": "Only the co-ops will vouch for them.",
+  "lore": "the-co-ops"
+ },
+ {
+  "match": {
+   "g": "sponsor",
+   "w": "a corp"
+  },
+  "text": "The corps want their own people only.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "g": "district",
+   "op": "is",
+   "w": "Dockside"
+  },
+  "text": "Voltaic places every crew it takes in Dockside.",
+  "lore": "dockside"
+ },
+ {
+  "match": {
+   "g": "district",
+   "op": "is"
+  },
+  "text": "Their placements are all in {w} this month.",
+  "lore": "the-houses"
+ },
+ {
+  "match": {
+   "g": "district",
+   "op": "not",
+   "w": "the Strand"
+  },
+  "text": "The boardwalk recruiters are under investigation.",
+  "lore": "neon-strand"
+ },
+ {
+  "match": {
+   "g": "district",
+   "op": "not",
+   "w": "the Marsh"
+  },
+  "text": "The city won't permit anyone into the Marsh.",
+  "lore": "the-marsh"
+ },
+ {
+  "match": {
+   "g": "district",
+   "op": "not"
+  },
+  "text": "{w} is closed to them this week.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "g": "trade",
+   "w": "none"
+  },
+  "text": "No one comes ashore without work to go to.",
+  "lore": "tidal-isle"
+ },
+ {
+  "match": {
+   "g": "trade",
+   "w": "dock labor"
+  },
+  "text": "Voltaic is cutting crews again.",
+  "lore": "voltaic-logistics"
+ },
+ {
+  "match": {
+   "g": "trade",
+   "w": "freight"
+  },
+  "text": "Voltaic is cutting crews again.",
+  "lore": "voltaic-logistics"
+ },
+ {
+  "match": {
+   "g": "trade"
+  },
+  "text": "The houses closed that trade to new placements.",
+  "lore": "the-houses"
+ }
+]

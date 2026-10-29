@@ -1,0 +1,111 @@
+{
+  "height": [
+    10,
+    28
+  ],
+  "lot": [
+    26,
+    18
+  ],
+  "streetEvery": [
+    3,
+    3
+  ],
+  "tallGain": 0.4,
+  "brick": 0.7,
+  "brokenRoof": 0,
+  "ruin": 0,
+  "emptyLot": 0.08,
+  "setback": 0,
+  "fireInLot": 0,
+  "blackout": {
+    "backup": 0.1,
+    "roofLights": 4,
+    "fires": 3,
+    "outage": 0.06
+  },
+  "windowLit": 0.6,
+  "windowColors": [
+    "#ffb060",
+    "#ffc27a",
+    "#ff9a4a",
+    "#ffd9a0"
+  ],
+  "pools": {
+    "colors": [
+      "#ffb060",
+      "#ff9a4a"
+    ],
+    "count": 40,
+    "power": 240000,
+    "reach": 120,
+    "radius": 0.6
+  },
+  "signColors": [
+    "#ffb060",
+    "#ff5a3c"
+  ],
+  "signShare": 0.02,
+  "deepZoom": true,
+  "angleDeg": -20,
+  "industry": {
+    "angleDeg": -20,
+    "steelworks": 3,
+    "furnace": 50,
+    "gasholders": 4,
+    "tanks": 4,
+    "cyan": "#4fe0ff",
+    "chimneys": 9,
+    "chimney": 90,
+    "apart": 50,
+    "rackReach": 320,
+    "pines": {
+      "count": 260,
+      "depth": 200
+    },
+    "scale": 1.5,
+    "grid": {
+      "slot": [
+        64,
+        44
+      ],
+      "street": 8,
+      "lampEvery": 3,
+      "lights": 0.45
+    },
+    "crates": [
+      "#6a4a3a",
+      "#4a5560",
+      "#7a3a2a",
+      "#5a5a50",
+      "#3a4a5a"
+    ],
+    "refineries": 2,
+    "flare": 64,
+    "blendWith": "dockside",
+    "blendReach": 220,
+    "interchange": {
+      "tracks": 5,
+      "offset": 16,
+      "trains": 0.8
+    },
+    "edgeBlend": [
+      "cloudridge",
+      "helios"
+    ],
+    "edgeReach": 200,
+    "derrick": {
+      "at": [
+        7.5,
+        22.5
+      ],
+      "height": 70,
+      "forest": 130
+    },
+    "spineFoot": [
+      10,
+      28.1
+    ],
+    "spineDeck": 120
+  }
+}

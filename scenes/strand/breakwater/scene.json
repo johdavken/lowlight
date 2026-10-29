@@ -1,0 +1,621 @@
+{
+  "id": "breakwater",
+  "name": "The Breakwater",
+  "description": "A small upstairs grill at the far end of the Strand's old pier, past where the boardwalk crowd thins out. Dark wood panelling, a plank floor, white enamel lamps over a few small tables, and a counter onto a little kitchen with a flat-top grill and hanging pans. One long run of old steel-framed windows looks out over the black bay: the harbour cranes and their lights, stacked containers, the city's towers, and to the left the Low Roller turning on its pier. In the corner by the window, a booth in worn oxblood vinyl, set for two, with a candle lamp.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissive": "room_e.png",
+      "emissiveLights": {
+        "booth_candle": "room_e_booth_candle.png",
+        "table_lamps": "room_e_table_lamps.png",
+        "ship_lamp": "room_e_ship_lamp.png",
+        "wall_lamp": "room_e_wall_lamp.png",
+        "pendants": "room_e_pendants.png",
+        "kitchen": "room_e_kitchen.png",
+        "wheel": "room_e_wheel.png",
+        "cranes": "room_e_cranes.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "booth_candle",
+      "label": "the candle lamp on the corner booth",
+      "pos": [
+        1395,
+        495
+      ],
+      "color": "#ffc060",
+      "intensity": 0.5,
+      "radius": 300,
+      "flicker": 0.08
+    },
+    {
+      "id": "table_lamps",
+      "label": "the little lamps on the small tables",
+      "pos": [
+        870,
+        485
+      ],
+      "color": "#ffc060",
+      "intensity": 0.4,
+      "radius": 380,
+      "flicker": 0.06
+    },
+    {
+      "id": "ship_lamp",
+      "label": "the brass ship's lamp on the window sill",
+      "pos": [
+        1085,
+        405
+      ],
+      "color": "#ffc070",
+      "intensity": 0.4,
+      "radius": 220,
+      "flicker": 0
+    },
+    {
+      "id": "wall_lamp",
+      "label": "the brass lamp on the panelling by the booth",
+      "pos": [
+        1485,
+        185
+      ],
+      "color": "#ffc878",
+      "intensity": 0.4,
+      "radius": 280,
+      "flicker": 0
+    },
+    {
+      "id": "pendants",
+      "label": "the enamel pendant lamps",
+      "pos": [
+        700,
+        190
+      ],
+      "color": "#ffe8b0",
+      "intensity": 0.45,
+      "radius": 620,
+      "flicker": 0,
+      "dust": 0.5
+    },
+    {
+      "id": "kitchen",
+      "label": "the work light behind the kitchen pass",
+      "pos": [
+        150,
+        300
+      ],
+      "color": "#ffd890",
+      "intensity": 0.5,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "wheel",
+      "label": "the Low Roller turning across the water",
+      "pos": [
+        615,
+        320
+      ],
+      "color": "#ffc060",
+      "intensity": 0.35,
+      "radius": 300,
+      "flicker": 0,
+      "outside": true
+    },
+    {
+      "id": "cranes",
+      "label": "the harbour cranes and the city across the bay",
+      "pos": [
+        1100,
+        300
+      ],
+      "color": "#e0a060",
+      "intensity": 0.3,
+      "radius": 600,
+      "flicker": 0,
+      "outside": true
+    }
+  ],
+  "defaults": {
+    "ambient": "#2a2030",
+    "ambientLevel": 0.35,
+    "weather": "rain",
+    "weatherLevel": 0.4,
+    "fog": 0.08,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambientLevel": 0.21,
+      "timeOfDay": "late-night",
+      "lights": {
+        "booth_candle": {
+          "intensity": 0.38
+        },
+        "table_lamps": {
+          "intensity": 0.3
+        },
+        "ship_lamp": {
+          "intensity": 0.3
+        },
+        "wall_lamp": {
+          "intensity": 0.3
+        },
+        "pendants": {
+          "intensity": 0.34
+        },
+        "kitchen": {
+          "intensity": 0.38
+        },
+        "wheel": {
+          "intensity": 0.26
+        },
+        "cranes": {
+          "intensity": 0.22
+        }
+      }
+    },
+    "quiet": {
+      "ambientLevel": 0.25,
+      "weatherLevel": 0.18,
+      "fog": 0.06,
+      "lights": {
+        "booth_candle": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "table_lamps": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "ship_lamp": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "wall_lamp": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "pendants": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "kitchen": {
+          "intensity": 0.38,
+          "flicker": 0
+        },
+        "wheel": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "cranes": {
+          "intensity": 0.22,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#2a0f1c",
+      "ambientLevel": 0.21,
+      "fog": 0.23,
+      "lights": {
+        "booth_candle": {
+          "intensity": 0.25,
+          "flicker": 0.28
+        },
+        "table_lamps": {
+          "intensity": 0.2,
+          "flicker": 0.26
+        },
+        "ship_lamp": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "wall_lamp": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "pendants": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "kitchen": {
+          "intensity": 0.25,
+          "flicker": 0.2
+        },
+        "wheel": {
+          "intensity": 0.18,
+          "flicker": 0.2
+        },
+        "cranes": {
+          "intensity": 0.15,
+          "flicker": 0.2
+        }
+      }
+    },
+    "last-table": {
+      "lights": {
+        "pendants": {
+          "intensity": 0
+        },
+        "kitchen": {
+          "intensity": 0
+        },
+        "table_lamps": {
+          "intensity": 0
+        },
+        "wall_lamp": {
+          "intensity": 0.2
+        }
+      }
+    },
+    "storm": {
+      "weatherLevel": 0.8,
+      "lights": {
+        "wheel": {
+          "intensity": 0
+        },
+        "booth_candle": {
+          "flicker": 0.2
+        }
+      }
+    },
+    "dawn": {
+      "ambient": "#50586f",
+      "ambientLevel": 0.45,
+      "timeOfDay": "dawn",
+      "lights": {
+        "cranes": {
+          "intensity": 0.1
+        },
+        "wheel": {
+          "intensity": 0
+        },
+        "booth_candle": {
+          "intensity": 0.2
+        },
+        "table_lamps": {
+          "intensity": 0
+        }
+      }
+    }
+  },
+  "weatherArea": [
+    [
+      [
+        582,
+        119
+      ],
+      [
+        700,
+        115
+      ],
+      [
+        701,
+        154
+      ],
+      [
+        584,
+        155
+      ],
+      [
+        584,
+        171
+      ],
+      [
+        698,
+        168
+      ],
+      [
+        669,
+        213
+      ],
+      [
+        740,
+        210
+      ],
+      [
+        713,
+        169
+      ],
+      [
+        782,
+        169
+      ],
+      [
+        782,
+        154
+      ],
+      [
+        709,
+        151
+      ],
+      [
+        711,
+        115
+      ],
+      [
+        786,
+        119
+      ],
+      [
+        786,
+        421
+      ],
+      [
+        582,
+        421
+      ]
+    ],
+    [
+      [
+        808,
+        119
+      ],
+      [
+        939,
+        118
+      ],
+      [
+        945,
+        152
+      ],
+      [
+        810,
+        155
+      ],
+      [
+        813,
+        167
+      ],
+      [
+        945,
+        166
+      ],
+      [
+        915,
+        211
+      ],
+      [
+        986,
+        214
+      ],
+      [
+        963,
+        176
+      ],
+      [
+        958,
+        169
+      ],
+      [
+        1005,
+        169
+      ],
+      [
+        1001,
+        157
+      ],
+      [
+        957,
+        152
+      ],
+      [
+        961,
+        120
+      ],
+      [
+        1007,
+        119
+      ],
+      [
+        1007,
+        423
+      ],
+      [
+        850,
+        417
+      ],
+      [
+        851,
+        378
+      ],
+      [
+        806,
+        375
+      ]
+    ],
+    [
+      [
+        1031,
+        115
+      ],
+      [
+        1159,
+        117
+      ],
+      [
+        1161,
+        149
+      ],
+      [
+        1175,
+        149
+      ],
+      [
+        1172,
+        117
+      ],
+      [
+        1223,
+        115
+      ],
+      [
+        1222,
+        155
+      ],
+      [
+        1168,
+        156
+      ],
+      [
+        1167,
+        167
+      ],
+      [
+        1126,
+        213
+      ],
+      [
+        1201,
+        219
+      ],
+      [
+        1173,
+        169
+      ],
+      [
+        1223,
+        170
+      ],
+      [
+        1223,
+        420
+      ],
+      [
+        1097,
+        420
+      ],
+      [
+        1101,
+        397
+      ],
+      [
+        1083,
+        384
+      ],
+      [
+        1062,
+        399
+      ],
+      [
+        1073,
+        421
+      ],
+      [
+        1031,
+        420
+      ],
+      [
+        1030,
+        173
+      ],
+      [
+        1161,
+        166
+      ],
+      [
+        1162,
+        155
+      ],
+      [
+        1032,
+        156
+      ]
+    ],
+    [
+      [
+        1239,
+        170
+      ],
+      [
+        1396,
+        171
+      ],
+      [
+        1393,
+        409
+      ],
+      [
+        1337,
+        408
+      ],
+      [
+        1333,
+        419
+      ],
+      [
+        1238,
+        419
+      ]
+    ],
+    [
+      [
+        1241,
+        117
+      ],
+      [
+        1394,
+        117
+      ],
+      [
+        1394,
+        157
+      ],
+      [
+        1241,
+        157
+      ]
+    ]
+  ],
+  "sound": {
+    "indoor": true
+  },
+  "effects": [
+    {
+      "kind": "glass",
+      "amount": 2
+    },
+    {
+      "kind": "lightning",
+      "strength": 0.5
+    },
+    {
+      "kind": "plume",
+      "rect": [
+        40,
+        250,
+        80,
+        140
+      ],
+      "style": "steam",
+      "amount": 0.7,
+      "lean": 0.15
+    }
+  ],
+  "resident": {
+    "character": "tilly",
+    "scale": 0.78
+  },
+  "exits": [
+    {
+      "to": "strand/old-pier",
+      "way": "down the outside stairs to the pier",
+      "door": [
+        1400,
+        150,
+        136,
+        714
+      ]
+    }
+  ]
+}

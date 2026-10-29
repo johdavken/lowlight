@@ -1,0 +1,1595 @@
+{
+  "version": 1,
+  "image": "/map/lowlight.webp",
+  "ambience": {
+    "signs": [
+      {
+        "at": [
+          84.3,
+          20.6
+        ],
+        "color": "#ff4fd8",
+        "mode": "flicker",
+        "size": 2.6
+      },
+      {
+        "at": [
+          50.9,
+          12.6
+        ],
+        "color": "#ff3dff",
+        "mode": "pulse",
+        "size": 1.8
+      },
+      {
+        "at": [
+          53.6,
+          21.4
+        ],
+        "color": "#d65cff",
+        "mode": "pulse",
+        "size": 2.2,
+        "speed": 0.6
+      },
+      {
+        "at": [
+          34.2,
+          5.2
+        ],
+        "color": "#ffd76b",
+        "mode": "pulse",
+        "size": 1.4,
+        "speed": 0.4
+      },
+      {
+        "at": [
+          73.6,
+          48
+        ],
+        "color": "#ff5fb0",
+        "mode": "pulse",
+        "size": 2.4,
+        "speed": 0.8
+      },
+      {
+        "at": [
+          51.6,
+          62.3
+        ],
+        "color": "#ff2a2a",
+        "mode": "blink",
+        "size": 0.7
+      },
+      {
+        "at": [
+          56.6,
+          63.6
+        ],
+        "color": "#ff2a2a",
+        "mode": "blink",
+        "size": 0.7,
+        "phase": 0.4
+      },
+      {
+        "at": [
+          41.3,
+          67.9
+        ],
+        "color": "#ff2a2a",
+        "mode": "blink",
+        "size": 0.7,
+        "phase": 0.7
+      },
+      {
+        "at": [
+          62.6,
+          70.7
+        ],
+        "color": "#ff2a2a",
+        "mode": "blink",
+        "size": 0.7,
+        "phase": 0.2
+      },
+      {
+        "at": [
+          78.3,
+          80.3
+        ],
+        "color": "#ff2a2a",
+        "mode": "blink",
+        "size": 0.7,
+        "phase": 0.55
+      },
+      {
+        "at": [
+          47.6,
+          9
+        ],
+        "color": "#ff2a2a",
+        "mode": "blink",
+        "size": 0.6,
+        "phase": 0.85
+      }
+    ],
+    "plumes": [
+      {
+        "at": [
+          4.2,
+          36.4
+        ],
+        "style": "smoke",
+        "amount": 2,
+        "lean": 0.35
+      },
+      {
+        "at": [
+          11.6,
+          31.6
+        ],
+        "style": "smoke",
+        "amount": 1,
+        "lean": 0.3
+      },
+      {
+        "at": [
+          74.5,
+          14.5
+        ],
+        "style": "smoke",
+        "amount": 0.8,
+        "lean": 0.2,
+        "tint": "#7a3a9a"
+      },
+      {
+        "at": [
+          82.3,
+          74.5
+        ],
+        "style": "steam",
+        "amount": 1,
+        "lean": 0.25
+      },
+      {
+        "at": [
+          89.5,
+          75
+        ],
+        "style": "steam",
+        "amount": 1.2,
+        "lean": 0.25
+      },
+      {
+        "at": [
+          94.6,
+          75.5
+        ],
+        "style": "steam",
+        "amount": 0.8,
+        "lean": 0.3
+      },
+      {
+        "at": [
+          38.6,
+          53.2
+        ],
+        "style": "steam",
+        "amount": 0.6,
+        "lean": 0.4
+      }
+    ],
+    "traffic": [
+      {
+        "kind": "cars",
+        "path": [
+          [
+            51,
+            31.2
+          ],
+          [
+            54.9,
+            31.7
+          ],
+          [
+            59.7,
+            31.2
+          ],
+          [
+            64.1,
+            29
+          ],
+          [
+            66.8,
+            27.2
+          ],
+          [
+            70.4,
+            28.3
+          ],
+          [
+            75.2,
+            29.9
+          ],
+          [
+            78.2,
+            31
+          ],
+          [
+            79.3,
+            33
+          ],
+          [
+            82.2,
+            35.2
+          ],
+          [
+            83.3,
+            38.4
+          ],
+          [
+            86,
+            40.7
+          ],
+          [
+            90,
+            41.3
+          ],
+          [
+            92.8,
+            42.2
+          ],
+          [
+            96.1,
+            44.1
+          ],
+          [
+            97.6,
+            47.1
+          ],
+          [
+            99.9,
+            49.4
+          ]
+        ],
+        "every": 5,
+        "speed": 1,
+        "z": 40
+      },
+      {
+        "kind": "cars",
+        "path": [
+          [
+            10,
+            28.1
+          ],
+          [
+            15.2,
+            26.4
+          ],
+          [
+            21.7,
+            23.8
+          ],
+          [
+            28,
+            23.4
+          ],
+          [
+            31.3,
+            23.4
+          ],
+          [
+            36.2,
+            25.1
+          ],
+          [
+            40,
+            24.8
+          ],
+          [
+            42.5,
+            25.9
+          ],
+          [
+            44.4,
+            28.1
+          ],
+          [
+            50.8,
+            31.1
+          ]
+        ],
+        "every": 2.8,
+        "speed": 1
+      },
+      {
+        "kind": "train",
+        "path": [
+          [
+            12.9,
+            40.3
+          ],
+          [
+            19,
+            37.8
+          ],
+          [
+            24.5,
+            33.8
+          ],
+          [
+            30,
+            30.6
+          ],
+          [
+            36,
+            28.3
+          ],
+          [
+            38.2,
+            27.6
+          ],
+          [
+            41.5,
+            26.6
+          ]
+        ],
+        "every": 26,
+        "speed": 7
+      },
+      {
+        "kind": "cars",
+        "path": [
+          [
+            79.7,
+            6
+          ],
+          [
+            80.4,
+            7.3
+          ],
+          [
+            81.2,
+            9
+          ],
+          [
+            83.3,
+            10.5
+          ],
+          [
+            88.5,
+            12.9
+          ],
+          [
+            87.5,
+            14
+          ],
+          [
+            90.5,
+            16.4
+          ],
+          [
+            91.6,
+            18.4
+          ],
+          [
+            92.7,
+            19.2
+          ]
+        ],
+        "every": 5,
+        "speed": 2.6
+      },
+      {
+        "kind": "cars",
+        "path": [
+          [
+            61,
+            72.6
+          ],
+          [
+            64,
+            71.4
+          ],
+          [
+            68.5,
+            73.4
+          ],
+          [
+            73.9,
+            69.3
+          ],
+          [
+            72.4,
+            67.5
+          ],
+          [
+            72.1,
+            65.2
+          ],
+          [
+            75.4,
+            62.4
+          ],
+          [
+            76.6,
+            60.9
+          ],
+          [
+            80.2,
+            58.6
+          ],
+          [
+            82.4,
+            57.5
+          ],
+          [
+            85.5,
+            52.6
+          ]
+        ],
+        "every": 4,
+        "speed": 1
+      },
+      {
+        "kind": "drone",
+        "path": [
+          [
+            38,
+            9
+          ],
+          [
+            52,
+            6.5
+          ],
+          [
+            66,
+            5.2
+          ],
+          [
+            80.3,
+            4.8
+          ],
+          [
+            96,
+            9.5
+          ]
+        ],
+        "every": 14,
+        "speed": 3.2
+      }
+    ]
+  },
+  "districts": [
+    {
+      "id": "cloudridge",
+      "name": "Cloudridge",
+      "area": "Executive Terraces",
+      "label": [
+        19.5,
+        10.6
+      ],
+      "border": [
+        [
+          7.7,
+          13.7
+        ],
+        [
+          11.2,
+          9.8
+        ],
+        [
+          23.1,
+          5.9
+        ],
+        [
+          33.1,
+          6.7
+        ],
+        [
+          31.7,
+          9.7
+        ],
+        [
+          31.1,
+          12.8
+        ],
+        [
+          31.4,
+          16.1
+        ],
+        [
+          25.2,
+          23.4
+        ],
+        [
+          19.1,
+          20.1
+        ],
+        [
+          11.7,
+          19.1
+        ]
+      ],
+      "windows": 0.8
+    },
+    {
+      "id": "helios",
+      "name": "Helios Towers",
+      "area": "Corp District",
+      "label": [
+        41.5,
+        6.4
+      ],
+      "border": [
+        [
+          32.4,
+          8
+        ],
+        [
+          36.3,
+          3.8
+        ],
+        [
+          44.9,
+          8
+        ],
+        [
+          43.1,
+          18.9
+        ],
+        [
+          39.5,
+          24.2
+        ],
+        [
+          36.3,
+          24.6
+        ],
+        [
+          33.4,
+          20.7
+        ],
+        [
+          31.3,
+          13.3
+        ]
+      ],
+      "windows": 0.6
+    },
+    {
+      "id": "nexus",
+      "name": "Nexus",
+      "area": "Central Core",
+      "label": [
+        58.4,
+        23.6
+      ],
+      "border": [
+        [
+          45.1,
+          8.1
+        ],
+        [
+          51.1,
+          7.8
+        ],
+        [
+          56.4,
+          8.2
+        ],
+        [
+          60.9,
+          10
+        ],
+        [
+          64.8,
+          16.4
+        ],
+        [
+          66,
+          22
+        ],
+        [
+          66.9,
+          26.5
+        ],
+        [
+          63.2,
+          28.4
+        ],
+        [
+          59.7,
+          30.6
+        ],
+        [
+          55.9,
+          31
+        ],
+        [
+          52.5,
+          31
+        ],
+        [
+          49.8,
+          29.9
+        ],
+        [
+          45.2,
+          28
+        ],
+        [
+          42.4,
+          25.4
+        ],
+        [
+          39.7,
+          24.3
+        ],
+        [
+          43.2,
+          19
+        ]
+      ],
+      "windows": 0.7
+    },
+    {
+      "id": "mirage",
+      "name": "Mirage Heights",
+      "area": "Luxury Enclave / The Shelf",
+      "label": [
+        90.6,
+        5.2
+      ],
+      "border": [
+        [
+          76,
+          0.5
+        ],
+        [
+          99.5,
+          0.5
+        ],
+        [
+          99.5,
+          22
+        ],
+        [
+          94,
+          24
+        ],
+        [
+          87.9,
+          18
+        ],
+        [
+          82,
+          12
+        ],
+        [
+          76,
+          6
+        ]
+      ],
+      "windows": 0.8
+    },
+    {
+      "id": "velvet",
+      "name": "Velvet",
+      "area": "Red-Light Quarter",
+      "label": [
+        76.2,
+        13.4
+      ],
+      "border": [
+        [
+          61.3,
+          10.2
+        ],
+        [
+          68.4,
+          9.7
+        ],
+        [
+          70.4,
+          7.9
+        ],
+        [
+          76.4,
+          7.9
+        ],
+        [
+          76.6,
+          13.7
+        ],
+        [
+          81.6,
+          17.4
+        ],
+        [
+          86.2,
+          21.1
+        ],
+        [
+          88.9,
+          25.5
+        ],
+        [
+          76.4,
+          29.5
+        ],
+        [
+          72.5,
+          28.3
+        ],
+        [
+          67,
+          26.7
+        ],
+        [
+          64.6,
+          16.1
+        ]
+      ]
+    },
+    {
+      "id": "karasu",
+      "name": "Karasu",
+      "area": "Old Town / The Ribbon",
+      "label": [
+        92.4,
+        25.6
+      ],
+      "border": [
+        [
+          76.5,
+          29.6
+        ],
+        [
+          88,
+          26
+        ],
+        [
+          94,
+          24
+        ],
+        [
+          99.5,
+          22
+        ],
+        [
+          99.5,
+          40
+        ],
+        [
+          99.7,
+          48
+        ],
+        [
+          98.4,
+          46.5
+        ],
+        [
+          97.3,
+          44.3
+        ],
+        [
+          94.9,
+          42.2
+        ],
+        [
+          91.5,
+          40.8
+        ],
+        [
+          86,
+          39.6
+        ],
+        [
+          84.4,
+          38.2
+        ],
+        [
+          83.8,
+          35.9
+        ],
+        [
+          82.5,
+          34.1
+        ],
+        [
+          80.3,
+          32.9
+        ],
+        [
+          78.9,
+          30.7
+        ]
+      ]
+    },
+    {
+      "id": "strand",
+      "name": "Neon Strand",
+      "area": "Entertainment District",
+      "label": [
+        66,
+        47.6
+      ],
+      "border": [
+        [
+          59.6,
+          41.3
+        ],
+        [
+          62.9,
+          37.3
+        ],
+        [
+          63.8,
+          34.2
+        ],
+        [
+          66,
+          30.2
+        ],
+        [
+          71.8,
+          31.5
+        ],
+        [
+          74.3,
+          33
+        ],
+        [
+          76.8,
+          35.5
+        ],
+        [
+          79.8,
+          37.5
+        ],
+        [
+          82.4,
+          42.2
+        ],
+        [
+          85.8,
+          45.2
+        ],
+        [
+          92.6,
+          48.1
+        ],
+        [
+          90.9,
+          49.2
+        ],
+        [
+          87.9,
+          49.7
+        ],
+        [
+          84.5,
+          52.8
+        ],
+        [
+          81.1,
+          50.3
+        ],
+        [
+          74.8,
+          54
+        ],
+        [
+          69.9,
+          50.5
+        ],
+        [
+          72.5,
+          48.4
+        ],
+        [
+          62.6,
+          43.9
+        ]
+      ]
+    },
+    {
+      "id": "spine",
+      "name": "The Spine",
+      "area": "Elevated Rail",
+      "label": [
+        89,
+        43.4
+      ],
+      "windows": 0.5
+    },
+    {
+      "id": "marsh",
+      "name": "The Marsh",
+      "area": "Lower City",
+      "label": [
+        93.6,
+        58
+      ],
+      "border": [
+        [
+          85,
+          52.5
+        ],
+        [
+          87.9,
+          49.9
+        ],
+        [
+          91.1,
+          49.2
+        ],
+        [
+          94.4,
+          47.4
+        ],
+        [
+          96.8,
+          51.5
+        ],
+        [
+          99.9,
+          53.6
+        ],
+        [
+          99.9,
+          73.2
+        ],
+        [
+          91,
+          69.8
+        ],
+        [
+          88.1,
+          68.7
+        ],
+        [
+          86.2,
+          71.4
+        ],
+        [
+          82.8,
+          72.5
+        ],
+        [
+          79.2,
+          71.8
+        ],
+        [
+          73.7,
+          69.7
+        ],
+        [
+          71.7,
+          65.3
+        ],
+        [
+          75.4,
+          60.6
+        ],
+        [
+          77.3,
+          58.7
+        ],
+        [
+          80.1,
+          56.7
+        ],
+        [
+          82.9,
+          54.9
+        ]
+      ]
+    },
+    {
+      "id": "drownworks",
+      "name": "Drownworks",
+      "area": "Waste & Reclamation",
+      "label": [
+        91,
+        82.6
+      ],
+      "border": [
+        [
+          71.6,
+          65.3
+        ],
+        [
+          73.7,
+          70
+        ],
+        [
+          78.1,
+          71.5
+        ],
+        [
+          83.2,
+          72.3
+        ],
+        [
+          88.1,
+          75.3
+        ],
+        [
+          99.6,
+          81.7
+        ],
+        [
+          99.5,
+          99.5
+        ],
+        [
+          76.5,
+          100
+        ],
+        [
+          72.3,
+          98.2
+        ],
+        [
+          66.8,
+          91.5
+        ],
+        [
+          64.8,
+          83.1
+        ],
+        [
+          67.5,
+          72.5
+        ],
+        [
+          70.5,
+          71
+        ],
+        [
+          71.9,
+          70.1
+        ],
+        [
+          71,
+          68.1
+        ],
+        [
+          64,
+          62
+        ],
+        [
+          65.7,
+          60.8
+        ],
+        [
+          69.9,
+          61.9
+        ]
+      ],
+      "windows": 0.8
+    },
+    {
+      "id": "tidal",
+      "name": "Tidal Isle",
+      "area": "Processing & Customs",
+      "label": [
+        52.8,
+        77.5
+      ],
+      "border": [
+        [
+          35.7,
+          81.3
+        ],
+        [
+          44.1,
+          73.6
+        ],
+        [
+          48.6,
+          69.1
+        ],
+        [
+          55.2,
+          65.7
+        ],
+        [
+          60.5,
+          67.4
+        ],
+        [
+          64.8,
+          70.6
+        ],
+        [
+          67.6,
+          72.4
+        ],
+        [
+          64.5,
+          82.6
+        ],
+        [
+          54,
+          94
+        ],
+        [
+          47.4,
+          92.1
+        ],
+        [
+          43.7,
+          88.5
+        ],
+        [
+          38.2,
+          85.5
+        ]
+      ],
+      "windows": 0.8
+    },
+    {
+      "id": "dockside",
+      "name": "Dockside",
+      "area": "Freight & Containers",
+      "label": [
+        30.6,
+        43.4
+      ],
+      "border": [
+        [
+          23.7,
+          49.2
+        ],
+        [
+          28.2,
+          46.2
+        ],
+        [
+          23.7,
+          39.5
+        ],
+        [
+          27.3,
+          34.8
+        ],
+        [
+          33.3,
+          33.2
+        ],
+        [
+          41.7,
+          39.8
+        ],
+        [
+          46.8,
+          45.2
+        ],
+        [
+          50.1,
+          50.8
+        ],
+        [
+          41.8,
+          59.4
+        ],
+        [
+          28,
+          72
+        ],
+        [
+          8.5,
+          87.3
+        ],
+        [
+          0.5,
+          89.6
+        ],
+        [
+          0.3,
+          60.6
+        ],
+        [
+          12.3,
+          54.3
+        ]
+      ],
+      "windows": 0.7
+    },
+    {
+      "id": "ironreach",
+      "name": "Iron Reach",
+      "area": "Industrial Zone",
+      "label": [
+        10,
+        47.6
+      ],
+      "border": [
+        [
+          0.2,
+          39
+        ],
+        [
+          7.6,
+          32.7
+        ],
+        [
+          4.8,
+          23.2
+        ],
+        [
+          4.9,
+          18.2
+        ],
+        [
+          9,
+          18.1
+        ],
+        [
+          11.9,
+          23.3
+        ],
+        [
+          18,
+          25
+        ],
+        [
+          33,
+          33
+        ],
+        [
+          27.5,
+          34.6
+        ],
+        [
+          23.8,
+          39.3
+        ],
+        [
+          28.3,
+          46.2
+        ],
+        [
+          13.4,
+          53.5
+        ],
+        [
+          6,
+          57.3
+        ],
+        [
+          0.2,
+          60.6
+        ]
+      ],
+      "windows": 0.7
+    },
+    {
+      "id": "bay",
+      "name": "Lowlight Bay",
+      "label": [
+        45.5,
+        60.5
+      ],
+      "windows": 0
+    }
+  ],
+  "places": [
+    {
+      "id": "ribbon-rooftop",
+      "name": "Ribbon Rooftop",
+      "district": "karasu",
+      "pin": [
+        85.9,
+        29.6
+      ],
+      "scene": "karasu/ribbon-rooftop",
+      "on": "ribbon",
+      "level": "roof"
+    },
+    {
+      "id": "nix-walk-up",
+      "name": "Nix's walk-up",
+      "district": "karasu",
+      "pin": [
+        88.4,
+        30.8
+      ],
+      "scene": "karasu/walk-up-landing",
+      "on": "ribbon",
+      "level": 5
+    },
+    {
+      "id": "public-landing",
+      "name": "Public landing",
+      "district": "karasu",
+      "pin": [
+        84.7,
+        31.5
+      ],
+      "scene": "karasu/public-landing",
+      "gigs": true,
+      "on": "ribbon",
+      "level": 6
+    },
+    {
+      "id": "lowlight-intake",
+      "name": "Lowlight Intake",
+      "district": "karasu",
+      "pin": [
+        89.1,
+        33.5
+      ],
+      "scene": "karasu/lowlight-intake",
+      "on": "ribbon",
+      "level": 4
+    },
+    {
+      "id": "second-socket",
+      "name": "Second Socket",
+      "district": "karasu",
+      "pin": [
+        89.8,
+        35.8
+      ],
+      "scene": "karasu/second-socket",
+      "hires": [
+        "wire",
+        "runner"
+      ],
+      "on": "ribbon",
+      "level": 4
+    },
+    {
+      "id": "haes-noodles",
+      "name": "Hae's Noodles",
+      "district": "karasu",
+      "pin": [
+        86.9,
+        33.8
+      ],
+      "scene": "karasu/noodle-stall",
+      "on": "ribbon",
+      "level": 4
+    },
+    {
+      "id": "the-tilt",
+      "name": "The Tilt",
+      "district": "karasu",
+      "pin": [
+        83.7,
+        34.3
+      ],
+      "scene": "karasu/the-tilt",
+      "gigs": true,
+      "on": "ribbon",
+      "level": 3
+    },
+    {
+      "id": "glass-orchid",
+      "name": "Glass Orchid",
+      "district": "velvet",
+      "pin": [
+        80.4,
+        23.8
+      ],
+      "scene": "velvet/glass-orchid",
+      "side": true
+    },
+    {
+      "id": "cass-s-backroom",
+      "name": "Cass's Backroom",
+      "district": "karasu",
+      "pin": [
+        82.8,
+        32.7
+      ],
+      "scene": "karasu/cass-apartment",
+      "side": true,
+      "on": "ribbon",
+      "level": 3
+    },
+    {
+      "id": "hicks-walkway",
+      "name": "Hicks's walkway",
+      "district": "karasu",
+      "pin": [
+        87.1,
+        37.7
+      ],
+      "scene": "karasu/hicks-gallery",
+      "on": "ribbon",
+      "level": 2
+    },
+    {
+      "id": "hicks-room",
+      "name": "Hicks's room",
+      "district": "karasu",
+      "pin": [
+        87.1,
+        37.7
+      ],
+      "scene": "karasu/hicks-room",
+      "side": true,
+      "on": "ribbon",
+      "level": 2
+    },
+    {
+      "id": "zhou-flat",
+      "name": "The twins' place",
+      "district": "karasu",
+      "pin": [
+        85.6,
+        38.3
+      ],
+      "scene": "karasu/zhou-flat",
+      "side": true,
+      "on": "ribbon",
+      "level": 2
+    },
+    {
+      "id": "ferry-stairs",
+      "name": "The Ferry Stairs",
+      "district": "tidal",
+      "pin": [
+        62.3,
+        80.7
+      ],
+      "scene": "tidal/ferry-stairs",
+      "gigs": true
+    },
+    {
+      "id": "counting-house",
+      "name": "The Counting House",
+      "district": "marsh",
+      "pin": [
+        84.2,
+        55.2
+      ],
+      "scene": "marsh/counting-house"
+    },
+    {
+      "id": "pump-house-nine",
+      "name": "Pump House Nine",
+      "district": "drownworks",
+      "pin": [
+        76,
+        84
+      ],
+      "scene": "drownworks/pump-house-nine",
+      "hires": [
+        "muscle",
+        "ears"
+      ]
+    },
+    {
+      "id": "low-roller",
+      "name": "The Low Roller",
+      "district": "strand",
+      "pin": [
+        70.9,
+        50.4
+      ],
+      "scene": "strand/low-roller",
+      "hires": [
+        "face",
+        "fence"
+      ]
+    },
+    {
+      "id": "breakwater",
+      "name": "The Breakwater",
+      "district": "strand",
+      "pin": [
+        79.3,
+        49.5
+      ],
+      "scene": "strand/breakwater"
+    },
+    {
+      "id": "under-the-cat",
+      "name": "Under the Cat",
+      "district": "velvet",
+      "pin": [
+        83.6,
+        26
+      ],
+      "scene": "velvet/under-the-cat",
+      "gigs": true
+    },
+    {
+      "id": "the-open-hand",
+      "name": "The Open Hand",
+      "district": "karasu",
+      "pin": [
+        85.4,
+        35.9
+      ],
+      "scene": "karasu/ripper-clinic",
+      "on": "ribbon",
+      "level": 1
+    },
+    {
+      "id": "soren-hab",
+      "name": "Soren's hab",
+      "district": "spine",
+      "pin": [
+        85.5,
+        42
+      ],
+      "scene": "spine/soren-hab"
+    },
+    {
+      "id": "oksanas-counter",
+      "name": "Oksana's",
+      "district": "spine",
+      "pin": [
+        73.4,
+        31.4
+      ],
+      "scene": "spine/oksanas-counter"
+    },
+    {
+      "id": "rue-hab",
+      "name": "Rue's hab",
+      "district": "spine",
+      "pin": [
+        69.5,
+        29.5
+      ],
+      "scene": "spine/rue-hab"
+    },
+    {
+      "id": "listening-post",
+      "name": "The listening post",
+      "district": "spine",
+      "pin": [
+        75.8,
+        33.5
+      ],
+      "scene": "spine/listening-post"
+    },
+    {
+      "id": "sdg-floor",
+      "name": "The Sentinel Tower",
+      "district": "nexus",
+      "pin": [
+        60.1,
+        18.4
+      ],
+      "scene": "nexus/sdg-floor"
+    },
+    {
+      "id": "long-haul",
+      "name": "The Long Haul",
+      "district": "spine",
+      "pin": [
+        80.9,
+        35.6
+      ],
+      "scene": "spine/long-haul"
+    },
+    {
+      "id": "deck-market",
+      "name": "The deck market",
+      "district": "spine",
+      "pin": [
+        67.7,
+        30
+      ],
+      "scene": "spine/deck-market"
+    },
+    {
+      "id": "catwalk",
+      "name": "The catwalk",
+      "district": "spine",
+      "pin": [
+        84.1,
+        40.9
+      ],
+      "scene": "spine/catwalk"
+    }
+  ]
+}

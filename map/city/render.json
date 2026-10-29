@@ -1,0 +1,66 @@
+{
+  "elevDeg": 52,
+  "tile": 512,
+  "margin": 64,
+  "levels": [
+    1,
+    2,
+    4,
+    8
+  ],
+  "webpQuality": 82,
+  "samples": 64,
+  "sky": {
+    "color": "#24243c",
+    "strength": 0.95
+  },
+  "moon": {
+    "energy": 0.8,
+    "rotation": [
+      66,
+      0,
+      -38
+    ]
+  },
+  "rim": {
+    "energy": 0.8,
+    "rotation": [
+      78,
+      0,
+      -75
+    ]
+  },
+  "fog": {
+    "density": 0.016,
+    "color": "#5a6080",
+    "height": 24
+  },
+  "grade": {
+    "exposure": 0.75,
+    "look": "AgX - Punchy",
+    "bloom": {
+      "threshold": 0.7,
+      "size": 0.75,
+      "strength": 0.6
+    },
+    "lift": [
+      0.93,
+      1.0,
+      1.07
+    ],
+    "gain": [
+      1.07,
+      1.0,
+      0.92
+    ],
+    "contrast": 6
+  },
+  "wet": {
+    "roofRoughMin": 0.16,
+    "puddleRough": [
+      0.16,
+      0.45
+    ]
+  },
+  "blender": "5.2"
+}

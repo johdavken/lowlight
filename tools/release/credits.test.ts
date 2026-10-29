@@ -168,10 +168,11 @@ describe('audioStatus', () => {
 
   it('reads public and restricted audio from the real CREDITS.md', () => {
     expect(status('web/public/sound/mission/tick.ogg')).toBe('public'); // Glitch Noises
-    expect(status('web/public/sound/mission/start.ogg')).toBe('restricted'); // JDSherbert
-    expect(status('web/public/sound/mission/read-ok.ogg')).toBe('restricted'); // Bleeoop
-    expect(status('web/public/sound/gig/traced.ogg')).toBe('restricted'); // CC0 + Sonniss mix
-    expect(status('web/public/sound/ui/move.ogg')).toBe('restricted');
+    expect(status('web/public/sound/mission/start.ogg')).toBe('public'); // ElevenLabs, was JDSherbert
+    expect(status('web/public/sound/mission/read-ok.ogg')).toBe('public'); // ElevenLabs, was Bleeoop
+    expect(status('web/public/sound/gig/traced.ogg')).toBe('public'); // ElevenLabs, was a CC0 + Sonniss mix
+    expect(status('web/public/sound/ui/move.ogg')).toBe('public'); // ElevenLabs
+    expect(status('web/public/sound/gig/select.ogg')).toBe('public'); // Glitch Noises
     expect(status('web/public/sound/music/Lost in Lowlight.ogg')).toBe('public'); // Suno
     expect(status('world/splash/music/Glass Floor (Glass Door Remix).ogg')).toBe('public');
     expect(status('scenes/karasu/lowlight-intake/sound/office-heater.ogg')).toBe('public'); // ElevenLabs scene row, Used by
@@ -200,6 +201,23 @@ describe('audioStatus', () => {
 - stall: sound/bed.ogg ← Sonniss / x.wav
 `);
     expect(both('web/public/sound/x.ogg')).toBe('restricted');
+  });
+
+  it('Sonniss, Bleeoop, JDSherbert and a CC0 mix with any of them are restricted', () => {
+    const rows = audioStatus(`## Files
+
+### Shared (all scenes): \`web/public/sound/\`
+
+| File | Used for | Source | Edits |
+|---|---|---|---|
+| \`a.ogg\` | a | GDC 2017 · y · \`y.wav\` | — |
+| \`b.ogg\` | b | Bleeoop · Interface Bleeps · \`b.ogg\` | — |
+| \`c.ogg\` | c | JDSherbert · Sci-Fi UI SFX Pack · \`c.wav\` | — |
+| \`d.ogg\` | d | Glitch Noises · \`d.wav\`, mixed with GDC 2016 · y · \`y.wav\` | — |
+| \`e.ogg\` | e | ElevenLabs · Sound Effects v3 · take 1 of “a tick” | — |
+`);
+    for (const f of ['a', 'b', 'c', 'd']) expect(rows(`web/public/sound/${f}.ogg`)).toBe('restricted');
+    expect(rows('web/public/sound/e.ogg')).toBe('public');
   });
 
   it('a Studio pick is restricted in any pack', () => {

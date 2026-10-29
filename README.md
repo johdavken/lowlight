@@ -29,6 +29,7 @@ It runs on your own machine. Bring an OpenRouter key; the characters' turns go t
 ## Play it
 
 - **The builds:** Windows and Linux, with every sound, on [itch.io](https://lowlightgame.itch.io/lowlight). This is the easy way.
+- **In SillyTavern:** the rooms, the cast, the lore book and the map as an extension: [Lowlight for SillyTavern](https://github.com/johdavken/lowlight-sillytavern).
 - **From source:** this repository. It's the same game, with a few menu and minigame sounds missing: see [why](#why-some-sounds-are-silent).
 
 ## Run it from source

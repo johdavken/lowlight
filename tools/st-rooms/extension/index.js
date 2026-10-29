@@ -4,6 +4,7 @@ import { mountMap, mountRoom } from './lowlight-room.js';
 import { getUserAvatar, user_avatar } from '../../../personas.js';
 import { mountHud } from './hud.js';
 import { mountSelect } from './select.js';
+import { mountSubtitles } from './subtitles.js';
 import { mountRoomTools } from './room-tools.js';
 import { planInstall, planSettings } from './lowlight-room.js';
 import { runInstall, updateCards, lowlightSettings } from './installer.js';
@@ -223,6 +224,8 @@ function setLowChat(on) {
 let lowChat = true;
 try { lowChat = localStorage.getItem(CHAT_KEY) !== '0'; } catch { /* private window */ }
 setLowChat(lowChat);
+// The dialogue box's paging and Page Up history (with /lowchat on).
+window.lowlightSubtitles = mountSubtitles();
 
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
   name: 'lowchat',

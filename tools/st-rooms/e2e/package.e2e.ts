@@ -176,6 +176,28 @@ async function runAccepted() {
     );
     check('jacking in opens the chat as the persona picked, locked to the chat', jacked && persona.name.toUpperCase() === p1Name && persona.locked?.toUpperCase() === p1Name, `${p1Name} → ${JSON.stringify(persona)}`);
 
+    // The subtitle band pages a long line as Lowlight's dialogue box does, and Page Up opens the history.
+    const long = Array.from({ length: 30 }, (_, n) => `Line ${n + 1} of a long reply, long enough that the band has to page it.`).join(' ');
+    await page.evaluate(`SillyTavern.getContext().executeSlashCommandsWithOptions(${JSON.stringify(`/sendas name=Nix ${long}`)})`);
+    const pager = () => page.evaluate<string>("document.querySelector('.ll-continue:not([hidden])')?.textContent ?? ''");
+    await until(page, "/1\\/\\d/.test(document.querySelector('.ll-continue:not([hidden])')?.textContent ?? '')", 15_000);
+    const first = await pager();
+    const pages = Number(/\/(\d+)/.exec(first)?.[1] ?? 0);
+    check('a long line is paged, CONTINUE ▸ 1/N', /CONTINUE ▸ 1\/\d+/.test(first) && pages >= 2, first);
+    await page.locator('body').click({ position: { x: 5, y: 300 } });
+    await page.keyboard.press('PageDown');
+    await page.waitForTimeout(400);
+    check('Page Down turns to the next page', (await pager()).includes(`2/${pages}`), await pager());
+    await page.keyboard.press('PageUp');
+    await page.waitForTimeout(400);
+    const history = await page.evaluate<{ open: boolean; shown: number }>(
+      "({ open: document.body.classList.contains('ll-history'), shown: [...document.querySelectorAll('#chat .mes')].filter((m) => m.offsetParent).length })",
+    );
+    check('Page Up opens the history: earlier lines show', history.open && history.shown >= 2, JSON.stringify(history));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+    check('Escape closes the history to the one line', !(await page.evaluate<boolean>("document.body.classList.contains('ll-history')")));
+
     check('closing the select hands the music back to the room', await until(page, "!decodeURIComponent(window.lowlightRoom.audio.state().musicUrl ?? '').includes('/sound/music/')", 15_000));
     // The key presses above unlocked the sound: the rain is the recording, not the engine's synthesized noise.
     const rain = await until(page, "window.lowlightRoom?.audio?.state?.().rain === 'recorded'", 20_000);

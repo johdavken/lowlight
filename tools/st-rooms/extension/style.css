@@ -302,3 +302,26 @@ body.lowlight-chat #top-settings-holder .drawer-content:is(.fillLeft, .fillRight
 body.lowlight-chat #chat .mes.toolCall.ll-room-tool:not(.last_mes) { display: none; }
 /* What she sent with a tool call, superseded by the reply written after it (room-tools.js). */
 body.lowlight-chat #chat .mes.ll-pre-tool { display: none; }
+
+/* ── The dialogue box's paging and history (subtitles.js), as in Lowlight ── */
+.ll-continue { display: none; }
+body.lowlight-chat .ll-continue:not([hidden]) {
+  display: block;
+  margin: 4px 48px 0 auto; /* clear of SillyTavern's swipe arrow and counter */
+  background: none;
+  border: none;
+  padding: 0 4px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: #ff4f8b;
+  cursor: pointer;
+  animation: ll-continue-pulse 1.6s ease-in-out infinite;
+}
+body.lowlight-chat.ll-history .ll-continue { display: none; }
+@keyframes ll-continue-pulse { 50% { opacity: 0.55; } }
+/* Page Up: the whole chat, scrollable, over a dimmed room. */
+body.lowlight-chat.ll-history #sheld { height: 86dvh; }
+body.lowlight-chat.ll-history #chat { justify-content: flex-start; }
+body.lowlight-chat.ll-history #chat .mes:not(.last_mes) { display: flex; opacity: 0.82; }
+body.lowlight-chat.ll-history::after { height: 100dvh; background: rgba(6, 2, 12, 0.86); }

@@ -1,12 +1,12 @@
 # Licensing audit
 
-An audit of everything Lowlight ships, made on 2026-10-23 before the SillyTavern package goes public and before Lowlight itself is open-sourced. Updated 2026-10-29: ElevenLabs takes replaced the Sonniss room beds, doors, rain and thunder (8b937cff), and the public repo is exported from the private one. The sources are `sounds/CREDITS.md`, the image masters in `art/`, `node_modules`, and the git history.
+An audit of everything Lowlight ships, made on 2026-10-23 before the SillyTavern package goes public and before Lowlight itself is open-sourced. Updated 2026-10-29: ElevenLabs takes and CC0 Glitch Noises files replaced every Sonniss, Bleeoop and JDSherbert sound (8b937cff to 9257d3af), so nothing restricted ships any more, and the public repo is exported from the private one. The sources are `sounds/CREDITS.md`, the image masters in `art/`, `node_modules`, and the git history.
 
 ## Decisions (Farban, 2026-10-23)
 
 - **Code: GPL-3.0.** This includes the renderer, map and audio code bundled into the SillyTavern extension. The license has to be in place before that package goes public.
 - **Farban's own content: CC BY-NC-SA 4.0.** That's the writing (identities, bios, lore, quests, gigs), the art and the Suno songs.
-- **Restricted third-party assets ship only inside official builds** (itch.io, Patreon). Public repos never carry their raw files, and those files are not offered as a separate pack, paid or free. The licenses allow shipping inside a finished game and forbid redistributing the raw files.
+- **Restricted third-party assets ship only inside official builds** (itch.io, Patreon). Public repos never carry their raw files, and those files are not offered as a separate pack, paid or free. The licenses allow shipping inside a finished game and forbid redistributing the raw files. Since 2026-10-28 no shipped file is restricted; the rule stands for anything added later.
 
 ## Summary
 
@@ -17,9 +17,9 @@ An audit of everything Lowlight ships, made on 2026-10-23 before the SillyTavern
 | Songs: 11 files from Suno | Farban's | Yes, CC BY-NC-SA 4.0 | All made on Suno's **Pro** plan, which gives commercial rights (checked 2026-10-10). Suno makes no promise that copyright vests. |
 | Images: rooms, characters, map, splash, districts, papers, extras, quests | Farban's (ChatGPT) | Yes, CC BY-NC-SA 4.0 | OpenAI's terms give the output to the user, commercial use included. The shipped images have had their C2PA signature stripped by cropping and processing; the masters in `art/` mostly keep it (see below). |
 | Fonts (IBM Plex Mono, VT323, Teko, Chakra Petch, Courier Prime and the rest, via `@fontsource`; Special Elite) | Free | Yes | SIL OFL 1.1; Special Elite is Apache-2.0. They're bundled from npm. |
-| Sounds: 13 files from Glitch Noises (Vladislav Zharkov) | Free (CC0) | Yes | Public domain. They're credited anyway. |
-| Sounds: 22 files from ElevenLabs (room beds, doors, rain, thunder) | Farban's (generated) | Yes, CC BY-NC-SA 4.0 | Generated on a paid ElevenLabs Starter plan, whose terms give a commercial licence for audio made while subscribed; no third-party recording is in them. They replaced the Sonniss versions on 2026-10-28. |
-| **Sounds: 61 files** (54 Sonniss GDC, 5 JDSherbert, 2 Bleeoop) | **Restricted** | **No: builds only** | Sonniss: no standalone redistribution. Bleeoop: no uploading the raw files to a server. JDSherbert: no redistributing the raw files, and credit required. |
+| Sounds: 20 files from Glitch Noises (Vladislav Zharkov) | Free (CC0) | Yes | Public domain. They're credited anyway. |
+| Sounds: 76 files from ElevenLabs (room beds, doors, rain, thunder, and every menu and minigame cue) | Farban's (generated) | Yes, CC BY-NC-SA 4.0 | Generated on a paid ElevenLabs Starter plan, whose terms give a commercial licence for audio made while subscribed; no third-party recording is in them. They replaced the Sonniss, Bleeoop and JDSherbert versions on 2026-10-28. |
+| Sounds: restricted | None | — | Nothing shipped uses Sonniss, Bleeoop or JDSherbert since 2026-10-28. The export still holds back any restricted row added later, such as a Studio library pick. |
 
 ## Images: masters without a ChatGPT signature (confirmed ChatGPT, 2026-10-23)
 
@@ -43,16 +43,9 @@ If they're all ChatGPT, nothing changes; they just need lines in `sounds/CREDITS
 - **Size.** `.git` is 704 MB, mostly Krita and Photoshop masters (`art/**/*.kra`, up to 19 MB each). Decide whether the masters go public, move to Git LFS, or stay private.
 - **Author email.** The author's personal email is on every commit. A rewrite could switch it to the GitHub noreply address.
 
-## What the public versions get instead of restricted sounds
+## The public versions have every sound
 
-Since the ElevenLabs swap, rain, thunder and every room's bed and door sound are public. What's still restricted is the menu and minigame cues, and the public repo skips them quietly (the game's sound list, `/api/sound-present`):
-
-| Restricted | Used for | Public version |
-|---|---|---|
-| `web/public/sound/ui/*` (move, confirm, lock, vs, save, page-swap) | Menu and select cues, the MAP's cue | Silence |
-| `web/public/sound/{gig,slip,crack,dice,papers}/*` and most of `mission/*` | Game systems | Silence; their songs and the CC0 cues still play |
-
-**SillyTavern package:** with no Lowlight install it uses the public set. With one, it plays the restricted sounds from that install on the player's own machine.
+Since 2026-10-28 every shipped sound is CC0, generated on ElevenLabs, or a Suno song, so the public repo, the builds and the SillyTavern package carry the same set. The game's sound list (`/api/sound-present`) still skips any file that's missing, so a restricted sound added later would play silent in the public repo rather than break it.
 
 ## The author's answers (2026-10-23)
 
@@ -63,22 +56,26 @@ Since the ElevenLabs swap, rain, thunder and every room's bed and door sound are
 
 ## Appendix: every audio file
 
-Regenerated 2026-10-29 from `sounds/CREDITS.md` and the export's `audioStatus`, after the ElevenLabs swap (8b937cff).
+Regenerated 2026-10-28 from `sounds/CREDITS.md` and the export's `audioStatus`, after the last restricted sounds were replaced (9257d3af).
 
 | Status | Files |
 |---|---|
-| FREE (CC0) | 13 |
-| YOURS (ElevenLabs) | 22 |
+| FREE (CC0) | 20 |
+| YOURS (ElevenLabs) | 76 |
 | YOURS (Suno Pro) | 11 |
-| RESTRICTED (builds only) | 61 |
 | NOT CREDITED (held back) | 1 |
 
 | File | Source | Status |
 |---|---|---|
 | `web/public/sound/crack/dud.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/crack/open.ogg` | CC0 | FREE (CC0) |
+| `web/public/sound/crack/reset.ogg` | CC0 | FREE (CC0) |
+| `web/public/sound/gig/enter.ogg` | CC0 | FREE (CC0) |
+| `web/public/sound/gig/probe.ogg` | CC0 | FREE (CC0) |
+| `web/public/sound/gig/select.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/mission/alarm.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/mission/beat.ogg` | CC0 | FREE (CC0) |
+| `web/public/sound/mission/edge.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/mission/fail.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/mission/heat.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/mission/messy.ogg` | CC0 | FREE (CC0) |
@@ -88,6 +85,8 @@ Regenerated 2026-10-29 from `sounds/CREDITS.md` and the export's `audioStatus`, 
 | `web/public/sound/mission/reroll.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/mission/sol.ogg` | CC0 | FREE (CC0) |
 | `web/public/sound/mission/tick.ogg` | CC0 | FREE (CC0) |
+| `web/public/sound/ui/confirm.ogg` | CC0 | FREE (CC0) |
+| `web/public/sound/ui/page-swap.ogg` | CC0 | FREE (CC0) |
 | `scenes/default/rooftop/sound/industry-night.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `scenes/default/workspace/sound/overhead-fan.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `scenes/drownworks/pump-house-nine/sound/29_Industrial_Gas_Boiler_room_pipes_instalations_room_in_front_near.ogg` | ElevenLabs | YOURS (ElevenLabs) |
@@ -101,8 +100,58 @@ Regenerated 2026-10-29 from `sounds/CREDITS.md` and the export's `audioStatus`, 
 | `scenes/tidal/ferry-stairs/sound/dock-berth.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `scenes/velvet/bathhouse/sound/hall-faucets.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `scenes/velvet/under-the-cat/sound/quiet-street.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/crack/granted.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/crack/guess.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/crack/hover.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/crack/last.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/crack/leave.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/crack/wrong.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/dice/bid.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/dice/liar.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/dice/lose-die.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/dice/lose.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/dice/reveal.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/dice/roll.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/dice/win.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/breach.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/cache.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/clean.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/close.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/jack-in.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/jack-out.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/key.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/pull.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/traced.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/trap.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/gig/watch.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/mission/deck.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/mission/dies.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/mission/read-ok.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/mission/start.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/back.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/blind.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/check.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/clean.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/close.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/fail.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/note.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/paper.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/pick.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/refuse.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/slide.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/papers/stamp.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `web/public/sound/rain-heavy.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `web/public/sound/rain-light.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/caught.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/clean.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/close.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/hide.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/jam.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/lift.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/noise.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/spotted.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/step.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/slip/wait.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `web/public/sound/thunder/far-1.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `web/public/sound/thunder/far-2.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `web/public/sound/thunder/mid-1.ogg` | ElevenLabs | YOURS (ElevenLabs) |
@@ -110,6 +159,10 @@ Regenerated 2026-10-29 from `sounds/CREDITS.md` and the export's `audioStatus`, 
 | `web/public/sound/thunder/near-1.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `web/public/sound/thunder/near-2.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `web/public/sound/thunder/near-3.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/ui/lock.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/ui/move.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/ui/save.ogg` | ElevenLabs | YOURS (ElevenLabs) |
+| `web/public/sound/ui/vs.ogg` | ElevenLabs | YOURS (ElevenLabs) |
 | `scenes/drownworks/_music/Clean Water.ogg` | Suno | YOURS (Suno Pro) |
 | `scenes/karasu/_music/Fast Drying Lacquer.ogg` | Suno | YOURS (Suno Pro) |
 | `scenes/karasu/_music/Nix.ogg` | Suno | YOURS (Suno Pro) |
@@ -121,65 +174,4 @@ Regenerated 2026-10-29 from `sounds/CREDITS.md` and the export's `audioStatus`, 
 | `web/public/sound/slip/glass-floor.ogg` | Suno | YOURS (Suno Pro) |
 | `world/splash/music/Glass Floor (Glass Door Remix).ogg` | Suno | YOURS (Suno Pro) |
 | `world/splash/music/Lowlight - Lost in Lowlight-uwarp.design.ogg` | Suno | YOURS (Suno Pro) |
-| `web/public/sound/crack/granted.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/crack/guess.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/crack/hover.ogg` | JDSherbert | RESTRICTED (builds only) |
-| `web/public/sound/crack/last.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/crack/leave.ogg` | JDSherbert | RESTRICTED (builds only) |
-| `web/public/sound/crack/reset.ogg` | JDSherbert | RESTRICTED (builds only) |
-| `web/public/sound/crack/wrong.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/dice/bid.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/dice/liar.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/dice/lose-die.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/dice/lose.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/dice/reveal.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/dice/roll.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/dice/win.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/breach.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/cache.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/clean.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/close.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/enter.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/jack-in.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/jack-out.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/key.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/probe.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/pull.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/select.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/traced.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/trap.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/gig/watch.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/mission/deck.ogg` | Bleeoop | RESTRICTED (builds only) |
-| `web/public/sound/mission/dies.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/mission/edge.ogg` | JDSherbert | RESTRICTED (builds only) |
-| `web/public/sound/mission/read-ok.ogg` | Bleeoop | RESTRICTED (builds only) |
-| `web/public/sound/mission/start.ogg` | JDSherbert | RESTRICTED (builds only) |
-| `web/public/sound/papers/back.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/blind.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/check.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/clean.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/close.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/fail.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/note.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/paper.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/pick.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/refuse.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/slide.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/papers/stamp.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/caught.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/clean.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/close.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/hide.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/jam.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/lift.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/noise.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/spotted.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/step.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/slip/wait.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/ui/confirm.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/ui/lock.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/ui/move.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/ui/page-swap.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/ui/save.ogg` | Sonniss | RESTRICTED (builds only) |
-| `web/public/sound/ui/vs.ogg` | Sonniss | RESTRICTED (builds only) |
 | `world/splash/history/2026-10-25T03-10-43-362Z-No Light in Lowlight.ogg` | not credited | NOT CREDITED (held back) |

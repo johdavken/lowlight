@@ -28,9 +28,9 @@ It runs on your own machine. Bring an OpenRouter key; the characters' turns go t
 
 ## Play it
 
-- **The builds:** Windows and Linux, with every sound, on [itch.io](https://lowlightgame.itch.io/lowlight). This is the easy way.
+- **The builds:** Windows and Linux, on [itch.io](https://lowlightgame.itch.io/lowlight). This is the easy way.
 - **In SillyTavern:** the rooms, the cast, the lore book and the map as an extension: [Lowlight for SillyTavern](https://github.com/johdavken/lowlight-sillytavern).
-- **From source:** this repository. It's the same game, with a few menu and minigame sounds missing: see [why](#why-some-sounds-are-silent).
+- **From source:** this repository. It's the same game, every sound included.
 
 ## Run it from source
 
@@ -57,13 +57,6 @@ where your saves live.
 | `scenes/` | The rooms, district by district, with their lights, moods and songs |
 | `world/` | The lore book, jobs, quests, gigs, and the menu's art and music |
 | `map/` | The city map and the data its 3D render is built from |
-
-## Why some sounds are silent
-
-The builds use some licensed sound effects for the menus and the minigames. Their licences allow them
-inside a finished game, but not as loose files anyone can download, so this repository leaves them out
-and the game skips them quietly. Everything else is here: the songs, the rain, the thunder and every
-room's ambience. Every sound's source and licence is in [sounds/CREDITS.md](sounds/CREDITS.md).
 
 ## How it's made
 

@@ -122,3 +122,30 @@ export function cardOf(png: Buffer): unknown {
   }
   return null;
 }
+
+/** One character in the package's cast/cast.json (paths relative to cast/; hashes are sha256 hex). */
+export interface CastCharacter {
+  id: string;
+  name: string;
+  /** The package version they arrived in. */
+  since: string;
+  card: string;
+  /** SillyTavern expression label → sprite file. */
+  sprites: Record<string, string>;
+  persona: { file: string; name: string; description: string; picture: string } | null;
+  tagline: string;
+  facts: { label: string; value: string }[];
+  accent: string | null;
+  /** Their first room (folder), for the select and a chat with no saved room. */
+  home: string | null;
+  /** Every room of theirs (folders): where go_to can take you. */
+  places: string[];
+  /** card: the card's text (its JSON, without the greeting), so new art alone isn't a card update; sprites, persona: the files. */
+  hash: { card: string; sprites: string; persona: string | null };
+}
+
+/** The package's cast/cast.json (and a local extension's cast.json). */
+export interface CastJson {
+  version: string;
+  characters: CastCharacter[];
+}

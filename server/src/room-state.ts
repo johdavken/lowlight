@@ -6,6 +6,7 @@ import { withBase } from '../../shared/light-share';
 import { normalizeHex } from '../../shared/color';
 import type { SceneDef } from '../../shared/types';
 import { currentSceneId } from '../../shared/scene-aliases';
+import { lightLabel, pct, roomLine } from '../../shared/room-line';
 
 /** Where rooms come from: the city's room registry, or one district's scenes (tests, tools). */
 export interface RoomScenes {
@@ -60,10 +61,6 @@ function unit(x: number, field: string, notes: string[]): number {
   const clamped = clamp(x, 0, 1);
   if (clamped !== x) notes.push(`${field} clamped to ${clamped}`);
   return clamped;
-}
-
-function pct(x: number): string {
-  return `${Math.round(x * 100)}%`;
 }
 
 /** Deep-freeze a plain object/array tree (atoms, arrays, objects only — no cycles). */
@@ -147,10 +144,6 @@ function restoreState(saved: RoomState, scenes: RoomScenes, start: string, compl
   };
 }
 
-function lightLabel(light: LightDef): string {
-  return `${light.id} "${light.label}" ${light.color} ${pct(light.intensity)}${light.outside ? ' outside' : ''}`;
-}
-
 /**
  * What changed in the room between `before` (what she was last shown) and `now`, as the summary words it: the scene
  * when she's somewhere else, else each light whose colour or level moved, then ambient, weather and fog. Null when
@@ -228,19 +221,19 @@ export class Room {
   summary(): string {
     const scene = this.scene();
     const { atmosphere, lights } = this.current;
-    const weatherText = atmosphere.weather === 'none' ? 'clear' : `${atmosphere.weather} ${pct(atmosphere.weatherLevel)}`;
-    const lightsText = lights.map(lightLabel).join(', ');
-    // "moods", not "presets": the word in front of her every turn leaked into the story ("Quiet preset ought to do it", 2026-10-14).
-    const presets = Object.keys(scene.presets).join(', ') || 'none';
-    const where = scene.district ? `, ${this.o.districtName(scene.district)}` : '';
     // Her other places, with ids, so taking them somewhere is one go_to call (GLM skipped the list_scenes round).
     // A room that's a way out of here shows once, as a way out, even when it's also hers.
     const exits = this.exitsHere();
     const exitIds = new Set(exits.map((e) => e.scene.id));
     const others = this.listScenes().filter((s) => s.id !== scene.id && !exitIds.has(s.id));
-    const places = others.length > 0 ? ` · places: ${others.map((s) => `${s.id} "${s.name}"`).join(', ')}` : '';
-    const ways = exits.length > 0 ? ` · ways out: ${exits.map((e) => `${e.scene.id} "${e.scene.name}" (${e.way})`).join(', ')}` : '';
-    return `[room: ${scene.id} "${scene.name}"${where} · ambient ${atmosphere.ambient} ${pct(atmosphere.ambientLevel)} · ${weatherText} · fog ${pct(atmosphere.fog)} · lights: ${lightsText} · moods: ${presets}${places}${ways}]`;
+    return roomLine({
+      scene,
+      atmosphere,
+      lights,
+      district: scene.district ? this.o.districtName(scene.district) : undefined,
+      places: others.map((s) => ({ id: s.id, name: s.name })),
+      ways: exits.map((e) => ({ id: e.scene.id, name: e.scene.name, way: e.way })),
+    });
   }
 
   describe(): string {

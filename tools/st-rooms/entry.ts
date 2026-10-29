@@ -1,5 +1,10 @@
 // Lowlight's room renderer as one ES module for the SillyTavern extension (tools/st-rooms/build.ts).
 import { createRenderer } from '../../web/src/renderer/index';
+export { roomLine } from '../../shared/room-line';
+export { ROOM_TOOLS, checkRoomTool, appliedText, isRoomToolMessage, preToolMessage } from './room-tools';
+export { stampOf, withStamp, roomFromChat } from './room-stamp';
+export { planInstall } from './install-plan';
+export { planSettings } from './settings-plan';
 import { sceneSchema } from '../../shared/scene-schema';
 import { applyPresetTo } from '../../shared/presets';
 import { withBase } from '../../shared/light-share';
@@ -7,7 +12,7 @@ import type { RoomState, SceneDef } from '../../shared/types';
 import { lightFilter, StageLight } from '../../web/src/ui/stage-light';
 import { MapPanel } from '../../web/src/ui/map';
 import { parseMap, type CityMapData, type Place } from '../../shared/map-schema';
-import { AudioEngine, RAIN_URLS } from '../../web/src/audio/engine';
+import { AudioEngine } from '../../web/src/audio/engine';
 import { createRoomAudio } from '../../web/src/audio/room-audio';
 import { THUNDER_TAKES } from '../../web/src/audio/thunder';
 import type { SoundView } from '../../web/src/ui/hud';
@@ -43,14 +48,26 @@ function lightFigures(renderer: Awaited<ReturnType<typeof createRenderer>>, figu
 
 /**
  * Lowlight's room sound (web/src/audio): music, the room's bed and one-off sounds, rain, light hums, thunder.
- * The rain and thunder recordings are fixed at the game's /sound/ paths: they're pointed at `soundBase` instead.
+ * The rain and thunder recordings come from `soundBase`, as sound-map.json lists them.
  */
-function roomSound(renderer: Awaited<ReturnType<typeof createRenderer>>, soundBase: string, view: (v: SoundView) => void) {
-  RAIN_URLS.light = `${soundBase}rain-light.ogg`;
-  RAIN_URLS.heavy = `${soundBase}rain-heavy.ogg`;
-  for (const t of THUNDER_TAKES) t.url = `${soundBase}thunder/${t.url.split('/').pop()}`;
-  const audio = createRoomAudio({ engine: new AudioEngine({ warn: (m) => console.warn('[lowlight sound]', m) }), view });
-  renderer.onStrike((s) => audio.thunder(s.distance, s.sceneId));
+/** Which shared sounds the extension has (build.ts writes sound-map.json); paths are under soundBase. */
+export interface SoundMap {
+  rain: { light: string; heavy: string } | null;
+  thunder: string[];
+  /** A public build's CC0 bed per room (null: the rooms' own beds). */
+  beds: Record<string, { src: string; level: number }> | null;
+  cues: Record<string, string>;
+}
+const FULL_SOUND: SoundMap = { rain: { light: 'rain-light.ogg', heavy: 'rain-heavy.ogg' }, thunder: THUNDER_TAKES.map((t) => t.url.split('/').pop()!), beds: null, cues: {} };
+
+function roomSound(renderer: Awaited<ReturnType<typeof createRenderer>>, soundBase: string, view: (v: SoundView) => void, map: SoundMap) {
+  // Only the thunder takes the extension has; with none, lightning stays silent.
+  const takes = THUNDER_TAKES.filter((t) => map.thunder.includes(t.url.split('/').pop()!));
+  THUNDER_TAKES.splice(0, THUNDER_TAKES.length, ...takes.map((t) => ({ ...t, url: `${soundBase}thunder/${t.url.split('/').pop()}` })));
+  // No rain recording (a public build before CC0 rain is picked): the engine's own synthesized rain.
+  const rainUrls = map.rain ? { light: `${soundBase}${map.rain.light}`, heavy: `${soundBase}${map.rain.heavy}` } : null;
+  const audio = createRoomAudio({ engine: new AudioEngine({ warn: (m) => console.warn('[lowlight sound]', m), rainUrls }), view });
+  if (THUNDER_TAKES.length) renderer.onStrike((s) => audio.thunder(s.distance, s.sceneId));
   renderer.onFrame(() => audio.frame(renderer.time()));
   document.addEventListener('visibilitychange', () => audio.visibility(document.hidden));
   // Browsers start sound only after a gesture: the first click or key anywhere unlocks it.
@@ -62,13 +79,21 @@ function roomSound(renderer: Awaited<ReturnType<typeof createRenderer>>, soundBa
 
 /** Draws rooms into `host` with their sound; `roomsBase` is the URL holding one folder per room (scene.json + layers),
  * `soundBase` the shared rain and thunder; `view` hears the speaker's state (locked, on, muted, levels). */
-export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase: string, view: (v: SoundView) => void = () => {}) {
+export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase: string, view: (v: SoundView) => void = () => {}, map: SoundMap = FULL_SOUND) {
   const renderer = await createRenderer(host, undefined, { backdrop: true });
-  const audio = roomSound(renderer, soundBase, view);
+  const audio = roomSound(renderer, soundBase, view, map);
   let scene: SceneDef | null = null;
   let state: RoomState | null = null;
+  /** The mood last applied (null: as painted, or changed light by light since). */
+  let moodName: string | null = null;
+  /** What the sound engine gets: a public build's CC0 bed in place of the room's own (and none of its one-off sounds). */
+  const audioScene = (sc: SceneDef): SceneDef => {
+    if (!map.beds || !sc.sound) return sc;
+    const bed = map.beds[sc.id];
+    return { ...sc, sound: { ...sc.sound, bed: bed ? { src: `../../sound/${bed.src}`, level: bed.level } : undefined, sounds: [] } } as SceneDef;
+  };
   const sound = (seconds: number, transition?: 'fade') => {
-    audio.room(state!, scene!, roomsBase, seconds, transition);
+    audio.room(state!, audioScene(scene!), roomsBase, seconds, transition);
     audio.place(scene!, roomsBase, seconds);
   };
   return {
@@ -85,6 +110,7 @@ export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase:
       scene = parsed.data as SceneDef;
       await renderer.loadScene(scene, roomsBase);
       state = defaultState(scene);
+      moodName = null;
       renderer.applyState(state, 0);
       sound(seconds, seconds > 0 ? 'fade' : undefined);
       return Object.keys(scene.presets ?? {});
@@ -98,9 +124,40 @@ export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase:
         if (!preset) return false;
         state = applyPresetTo(state, preset);
       }
+      moodName = name === 'default' ? null : name;
       renderer.applyState(state, seconds);
       sound(seconds);
       return true;
+    },
+    /** The room as it is now (null before one loads), and the mood last applied. */
+    state: (): RoomState | null => state,
+    moodName: (): string | null => moodName,
+    /** The loaded scene (its lights, moods and exits), or null. */
+    scene: (): SceneDef | null => scene,
+    /** Puts a saved room back (the room must already be loaded): its lights, atmosphere and mood. */
+    apply(saved: { mood: string | null; atmosphere: RoomState['atmosphere']; lights: RoomState['lights'] }, seconds = 0): void {
+      if (!scene) return;
+      state = { sceneId: scene.id, lights: saved.lights.map((l) => ({ ...l })), atmosphere: { ...saved.atmosphere } };
+      moodName = saved.mood;
+      renderer.applyState(state, seconds);
+      sound(seconds);
+    },
+    /** One light's brightness and flicker (her set_light). */
+    setLight(id: string, patch: { intensity?: number; flicker?: number }, seconds = 1.5): boolean {
+      if (!state || !state.lights.some((l) => l.id === id)) return false;
+      // The bases stay (as Lowlight's server set_light): turning lamps down then dims the room with them.
+      state = { ...state, lights: state.lights.map((l) => (l.id === id ? { ...l, ...patch } : l)) };
+      moodName = null;
+      renderer.applyState(state, seconds);
+      sound(seconds);
+      return true;
+    },
+    /** Weather, its level and fog (her set_atmosphere). */
+    setAtmosphere(patch: Partial<RoomState['atmosphere']>, seconds = 1.5): void {
+      if (!state) return;
+      state = { ...state, atmosphere: { ...state.atmosphere, ...patch } };
+      renderer.applyState(state, seconds);
+      sound(seconds);
     },
     moods: (): string[] => Object.keys(scene?.presets ?? {}),
     /** The room's name as painted ("Lowlight Intake"), or null before one loads. */

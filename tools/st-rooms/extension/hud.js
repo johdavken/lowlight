@@ -44,7 +44,7 @@ function meter(v) {
 /**
  * @param {{ room: any, map: any, onLowChat: (on: boolean) => void }} deps
  */
-export function mountHud({ room, map, select }) {
+export function mountHud({ room, map, select, roomTools }) {
   const root = el('div', 'llh-root');
   const band = el('div', 'llh-band');
   const bar = el('div', 'llh-bar');
@@ -117,6 +117,19 @@ export function mountHud({ room, map, select }) {
       menu.append(row);
     }
     menu.append(el('div', 'llh-rule'));
+    // CAST: the package's cast, installed or not, and Lowlight's newer cards (dev setups have no package cast).
+    const castInfo = window.lowlightCast?.status();
+    if (castInfo?.isPackage) {
+      const castRow = el('div', 'llh-row');
+      const value = !castInfo.accepted ? 'INSTALL ›' : castInfo.cardUpdates ? `${castInfo.cardUpdates} CARDS HAVE UPDATES · UPDATE CARDS ›` : `INSTALLED · ${castInfo.installed}`;
+      castRow.append(el('span', 'llh-label', 'CAST'), el('span', 'llh-value', value));
+      castRow.addEventListener('click', () => {
+        closeMenu();
+        if (!castInfo.accepted) void window.lowlightCast.install();
+        else if (castInfo.cardUpdates) void window.lowlightCast.updateCards();
+      });
+      menu.append(castRow);
+    }
     const pick = el('div', 'llh-row');
     pick.append(el('span', 'llh-label', 'SELECT'), el('span', 'llh-value', 'WHO YOU ARE · WHO YOU SEE ›'));
     pick.addEventListener('click', () => { closeMenu(); select.open(); });
@@ -128,6 +141,10 @@ export function mountHud({ room, map, select }) {
       menu.append(row);
     }
     menu.append(el('div', 'llh-rule'));
+    const tools = el('div', 'llh-row');
+    tools.append(el('span', 'llh-label', 'HER ROOM TOOLS'), el('span', 'llh-value', !roomTools.isOn() ? 'OFF' : roomTools.canCall() ? 'ON' : 'ON · FUNCTION CALLING OFF'));
+    tools.addEventListener('click', () => { roomTools.set(!roomTools.isOn()); paintMenu(); });
+    menu.append(tools);
     const look = el('div', 'llh-row');
     look.append(el('span', 'llh-label', 'LOOK'), el('span', 'llh-value', 'LOWLIGHT · SWITCH TO SILLYTAVERN'));
     look.addEventListener('click', () => { closeMenu(); SillyTavern.getContext().executeSlashCommandsWithOptions('/lowchat'); });

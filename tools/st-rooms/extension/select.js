@@ -57,14 +57,18 @@ export function mountSelect({ cast, rooms, current, goTo, cue }) {
   function load() {
     const c = SillyTavern.getContext();
     const charByName = new Map(c.characters.map((ch, i) => [ch.name, { ch, i }]));
-    roster.p1 = Object.entries(c.powerUserSettings.personas)
-      .filter(([, name]) => name && name !== '[Unnamed Persona]')
+    const descriptions = c.powerUserSettings.persona_descriptions;
+    const named = Object.entries(c.powerUserSettings.personas).filter(([, name]) => name && name !== '[Unnamed Persona]');
+    // SillyTavern's own first-run persona (its default picture, nothing written) has no figure or file to show: leave
+    // it off the grid when there's anyone else to be.
+    const untouched = ([file]) => file === 'user-default.png' && !descriptions[file]?.description;
+    roster.p1 = (named.some((p) => !untouched(p)) ? named.filter((p) => !untouched(p)) : named)
       .map(([file, name]) => ({
         name,
         file,
         face: charByName.has(name) ? thumb('avatar', charByName.get(name).ch.avatar) : thumb('persona', file),
         figure: getUserAvatar(file),
-        about: c.powerUserSettings.persona_descriptions[file]?.description ?? '',
+        about: descriptions[file]?.description ?? '',
       }));
     // Without cast.json there's no cast to keep to: everyone shows.
     const keep = (ch) => showAll || info.size === 0 || info.has(ch.name);
@@ -75,6 +79,8 @@ export function mountSelect({ cast, rooms, current, goTo, cue }) {
       // SillyTavern keeps sprites in a folder named for the character (Seraphina), not the card file (default_Seraphina.png).
       figure: `/characters/${encodeURIComponent(ch.name)}/neutral.png`,
       fallback: `/characters/${encodeURIComponent(ch.avatar)}`,
+      // Their FILE: the bio a playable character carries as a persona (as on Lowlight's own select screen).
+      about: info.get(ch.name)?.persona?.description ?? '',
     }));
     cursor.p1 = Math.max(0, roster.p1.findIndex((p) => p.file === user_avatar));
     const open = c.characterId !== undefined ? roster.p2.findIndex((r) => r.index === Number(c.characterId)) : -1;
@@ -93,7 +99,7 @@ export function mountSelect({ cast, rooms, current, goTo, cue }) {
     const name = el('div', `lls-name${who.name.length > 8 ? ' long' : ''}`, who.name.toUpperCase());
     box.append(name);
     if (meta?.tagline) box.append(el('div', 'lls-tagline', meta.tagline));
-    if (side === 'p1' && who.about) {
+    if (who.about) {
       box.append(el('div', 'lls-dh', `// FILE ${who.name.toUpperCase()}`));
       const about = el('div', 'lls-about');
       for (const para of who.about.split(/\n\s*\n/)) about.append(el('p', '', para.trim()));

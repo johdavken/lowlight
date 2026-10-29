@@ -296,3 +296,9 @@ body.lowlight-chat #top-settings-holder .drawer-content { pointer-events: auto; 
 /* Every panel opens under the bar: the centred ones and the full-height side ones (characters, AI settings). */
 body.lowlight-chat #top-settings-holder .drawer-content { top: 74px !important; max-height: calc(100dvh - 74px - 70px); }
 body.lowlight-chat #top-settings-holder .drawer-content:is(.fillLeft, .fillRight) { height: calc(100dvh - 74px); max-height: calc(100dvh - 74px); }
+
+/* Her tool calls (SillyTavern saves each as a system message classed toolCall; room-tools.js marks the ones made only of
+   her room tools): hidden in the Lowlight look, so the room just changes. The newest stays, so a failed follow-up shows. */
+body.lowlight-chat #chat .mes.toolCall.ll-room-tool:not(.last_mes) { display: none; }
+/* What she sent with a tool call, superseded by the reply written after it (room-tools.js). */
+body.lowlight-chat #chat .mes.ll-pre-tool { display: none; }

@@ -25,6 +25,30 @@ In the chat box:
 - **Character select** (`/select`, SYS → SELECT, and on its own whenever no chat is open with the Lowlight look on) is Lowlight's select screen. 1P picks who you are from your personas and CPU picks your contact from the Lowlight cast (**A** switches to every SillyTavern character and back, remembered per browser), each with their file, facts and figure. //JACK IN switches persona and opens that chat. The room behind shows the skyline, then each contact's own room once the cursor rests on them, with Lowlight's menu cues. Esc steps back, and closing without jacking in puts the room back.
 - `/lowchat` switches Lowlight's subtitle chat look on or off. It's on by default, and each browser remembers the choice. The look shows no frame, only the newest line over a dark scrim, Plex Mono text, pink actions and a purple underline for typing. Switch it off to see the whole log.
 
+## Publishing the public package
+
+```bash
+npm run st-publish -- --message "Second Socket: a new neon flicker"     # a patch version
+npm run st-publish -- --minor --message "Ines joins the cast"            # a minor version
+```
+
+This builds the public package into its checkout (`~/Projects/lowlight-sillytavern`, or `--repo`):
+- **The build:** the public build (`--public`: no restricted sound, only the songs and the CC0 picks in `cc0-sounds.json`) and the cast (`cast/`).
+- **The package files:** `package/` (LICENSE GPL-3.0-or-later, CONTENT-LICENSE CC BY-NC-SA 4.0, README, CREDITS), plus a generated `THIRD-PARTY-LICENSES.md`.
+- **Version and changelog:** bumps the version and adds the changelog line.
+- **The guard:** checks every file git would commit (`guard.ts`: audio must be Suno or CC0 in a credits file; everything else must be on the allowlist).
+- **The commit:** it commits once. It never pushes.
+
+Create the checkout once with `git init -b main`, set `user.email` to the GitHub noreply address, and add the remote. Players install from the repo URL, and SillyTavern's Update button pulls new commits.
+
+**The install run** (no model calls) runs a fresh SillyTavern per case on port 8011:
+
+```bash
+npx tsx tools/st-rooms/e2e/package.e2e.ts --package ~/Projects/lowlight-sillytavern
+```
+
+It covers: Y at the welcome, then the cast, personas, lore book and function calling; her tool moving the room, saved on the message and back after a reload; an update adding a character and refreshing a sprite; and N, then SYS → CAST → INSTALL. It needs the GPU (Vulkan), because in software the live room starves the installer.
+
 ## The cast
 
 ```bash

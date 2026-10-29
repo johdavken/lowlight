@@ -57,7 +57,3 @@ npm run e2e
 
 - `npm run dev` and `npm start`: in `data/` (playthroughs, settings, bug reports). It's git-ignored.
 - The desktop app: in the app's user data folder.
-
-## Why some sounds are silent
-
-The official builds on itch.io use some licensed sound effects for the menus and the minigames, whose licenses allow them inside a finished game but not as files in a public repository. This repository leaves them out, and the game skips them quietly. Every sound's source and license is listed in `sounds/CREDITS.md`.

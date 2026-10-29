@@ -4,10 +4,14 @@ import { mountMap, mountRoom } from './lowlight-room.js';
 import { getUserAvatar, user_avatar } from '../../../personas.js';
 import { mountHud } from './hud.js';
 import { mountSelect } from './select.js';
+import { mountRoomTools } from './room-tools.js';
+import { planInstall, planSettings } from './lowlight-room.js';
+import { runInstall, updateCards, lowlightSettings } from './installer.js';
+import { showNotice, showWelcome } from './welcome.js';
 
 const BASE = new URL('./rooms/', import.meta.url).href;
 // The bundle's stylesheet (the map, its fonts) and the map's rules copied from the game's: SillyTavern loads only style.css.
-for (const css of ['lowlight-room.css', 'map-game.css', 'panels.css', 'select.css']) {
+for (const css of ['lowlight-room.css', 'map-game.css', 'panels.css', 'select.css', 'welcome.css']) {
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = new URL(`./${css}`, import.meta.url).href;
@@ -15,7 +19,15 @@ for (const css of ['lowlight-room.css', 'map-game.css', 'panels.css', 'select.cs
 }
 const ROOMS = await (await fetch(new URL('./rooms.json', import.meta.url))).json();
 /** The cast's details and personas (npm run st-cast writes cast.json); {} before it has run. */
-const cast = await fetch(new URL('./cast.json', import.meta.url)).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
+/** The cast (cast.json): the package's cast/cast.json, else the one npm run st-cast writes beside the extension; {} with neither. */
+const fetchJson = (rel) => fetch(new URL(rel, import.meta.url)).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const packageCast = await fetchJson('./cast/cast.json');
+/** The package installs its own cast (welcome, installer); a developer's own setup (npm run st-cast) already has it. */
+const IS_PACKAGE = Boolean(packageCast);
+const CAST_BASE = new URL('./cast/', import.meta.url).href;
+const cast = packageCast ?? (await fetchJson('./cast.json')) ?? {};
+/** Each room's name and district, for her room line (build.ts writes it). */
+const META = await fetch(new URL('./rooms-meta.json', import.meta.url)).then((r) => (r.ok ? r.json() : {})).catch(() => ({}));
 
 const host = document.createElement('div');
 host.id = 'lowlight-room';
@@ -40,7 +52,9 @@ function showSound(v) {
         : 'Lowlight sound: click anywhere to start it';
 }
 
-const room = await mountRoom(host, BASE, new URL('./sound/', import.meta.url).href, showSound);
+/** Which shared sounds this build has (build.ts): the full set in a developer's own build, CC0 picks or nothing in the public package. */
+const SOUND_MAP = await fetchJson('./sound-map.json');
+const room = await mountRoom(host, BASE, new URL('./sound/', import.meta.url).href, showSound, SOUND_MAP ?? undefined);
 speaker.addEventListener('click', () => room.audio.toggleMute());
 speaker.addEventListener('wheel', (e) => {
   e.preventDefault();
@@ -68,9 +82,20 @@ let current = ROOMS.includes('lowlight-intake') ? 'lowlight-intake' : ROOMS[0];
 await room.load(current);
 
 /** Fades to another room. */
-async function goTo(folder) {
-  await room.renderer.playTransition('fade', async () => { await room.load(folder, 1.2); });
-  current = folder;
+/** Room changes run one after another, whoever asks (a chat's saved room, the select, the map, her go_to): two fades
+ * at once could finish in either order and leave the wrong room showing. */
+let goChain = Promise.resolve();
+function goTo(folder) {
+  goChain = goChain
+    .then(() =>
+      // `current` changes the moment the new room loads (mid-fade), so the room and its name never disagree.
+      room.renderer.playTransition('fade', async () => {
+        await room.load(folder, 1.2);
+        current = folder;
+      }),
+    )
+    .catch((e) => console.warn('[lowlight] changing room failed', e));
+  return goChain;
 }
 
 // The travel note (Lowlight's [travel] line): her next reply is told you both just arrived. Cleared once she has answered.
@@ -90,6 +115,7 @@ const map = mountMap(mapHost, {
   canGo: (folder) => ROOMS.includes(folder),
   onTravel: async (place, folder) => {
     await goTo(folder);
+    yourChange();
     const c = SillyTavern.getContext();
     if (c.characterId === undefined) return;
     travelNote(`[travel: ${c.name1} has just walked you both to ${place.name}; you've just arrived together. Answer arriving there in one beat, in character, shaped by the place and the moment.]`);
@@ -105,11 +131,34 @@ const select = mountSelect({
   rooms: ROOMS,
   current: () => current,
   goTo,
-  cue: (name) => room.audio.cue(new URL(`./sound/ui/${name}.ogg`, import.meta.url).href, CUES[name] * 0.25),
+  // A cue this build doesn't have stays silent (the public package: until CC0 cues are picked).
+  cue: (name) => {
+    const file = SOUND_MAP ? SOUND_MAP.cues[name] : `ui/${name}.ogg`;
+    if (file) room.audio.cue(new URL(`./sound/${file}`, import.meta.url).href, CUES[name] * 0.25);
+  },
 });
 window.lowlightSelect = select;
 // Lowlight's Keys bar in place of SillyTavern's top bar (with /lowchat on).
-mountHud({ room, map, select });
+// Her room tools, her room line, and the room saved on every message (on unless SYS → HER ROOM TOOLS is off).
+const settings = () => {
+  const es = SillyTavern.getContext().extensionSettings;
+  es.lowlight ??= {};
+  return es.lowlight;
+};
+const roomTools = mountRoomTools({ room, cast, rooms: ROOMS, meta: META, current: () => current, goTo, idle: () => goChain });
+roomTools.setEnabled(settings().tools !== false);
+window.lowlightRoomTools = roomTools;
+const setRoomTools = (on) => {
+  settings().tools = on;
+  SillyTavern.getContext().saveSettingsDebounced();
+  roomTools.setEnabled(on);
+};
+/** A room change of yours (/room, /mood, the map): saved on the newest message, and her line follows. */
+const yourChange = async () => {
+  await roomTools.stamp();
+  roomTools.refreshLine();
+};
+mountHud({ room, map, select, roomTools: { isOn: () => roomTools.isEnabled(), canCall: () => roomTools.canCall(), set: setRoomTools } });
 
 // A map icon in SillyTavern's top bar.
 const mapBtn = document.createElement('div');
@@ -127,11 +176,12 @@ window.addEventListener('keydown', (e) => {
 });
 
 const { SlashCommandParser, SlashCommand, SlashCommandArgument, ARGUMENT_TYPE, eventSource, eventTypes } = SillyTavern.getContext();
-// The cast's personas (npm run st-cast writes cast.json): any missing is added; one you've edited is left alone.
-try {
+// Dev setup only (npm run st-cast writes cast.json beside the extension): the cast's personas, any missing added, one
+// you've edited left alone. The package's installer does this for its own cast.
+if (!IS_PACKAGE) try {
   const pu = SillyTavern.getContext().powerUserSettings;
   let added = 0;
-  for (const p of cast.personas ?? []) {
+  for (const p of (cast.characters ?? []).map((c) => c.persona).filter(Boolean)) {
     // SillyTavern registers a new picture by itself as an unnamed, empty persona: that one still counts as missing.
     const unnamed = !pu.personas[p.file] || (pu.personas[p.file] === '[Unnamed Persona]' && !pu.persona_descriptions[p.file]?.description);
     if (!unnamed) continue;
@@ -158,6 +208,7 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
     const name = String(folder).trim();
     if (!ROOMS.includes(name)) return `No room ${name}. Rooms: ${ROOMS.join(', ')}`;
     await goTo(name);
+    yourChange();
     return `Moods: ${room.moods().join(', ')}`;
   },
 }));
@@ -190,8 +241,101 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
   },
 }));
 
-// No chat open (SillyTavern's welcome screen): the select stands in for it, with the Lowlight look on.
-const selectIfNoChat = () => {
+// ── The package's cast (spec 2026-10-23 §3): ask once, install, then on each update add new characters and refresh art ──
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+/** The latest line of the package's CHANGELOG.md (its first "- " line), or ''. */
+const latestChange = async () => {
+  const text = await fetch(new URL('./CHANGELOG.md', import.meta.url)).then((r) => (r.ok ? r.text() : '')).catch(() => '');
+  return (/^- (.+)$/m.exec(text)?.[1] ?? '').trim();
+};
+const namesOf = (ids) => ids.map((id) => cast.characters.find((c) => c.id === id)?.name ?? id).map((n) => n.toUpperCase()).join(', ');
+/** The plan for this load (what to install, refresh, offer), from SillyTavern's own lists. */
+const castPlan = () => {
+  const c = SillyTavern.getContext();
+  return planInstall(cast, lowlightSettings(), { cards: c.characters.map((ch) => ({ name: ch.name, avatar: ch.avatar })), personas: c.powerUserSettings.personas });
+};
+async function installNow() {
+  const s = lowlightSettings();
+  const firstVersion = !s.version;
+  const plan = castPlan();
+  const result = plan.install.length || plan.refresh.length || plan.lore ? await runInstall(plan, cast, CAST_BASE) : { done: [], failed: [] };
+  const lines = [];
+  if (plan.isNew.length) lines.push(`NEW IN LOWLIGHT: ${namesOf(plan.isNew.filter((id) => result.done.includes(id)))}`);
+  else if (firstVersion && result.done.length) lines.push(`INSTALLED: ${result.done.length} CHARACTERS`);
+  if (plan.skip.length) lines.push(`KEPT YOUR OWN: ${namesOf(plan.skip.map((k) => k.id))}`);
+  if (result.failed.length) lines.push(`COULDN'T INSTALL: ${namesOf(result.failed.map((f) => f.id))} (they'll try again next time)`);
+  if (s.version && s.version !== cast.version) lines.push(await latestChange());
+  // The version is only recorded once everything went in, so a failure tries again on the next load.
+  if (!result.failed.length) s.version = cast.version;
+  SillyTavern.getContext().saveSettingsDebounced();
+  showNotice(lines);
+}
+/** Resolves once SillyTavern's own first-run dialog (its persona prompt) has closed: browser dialogs sit above all. */
+async function noDialogOpen() {
+  while (document.querySelector('dialog[open]')) await wait(400);
+}
+const castReady = (async () => {
+  if (!IS_PACKAGE || !cast.characters?.length) return;
+  // Once SillyTavern has its characters (APP_READY replays to late listeners), so the plan sees what's really there.
+  await new Promise((r) => eventSource.once(eventTypes.APP_READY, r));
+  await wait(800);
+  const s = lowlightSettings();
+  if (!s.answered) {
+    await noDialogOpen();
+    // What Y would change, worked out now so the welcome can say so (SillyTavern's settings, shared by all chats).
+    const c = SillyTavern.getContext();
+    const settings = planSettings({
+      mainApi: String(c.mainApi ?? ''),
+      functionCalling: Boolean(document.getElementById('openai_function_calling')?.checked),
+      context: Number(c.chatCompletionSettings?.openai_max_context ?? 0),
+    });
+    const yes = await showWelcome(cast, settings.changes);
+    s.answered = true;
+    s.accepted = yes;
+    if (yes) {
+      const cb = document.getElementById('openai_function_calling');
+      if (settings.functionCalling && cb) {
+        cb.checked = true;
+        cb.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      // SillyTavern's untouched default (4,095 tokens, 1,500 kept for the reply) leaves no room for the chat once a
+      // Lowlight card, the roleplay guide and the lore are in: the live check saw her answer with no history at all.
+      const ctxSlider = document.getElementById('openai_max_context');
+      if (settings.context && ctxSlider) {
+        ctxSlider.value = settings.context;
+        ctxSlider.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+      const lines = [...settings.changes, ...settings.advice];
+      if (lines.length) showNotice(['SETTINGS FOR LOWLIGHT', ...lines]);
+    }
+    SillyTavern.getContext().saveSettingsDebounced();
+  }
+  if (s.accepted) await installNow();
+})();
+window.lowlightCast = {
+  /** SYS → CAST's line: accepted or not, how many installed, how many cards have updates. */
+  status: () => {
+    const s = lowlightSettings();
+    return { isPackage: IS_PACKAGE, accepted: Boolean(s.accepted), installed: s.installed.length, cardUpdates: s.accepted ? castPlan().cardUpdates.length : 0 };
+  },
+  install: async () => {
+    const s = lowlightSettings();
+    s.answered = true;
+    s.accepted = true;
+    await installNow();
+    select.open();
+  },
+  updateCards: async () => {
+    const ids = castPlan().cardUpdates;
+    await updateCards(ids, cast, CAST_BASE);
+    showNotice([`CARDS UPDATED: ${namesOf(ids)}`]);
+  },
+};
+
+// No chat open (SillyTavern's welcome screen): the select stands in for it, with the Lowlight look on, once the
+// package's welcome (if any) is answered.
+const selectIfNoChat = async () => {
+  await castReady;
   if (document.body.classList.contains('lowlight-chat') && SillyTavern.getContext().characterId === undefined) select.open();
 };
 eventSource.on(eventTypes.CHAT_CHANGED, selectIfNoChat);
@@ -234,5 +378,9 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
   name: 'mood',
   helpString: 'Lowlight room mood (or "default").',
   unnamedArgumentList: [SlashCommandArgument.fromProps({ description: 'mood name', typeList: [ARGUMENT_TYPE.STRING], isRequired: true })],
-  callback: (_args, name) => (room.mood(String(name).trim()) ? '' : `Moods: ${room.moods().join(', ')}, default`),
+  callback: (_args, name) => {
+    if (!room.mood(String(name).trim())) return `Moods: ${room.moods().join(', ')}, default`;
+    yourChange();
+    return '';
+  },
 }));

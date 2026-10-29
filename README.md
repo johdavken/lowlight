@@ -82,11 +82,11 @@ about you, the hour, where they said they'd be next, and what they promised to t
 reply forgets to and catches the lights they forgot to dim. Nothing it keeps lives in the chat, so the model
 can't talk its way out of it.
 
-**Cipher** (coming next) is the part of the Ledger you never get to read. The city keeps secrets: what someone
+**Cipher** is the part of the Ledger you never get to read. The city keeps secrets: what someone
 hides about themselves, what's between two people, what a place really is, what's moving in the streets, and
-what grew out of your own playthrough. The Residual keeps two or three of them open at a time, and only the
-people who'd know a secret are told it, so they guard it the way they would. Clues surface in the story over
-time. What you notice goes into LOOSE ENDS on the PEOPLE screen, where and when you saw it, and a truth only
+what grew out of your own playthrough. A few replies into a story the Residual decides two or three, and only the
+people who'd know a secret are told it, and they guard it, avoid it or let it slip. Clues surface in the story over
+time. What you notice goes into PEOPLE → LOOSE ENDS (Alt+O), where and when you saw it, and a truth only
 shows there once you've learned it.
 
 <br clear="right">

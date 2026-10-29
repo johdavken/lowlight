@@ -31,6 +31,11 @@ function check(what: string, ok: boolean, detail = '') {
 }
 
 async function startST(): Promise<{ root: string; ext: string; proc: ChildProcess }> {
+  // A package installed for all users (public/…/third-party) shadows the copy under test: every check would test it.
+  if (fs.existsSync(path.join(ST, 'public', 'scripts', 'extensions', 'third-party', EXT))) {
+    console.error(`${ST} has ${EXT} installed for all users, which would be tested instead of ${PKG}. Run on a copy without it:\n  rsync -a --exclude /data --exclude '/public/scripts/extensions/third-party/*' --exclude /.git ${ST}/ <copy>/ && … --st <copy>`);
+    process.exit(1);
+  }
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'st-e2e-'));
   const proc = spawn('node', ['server.js', '--port', String(PORT), '--dataRoot', root, '--listen', 'false', '--browserLaunchEnabled', 'false'], { cwd: ST, stdio: ['ignore', 'pipe', 'ignore'] });
   await new Promise<void>((resolve, reject) => {
@@ -46,6 +51,24 @@ async function startST(): Promise<{ root: string; ext: string; proc: ChildProces
   const ext = path.join(root, 'default-user', 'extensions', EXT);
   fs.cpSync(PKG, ext, { recursive: true, filter: (src) => path.basename(src) !== '.git' });
   return { root, ext, proc };
+}
+
+/** E2E_CONSOLE=1: the page's errors and Lowlight's warnings, as they happen (for a run that fails in the page). */
+function watchConsole(page: Page): void {
+  if (process.env.E2E_CONSOLE !== '1') return;
+  page.on('console', (m) => {
+    if (m.type() === 'error' || /lowlight/i.test(m.text())) console.log(`  [page ${m.type()}] ${m.text().slice(0, 240)}`);
+  });
+  page.on('pageerror', (e) => console.log(`  [page crash] ${String(e).slice(0, 240)}`));
+  page.on('load', () => console.log('  [page load]'));
+}
+
+/** Stops a SillyTavern startST began and deletes its data folder (each is a few hundred MB, in /tmp's RAM). */
+async function stopST(st: { root: string; proc: ChildProcess }): Promise<void> {
+  const exited = new Promise((resolve) => st.proc.once('exit', resolve));
+  st.proc.kill();
+  await Promise.race([exited, new Promise((r) => setTimeout(r, 10_000))]);
+  fs.rmSync(st.root, { recursive: true, force: true });
 }
 
 /** Passes SillyTavern's own first-run persona prompt, if it's up, keeping its default name as a new player does. */
@@ -80,6 +103,7 @@ async function runAccepted() {
   const st = await startST();
   const browser = await chromium.launch({ args: GL_ARGS });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  watchConsole(page);
   // tsx keeps function names with a __name() helper that the page doesn't have.
   await page.addInitScript('globalThis.__name = (f) => f;');
   try {
@@ -129,14 +153,33 @@ async function runAccepted() {
     check("SillyTavern's default User isn't a 1P tile, and no one is there twice", p1Tiles.length > 0 && !p1Tiles.includes('USER') && new Set(p1Tiles).size === p1Tiles.length, p1Tiles.join(', '));
     await page.keyboard.press('Enter');
     check('1P locks in', await until(page, "document.querySelector('.lls-root')?.dataset.phase === 'p2'"));
+    const contacts = await page.evaluate<string[]>("[...document.querySelectorAll('.lls-tile-name')].map((n) => n.textContent)");
+    const residents = ['HAE', 'TILLY', 'VESNA', 'OKSANA', 'GARRO'];
+    check("the contact grid leaves out the game's residents", contacts.includes('NIX') && !contacts.some((n) => residents.includes(n)), contacts.join(', '));
+    // As Lowlight's own select screen: the menu theme plays over the room behind (which drops to a quarter).
+    const theme = (JSON.parse(fs.readFileSync(path.join(PKG, 'sound-map.json'), 'utf8')) as { theme?: string | null }).theme ?? null;
+    check('the select plays the menu theme', theme !== null && (await until(page, `decodeURIComponent(window.lowlightRoom.audio.state().musicUrl ?? '').endsWith(${JSON.stringify(theme ?? '-')})`, 15_000)), String(theme));
     await page.locator('.lls-tile', { hasText: 'NIX' }).first().click();
     const aiFile = await page.evaluate<{ head: string; about: number }>(
       "({ head: document.querySelector('.lls-p2 .lls-dh')?.textContent ?? '', about: document.querySelector('.lls-p2 .lls-about')?.textContent.length ?? 0 })",
     );
     check("the AI side shows the contact's FILE", aiFile.head === '// FILE NIX' && aiFile.about > 200, JSON.stringify(aiFile));
-    await page.keyboard.press('n');
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('Escape');
+    // Jack in: the chat opens with the persona picked, locked to the chat (else SillyTavern's default persona wins,
+    // and it warns that the pick is temporary).
+    const p1Name = await page.evaluate<string>("document.querySelector('.lls-p1 .lls-name')?.textContent ?? ''");
+    await page.keyboard.press('y');
+    const jacked = await until(page, "SillyTavern.getContext().characters[SillyTavern.getContext().characterId]?.name === 'Nix'", 30_000);
+    // The persona is set once the chat has loaded, a moment after it opens.
+    await until(page, '!!SillyTavern.getContext().chatMetadata?.persona', 15_000);
+    const persona = await page.evaluate<{ name: string; locked: string | null }>(
+      "(() => { const c = SillyTavern.getContext(); const f = c.chatMetadata?.persona ?? null; return { name: c.name1, locked: f ? c.powerUserSettings.personas[f] : null }; })()",
+    );
+    check('jacking in opens the chat as the persona picked, locked to the chat', jacked && persona.name.toUpperCase() === p1Name && persona.locked?.toUpperCase() === p1Name, `${p1Name} → ${JSON.stringify(persona)}`);
+
+    check('closing the select hands the music back to the room', await until(page, "!decodeURIComponent(window.lowlightRoom.audio.state().musicUrl ?? '').includes('/sound/music/')", 15_000));
+    // The key presses above unlocked the sound: the rain is the recording, not the engine's synthesized noise.
+    const rain = await until(page, "window.lowlightRoom?.audio?.state?.().rain === 'recorded'", 20_000);
+    check('the rain is the recording, not synthesized', rain, String(await page.evaluate("window.lowlightRoom?.audio?.state?.().rain")));
 
     // Her tools: the room follows, is saved on the message, and comes back after a reload.
     const tools = await inPage<any>(page, async () => {
@@ -152,6 +195,8 @@ async function runAccepted() {
     check("her apply_mood moves the room and is saved on the message", tools.res === 'applied:' && tools.mood === 'storm' && tools.saved === 'storm', JSON.stringify(tools));
     await page.reload();
     await page.waitForTimeout(8000);
+    // The extension loads after SillyTavern's own scripts: wait for it rather than for a fixed time.
+    await until(page, '!!window.lowlightSelect && !!window.lowlightRoom', 60_000);
     const after = await inPage<any>(page, async () => {
       const w = (ms: number) => new Promise((r) => setTimeout(r, ms));
       const c = SillyTavern.getContext();
@@ -188,7 +233,7 @@ async function runAccepted() {
     check('the changed sprites are uploaded again', fs.statSync(cassSprite).mtimeMs > spriteBefore);
   } finally {
     await browser.close();
-    st.proc.kill();
+    await stopST(st);
   }
 }
 
@@ -200,6 +245,7 @@ async function runOwnContext() {
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/"openai_max_context": *\d+/, '"openai_max_context": 8192'));
   const browser = await chromium.launch({ args: GL_ARGS });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  watchConsole(page);
   await page.addInitScript('globalThis.__name = (f) => f;');
   try {
     await page.goto(URL);
@@ -219,7 +265,7 @@ async function runOwnContext() {
     check('the notice advises 16k+', notice.includes('8,192') && notice.includes('16K'), notice);
   } finally {
     await browser.close();
-    st.proc.kill();
+    await stopST(st);
   }
 }
 
@@ -228,6 +274,7 @@ async function runDeclined() {
   const st = await startST();
   const browser = await chromium.launch({ args: GL_ARGS });
   const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  watchConsole(page);
   // tsx keeps function names with a __name() helper that the page doesn't have.
   await page.addInitScript('globalThis.__name = (f) => f;');
   try {
@@ -248,7 +295,7 @@ async function runDeclined() {
     check('INSTALL from SYS installs the cast', await until(page, "SillyTavern.getContext().characters.some((c) => c.name === 'Cass')"));
   } finally {
     await browser.close();
-    st.proc.kill();
+    await stopST(st);
   }
 }
 

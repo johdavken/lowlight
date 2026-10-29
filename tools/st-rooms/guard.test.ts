@@ -1,15 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { PACKAGE_ALLOW, checkShipList, publicAudio } from './guard';
+import os from 'node:os';
+import { PACKAGE_ALLOW, checkShipList, publicAudio, publicPackageAudio } from './guard';
 
 const credits = fs.readFileSync(path.join(__dirname, '../../sounds/CREDITS.md'), 'utf8');
 const allowed = publicAudio(credits);
 
 describe('publish guard', () => {
-  it('a restricted sound stops it', () => {
-    expect(checkShipList(['rooms/noodle-stall/sound/street-crowd-sizzle.ogg'], allowed, PACKAGE_ALLOW)).toEqual(['rooms/noodle-stall/sound/street-crowd-sizzle.ogg']);
-  });
 
   it('songs pass', () => {
     expect(checkShipList(['rooms/_music/Nix.ogg', 'rooms/_music/What Hae Serves.ogg'], allowed, PACKAGE_ALLOW)).toEqual([]);
@@ -19,10 +17,26 @@ describe('publish guard', () => {
     expect(checkShipList(['art/nix/nix.kra', 'data/settings.json'], allowed, PACKAGE_ALLOW)).toEqual(['art/nix/nix.kra', 'data/settings.json']);
   });
 
-  it('the real credits: songs and CC0 in, Sonniss and mixes out', () => {
-    expect(checkShipList(['rooms/_music/Nix.ogg'], allowed, PACKAGE_ALLOW)).toEqual([]);
-    expect(checkShipList(['sound/rain-light.ogg', 'rooms/lowlight-intake/sound/office-heater.ogg'], allowed, PACKAGE_ALLOW)).toHaveLength(2);
-    expect([...allowed].length).toBeGreaterThanOrEqual(10);
+  it('the real credits: songs, the ElevenLabs rain and room beds, and the CC0 cues go in (CREDITS decides, as for the public repo)', () => {
+    const repo = path.join(__dirname, '../..');
+    const files = ['rooms/_music/Nix.ogg', 'sound/rain-light.ogg', 'sound/thunder/near-1.ogg', 'rooms/lowlight-intake/sound/office-heater.ogg', 'rooms/noodle-stall/sound/street-crowd-sizzle.ogg', 'sound/mission/tick.ogg', 'sound/music/Glass Floor (Glass Door Remix).ogg'];
+    expect(checkShipList(files, publicPackageAudio(files, repo, credits), PACKAGE_ALLOW)).toEqual([]);
+  });
+
+  it('a restricted room sound, rain or song stops it, and so does audio CREDITS never mentions', () => {
+    const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'st-guard-'));
+    for (const f of ['scenes/k/bar/sound/bed.ogg', 'scenes/k/_music/Song.ogg', 'web/public/sound/rain-light.ogg', 'web/public/sound/new.ogg']) {
+      fs.mkdirSync(path.dirname(path.join(repo, f)), { recursive: true });
+      fs.writeFileSync(path.join(repo, f), 'ogg');
+    }
+    const fixture = [
+      '## Files', '', '| File (in each scene folder) | Used by | Source | Edits |', '|---|---|---|---|', '| `sound/bed.ogg` | k/bar | GDC 2017 · x · `a.wav` | — |', '',
+      '### Shared (all scenes): `web/public/sound/`', '', '| File | Used for | Source | Edits |', '|---|---|---|---|', '| `rain-light.ogg` | rain | GDC · y · `b.wav` | — |', '',
+      '## Music: Suno (Pro plan)', '', '| File | Used for | Source | Edits |', '|---|---|---|---|', '| `scenes/k/_music/Song.ogg` | song | Suno · "Song" | — |', '',
+    ].join('\n');
+    const files = ['rooms/bar/sound/bed.ogg', 'sound/rain-light.ogg', 'sound/new.ogg', 'rooms/_music/Song.ogg'];
+    expect(checkShipList(files, publicPackageAudio(files, repo, fixture), PACKAGE_ALLOW)).toEqual(['rooms/bar/sound/bed.ogg', 'sound/rain-light.ogg', 'sound/new.ogg']);
+    fs.rmSync(repo, { recursive: true, force: true });
   });
 
   it('audio is cleared by its path, not its name: a restricted file named like a cleared one stops it', () => {

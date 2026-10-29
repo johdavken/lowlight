@@ -131,6 +131,7 @@ const select = mountSelect({
   rooms: ROOMS,
   current: () => current,
   goTo,
+  menu: (on) => room.menu(on),
   // A cue this build doesn't have stays silent (the public package: until CC0 cues are picked).
   cue: (name) => {
     const file = SOUND_MAP ? SOUND_MAP.cues[name] : `ui/${name}.ogg`;

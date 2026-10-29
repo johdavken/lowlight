@@ -9,6 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'vite';
 import { mapRules } from './map-rules';
+import { audioStatus } from '../release/credits';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
@@ -18,9 +19,14 @@ function arg(name: string): string | undefined {
   return i >= 0 ? process.argv[i + 1] : undefined;
 }
 
-/** --public: the package build. No restricted sound ships: rooms lose their sound/ folders, and rain, thunder, room beds
- * and menu cues are the CC0 picks in cc0-sounds.json (files in tools/st-rooms/cc0/), or silent. */
+/** --public: the package build. Only sound sounds/CREDITS.md marks public ships (audioStatus, as for the public repo):
+ * the rooms' own sounds, rain, thunder and menu cues when cleared; for anything still restricted, the CC0 picks in
+ * cc0-sounds.json (files in tools/st-rooms/cc0/), or silence. */
 const isPublic = process.argv.includes('--public');
+const AUDIO = /\.(ogg|mp3|wav|opus|flac|m4a)$/i;
+/** Whether a repo audio file may ship in a public build (always true for the author's own build). */
+const creditsStatus = audioStatus(fs.readFileSync(path.join(repo, 'sounds', 'CREDITS.md'), 'utf8'));
+const ships = (abs: string) => !isPublic || creditsStatus(path.relative(repo, abs).split(path.sep).join('/')) === 'public';
 
 const out = path.resolve(arg('out') ?? path.join(os.homedir(), 'Projects/SillyTavern/data/default-user/extensions/lowlight-rooms'));
 
@@ -70,7 +76,7 @@ for (const file of fs.readdirSync(path.join(here, 'extension'))) {
 // (a room without a district reads its songs from its base's _music/).
 fs.rmSync(path.join(out, 'rooms'), { recursive: true, force: true });
 for (const room of rooms) {
-  fs.cpSync(all.get(room)!, path.join(out, 'rooms', room), { recursive: true, filter: (src) => !(isPublic && path.basename(src) === 'sound') });
+  fs.cpSync(all.get(room)!, path.join(out, 'rooms', room), { recursive: true, filter: (src) => !(isPublic && AUDIO.test(src) && !ships(src)) });
 }
 fs.mkdirSync(path.join(out, 'rooms', '_music'), { recursive: true });
 for (const district of fs.readdirSync(path.join(repo, 'scenes'))) {
@@ -91,11 +97,16 @@ interface SoundMap {
   /** Public builds: each room's CC0 bed (null: the rooms' own beds). */
   beds: Record<string, { src: string; level: number }> | null;
   cues: Record<string, string>;
+  theme?: string | null;
 }
 fs.rmSync(path.join(out, 'sound'), { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'sound'), { recursive: true });
 let soundMap: SoundMap;
-if (isPublic) {
+const shared = path.join(repo, 'web', 'public', 'sound');
+const sharedPublic = (f: string) => ships(path.join(shared, f));
+const thunderTakes = fs.readdirSync(path.join(shared, 'thunder'));
+const uiCues = fs.readdirSync(path.join(shared, 'ui'));
+if (isPublic && !(sharedPublic('rain-light.ogg') && sharedPublic('rain-heavy.ogg') && thunderTakes.every((t) => sharedPublic(`thunder/${t}`)) && uiCues.every((u) => sharedPublic(`ui/${u}`)))) {
   const cc0 = JSON.parse(fs.readFileSync(path.join(here, 'cc0-sounds.json'), 'utf8')) as Omit<SoundMap, 'thunder'> & { thunder: string[] };
   const files = [
     ...(cc0.rain ? [cc0.rain.light, cc0.rain.heavy] : []),
@@ -109,6 +120,8 @@ if (isPublic) {
   }
   soundMap = { rain: cc0.rain, thunder: cc0.thunder, beds: cc0.beds ?? {}, cues: cc0.cues };
 } else {
+  // The game's own rain, thunder and menu cues: always for the author's own build, and for the public one once
+  // CREDITS clears every one of them (the ElevenLabs swap of 2026-10-28 did).
   for (const f of ['rain-light.ogg', 'rain-heavy.ogg']) fs.copyFileSync(path.join(repo, 'web', 'public', 'sound', f), path.join(out, 'sound', f));
   fs.cpSync(path.join(repo, 'web', 'public', 'sound', 'thunder'), path.join(out, 'sound', 'thunder'), { recursive: true });
   // The menu cues (the select screen's move, lock and VS).
@@ -120,6 +133,14 @@ if (isPublic) {
     cues: Object.fromEntries(fs.readdirSync(path.join(out, 'sound', 'ui')).map((f) => [f.replace(/\.ogg$/, ''), `ui/${f}`])),
   };
 }
+// The menu theme the select screen plays: the splash library's theme, as the game's own select plays it.
+const themeFile = (JSON.parse(fs.readFileSync(path.join(repo, 'world', 'splash', 'splashes.json'), 'utf8')) as { theme?: { file?: string } }).theme?.file;
+const themeSrc = themeFile ? path.join(repo, 'world', 'splash', 'music', themeFile) : null;
+if (themeSrc && fs.existsSync(themeSrc) && ships(themeSrc)) {
+  fs.mkdirSync(path.join(out, 'sound', 'music'), { recursive: true });
+  fs.copyFileSync(themeSrc, path.join(out, 'sound', 'music', themeFile!));
+  soundMap.theme = `music/${themeFile}`;
+} else soundMap.theme = null;
 fs.writeFileSync(path.join(out, 'sound-map.json'), JSON.stringify(soundMap));
 
 fs.writeFileSync(path.join(out, 'rooms.json'), JSON.stringify(rooms));

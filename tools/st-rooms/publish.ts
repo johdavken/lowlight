@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PACKAGE_ALLOW, checkShipList, publicAudio } from './guard';
+import { PACKAGE_ALLOW, checkShipList, publicAudio, publicPackageAudio } from './guard';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '../..');
@@ -58,7 +58,8 @@ fs.writeFileSync(path.join(repo, 'THIRD-PARTY-LICENSES.md'), thirdParty());
 
 // 3. The guard, over everything git would commit, before the version and changelog are written.
 const files = git('ls-files', '--cached', '--others', '--exclude-standard').split('\n').filter(Boolean);
-const allowed = publicAudio(fs.readFileSync(path.join(root, 'sounds', 'CREDITS.md'), 'utf8') + '\n' + fs.readFileSync(path.join(repo, 'CREDITS.md'), 'utf8'));
+// Lowlight's own sounds as sounds/CREDITS.md decides them (as for the public repo), and the package's own CC0 credits.
+const allowed = new Set([...publicPackageAudio(files, root, fs.readFileSync(path.join(root, 'sounds', 'CREDITS.md'), 'utf8')), ...publicAudio(fs.readFileSync(path.join(repo, 'CREDITS.md'), 'utf8'))]);
 const bad = checkShipList(files, allowed, PACKAGE_ALLOW);
 if (bad.length) {
   console.error(`Not published: these may not ship:\n  ${bad.join('\n  ')}`);

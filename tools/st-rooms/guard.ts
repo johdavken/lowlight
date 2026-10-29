@@ -1,6 +1,8 @@
 // The publish guard (spec 2026-10-23 §2): the public package never ships a restricted sound (Sonniss, Bleeoop,
 // JDSherbert: their licenses forbid redistributing the raw files) or anything outside its allowlist.
+import fs from 'node:fs';
 import path from 'node:path';
+import { audioStatus } from '../release/credits';
 
 const AUDIO = /\.(ogg|mp3|wav|opus|flac|m4a)$/i;
 
@@ -28,6 +30,38 @@ export function publicAudio(credits: string): Set<string> {
     const restricted = /gdc|sonniss|bleeoop|interface bleeps|sherbert/.test(source);
     const open = /suno|cc0|glitch noises|zharkov/.test(source);
     if (open && !restricted) for (const n of names) out.add(n);
+  }
+  return out;
+}
+
+/**
+ * Where a package audio file comes from in the repo: rooms/_music/<song> from a district's _music/, rooms/<folder>/…
+ * from scenes/<district>/<folder>/…, sound/… from web/public/sound/… (sound/music/… also from world/splash/music/). Null
+ * when the repo has no such file.
+ */
+function repoPathOf(repo: string, rel: string): string | null {
+  const parts = rel.split('/');
+  const districts = () => (fs.existsSync(path.join(repo, 'scenes')) ? fs.readdirSync(path.join(repo, 'scenes')) : []);
+  const found = (candidates: string[]) => candidates.find((c) => fs.existsSync(path.join(repo, c))) ?? null;
+  if (parts[0] === 'rooms' && parts[1] === '_music') return found(districts().map((d) => `scenes/${d}/_music/${parts.slice(2).join('/')}`));
+  if (parts[0] === 'rooms') return found(districts().map((d) => `scenes/${d}/${parts.slice(1).join('/')}`));
+  // sound/music/<theme>: the select screen's menu theme, from the splash library.
+  if (parts[0] === 'sound') return found([`web/public/${rel}`, ...(parts[1] === 'music' ? [`world/splash/music/${parts.slice(2).join('/')}`] : [])]);
+  return null;
+}
+
+/**
+ * The audioKeys of `files` (package paths) that sounds/CREDITS.md marks public, decided by the same audioStatus as the
+ * public repo's export (Suno, CC0, ElevenLabs in; Sonniss, Bleeoop, JDSherbert and anything uncredited out).
+ */
+export function publicPackageAudio(files: string[], repo: string, credits: string): Set<string> {
+  const status = audioStatus(credits);
+  const out = new Set<string>();
+  for (const f of files) {
+    const rel = f.replace(/\\/g, '/').replace(/^\.\//, '');
+    if (!AUDIO.test(rel)) continue;
+    const from = repoPathOf(repo, rel);
+    if (from && status(from) === 'public') out.add(audioKey(rel));
   }
   return out;
 }

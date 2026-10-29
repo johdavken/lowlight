@@ -57,6 +57,8 @@ export interface SoundMap {
   /** A public build's CC0 bed per room (null: the rooms' own beds). */
   beds: Record<string, { src: string; level: number }> | null;
   cues: Record<string, string>;
+  /** The menu theme the select screen plays (the splash library's theme), under soundBase; null or absent: none. */
+  theme?: string | null;
 }
 const FULL_SOUND: SoundMap = { rain: { light: 'rain-light.ogg', heavy: 'rain-heavy.ogg' }, thunder: THUNDER_TAKES.map((t) => t.url.split('/').pop()!), beds: null, cues: {} };
 
@@ -66,7 +68,8 @@ function roomSound(renderer: Awaited<ReturnType<typeof createRenderer>>, soundBa
   THUNDER_TAKES.splice(0, THUNDER_TAKES.length, ...takes.map((t) => ({ ...t, url: `${soundBase}thunder/${t.url.split('/').pop()}` })));
   // No rain recording (a public build before CC0 rain is picked): the engine's own synthesized rain.
   const rainUrls = map.rain ? { light: `${soundBase}${map.rain.light}`, heavy: `${soundBase}${map.rain.heavy}` } : null;
-  const audio = createRoomAudio({ engine: new AudioEngine({ warn: (m) => console.warn('[lowlight sound]', m), rainUrls }), view });
+  const engine = new AudioEngine({ warn: (m) => console.warn('[lowlight sound]', m), rainUrls });
+  const audio = createRoomAudio({ engine, view });
   if (THUNDER_TAKES.length) renderer.onStrike((s) => audio.thunder(s.distance, s.sceneId));
   renderer.onFrame(() => audio.frame(renderer.time()));
   document.addEventListener('visibilitychange', () => audio.visibility(document.hidden));
@@ -74,14 +77,25 @@ function roomSound(renderer: Awaited<ReturnType<typeof createRenderer>>, soundBa
   const unlock = (e: Event) => audio.gesture({ fromSpeaker: e.target instanceof Element && e.target.closest('#lowlight-sound') !== null });
   window.addEventListener('pointerdown', unlock, true);
   window.addEventListener('keydown', unlock, true);
-  return audio;
+  /**
+   * The select screen's sound, as Lowlight's own: the menu theme over the room behind, which drops to a quarter
+   * (music keeps its own level). Off hands the music back to the room. Nothing is saved to the player's settings.
+   */
+  const menu = (on: boolean) => {
+    engine.setScale(on ? MENU_SCALE : 1);
+    audio.overrideMusic(on && map.theme ? `${soundBase}${map.theme}` : null);
+  };
+  return { audio, menu };
 }
+
+/** The room behind the select screen, as the game's landing hears it (web/src/landing: scale 0.25). */
+const MENU_SCALE = 0.25;
 
 /** Draws rooms into `host` with their sound; `roomsBase` is the URL holding one folder per room (scene.json + layers),
  * `soundBase` the shared rain and thunder; `view` hears the speaker's state (locked, on, muted, levels). */
 export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase: string, view: (v: SoundView) => void = () => {}, map: SoundMap = FULL_SOUND) {
   const renderer = await createRenderer(host, undefined, { backdrop: true });
-  const audio = roomSound(renderer, soundBase, view, map);
+  const { audio, menu } = roomSound(renderer, soundBase, view, map);
   let scene: SceneDef | null = null;
   let state: RoomState | null = null;
   /** The mood last applied (null: as painted, or changed light by light since). */
@@ -99,6 +113,8 @@ export async function mountRoom(host: HTMLElement, roomsBase: string, soundBase:
   return {
     renderer,
     audio,
+    /** The select screen's sound on (theme, room at a quarter) or off. */
+    menu,
     /** Lights the figures `figures()` returns (re-read every sample, so they can come and go). */
     light: (figures: () => HTMLElement[]) => lightFigures(renderer, figures),
     /** Loads a room by folder name at its painted state, its sound crossfading over `seconds`; returns its mood names. */

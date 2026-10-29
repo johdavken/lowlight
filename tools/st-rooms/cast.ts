@@ -140,7 +140,9 @@ export interface CastCharacter {
   home: string | null;
   /** Every room of theirs (folders): where go_to can take you. */
   places: string[];
-  /** card: the card's text (its JSON, without the greeting), so new art alone isn't a card update; sprites, persona: the files. */
+  /** One of the game's fixed residents (Hae at her stall): not a contact you call, so not on the select's contact grid. */
+  resident?: boolean;
+  /** card: the card's text (its JSON, without the greeting) and its picture's pixels; sprites, persona: the files. */
   hash: { card: string; sprites: string; persona: string | null };
 }
 

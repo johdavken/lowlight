@@ -1,7 +1,7 @@
 // Lowlight's character select over SillyTavern: 1P picks who you are (a persona), CPU picks your contact (a
 // character), then //JACK IN switches persona and opens that chat. Built on a 1600×900 stage scaled to the window,
 // as Lowlight's is; the live room behind it shows the skyline, and each contact's own room while the cursor rests.
-import { getUserAvatar, setUserAvatar, user_avatar } from '../../../personas.js';
+import { getUserAvatar, setPersonaLockState, setUserAvatar, user_avatar } from '../../../personas.js';
 
 const COLUMNS = 6;
 const STAGE_W = 1600;
@@ -19,9 +19,9 @@ const el = (tag, cls, text) => {
 const thumb = (type, file) => `/thumbnail?type=${type}&file=${encodeURIComponent(file)}`;
 
 /**
- * @param {{ cast: { characters?: any[] }, rooms: string[], current: () => string, goTo: (folder: string) => Promise<void>, cue: (name: string) => void }} deps
+ * @param {{ cast: { characters?: any[] }, rooms: string[], current: () => string, goTo: (folder: string) => Promise<void>, cue: (name: string) => void, menu?: (on: boolean) => void }} deps
  */
-export function mountSelect({ cast, rooms, current, goTo, cue }) {
+export function mountSelect({ cast, rooms, current, goTo, cue, menu = () => {} }) {
   const info = new Map((cast.characters ?? []).map((c) => [c.name, c]));
   const root = el('div', 'lls-root');
   root.hidden = true;
@@ -71,7 +71,8 @@ export function mountSelect({ cast, rooms, current, goTo, cue }) {
         about: descriptions[file]?.description ?? '',
       }));
     // Without cast.json there's no cast to keep to: everyone shows.
-    const keep = (ch) => showAll || info.size === 0 || info.has(ch.name);
+    // The game's residents (Hae at her stall) aren't contacts you call: off the grid unless [A] shows everyone.
+    const keep = (ch) => showAll || info.size === 0 || (info.has(ch.name) && !info.get(ch.name).resident);
     roster.p2 = c.characters.map((ch, i) => ({ ch, i })).filter(({ ch }) => keep(ch)).map(({ ch, i }) => ({
       name: ch.name,
       index: i,
@@ -242,8 +243,20 @@ export function mountSelect({ cast, rooms, current, goTo, cue }) {
     cue('confirm');
     close(false);
     const c = SillyTavern.getContext();
+    // The chat first: opening it applies its locked persona, else the default one, which would undo the pick. Then
+    // the persona, locked to this chat so reloads and later visits keep it (no "temporary persona" warning).
+    if (String(c.characterId) !== String(p2.index)) {
+      // selectCharacterById returns before the chat has loaded; SillyTavern's own CHAT_CHANGED listeners then set the
+      // chat's persona and metadata. Ours runs after theirs (listeners run in order), so the pick and its lock stand.
+      const loaded = new Promise((resolve) => {
+        c.eventSource.once(c.eventTypes.CHAT_CHANGED, resolve);
+        setTimeout(resolve, 15_000);
+      });
+      await c.selectCharacterById(p2.index);
+      await loaded;
+    }
     if (p1.file !== user_avatar) await setUserAvatar(p1.file, { toastPersonaNameChange: false });
-    if (String(c.characterId) !== String(p2.index)) await c.selectCharacterById(p2.index);
+    await setPersonaLockState(true, 'chat');
   }
 
   function fit() {
@@ -260,6 +273,8 @@ export function mountSelect({ cast, rooms, current, goTo, cue }) {
     root.hidden = false;
     document.body.classList.add('lls-open');
     fit();
+    // Its sound, as Lowlight's own select: the menu theme over the room behind at a quarter.
+    menu(true);
     backdropFor(null);
     paint();
   }
@@ -270,6 +285,7 @@ export function mountSelect({ cast, rooms, current, goTo, cue }) {
     clearTimeout(restTimer);
     root.hidden = true;
     document.body.classList.remove('lls-open');
+    menu(false);
     if (restore && roomBefore && roomBefore !== current()) void goTo(roomBefore);
   }
 

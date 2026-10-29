@@ -21,6 +21,31 @@ interface CharacterJson {
   identity?: string;
   sprite: { src: string };
   expressions?: Record<string, string>;
+  /** The face Lowlight's select screen shows (`neutral`: the sprite as it is). */
+  selectExpression?: string;
+  /** 'fixed': one of the game's residents, at their place (not a contact). */
+  kind?: string;
+  /** Where their face sits on their sprite, as fractions of its width and height. */
+  face?: { x: number; y: number };
+}
+
+/** The game's default face position (server/src/character-profile.ts DEFAULT_FACE). */
+const DEFAULT_FACE = { x: 0.5, y: 0.08 };
+
+/** The expression Lowlight's select screen shows (server/src/agents.ts selectFace): theirs, else happy, else none. */
+export function selectFaceName(c: { selectExpression?: string }, faces: Record<string, string>): string | null {
+  const name = c.selectExpression ?? (faces.happy ? 'happy' : 'neutral');
+  return name !== 'neutral' && faces[name] ? name : null;
+}
+
+/**
+ * The game tile's crop (server/src/thumb.ts cropBox) made square for SillyTavern's avatars: 30% of the sprite's
+ * width, centred on the face, kept inside the sprite.
+ */
+export function cardBox(w: number, h: number, face: { x: number; y: number }): { left: number; top: number; width: number; height: number } {
+  const side = Math.min(Math.round(w * 0.3), h);
+  const clamp = (n: number, hi: number) => Math.min(Math.max(n, 0), hi);
+  return { left: clamp(Math.round(face.x * w - side / 2), w - side), top: clamp(Math.round(face.y * h - side / 2), h - side), width: side, height: side };
 }
 
 export interface ExportOptions {
@@ -70,20 +95,10 @@ async function figure(dir: string, sprite: string, face?: string): Promise<Buffe
   return face ? base.composite([{ input: path.join(dir, face) }]).png().toBuffer() : base.png().toBuffer();
 }
 
-/** A square crop around their face, on the Intake's violet (SillyTavern's thumbnails turn transparency black). */
-async function avatar(fig: Buffer, faceFile: string | undefined, dir: string): Promise<Buffer> {
-  let box = { left: 380, top: 40, width: 300, height: 300 };
-  if (faceFile) {
-    const { info } = await sharp(path.join(dir, faceFile)).trim().toBuffer({ resolveWithObject: true });
-    const cx = -(info.trimOffsetLeft ?? 0) + info.width / 2;
-    const cy = -(info.trimOffsetTop ?? 0) + info.height / 2;
-    const side = Math.round(Math.max(info.width, info.height) * 2.2);
-    box = { left: Math.max(0, Math.round(cx - side / 2)), top: Math.max(0, Math.round(cy - side / 2.4)), width: side, height: side };
-  }
+/** Their card picture: the game tile's crop around their face, on the Intake's violet (SillyTavern's thumbnails turn transparency black). */
+async function avatar(fig: Buffer, face: { x: number; y: number }): Promise<Buffer> {
   const meta = await sharp(fig).metadata();
-  box.width = Math.min(box.width, meta.width! - box.left);
-  box.height = Math.min(box.height, meta.height! - box.top);
-  return sharp(fig).extract(box).resize(480, 480, { kernel: 'nearest' }).flatten({ background: { r: 26, g: 16, b: 48 } }).png().toBuffer();
+  return sharp(fig).extract(cardBox(meta.width!, meta.height!, face)).resize(480, 480, { kernel: 'nearest' }).flatten({ background: { r: 26, g: 16, b: 48 } }).png().toBuffer();
 }
 
 /** Residents' rooms: the scene that names them as its resident (Hae at the noodle stall). */
@@ -164,9 +179,14 @@ export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; re
     const data = cardData({ name: c.name, description: fs.readFileSync(path.join(dir, identity), 'utf8').trim(), firstMes: greeting(o.data, id), systemPrompt: guide, world: 'Lowlight' });
     const card = where.card(c.name);
     const had = !isPackage && fs.existsSync(path.join(root, card));
+    // The face Lowlight's own select screen shows, cropped where the game crops its face tiles. Part of the card's hash,
+    // so a new picture reaches players as a card update.
+    const shown = selectFaceName({ selectExpression: c.selectExpression ?? base?.selectExpression }, faces);
+    const picture = await avatar(await figure(dir, c.sprite.src, shown ? faces[shown] : undefined), c.face ?? base?.face ?? DEFAULT_FACE);
+    // Hashed by its pixels: PNG bytes for the same pixels can differ with the source they were cut from.
+    const pictureRaw = await sharp(picture).raw().toBuffer();
     if (!had || o.replace) {
-      const face = faces.annoyed ?? Object.values(faces)[0];
-      write(card, pngWithCard(await avatar(await figure(dir, c.sprite.src, face), face, dir), data));
+      write(card, pngWithCard(picture, data));
       if (!isPackage) fs.rmSync(path.join(root, 'thumbnails', 'avatar', `${c.name}.png`), { force: true });
     }
 
@@ -191,6 +211,7 @@ export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; re
     characters.push({
       id: c.extends ?? id,
       name: c.name,
+      ...(c.kind === 'fixed' ? { resident: true } : {}),
       since: before?.characters.find((b) => b.id === (c.extends ?? id))?.since ?? version,
       card,
       sprites,
@@ -201,7 +222,7 @@ export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; re
       home: places[0] ?? null,
       places,
       // The greeting comes from the newest playthrough and changes whenever someone plays: it isn't a card update.
-      hash: { card: sha(JSON.stringify({ ...data, data: { ...data.data, first_mes: '' } })), sprites: sha(...spriteBufs), persona: personaHash },
+      hash: { card: sha(JSON.stringify({ ...data, data: { ...data.data, first_mes: '' } }), pictureRaw), sprites: sha(...spriteBufs), persona: personaHash },
     });
     report.push(`${c.name}${had && !o.replace ? ' (card kept)' : ''}`);
   }

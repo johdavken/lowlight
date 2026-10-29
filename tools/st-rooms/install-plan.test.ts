@@ -3,7 +3,7 @@ import type { CastCharacter, CastJson } from './cast';
 import { planInstall, type LowlightSettings } from './install-plan';
 
 const char = (id: string, name: string, hash = { card: `c-${id}`, sprites: `s-${id}`, persona: `p-${id}` as string | null }): CastCharacter => ({
-  id, name, since: '1.0.0', card: `cards/${name}.png`, sprites: {}, persona: hash.persona ? { file: `${id}.png`, name, description: '', picture: `personas/${id}.png` } : null,
+  id, name, pronoun: 'she', since: '1.0.0', card: `cards/${name}.png`, sprites: {}, persona: hash.persona ? { file: `${id}.png`, name, description: '', picture: `personas/${id}.png` } : null,
   tagline: '', facts: [], accent: null, home: null, places: [], hash,
 });
 const ten = ['cass', 'ember', 'hae', 'hicks', 'ines', 'mother-rot', 'nix', 'silas', 'tilly', 'vesna'];

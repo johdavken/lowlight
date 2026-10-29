@@ -195,5 +195,5 @@ export function mountRoomTools({ room, cast, rooms, meta, current, goTo, idle })
 
   /** Resolves once the room restores queued so far (a chat opened, a message deleted) have landed. */
   const settled = () => restoring;
-  return { setEnabled, refreshLine, stamp, line, isEnabled: () => enabled, canCall, stampOf, settled, ours };
+  return { setEnabled, refreshLine, stamp, line, isEnabled: () => enabled, canCall, stampOf, settled, ours, speaker };
 }

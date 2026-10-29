@@ -127,6 +127,8 @@ export function cardOf(png: Buffer): unknown {
 export interface CastCharacter {
   id: string;
   name: string;
+  /** she / he / they, as the game's (default they). */
+  pronoun: string;
   /** The package version they arrived in. */
   since: string;
   card: string;

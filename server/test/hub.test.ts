@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeAll, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { writeHabits } from '../src/habits';
 import os from 'node:os';
 import type { WebSocket } from 'ws';
 import { SceneRegistry } from '../src/scenes';
@@ -338,6 +339,18 @@ describe('hub journal', () => {
     expect(ev.runs[0].at).toBe(54);
     expect(ev.runs.every((r) => r.player === 'hicks')).toBe(true);
     expect(validateClientEvent({ type: 'residual_runs' })).toEqual({ type: 'residual_runs' });
+    db.close();
+  });
+
+  it("residual_runs carries the pair's habits list, null without one (habits spec §3)", () => {
+    const { hub, db } = makeHub();
+    const a = fakeSocket();
+    hub.addClient(a.ws, 'hicks');
+    a.client({ type: 'residual_runs' });
+    expect((of(a.events, 'residual_runs').at(-1)! as unknown as { habits: unknown }).habits).toBeNull();
+    writeHabits(db, 'hicks', { rules: ['A'], through: 'm1' });
+    a.client({ type: 'residual_runs' });
+    expect((of(a.events, 'residual_runs').at(-1)! as unknown as { habits: unknown }).habits).toEqual({ rules: ['A'], through: 'm1' });
     db.close();
   });
 

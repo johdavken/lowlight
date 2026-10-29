@@ -6,6 +6,8 @@ import { mountHud } from './hud.js';
 import { mountSelect } from './select.js';
 import { mountSubtitles } from './subtitles.js';
 import { mountRoomTools } from './room-tools.js';
+import { mountResidual } from './residual.js';
+import { openLedger } from './ledger-panel.js';
 import { planInstall, planSettings, stageRect, GREET_INSTRUCTIONS } from './lowlight-room.js';
 import { runInstall, updateCards, lowlightSettings, addPersonaWearing } from './installer.js';
 import { showNotice, showWelcome } from './welcome.js';
@@ -168,6 +170,8 @@ const settings = () => {
 // first, or her room's restore would wait forever on a fade nobody is drawing.
 SillyTavern.getContext().eventSource.on(SillyTavern.getContext().eventTypes.CHAT_CHANGED, () => chatChanged());
 const roomTools = mountRoomTools({ room, cast, rooms: ROOMS, meta: META, current: () => current, goTo, idle: () => goChain });
+const residual = mountResidual({ room, roomTools });
+const showLedger = () => openLedger(residual.ledger(), roomTools.speaker()?.name, residual);
 roomTools.setEnabled(settings().tools !== false);
 window.lowlightRoomTools = roomTools;
 const setRoomTools = (on) => {
@@ -180,7 +184,13 @@ const yourChange = async () => {
   await roomTools.stamp();
   roomTools.refreshLine();
 };
-mountHud({ room, map, select, roomTools: { isOn: () => roomTools.isEnabled(), canCall: () => roomTools.canCall(), set: setRoomTools } });
+mountHud({
+  room,
+  map,
+  select,
+  roomTools: { isOn: () => roomTools.isEnabled(), canCall: () => roomTools.canCall(), set: setRoomTools },
+  residual: { isOn: residual.isOn, set: residual.set, status: residual.status, openLedger: () => showLedger() },
+});
 
 // A map icon in SillyTavern's top bar.
 const mapBtn = document.createElement('div');
@@ -306,6 +316,15 @@ SlashCommandParser.addCommandObject(SlashCommand.fromProps({
 }));
 
 SlashCommandParser.addCommandObject(SlashCommand.fromProps({
+  name: 'ledger',
+  helpString: "Her Residual's ledger for this chat: her notes and the recap, and its ON/OFF switch.",
+  callback: () => {
+    if (roomTools.ours()) showLedger();
+    return '';
+  },
+}));
+
+SlashCommandParser.addCommandObject(SlashCommand.fromProps({
   name: 'select',
   helpString: "Lowlight's character select: who you are, then who you see.",
   callback: () => {
@@ -360,6 +379,8 @@ const castReady = (async () => {
   await new Promise((r) => eventSource.once(eventTypes.APP_READY, r));
   await wait(800);
   const s = lowlightSettings();
+  // Told about her Residual's extra call: in the welcome for a new player, else once in a notice after the update.
+  const residualNews = s.answered && !s.residualSaid;
   if (!s.answered) {
     await noDialogOpen();
     // What Y would change, worked out now so the welcome can say so (SillyTavern's settings, shared by all chats).
@@ -388,6 +409,11 @@ const castReady = (async () => {
       const lines = [...settings.changes, ...settings.advice];
       if (lines.length) showNotice(['SETTINGS FOR LOWLIGHT', ...lines]);
     }
+    SillyTavern.getContext().saveSettingsDebounced();
+  }
+  if (!s.residualSaid) {
+    if (residualNews) showNotice(['HER RESIDUAL IS NEW', 'ONE MORE CALL AFTER EACH OF HER REPLIES KEEPS HER NOTES · SYS → RESIDUAL OR /ledger TO SWITCH IT OFF']);
+    s.residualSaid = true;
     SillyTavern.getContext().saveSettingsDebounced();
   }
   if (s.accepted) await installNow();

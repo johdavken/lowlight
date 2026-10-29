@@ -11,6 +11,7 @@ import { worldInfoFrom } from './lore';
 
 interface CharacterJson {
   name: string;
+  pronoun?: string;
   extends?: string;
   tagline?: string;
   accent?: string;
@@ -202,6 +203,7 @@ export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; re
     characters.push({
       id: c.extends ?? id,
       name: c.name,
+      pronoun: c.pronoun ?? base?.pronoun ?? 'they',
       ...(c.kind === 'fixed' ? { resident: true } : {}),
       since: before?.characters.find((b) => b.id === (c.extends ?? id))?.since ?? version,
       card,

@@ -8,6 +8,7 @@ import { SceneRegistry } from '../src/scenes';
 import { Room } from '../src/room-state';
 import { generateScenes } from '../../tools/gen-placeholders';
 import { openDb, type Db } from '../src/db';
+import { writeHabits } from '../src/habits';
 import { CONTINUE_INSTRUCTION } from '../src/history';
 import { ChatRelay, type ChatRelayDeps } from '../src/chat-relay';
 import { fakePlayers } from './fixtures/players';
@@ -2061,6 +2062,38 @@ describe('ChatRelay journal lines', () => {
       old(db, 'a2', 2 * 60_000, { text: '*Under the paper lantern I close the bakery box.*' });
     }, (relay) => relay.send('hicks', '*opens the bakery box*'));
     expect(message).toContain(`\n[you keep writing these — "paper lantern". Leave them out of this reply; write what's new in this moment instead.]\n${beatLine('hicks')}\n\n*opens the bakery box*`);
+  });
+
+  describe('habits line (habits spec §2)', () => {
+    const WORN = '[worn thin — leave out: no glasses business]';
+    const stored = (db: Db) => writeHabits(db, 'hicks', { rules: ['No glasses business'], through: 'x' });
+
+    it('on a plain in-character turn, right before the beat line', async () => {
+      const { message } = await turn(stored);
+      expect(message).toContain(`\n${WORN}\n${beatLine('hicks')}\n\nhello`);
+    });
+
+    it('before the echo line when both are there', async () => {
+      const { message } = await turn((db) => {
+        stored(db);
+        old(db, 'a1', 3 * 60_000, { text: '*The paper lantern glows. The bakery box sits open.*' });
+        old(db, 'a2', 2 * 60_000, { text: '*Under the paper lantern I close the bakery box.*' });
+      }, (relay) => relay.send('hicks', '*opens the bakery box*'));
+      expect(message).toContain(`\n${WORN}\n[you keep writing these — "paper lantern".`);
+      expect(message.indexOf('[you keep writing these')).toBeLessThan(message.indexOf(beatLine('hicks')));
+    });
+
+    it('never on OOC, greeting or END SCENE turns', async () => {
+      for (const mode of ['ooc', 'greet', 'end'] as const) {
+        const { message } = await turn(stored, (relay) => relay.send('hicks', mode === 'end' ? '' : 'hm', mode));
+        expect(message).not.toContain('worn thin');
+      }
+    });
+
+    it('nothing with no list, or an empty one', async () => {
+      expect((await turn(() => {})).message).not.toContain('worn thin');
+      expect((await turn((db) => writeHabits(db, 'hicks', { rules: [], through: 'x' }))).message).not.toContain('worn thin');
+    });
   });
 
   it('puts the journal line right after the room line', async () => {

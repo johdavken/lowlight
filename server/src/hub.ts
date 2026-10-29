@@ -1,4 +1,5 @@
 import type { CipherState } from '../../shared/cipher';
+import { readHabits } from './habits';
 import type { CommsState } from '../../shared/comms';
 import { TRAVEL_LINE_MAX } from '../../shared/arrival';
 import { SCENE_TEXT_MAX } from '../../shared/scenario';
@@ -978,7 +979,7 @@ export function createHub(deps: HubDeps): Hub {
         deps.journal.markRecapSeen(player);
         break;
       case 'residual_runs':
-        send(ws, { type: 'residual_runs', runs: deps.db.residualRuns(RESIDUAL_RUNS_SHOWN, player), cipher: deps.cipher?.(player) ?? null });
+        send(ws, { type: 'residual_runs', runs: deps.db.residualRuns(RESIDUAL_RUNS_SHOWN, player), cipher: deps.cipher?.(player) ?? null, habits: readHabits(deps.db, player) });
         break;
       case 'let_her_go':
         if (!deps.getRelay().ready) return rejectNoLink(ws);

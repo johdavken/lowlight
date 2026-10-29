@@ -70,6 +70,8 @@ export class DevPanel {
   private readonly residualList: HTMLElement;
   /** The Cipher under the runs (cipher spec §2.9): every truth, read-only. */
   private readonly cipherBox: HTMLElement;
+  /** HABITS under the Cipher (habits spec §3): the rules she's told to leave out, read-only. */
+  private readonly habitsBox: HTMLElement;
   private residualRuns: ResidualRunInfo[] = [];
   /** The row whose details are open; null: none. */
   private residualOpen: number | null = null;
@@ -215,8 +217,10 @@ export class DevPanel {
     residualHead.append(el('label', 'dp-label', 'RESIDUAL · BLACK LEDGER'), refresh);
     this.residualList = el('div', 'dp-residual-list');
     this.cipherBox = el('div', 'dp-cipher');
-    residualSection.append(residualHead, this.residualList, this.cipherBox);
+    this.habitsBox = el('div', 'dp-habits');
+    residualSection.append(residualHead, this.residualList, this.cipherBox, this.habitsBox);
     this.renderCipher(null);
+    this.renderHabits(null);
 
     const simSection = el('div', 'dp-section dp-simulate');
     simSection.append(el('label', 'dp-label', 'SIMULATE TOOL CALL'));
@@ -410,10 +414,21 @@ export class DevPanel {
   }
 
   /** The RESIDUAL section's rows, newest first; a row opens its raw answer beside what was applied and refused. */
-  setResidualRuns(runs: ResidualRunInfo[], cipher: CipherState | null = null): void {
+  setResidualRuns(runs: ResidualRunInfo[], cipher: CipherState | null = null, habits: { rules: string[]; through: string } | null = null): void {
     this.residualRuns = runs;
     this.renderResidual();
     this.renderCipher(cipher);
+    this.renderHabits(habits);
+  }
+
+  /** HABITS: the rules in place and the reply they run through. */
+  private renderHabits(h: { rules: string[]; through: string } | null): void {
+    const head = el('label', 'dp-label', 'HABITS');
+    if (!h) {
+      this.habitsBox.replaceChildren(head, el('div', 'dp-habits-none', 'none yet'));
+      return;
+    }
+    this.habitsBox.replaceChildren(head, ...h.rules.map((r) => el('div', 'dp-habits-rule', r)), el('div', 'dp-habits-none', `${h.rules.length === 0 ? 'nothing worn · ' : ''}through ${h.through}`));
   }
 
   /** CIPHER: every truth (open and out), who keeps it, and its clues, off-page ones flagged. */

@@ -387,7 +387,7 @@ export type ServerEvent =
   | { type: 'turn_rejected'; reason: 'busy' | 'no-link'; text?: string }
   | { type: 'dev_log'; level: 'info' | 'warn' | 'error'; text: string }
   /** Answer to `residual_runs`: this pair's newest runs, newest first, and the playthrough's Cipher (cipher spec §2.9; null without one). */
-  | { type: 'residual_runs'; runs: ResidualRunInfo[]; cipher: CipherState | null }
+  | { type: 'residual_runs'; runs: ResidualRunInfo[]; cipher: CipherState | null; habits: { rules: string[]; through: string } | null }
   /** Her whole journal (pinned first, then newest first), on connect and after every change. */
   | { type: 'journal'; notes: Note[] }
   /** Her recap; `text` and `at` are null when there is none. */
@@ -772,7 +772,7 @@ export interface HeldLead {
 /** One residual run, as the dev panel's RESIDUAL section shows it (scribe spec §8). */
 export interface ResidualRunInfo {
   at: number;
-  kind: 'turn' | 'end' | 'summary' | 'cipher';
+  kind: 'turn' | 'end' | 'summary' | 'cipher' | 'habits';
   player: string;
   /** The reply it read (and its take); null when it never got that far. */
   messageId: string | null;

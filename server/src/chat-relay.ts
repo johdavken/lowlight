@@ -19,6 +19,7 @@ import { TurnError, STREAM_OPEN_EVENT, type CompletionMessage, type ModelPair } 
 import { wearingLine, type WearEntry } from './wearing';
 import { TEXT_HEADING, TEXT_INSTRUCTIONS, promisedLine, textPlanLine, textWhereLine, herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, COMMS_BACK_INSTRUCTIONS, COMMS_DROP_LINE, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, commsLine, beatLine, RP_HEADING, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, ENCOUNTER_INSTRUCTIONS, QUEST_INSTRUCTIONS, MISSION_OPEN, MISSION_CLOSE, JOB_AFTER_READ, JOB_AFTER_GIG, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, endSceneText, othersBlock, strangerBlock, type OtherVoice } from './instructions';
 import { echoLine } from './echoes';
+import { habitsLine, readHabits } from './habits';
 import { parsePlan, planKey, planSeenKey } from '../../shared/plan';
 import { encounterText, parseEncounter, strangerAt, type Encounter } from '../../shared/encounter';
 import { gigActionLine, gigText, RESULTS_FOR, type GigResult, type GigSnapshot } from '../../shared/gig/brief';
@@ -2269,12 +2270,14 @@ export class ChatRelay {
     const beat = userMessage.mode === undefined ? beatLine(player.name) : null;
     // What she keeps writing, right before the beat (the lantern in eight replies running).
     const echo = beat ? this.echoLineFor(userMessage) : null;
+    // What she keeps writing over the longer stretch (habits spec §2): the Residual's rules, before the echo line; not on comms.
+    const habits = beat && !comms ? habitsLine(readHabits(this.deps.db, this.pair())?.rules ?? []) : null;
     // Her plan (spec 2026-10-21 §6): the meeting you came to, or the one you missed; her reply spends an ended plan.
     const planNote = this.deps.planNote ? this.deps.planNote(userMessage.mode ?? 'rp', ...this.planBeforeTake()) : null;
     this.planSpend = planNote?.spend === true;
     const plan = planNote?.line ?? null;
     const [since, clothes] = this.changedLines(userMessage, wearing);
-    if (!journal) return [since, lights, clothes, this.timeLine(), comms, presence, arrival, plan, you, echo, beat].filter((l): l is string => l !== null);
+    if (!journal) return [since, lights, clothes, this.timeLine(), comms, presence, arrival, plan, you, habits, echo, beat].filter((l): l is string => l !== null);
     // The gap is measured from the latest message that isn't this turn's own user message (a retry
     // reuses an old one) or the reply now streaming.
     const last = db
@@ -2282,7 +2285,7 @@ export class ChatRelay {
       .filter((m) => m.id !== userMessage.id && m.status !== 'streaming')
       .reduce<number | null>((max, m) => (max === null || m.ts > max ? m.ts : max), null);
     const greeting = userMessage.mode === 'greet';
-    return [since, lights, clothes, this.timeLine(), comms, presence, journal.journalLine(this.pair(), recent), journal.previouslyLine(this.pair(), last, greeting), arrival, plan, you, echo, beat].filter(
+    return [since, lights, clothes, this.timeLine(), comms, presence, journal.journalLine(this.pair(), recent), journal.previouslyLine(this.pair(), last, greeting), arrival, plan, you, habits, echo, beat].filter(
       (l): l is string => l !== null,
     );
   }

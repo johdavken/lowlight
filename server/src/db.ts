@@ -193,7 +193,7 @@ const PAGE_KEY_RE = /^page\.(.+)\.(?:text|at|by)$/;
 
 /** The meta keys that are story state (logged and rebuilt): each pair's recap and dossier page, and the leads they followed. `scribe.` is the Residual's old name, kept for saves. */
 const isStoryMeta = (k: string) =>
-  k.startsWith('recap.') || k.startsWith('page.') || k.startsWith('lead.') || k.startsWith('standing.') || k.startsWith('scribe.') || k.startsWith('summary.') || k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('storyMood.') || k.startsWith('cityWeather.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('cipher.');
+  k.startsWith('recap.') || k.startsWith('page.') || k.startsWith('lead.') || k.startsWith('standing.') || k.startsWith('scribe.') || k.startsWith('summary.') || k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('storyMood.') || k.startsWith('cityWeather.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('cipher.') || k.startsWith('habits.');
 /** A shared_contacts row's log key. */
 const shareKey = (contactId: string, player: string) => `${contactId}\u0000${player}`;
 /** A leads row's log key. */
@@ -676,7 +676,7 @@ function createDb(sqlite: DatabaseSync): Db {
     ORDER BY w.seq`);
   const allNoteRowsStmt = sqlite.prepare(`SELECT ${NOTE_COLS} FROM notes`);
   const storyMetaStmt = sqlite.prepare(
-    "SELECT k, v FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%'",
+    "SELECT k, v FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%' OR k LIKE 'habits.%'",
   );
   const allLeadsStmt = sqlite.prepare('SELECT id, player, details, message_id, at FROM leads');
   const replaceLeadStmt = sqlite.prepare('INSERT OR REPLACE INTO leads (id, player, details, message_id, at) VALUES (?, ?, ?, ?, ?)');
@@ -739,7 +739,7 @@ function createDb(sqlite: DatabaseSync): Db {
   const rebuild = (show: { messageId: string; take: number } | null): RebuildResult => {
     const before = snapshot();
     sqlite.exec(
-      "DELETE FROM notes; DELETE FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%'; DELETE FROM room_state; DELETE FROM shared_contacts; DELETE FROM leads",
+      "DELETE FROM notes; DELETE FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%' OR k LIKE 'habits.%'; DELETE FROM room_state; DELETE FROM shared_contacts; DELETE FROM leads",
     );
     const rows = keptWritesStmt.all(show?.messageId ?? null, show?.take ?? null) as { kind: WriteKind; key: string; value: string | null }[];
     for (const r of rows) apply(r.kind, r.key, r.value);

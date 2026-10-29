@@ -322,12 +322,254 @@ async function runDeclined() {
   }
 }
 
+/** Her Residual (spec 2026-10-29-st-residual-design), with the model stood in for: each call takes the next scripted answer. */
+async function runResidual() {
+  console.log('\n— her Residual: notes on the message, rolled back by a swipe and a delete, a missed light, OFF, another card —');
+  const st = await startST();
+  const browser = await chromium.launch({ args: GL_ARGS });
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  watchConsole(page);
+  await page.addInitScript('globalThis.__name = (f) => f;');
+  try {
+    await page.goto(URL);
+    await page.waitForTimeout(6000);
+    await passStWelcome(page);
+    await until(page, "!!document.querySelector('.llw-root')", 30_000);
+    await page.keyboard.press('y');
+    await until(page, "(SillyTavern.getContext().extensionSettings.lowlight?.installed?.length ?? 0) > 0");
+    await page.waitForTimeout(3000);
+    const open = (name: string) =>
+      page.evaluate(`(async () => {
+        window.lowlightSelect?.close();
+        const c = SillyTavern.getContext();
+        await c.selectCharacterById(c.characters.findIndex((x) => x.name === ${JSON.stringify(name)}));
+        await new Promise((r) => setTimeout(r, 4000));
+        // Her live greeting needs a model: none here, so start from an empty chat.
+        while (c.chat.length > 0) await c.deleteMessage(c.chat.length - 1);
+      })()`);
+    // Someone who answered the welcome before the Residual existed is told once, after the update.
+    check('a new player, told in the welcome, gets no Residual notice after it', (await page.evaluate<boolean>('SillyTavern.getContext().extensionSettings.lowlight.residualSaid === true')));
+    await page.evaluate('delete SillyTavern.getContext().extensionSettings.lowlight.residualSaid; SillyTavern.getContext().saveSettingsDebounced();');
+    await page.waitForTimeout(2500);
+    await page.reload();
+    const told = await until(page, "[...document.querySelectorAll('.llw-notice')].some((n) => n.textContent.includes('RESIDUAL'))", 60_000);
+    check('an existing install is told once that her Residual makes one more call per reply', told && (await page.evaluate<boolean>('SillyTavern.getContext().extensionSettings.lowlight.residualSaid === true')));
+    await until(page, '!!window.lowlightSelect && !!window.lowlightRoom', 60_000);
+    await page.waitForTimeout(3000);
+
+    await open('Nix');
+    // The stand-in model: answers in order, counting calls; a '!wait' answer takes 3 s.
+    await page.evaluate(`(() => {
+      window.__calls = 0;
+      window.__answers = [];
+      window.lowlightResidual.setComplete(async () => {
+        window.__calls++;
+        const a = window.__answers.shift() ?? '{"notes":[],"lights":[],"recap":null}';
+        if (a.startsWith('!wait')) { await new Promise((r) => setTimeout(r, 3000)); return a.slice(5); }
+        return a;
+      });
+    })()`);
+    const say = async (text: string, answer: string) => {
+      await page.evaluate(`window.__answers.push(${JSON.stringify(answer)})`);
+      await page.evaluate(`SillyTavern.getContext().executeSlashCommandsWithOptions(${JSON.stringify(`/sendas name=Nix ${text}`)})`);
+    };
+    const saved = "(() => { const c = SillyTavern.getContext(); const m = c.chat[c.chat.length - 1]; return !!m?.extra?.lowlight_ledger; })()";
+    const line = "SillyTavern.getContext().extensionPrompts?.['lowlight-ledger']?.value ?? ''";
+
+    await say('You owe Hae for the noodles.', '{"notes":[{"op":"add","about":"you","text":"Owes Hae for noodles.","keys":["noodles"],"pin":true}],"lights":[],"recap":null}');
+    check('a reply adds a note, saved on her message', await until(page, saved, 15_000));
+    check('the note is in her prompt', (await page.evaluate<string>(line)) === '[journal (pinned): n1 (you) Owes Hae for noodles.]', await page.evaluate<string>(line));
+
+    const swiped = await page.evaluate<{ notes: number; line: string }>(`(async () => {
+      const c = SillyTavern.getContext();
+      const at = c.chat.length - 1;
+      const m = c.chat[at];
+      m.swipes = m.swipes ?? [m.mes];
+      m.swipe_info = m.swipe_info ?? m.swipes.map(() => ({ send_date: m.send_date, extra: { ...m.extra } }));
+      m.swipes.push('Another take.');
+      // As SillyTavern does: the new take gets its own date, and its swipe_info a copy of the message's extra, the old
+      // take's change in it.
+      m.send_date = Date.now() + 1;
+      m.swipe_info.push({ send_date: m.send_date, extra: structuredClone(m.extra) });
+      m.swipe_id = m.swipes.length - 1;
+      m.mes = 'Another take.';
+      await c.eventSource.emit(c.eventTypes.MESSAGE_SWIPED, at);
+      return { notes: window.lowlightResidual.ledger().notes.length, line: ${line} };
+    })()`);
+    check('a swipe rolls the note back', swiped.notes === 0 && swiped.line === '', JSON.stringify(swiped));
+
+    await page.evaluate(`(async () => { const c = SillyTavern.getContext(); await c.deleteMessage(c.chat.length - 1); })()`);
+    await say('Hae says hi.', '{"notes":[{"op":"add","about":"me","text":"Hae waved.","keys":["hae"],"pin":false}],"lights":[],"recap":null}');
+    await until(page, saved, 15_000);
+    await page.evaluate(`(async () => { const c = SillyTavern.getContext(); await c.deleteMessage(c.chat.length - 1); })()`);
+    check('a delete rolls the note back', (await page.evaluate<number>('window.lowlightResidual.ledger().notes.length')) === 0);
+
+    const lamp = await page.evaluate<string>('window.lowlightRoom.scene()?.lights?.[0]?.id ?? ""');
+    await say('*She kills the lamp.*', `{"notes":[],"lights":[{"id":"${lamp}","intensity":0}],"recap":null}`);
+    await until(page, saved, 15_000);
+    const lit = await page.evaluate<{ now: number; saved: number }>(`(() => {
+      const c = SillyTavern.getContext();
+      const find = (ls) => ls?.find((l) => l.id === ${JSON.stringify(lamp)})?.intensity;
+      return { now: find(window.lowlightRoom.state()?.lights), saved: find(c.chat[c.chat.length - 1]?.extra?.lowlight?.lights) };
+    })()`);
+    check('a missed light is set, and saved with the room on her message', lamp !== '' && lit.now === 0 && lit.saved === 0, `${lamp} ${JSON.stringify(lit)}`);
+
+    await say('Wait.', '!wait{"notes":[{"op":"add","about":"you","text":"Too late.","keys":[],"pin":false}],"lights":[],"recap":null}');
+    await page.waitForTimeout(800);
+    // A new take while the run is out: the answer was for the old one, so the new take gets nothing.
+    await page.evaluate(`(async () => {
+      const c = SillyTavern.getContext();
+      const at = c.chat.length - 1;
+      const m = c.chat[at];
+      m.swipes = m.swipes ?? [m.mes];
+      m.swipe_info = m.swipe_info ?? m.swipes.map(() => ({ send_date: m.send_date, extra: {} }));
+      m.swipes.push('A new take.');
+      m.send_date = Date.now() + 1;
+      m.swipe_info.push({ send_date: m.send_date, extra: {} });
+      m.swipe_id = m.swipes.length - 1;
+      m.mes = 'A new take.';
+      await c.eventSource.emit(c.eventTypes.MESSAGE_SWIPED, at);
+    })()`);
+    await page.waitForTimeout(3500);
+    check('an answer for a take swiped away mid-run is dropped', (await page.evaluate<number>('window.lowlightResidual.ledger().notes.length')) === 0);
+
+    await say('Think hard.', ' ');
+    await until(page, saved, 15_000);
+    const empty = await page.evaluate<any>(`(() => { const c = SillyTavern.getContext(); return { run: c.chat[c.chat.length - 1].extra.lowlight_ledger.run, status: window.lowlightResidual.status() }; })()`);
+    check('an empty answer saves the failure and nothing else', empty.run.ok === false && empty.run.why === 'no answer' && empty.status?.why === 'no answer', JSON.stringify(empty));
+
+    await page.evaluate("SillyTavern.getContext().executeSlashCommandsWithOptions('/ledger')");
+    const shown = await until(page, "!!document.querySelector('.llr-root')", 5_000);
+    await page.keyboard.press('o');
+    const offFromPanel = await page.evaluate<boolean>('!window.lowlightResidual.isOn()');
+    await page.keyboard.press('o');
+    await page.keyboard.press('Escape');
+    check('/ledger opens the ledger, and O switches the Residual off and on', shown && offFromPanel && (await page.evaluate<boolean>("window.lowlightResidual.isOn() && !document.querySelector('.llr-root')")));
+
+    const stamps = await page.evaluate<number>("Math.max(0, ...[...document.querySelectorAll('#chat .mes')].map((m) => m.querySelectorAll('.ll-stamp').length))");
+    check('each message has one time-and-model stamp', stamps === 1, `${stamps} at most`);
+
+    // E2E_SHOTS=<dir>: the SYS row and the LEDGER panel, at the desktop stage and a phone, for a look by eye.
+    const shots = process.env.E2E_SHOTS;
+    if (shots) {
+      await say('One for the ledger.', '{"notes":[{"op":"add","about":"me","text":"Moved the spare deck to the Tilt.","keys":["deck","tilt"],"pin":false},{"op":"add","about":"you","text":"Lies about where he sleeps.","keys":["sleeps"],"pin":true}],"lights":[],"recap":null}');
+      await until(page, saved, 15_000);
+      for (const [w, h] of [[1600, 900], [390, 844]]) {
+        await page.setViewportSize({ width: w, height: h });
+        await page.waitForTimeout(800);
+        await page.evaluate("document.querySelector('.llh-sys')?.click()");
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: path.join(shots, `residual-sys-${w}.png`) });
+        await page.evaluate("document.querySelector('.llr-open')?.click()");
+        await page.waitForTimeout(400);
+        await page.screenshot({ path: path.join(shots, `residual-ledger-${w}.png`) });
+        await page.keyboard.press('Escape');
+      }
+      await page.setViewportSize({ width: 1600, height: 900 });
+    }
+
+    await page.evaluate('window.__calls = 0;');
+    await page.evaluate(`SillyTavern.getContext().executeSlashCommandsWithOptions('/sendas name=Hae Two bowls, then.')`);
+    await page.waitForTimeout(2500);
+    check("someone else's line in her chat makes no call", (await page.evaluate<number>('window.__calls')) === 0);
+    await page.evaluate(`(async () => { const c = SillyTavern.getContext(); await c.deleteMessage(c.chat.length - 1); })()`);
+
+    // Her reply from a generation (a tool call and the reply after it included) runs once the generation has ended.
+    await page.evaluate(`(async () => {
+      window.__answers.push('{"notes":[{"op":"add","about":"me","text":"Heard it from the generation.","keys":[],"pin":false}],"lights":[],"recap":null}');
+      const c = SillyTavern.getContext();
+      c.chat.push({ name: 'Nix', is_user: false, mes: 'From a generation.', extra: {}, send_date: Date.now() });
+      await c.eventSource.emit(c.eventTypes.GENERATION_ENDED, c.chat.length);
+    })()`);
+    check('her reply runs when the generation ends', await until(page, saved, 15_000));
+
+    await page.evaluate('window.lowlightResidual.set(false); window.__calls = 0;');
+    await say('Off now.', '{"notes":[],"lights":[],"recap":null}');
+    await page.waitForTimeout(2500);
+    check('OFF makes no call', (await page.evaluate<number>('window.__calls')) === 0);
+    await page.evaluate('window.lowlightResidual.set(true);');
+
+    await open('Seraphina');
+    await page.evaluate('window.__calls = 0;');
+    await page.evaluate(`SillyTavern.getContext().executeSlashCommandsWithOptions('/sendas name=Seraphina Hello, traveller.')`);
+    await page.waitForTimeout(2500);
+    check("another card's chat makes no call and gets no ledger line", (await page.evaluate<number>('window.__calls')) === 0 && (await page.evaluate<string>(line)) === '');
+  } finally {
+    await browser.close();
+    await stopST(st);
+  }
+}
+
+/** JACK IN with different personas: each gets its own chat with the contact, and coming back as one opens theirs again. */
+async function runPersonas() {
+  console.log('\n— JACK IN as one persona, then another, then the first again —');
+  const st = await startST();
+  const browser = await chromium.launch({ args: GL_ARGS });
+  const page = await browser.newPage({ viewport: { width: 1600, height: 900 } });
+  watchConsole(page);
+  await page.addInitScript('globalThis.__name = (f) => f;');
+  try {
+    await page.goto(URL);
+    await page.waitForTimeout(6000);
+    await passStWelcome(page);
+    await until(page, "!!document.querySelector('.llw-root')", 30_000);
+    await page.keyboard.press('y');
+    await until(page, "(SillyTavern.getContext().extensionSettings.lowlight?.installed?.length ?? 0) > 0");
+    await page.waitForTimeout(3000);
+    /** JACK IN as `who`, calling Nix: the chat it opened and who you are in it. */
+    const jackAs = async (who: string) => {
+      await page.evaluate("window.lowlightSelect.close(); SillyTavern.getContext().executeSlashCommandsWithOptions('/select')");
+      await until(page, "!!document.querySelector('.lls-root:not([hidden]) .lls-tile')", 20_000);
+      await page.waitForTimeout(800);
+      // A click on a 1P tile picks and locks it in.
+      await page.locator('.lls-tile', { hasText: who.toUpperCase() }).first().click();
+      if (await page.evaluate("document.querySelector('.lls-root')?.dataset.phase === 'p1'")) await page.keyboard.press('Enter');
+      await until(page, "document.querySelector('.lls-root')?.dataset.phase === 'p2'", 10_000);
+      await page.locator('.lls-tile', { hasText: 'NIX' }).first().click();
+      await page.keyboard.press('y');
+      await until(page, "SillyTavern.getContext().characters[SillyTavern.getContext().characterId]?.name === 'Nix' && !!SillyTavern.getContext().chatMetadata?.persona && !window.lowlightSelect.jacking", 30_000);
+      await page.waitForTimeout(1500);
+      return page.evaluate<{ chat: string; name: string; locked: string | null }>(
+        "(() => { const c = SillyTavern.getContext(); const f = c.chatMetadata?.persona ?? null; return { chat: c.getCurrentChatId(), name: c.name1, locked: f ? c.powerUserSettings.personas[f] : null }; })()",
+      );
+    };
+    const nixChats = () =>
+      page.evaluate<{ id: string; persona: string | null }[]>(`(async () => {
+        const c = SillyTavern.getContext();
+        const nix = c.characters.find((x) => x.name === 'Nix');
+        const all = await fetch('/api/characters/chats', { method: 'POST', headers: c.getRequestHeaders(), body: JSON.stringify({ avatar_url: nix.avatar, metadata: true }) }).then((r) => r.json());
+        return Object.values(all).map((x) => ({ id: x.file_id, persona: x.chat_metadata?.persona ? c.powerUserSettings.personas[x.chat_metadata.persona] : null }));
+      })()`);
+
+    const first = await jackAs('Adebayo');
+    await page.evaluate("SillyTavern.getContext().executeSlashCommandsWithOptions('/sendas name=Nix First of the night.')");
+    await page.waitForTimeout(1500);
+    const afterFirst = await nixChats();
+    check('the first JACK IN uses her empty chat, locked to the persona picked', afterFirst.length === 1 && first.locked === first.name, JSON.stringify({ first, afterFirst }));
+
+    const second = await jackAs('Cass');
+    const afterSecond = await nixChats();
+    check(
+      'JACK IN as another persona starts their own chat, and leaves the first one locked to its persona',
+      second.chat !== first.chat && second.name !== first.name && second.locked === second.name && afterSecond.find((x) => x.id === first.chat)?.persona === first.name,
+      JSON.stringify({ second, afterSecond }),
+    );
+
+    const again = await jackAs('Adebayo');
+    check('JACK IN as the first persona again opens their chat', again.chat === first.chat && again.name === first.name, JSON.stringify(again));
+  } finally {
+    await browser.close();
+    await stopST(st);
+  }
+}
+
 if (!fs.existsSync(path.join(PKG, 'cast', 'cast.json'))) {
   console.error(`No published package at ${PKG} (npm run st-publish first).`);
   process.exit(1);
 }
-await runAccepted();
-await runOwnContext();
-await runDeclined();
+// --only <name>: one case (accepted, context, declined, residual, personas).
+const only = arg('only');
+const cases: [string, () => Promise<void>][] = [['accepted', runAccepted], ['context', runOwnContext], ['declined', runDeclined], ['residual', runResidual], ['personas', runPersonas]];
+for (const [name, run] of cases) if (!only || only === name) await run();
 console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
 process.exit(failures ? 1 : 0);

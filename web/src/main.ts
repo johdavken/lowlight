@@ -1397,7 +1397,7 @@ function startRoom(agentId: string): void {
         break;
       }
       case 'residual_runs':
-        devPanel.setResidualRuns(e.runs, e.cipher);
+        devPanel.setResidualRuns(e.runs, e.cipher, e.habits);
         break;
       case 'dev_log':
         // A refused journal edit comes back as a warning to this tab: show it in the open panel too.

@@ -357,3 +357,15 @@ body.lowlight-chat.ll-history #sheld { height: calc(774 * var(--px)); }
 body.lowlight-chat.ll-history #chat { justify-content: flex-start; }
 body.lowlight-chat.ll-history #chat .mes:not(.last_mes) { display: flex; opacity: 0.82; }
 body.lowlight-chat.ll-history::after { height: var(--stage-h); background: rgba(6, 2, 12, 0.86); }
+
+/* SYS → RESIDUAL: the last run's dot, and the LEDGER panel in the welcome's frame (welcome.css). */
+.llr-open { cursor: pointer; }
+.llr-open:hover { color: #fff; }
+.llr-dot { width: 8px; height: 8px; margin-left: 10px; background: rgba(127, 233, 255, 0.35); flex: none; }
+.llr-dot.bad { background: #ff4f8b; box-shadow: 0 0 6px #ff4f8b; }
+.llr-box { width: min(720px, calc(100vw - 32px)); max-height: calc(100vh - 64px); display: flex; flex-direction: column; }
+.llr-body { overflow-y: auto; margin-top: 8px; padding-right: 6px; }
+.llr-head { margin: 14px 0 6px; color: #ff4f8b; letter-spacing: 0.3em; }
+.llr-note { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-bottom: 1px solid rgba(127, 233, 255, 0.12); }
+.llr-text, .llr-recap { font: 14px/1.5 'IBM Plex Mono', ui-monospace, monospace; letter-spacing: 0.01em; color: #e9def9; }
+.llr-keys { font-size: 15px; color: rgba(127, 233, 255, 0.55); }

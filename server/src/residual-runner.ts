@@ -19,6 +19,8 @@ import type { StandingControl } from './standing';
 import type { CompletionMessage } from './turn';
 import { CIPHER, cipherDue, cipherKey, parseCipherEvents, storyProse, type CipherEvent, type CipherState } from '../../shared/cipher';
 import { CIPHER_MAX_TOKENS, cipherRunMessages, parseCipherAnswer, type CipherRunInput } from './cipher-run';
+import { HABITS, habitsDue, herReplies, readHabits, repliesCount, writeHabits } from './habits';
+import { HABITS_MAX_TOKENS, habitsMessages, parseHabitsAnswer, type HabitsRunInput } from './habits-run';
 
 export { RESIDUAL_RUNS_KEPT };
 /** How long a new turn waits for the last reply's residual before going ahead without it. */
@@ -152,6 +154,8 @@ export class ResidualRunner {
   } | null = null;
   /** Her replies when a player's cipher call last failed (minor 1): it waits CIPHER.retryGap, not a call every reply. */
   private cipherFailed = new Map<string, number>();
+  /** Her replies when a player's habits run last failed: it waits HABITS.retryGap (habits spec §1.1). */
+  private habitsFailed = new Map<string, number>();
   /** Waiting jobs, one per player, oldest first. */
   private pending = new Map<string, Job>();
   private idle: Promise<void> = Promise.resolve();
@@ -244,6 +248,7 @@ export class ResidualRunner {
       })
       .then(() => this.summarize(job, abort.signal))
       .then(() => this.cipherRun(job, abort.signal))
+      .then(() => this.habitsRun(job, abort.signal))
       // A database closed under it (a load or a branch switched playthroughs) ends the run; nothing to record it in.
       .catch((err: unknown) => this.d.log(`residual · failed: ${err instanceof Error ? err.message : String(err)}`))
       .finally(() => {
@@ -443,6 +448,68 @@ export class ResidualRunner {
     });
     const kinds = parsed.truths.map((x) => x.kind).join(', ');
     const parts = ['residual · cipher', `${parsed.truths.length} ${parsed.truths.length === 1 ? 'truth' : 'truths'}${kinds ? ` (${kinds})` : ''}`];
+    if (row.refused.length > 0) parts.push(`${row.refused.length} refused`);
+    finish(parts.join(' · '));
+  }
+
+  /** The habits run (habits spec §1): when due, name what she keeps writing and store it under the reply. */
+  private async habitsRun(job: Job, signal: AbortSignal): Promise<void> {
+    if (signal.aborted) return;
+    const { db } = this.d;
+    // Up to its own reply: one that landed while the summary or cipher ran is the next job's (task 3 review I1).
+    const history = db.allMessages(job.player);
+    const end = history.findIndex((m) => m.id === job.reply.id);
+    if (end < 0) return;
+    const all = history.slice(0, end + 1);
+    const old = readHabits(db, job.player);
+    if (!habitsDue(all, old)) return;
+    const count = repliesCount(all);
+    const failed = this.habitsFailed.get(job.player);
+    if (failed !== undefined && count - failed < HABITS.retryGap) return;
+    const t0 = this.now();
+    const row: ResidualRunInfo = { at: Date.now(), kind: 'habits', player: job.player, messageId: job.reply.id, take: job.reply.take, ms: 0, tokensIn: null, tokensOut: null, raw: null, applied: [], refused: [], error: null };
+    const finish = (line: string) => {
+      row.ms = this.now() - t0;
+      db.insertResidualRun(row);
+      const devLine = `${line} · ${(row.ms / 1000).toFixed(1)} s`;
+      trace('residual:habits-run', '', devLine);
+      this.d.log(devLine);
+    };
+    const hers = herReplies(all).slice(-HABITS.window);
+    const from = all.indexOf(hers[0]);
+    const theirs = new Set<ChatMessage['mode']>([undefined, 'greet', 'travel', 'end']);
+    const hersIds = new Set(hers.map((m) => m.id));
+    const lines: HabitsRunInput['lines'] = all
+      .slice(from)
+      .filter((m) => hersIds.has(m.id) || (m.role === 'user' && m.status === 'ok' && m.text.trim() !== '' && theirs.has(m.mode)))
+      .map((m) => ({ speaker: m.role === 'agent' ? 'her' : 'them', text: m.text }));
+    const input: HabitsRunInput = { self: this.d.selfName, player: this.d.playerName(job.player), lines, current: old?.rules ?? [] };
+    let answer: { text: string; tokensIn?: number; tokensOut?: number };
+    try {
+      answer = await this.call(habitsMessages(input), HABITS_MAX_TOKENS, signal);
+    } catch (err) {
+      row.error = signal.aborted ? 'dropped: take replaced' : `call failed: ${err instanceof Error ? err.message : String(err)}`;
+      if (!signal.aborted) this.habitsFailed.set(job.player, count);
+      return finish(`residual · habits ${row.error}`);
+    }
+    this.habitsFailed.delete(job.player);
+    row.raw = answer.text;
+    row.tokensIn = answer.tokensIn ?? null;
+    row.tokensOut = answer.tokensOut ?? null;
+    if (signal.aborted || !db.getMessage(job.player, job.reply.id)) {
+      row.error = 'dropped: take replaced';
+      return finish(`residual · habits ${row.error}`);
+    }
+    const parsed = parseHabitsAnswer(answer.text, hers.map((m) => m.text));
+    if (parsed === null) {
+      row.error = 'answer: not JSON';
+      this.habitsFailed.set(job.player, count);
+      return finish(`residual · habits failed: ${row.error}`);
+    }
+    row.refused = parsed.refused;
+    db.withStamp({ messageId: job.reply.id, take: job.reply.take }, () => writeHabits(db, job.player, { rules: parsed.rules, through: hers.at(-1)!.id }));
+    row.applied = [`habits: ${parsed.rules.length} rules`];
+    const parts = ['residual · habits', `${parsed.rules.length} rules`];
     if (row.refused.length > 0) parts.push(`${row.refused.length} refused`);
     finish(parts.join(' · '));
   }

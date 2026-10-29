@@ -44,7 +44,8 @@ export function mountSubtitles() {
       const time = m.send_date ? timestampToMoment(m.send_date) : null;
       const clock = time?.isValid() ? time.format('HH:mm') : '';
       const model = !m.is_user && m.extra?.model ? modelLabel(m.extra.model) : '';
-      let el = ts.nextElementSibling?.classList.contains('ll-stamp') ? ts.nextElementSibling : null;
+      // Its own row's stamp, wherever SillyTavern has since put something next to the timestamp.
+      let el = ts.parentElement?.querySelector(':scope > .ll-stamp') ?? null;
       // Only real changes touch the row: the chat's own observer would otherwise see this and stamp again, forever.
       if (el && el.dataset.clock === clock && el.dataset.model === model) continue;
       if (!el) {

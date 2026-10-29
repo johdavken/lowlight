@@ -255,20 +255,40 @@ export function mountSelect({ cast, rooms, current, goTo, cue, menu = () => {}, 
   async function enter() {
     const { p1, p2 } = picked;
     const c = SillyTavern.getContext();
-    // The chat first: opening it applies its locked persona, else the default one, which would undo the pick. Then
-    // the persona, locked to this chat so reloads and later visits keep it (no "temporary persona" warning).
-    if (String(c.characterId) !== String(p2.index)) {
-      // selectCharacterById returns before the chat has loaded; SillyTavern's own CHAT_CHANGED listeners then set the
-      // chat's persona and metadata. Ours runs after theirs (listeners run in order), so the pick and its lock stand.
+    // Opening a chat applies its locked persona (else the default one), so each step waits for SillyTavern's own
+    // CHAT_CHANGED listeners to finish; ours runs after theirs (listeners run in order), so the pick and its lock stand.
+    const opened = (open) => {
       const loaded = new Promise((resolve) => {
         c.eventSource.once(c.eventTypes.CHAT_CHANGED, resolve);
         setTimeout(resolve, 15_000);
       });
-      await c.selectCharacterById(p2.index);
-      await loaded;
+      return Promise.resolve(open()).then(() => loaded);
+    };
+    if (String(c.characterId) !== String(p2.index)) await opened(() => c.selectCharacterById(p2.index));
+    // A playthrough per persona, as Lowlight's: the newest chat with them locked to who you picked, else a new one
+    // (or the chat that's open, while it's empty and nobody's). Chats from before JACK IN stay in SillyTavern's list.
+    const mine = await chatLockedTo(c, p2.index, p1.file);
+    const current = SillyTavern.getContext();
+    const fresh = current.chat.length === 0 && !current.chatMetadata?.persona;
+    if (mine && mine !== current.getCurrentChatId()) await opened(() => current.openCharacterChat(mine));
+    else if (!mine && !fresh) {
+      const { doNewChat } = await import('../../../../script.js');
+      await opened(() => doNewChat({ deleteCurrentChat: false }));
     }
     if (p1.file !== user_avatar) await setUserAvatar(p1.file, { toastPersonaNameChange: false });
     await setPersonaLockState(true, 'chat');
+  }
+
+  /** The newest of the character's chats locked to persona `file`, by its file id, or null. */
+  async function chatLockedTo(c, index, file) {
+    const avatar = c.characters[index]?.avatar;
+    if (!avatar) return null;
+    const all = await fetch('/api/characters/chats', { method: 'POST', headers: c.getRequestHeaders(), body: JSON.stringify({ avatar_url: avatar, metadata: true }) })
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => []);
+    const locked = Object.values(all ?? {}).filter((x) => x?.chat_metadata?.persona === file);
+    locked.sort((a, b) => (b.last_mes ?? 0) - (a.last_mes ?? 0));
+    return locked[0]?.file_id ?? null;
   }
 
   function fit() {

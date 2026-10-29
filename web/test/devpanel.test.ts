@@ -436,6 +436,20 @@ describe('RESIDUAL section (scribe spec §8)', () => {
     expect(c.textContent).toContain('9 replies · last run at 6');
   });
 
+  it('HABITS: the rules and their reply, none yet without; a habits run shows its refusals (habits spec §3)', () => {
+    const { root, panel } = setup();
+    panel.setResidualRuns([], null, null);
+    expect(root.querySelector('.dp-habits')!.textContent).toContain('none yet');
+    panel.setResidualRuns([run({ kind: 'habits', applied: ['habits: 2 rules'], refused: ['habits: rule 2 quotes her'] })], null, { rules: ['A', 'B'], through: 'm9' });
+    const h = root.querySelector('.dp-habits')!;
+    expect([...h.querySelectorAll('.dp-habits-rule')].map((r) => r.textContent)).toEqual(['A', 'B']);
+    expect(h.textContent).toContain('through m9');
+    const row = root.querySelector<HTMLElement>('.dp-residual-row .dp-residual-sum')!;
+    expect(row.textContent).toBe('22:41 · habits · 1 applied · 1 refused · 1.4 s');
+    row.click();
+    expect(root.querySelector('.dp-residual-detail')!.textContent).toContain('habits: rule 2 quotes her');
+  });
+
   it('REFRESH asks for the runs, and so does a Residual log line', () => {
     const { root, send, panel } = setup();
     root.querySelector<HTMLButtonElement>('.dp-residual-refresh')!.click();

@@ -1,0 +1,33 @@
+{
+  "contacts": [
+    { "id": "silas", "player": "hicks" },
+    { "id": "ember", "player": "hicks" },
+    { "id": "cass", "player": "hicks" }
+  ],
+  "turns": [
+    { "text": "*sits down across from you and shakes the rain off* Slow night?" },
+    { "text": "Yeah. Nothing worth telling. I just didn't want to be home yet." },
+    { "text": "*listens to the rain for a while*" },
+    { "text": "What do you do when it's this quiet?" },
+    { "text": "Huh. I'd have guessed something else." },
+    { "text": "*watches the street*" },
+    { "text": "You ever think about leaving the city?" },
+    { "text": "Me neither, really. It's just a thing people say." },
+    { "text": "*finishes the drink and turns the empty glass slowly*" },
+    { "text": "Tell me something you liked about today." },
+    { "text": "That's more than I've got." },
+    { "text": "*says nothing for a long moment*" },
+    { "text": "Sorry. Long week." },
+    { "text": "No, it's fine. I like the quiet in here." },
+    { "text": "What were you like when you were younger?" },
+    { "text": "I can't picture that at all." },
+    { "text": "*laughs, quietly*" },
+    { "text": "Okay, okay. I believe you." },
+    { "text": "*leans back and closes their eyes for a second*" },
+    { "text": "Still raining?" },
+    { "text": "Figures. It always is." },
+    { "text": "What's the worst job you ever took?" },
+    { "text": "*lets that sit*" },
+    { "text": "I should go soon. Not yet, though." }
+  ]
+}

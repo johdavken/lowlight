@@ -4,6 +4,7 @@ import { ownedBy, parseQuestFile, parseRun } from '../../shared/quests';
 import { DESK, JOB } from '../../shared/quests.fixture';
 import { arrangementKey } from '../../shared/arrangement';
 import { commsKey, parseComms } from '../../shared/comms';
+import { writeHabits } from '../src/habits';
 import { at, intakeRelay, lastUser, parse } from './fixtures/intake-relay';
 import { COMMS_BACK_INSTRUCTIONS, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, LEAVE_INSTRUCTIONS, LIGHTS_LINE, TRAVEL_INSTRUCTIONS, TRAVEL_LINE } from '../src/instructions';
 
@@ -65,6 +66,15 @@ describe('comms: her prompt', () => {
     r.deps.commsPlaces = () => ({ her: 'Lowlight Intake', you: "Hae's Noodles" });
   };
   const last = (r: ReturnType<typeof intakeRelay>) => lastUser(r.backend.reqs.at(-1)!);
+
+  it('no [worn thin …] line on comms (habits spec §2)', async () => {
+    const r = intakeRelay({ trust: 5 });
+    on(r);
+    writeHabits(r.db, 'hicks', { rules: ['No glasses business'], through: 'x' });
+    await r.relay.send('hicks', 'what do you see');
+    expect(last(r)).toContain('[comms]');
+    expect(last(r)).not.toContain('worn thin');
+  });
 
   it('her [comms] line on comms, right after the time line; none off comms or out of character', async () => {
     const r = intakeRelay({ trust: 5 });

@@ -33,15 +33,20 @@ export const TIME_MAX = 720;
 export type ResidualKind = 'turn' | 'end';
 
 export interface ResidualInput {
-  kind: ResidualKind;
+  /** 'recap': SillyTavern's every-10th-reply run, asking where things stand so far (no nights there to end). */
+  kind: ResidualKind | 'recap';
   self: { name: string; pronoun: string };
   player: { id: string; name: string };
   /** Her room as it is now: the `[room: …]` line. */
   roomLine: string;
   /** Her reply's story clock (its line's stamp plus what she passed); null or absent outside a stamped turn. */
   clock?: number | null;
-  /** Her standing with the player in words and numbers; null when standing doesn't apply. */
-  standing: string | null;
+  /** Her standing with the player in words and numbers; null when there's none yet; false: no standing at all (SillyTavern). */
+  standing: string | null | false;
+  /** false: no jobs-and-quests rule (SillyTavern has no jobs). */
+  jobs?: boolean;
+  /** false on a 'turn': no recap asked for when the night ends (SillyTavern has no nights). */
+  nights?: boolean;
   /** Her journal and this pair's dossier notes. */
   notes: Note[];
   /** What happened since the last reply the Residual covered, oldest first. */
@@ -538,11 +543,12 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
   const promising = timed && (i.places?.length ?? 0) > 0 && i.promises === true;
   const placed = planned || promising;
   const ciphered = (i.cipher?.length ?? 0) > 0;
+  const standing = i.standing !== false;
   const system = [
     `You keep the records for a roleplay between ${her} (${i.self.pronoun}) and ${you}. You never write story: you read what just happened and answer with one JSON object.`,
     `NOTES are ${her}'s memory. Only lasting facts: what is owed or promised, what was revealed, what changed, where something is. Not moods, not small talk. One fact per note: a new fact is a new note, even about the same person; rewrite a note only when that same fact changed, and forget it once it stops being true. "about": "me" is ${her}'s own journal (her life, her room, her plans); "about": "you" is what ${her} learns about ${you}. Up to ${NOTE_MAX} characters each, in ${her}'s words. Give every note 1–4 keywords, written the way they would be said (\"chrome hand\", not \"chrome-hand\"): names of other people, places, objects, words that would come up again in talk — not ${her}'s or ${you}'s names, not everyday words. Pin only what should matter every scene (at most ${PIN_CAP} pins). Most turns add nothing.`,
-    `STANDING is about what ${you} did this turn and how it lands with ${her}: something ${you} said or did, never what ${her} or anyone else did. ${her}'s reply only shows how it landed. Leave it null unless what ${you} did would still matter to ${her} next week: most turns move nothing, and ordinary courtesy, small favours, flirting or a pleasant chat are not enough. Decide the reason first, then its sign: a lie, a dodge, hiding something, pushing ${her} or bringing ${her} trouble moves down; keeping a promise, telling a hard truth or taking a risk for ${her} moves up. Trust and warmth usually move apart: someone can earn trust and still not be liked, or be liked and not believed — move only the one that changed. Each is -1, 0 or +1. trust: whether ${her} believes them and would tell them things. warmth: whether ${her} likes having them around. reason: a few words.`,
-    JOBS_APART,
+    ...(standing ? [`STANDING is about what ${you} did this turn and how it lands with ${her}: something ${you} said or did, never what ${her} or anyone else did. ${her}'s reply only shows how it landed. Leave it null unless what ${you} did would still matter to ${her} next week: most turns move nothing, and ordinary courtesy, small favours, flirting or a pleasant chat are not enough. Decide the reason first, then its sign: a lie, a dodge, hiding something, pushing ${her} or bringing ${her} trouble moves down; keeping a promise, telling a hard truth or taking a risk for ${her} moves up. Trust and warmth usually move apart: someone can earn trust and still not be liked, or be liked and not believed — move only the one that changed. Each is -1, 0 or +1. trust: whether ${her} believes them and would tell them things. warmth: whether ${her} likes having them around. reason: a few words.`] : []),
+    ...(i.jobs === false ? [] : [JOBS_APART]),
     `LIGHTS: only when the reply says a light changed (the power cut, a lamp switched off) and the [room: …] line shows it didn't. Use the light ids from that line; intensity 0–1.`,
     ...(timed
       ? [
@@ -559,10 +565,16 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
             : []),
         ]
       : []),
-    ...(i.kind === 'end'
+    ...(i.kind === 'recap'
+      ? [
+          `RECAP: where things stand between ${her} and ${you} so far, for when the chat runs long (up to ${RECAP_MAX} characters), carrying over what still holds from the recap now.`,
+        ]
+      : i.kind === 'end'
       ? [
           `The scene is ending. RECAP: where things stand between ${her} and ${you}, for the next visit (up to ${RECAP_MAX} characters). DOSSIER: ${her}'s whole page on ${you} rewritten if ${her} learned something lasting (up to ${PAGE_MAX} characters, carry over what still holds), else null.`,
         ]
+      : i.nights === false
+      ? []
       : [
           `RECAP: only if this turn ends the night — they part, say goodnight, one of them leaves: where things stand between ${her} and ${you}, for the next visit (up to ${RECAP_MAX} characters). Otherwise null.`,
         ]),
@@ -577,8 +589,12 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
       : timed
         ? '{"notes":[],"standing":null,"lights":[],"time":null,"recap":null,"dossier":null}'
         : '{"notes":[],"standing":null,"lights":[],"recap":null,"dossier":null}'
-    ).replace('"recap":null', ciphered ? '"cipher":null,"recap":null' : '"recap":null'),
-    'Each entry in "notes" is one of: add {"op":"add","about":"me" or "you","text":the note,"keys":[1–4 keywords],"pin":true or false}; rewrite {"op":"rewrite","id":an id from the notes listed,"text":the new text,"keys":[…],"pin":…} (any of text, keys, pin; leave out what stays); forget {"op":"forget","id":an id from the notes listed}. "standing" is null or {"reason":"a few words","trust":n,"warmth":n}. "lights" holds {"id":a light id from the [room: …] line,"intensity":0 to 1}.' +
+    )
+      .replace('"recap":null', ciphered ? '"cipher":null,"recap":null' : '"recap":null')
+      .replace(standing ? '' : '"standing":null,', ''),
+    'Each entry in "notes" is one of: add {"op":"add","about":"me" or "you","text":the note,"keys":[1–4 keywords],"pin":true or false}; rewrite {"op":"rewrite","id":an id from the notes listed,"text":the new text,"keys":[…],"pin":…} (any of text, keys, pin; leave out what stays); forget {"op":"forget","id":an id from the notes listed}.' +
+      (standing ? ' "standing" is null or {"reason":"a few words","trust":n,"warmth":n}.' : '') +
+      ' "lights" holds {"id":a light id from the [room: …] line,"intensity":0 to 1}.' +
       (timed ? ' "time" is null or {"until":"HH:MM"}.' : '') +
       (planned ? ' "plan" is null, {"cancel":true}, or {"going":{"place":id,"until":"HH:MM" or null} or null,"meet":{"place":id,"at":"HH:MM"} or null}.' : '') +
       (promising ? ' "promise" is null, {"cancel":true}, {"at":"HH:MM","about":"…"}, or {"place":id,"about":"…"}.' : '') +
@@ -597,6 +613,7 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
     ciphered ? `[cipher: ${i.cipher!.map((c) => `${c.label} · ${flat(c.truth)} · comes out when ${flat(c.comesOutWhen)}`).join('; ')}]` : null,
     i.notes.length > 0 ? `${her}'s notes:\n${i.notes.map(noteLine).join('\n')}` : `${her} has no notes yet.`,
     ...(i.kind === 'end' ? [`The recap now: ${i.recap ?? '(none)'}`, `${her}'s dossier page on ${you} now: ${i.page ?? '(empty)'}`] : []),
+    ...(i.kind === 'recap' ? [`The recap now: ${i.recap ?? '(none)'}`] : []),
     `What just happened:\n${i.exchanges.map((e) => `${e.speaker}: ${flat(e.text)}`).join('\n')}`,
     unkeyed.length > 0 ? `Give keywords to these notes (a rewrite with keys only): ${unkeyed.map((n) => n.id).join(', ')}` : null,
   ]

@@ -9,6 +9,7 @@ import { DEFAULT_SHARED_STANDING } from '../../shared/standing';
 import { plansApply, ResidualRunner, RESIDUAL_BACKLOG, RESIDUAL_RUNS_KEPT, RESIDUAL_TIMEOUT_MS, RESIDUAL_WAIT_MS, type ResidualRunnerDeps } from '../src/residual-runner';
 import type { CompletionMessage } from '../src/turn';
 import { readSummary } from '../src/summary';
+import { readHabits, writeHabits } from '../src/habits';
 import type { ChatMessage } from '../../shared/types';
 import { cipherKey, foldCipher, parseCipherEvents, type CipherState } from '../../shared/cipher';
 
@@ -324,6 +325,8 @@ describe('ResidualRunner', () => {
     let last!: ChatMessage;
     for (let i = 0; i < 20; i++) last = exchange(`line ${i}`, `reply ${i}`);
     db.setMeta(`scribe.${P}.through`, JSON.stringify({ id: db.allMessages(P).at(-3)!.id, take: 0 }));
+    // Habits are up to date: only the turn run and the summary call.
+    writeHabits(db, P, { rules: [], through: last.id });
     answers.push(answer({ notes: [] }), () => Promise.resolve({ text: 'They talked for a long time.' }));
     r.afterTurn(P, { id: last.id, take: 0 }, 'turn');
     await r.waitAll();
@@ -360,6 +363,7 @@ describe('ResidualRunner', () => {
     db.insertMessage(P, { id: `m${++seq}`, role: 'user', text: "[you told Hicks you'd text — it's 22:00. Text them now.]", toolLines: [], ts: 1000 * seq, status: 'ok', mode: 'text', promised: true });
     for (let i = 0; i < 20; i++) last = exchange(`line ${i}`, `reply ${i}`);
     db.setMeta(`scribe.${P}.through`, JSON.stringify({ id: db.allMessages(P).at(-3)!.id, take: 0 }));
+    writeHabits(db, P, { rules: [], through: last.id });
     answers.push(answer({ notes: [] }), () => Promise.resolve({ text: 'They talked.' }));
     r.afterTurn(P, { id: last.id, take: 0 }, 'turn');
     await r.waitAll();
@@ -828,5 +832,132 @@ describe('the cipher run (cipher spec §2.2)', () => {
     r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
     await r.waitAll();
     expect(parseCipherEvents(db.getMeta(cipherKey(P))).filter((e) => e.t === 'truth').map((e) => (e as { id: string }).id)).toEqual(['nix-1', `nix-${a1.id}.0-1`]);
+  });
+});
+
+describe('habits run (habits spec §1)', () => {
+  let habitAnswers: (() => Promise<{ text: string }>)[];
+  let habitCalls: CompletionMessage[][];
+  const isHabits = (m: CompletionMessage[]) => m[0].content.startsWith("You read one writer's");
+  /** A runner whose habits calls answer from habitAnswers; every other call gets an empty turn answer. */
+  const habitsRunner = () =>
+    runner({
+      complete: async (messages) => {
+        if (!isHabits(messages)) return { text: '{"notes":[]}' };
+        habitCalls.push(messages);
+        const next = habitAnswers.shift();
+        return next ? next() : { text: '{"rules":[]}' };
+      },
+    });
+  /** `k` exchanges, each followed by the Residual; returns her last reply. */
+  const play = async (r: ResidualRunner, k: number, reply = (i: number) => `reply ${seq + i}`) => {
+    let last!: ChatMessage;
+    for (let i = 0; i < k; i++) {
+      last = exchange(`line ${i}`, reply(i));
+      r.afterTurn(P, { id: last.id, take: 0 }, 'turn');
+      await r.waitAll();
+    }
+    return last;
+  };
+  const habitRows = () => db.residualRuns(50, P).filter((x) => x.kind === 'habits');
+
+  beforeEach(() => {
+    habitAnswers = [];
+    habitCalls = [];
+  });
+
+  it('none before 8 of her replies; at the 8th the rules are written and the run recorded', async () => {
+    const r = habitsRunner();
+    habitAnswers.push(() => Promise.resolve({ text: '{"rules":["No glasses business"]}' }));
+    await play(r, 7);
+    expect(habitCalls).toHaveLength(0);
+    const eighth = await play(r, 1);
+    expect(readHabits(db, P)).toEqual({ rules: ['No glasses business'], through: eighth.id });
+    expect(habitRows()[0]).toMatchObject({ kind: 'habits', messageId: eighth.id, applied: ['habits: 1 rules'], error: null });
+    expect(logs.some((l) => l.startsWith('residual · habits · 1 rules'))).toBe(true);
+  });
+
+  it('the next run waits 12 more of her replies', async () => {
+    const r = habitsRunner();
+    await play(r, 8);
+    await play(r, 11);
+    expect(habitCalls).toHaveLength(1);
+    await play(r, 1);
+    expect(habitCalls).toHaveLength(2);
+  });
+
+  it('a failed call writes nothing and waits 3 replies', async () => {
+    const r = habitsRunner();
+    habitAnswers.push(() => Promise.reject(new Error('provider down')));
+    await play(r, 8);
+    expect(readHabits(db, P)).toBeNull();
+    expect(habitRows()[0].error).toMatch(/^call failed/);
+    await play(r, 2);
+    expect(habitCalls).toHaveLength(1);
+    await play(r, 1);
+    expect(habitCalls).toHaveLength(2);
+  });
+
+  it('an answer that is no list writes nothing and waits too', async () => {
+    const r = habitsRunner();
+    habitAnswers.push(() => Promise.resolve({ text: 'I see no habits.' }));
+    await play(r, 8);
+    expect(readHabits(db, P)).toBeNull();
+    expect(habitRows()[0].error).toBe('answer: not JSON');
+    await play(r, 2);
+    expect(habitCalls).toHaveLength(1);
+  });
+
+  it('a take replaced while the call is out drops the answer', async () => {
+    const r = habitsRunner();
+    const d = deferred();
+    habitAnswers.push(() => d.promise);
+    await play(r, 7);
+    const last = exchange('line', 'reply');
+    r.afterTurn(P, { id: last.id, take: 0 }, 'turn');
+    await vi.waitFor(() => expect(habitCalls).toHaveLength(1));
+    r.takeReplaced(last.id);
+    d.resolve({ text: '{"rules":["A"]}' });
+    await r.waitAll();
+    expect(readHabits(db, P)).toBeNull();
+    expect(habitRows()[0].error).toBe('dropped: take replaced');
+  });
+
+  it('a rule that quotes her is refused, the rest kept', async () => {
+    const r = habitsRunner();
+    habitAnswers.push(() => Promise.resolve({ text: '["A","Stop: pushes his glasses up"]' }));
+    await play(r, 8, () => '*pushes his glasses up* Sure.');
+    expect(readHabits(db, P)!.rules).toEqual(['A']);
+    expect(habitRows()[0].refused).toEqual(['habits: rule 2 quotes her']);
+  });
+
+  it('an empty list clears the one in place', async () => {
+    const r = habitsRunner();
+    habitAnswers.push(() => Promise.resolve({ text: '{"rules":["A"]}' }), () => Promise.resolve({ text: '{"rules":[]}' }));
+    await play(r, 8);
+    expect(readHabits(db, P)!.rules).toEqual(['A']);
+    await play(r, 12);
+    expect(readHabits(db, P)!.rules).toEqual([]);
+  });
+
+  it('reads only up to its own reply, not one that landed while it ran (task 3 review I1)', async () => {
+    const r = habitsRunner();
+    await play(r, 7);
+    const eighth = exchange('line 8', 'reply eight');
+    r.afterTurn(P, { id: eighth.id, take: 0 }, 'turn');
+    exchange('the next line', 'the next reply');
+    await r.waitAll();
+    expect(readHabits(db, P)!.through).toBe(eighth.id);
+    expect(habitCalls[0][1].content).not.toContain('the next');
+  });
+
+  it('reads her lines and theirs, and the rules in place', async () => {
+    const r = habitsRunner();
+    habitAnswers.push(() => Promise.resolve({ text: '{"rules":["No glasses business"]}' }));
+    await play(r, 20);
+    const user = habitCalls[1][1].content;
+    expect(user).toContain('No glasses business');
+    expect(user).toContain('Nix: reply');
+    expect(user).toContain('Hicks: line');
   });
 });

@@ -8,6 +8,9 @@ export { ROOM_TOOLS, checkRoomTool, appliedText, isRoomToolMessage, preToolMessa
 export { stampOf, withStamp, roomFromChat } from './room-stamp';
 export { planInstall } from './install-plan';
 export { planSettings } from './settings-plan';
+export { residualMessages, parseResidualAnswer } from '../../server/src/residual';
+export { journalLineOf } from '../../shared/journal-line';
+export { applyAnswer, changeOf, exchangesFor, isRecapRun, ledgerOf, takeOf, withChange } from './ledger';
 import { sceneSchema } from '../../shared/scene-schema';
 import { applyPresetTo } from '../../shared/presets';
 import { withBase } from '../../shared/light-share';

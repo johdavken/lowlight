@@ -88,6 +88,11 @@ describe('residents', () => {
     const cast = (await exportCast({ repo, target: { package: tmp() }, version: '1.0.0', ids: ['hae', 'cass'] })).cast;
     expect(Object.fromEntries(cast.characters.map((c) => [c.id, c.resident ?? false]))).toEqual({ hae: true, cass: false });
   }, 60_000);
+
+  it("carries each one's pronoun, for her Residual's prompt", async () => {
+    const cast = (await exportCast({ repo, target: { package: tmp() }, version: '1.0.0', ids: ['hicks', 'cass'] })).cast;
+    expect(Object.fromEntries(cast.characters.map((c) => [c.id, c.pronoun]))).toEqual({ hicks: 'he', cass: 'she' });
+  }, 60_000);
 });
 
 describe("the card picture, as Lowlight's select screen shows them", () => {

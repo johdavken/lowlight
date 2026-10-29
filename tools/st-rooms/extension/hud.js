@@ -44,7 +44,7 @@ function meter(v) {
 /**
  * @param {{ room: any, map: any, onLowChat: (on: boolean) => void }} deps
  */
-export function mountHud({ room, map, select, roomTools }) {
+export function mountHud({ room, map, select, roomTools, residual }) {
   const root = el('div', 'llh-root');
   const band = el('div', 'llh-band');
   const bar = el('div', 'llh-bar');
@@ -145,6 +145,22 @@ export function mountHud({ room, map, select, roomTools }) {
     tools.append(el('span', 'llh-label', 'HER ROOM TOOLS'), el('span', 'llh-value', !roomTools.isOn() ? 'OFF' : roomTools.canCall() ? 'ON' : 'ON · FUNCTION CALLING OFF'));
     tools.addEventListener('click', () => { roomTools.set(!roomTools.isOn()); paintMenu(); });
     menu.append(tools);
+    // Her Residual: ON/OFF, the ledger, and a dot for the last run (dim: ran; red: failed, why on hover).
+    if (residual) {
+      const res = el('div', 'llh-row');
+      const state = el('span', 'llh-value', residual.isOn() ? 'ON' : 'OFF');
+      const book = el('span', 'llh-value llr-open', '· LEDGER ›');
+      const last = residual.status();
+      res.append(el('span', 'llh-label', 'RESIDUAL'), state, book);
+      if (last) {
+        const dot = el('span', `llr-dot${last.ok ? '' : ' bad'}`);
+        dot.title = last.ok ? 'Last run kept the ledger' : `Last run failed: ${last.why}`;
+        res.append(dot);
+      }
+      state.addEventListener('click', (e) => { e.stopPropagation(); residual.set(!residual.isOn()); paintMenu(); });
+      book.addEventListener('click', (e) => { e.stopPropagation(); closeMenu(); residual.openLedger(); });
+      menu.append(res);
+    }
     const look = el('div', 'llh-row');
     look.append(el('span', 'llh-label', 'LOOK'), el('span', 'llh-value', 'LOWLIGHT · SWITCH TO SILLYTAVERN'));
     look.addEventListener('click', () => { closeMenu(); SillyTavern.getContext().executeSlashCommandsWithOptions('/lowchat'); });

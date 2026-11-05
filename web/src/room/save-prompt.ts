@@ -1,21 +1,25 @@
 /**
- * The room's SAVE card (spec 2026-10-07 §6; restyled 2026-10-18, PEOPLE spec §3): the room's picture, the line
- * LOAD will show (place · time · who's with you), and a name field prefilled with the automatic name. Enter
- * saves, Esc cancels; a refused save keeps it open with the reason inline.
+ * The room's SAVE card (spec 2026-10-07 §6; restyled 2026-10-18, PEOPLE spec §3; the strip, pause menu mockup
+ * 2026-10-30): the strip LOAD will show (the room, your face and theirs, the name as you type it, place · time ·
+ * who's with you), and a name field prefilled with the automatic name. Enter saves, Esc cancels; a refused
+ * save keeps it open with the reason inline.
  */
 
 import { ApiError } from '../net/playthroughs';
 import { onClickAway } from '../ui/click-away';
+import { saveStrip } from '../ui/save-strip';
 import './save-card.css';
 
 /** What the card shows of the moment being saved. */
 export interface SaveSnapshot {
-  /** The room's art (null: none). */
-  picture: string | null;
+  /** The room (a scene id; null: no picture). */
+  scene: string | null;
+  /** Face thumbnails: yours, and whoever you're with (null: nobody). */
+  you: string | null;
+  them: string | null;
   place: string;
   time: string | null;
   withName: string;
-  withAccent: string;
 }
 
 const NAME_MAX = 80; // the server's limit on a save's name
@@ -67,21 +71,17 @@ export function openSavePrompt(
   const error = el('div', 'error');
   const body = el('div', 'sc-body');
   const s = o.snapshot;
-  if (s?.picture) {
-    const pic = el('img', 'sc-picture');
-    pic.alt = '';
-    pic.src = s.picture;
-    pic.addEventListener('error', () => pic.remove(), { once: true });
-    box.append(pic);
-  }
+  body.append(el('div', 'sc-title', 'SAVE'));
   if (s) {
-    const line = el('div', 'sc-line', `${[s.place, s.time].filter(Boolean).join(' · ').toUpperCase()} · `);
-    const who = el('span', 'sc-with', `WITH ${s.withName.toUpperCase()}`);
-    who.style.color = s.withAccent;
-    line.append(who);
-    body.append(line);
+    const meta = [s.place, s.time, s.them ? `with ${s.withName}` : null].filter(Boolean).join(' · ');
+    const strip = saveStrip({ scene: s.scene, you: s.you, them: s.them, name: field.value, meta });
+    strip.classList.add('sc-strip');
+    const name = strip.querySelector('.ss-name')!;
+    // The strip's name follows the field: what you type is what LOAD will show.
+    field.addEventListener('input', () => (name.textContent = field.value));
+    body.append(strip);
   }
-  body.append(el('div', 'sc-title', 'SAVE'), field, error, el('div', 'sc-hint', '[ENTER] SAVE · [ESC] CANCEL'));
+  body.append(field, error, el('div', 'sc-hint', '[ENTER] SAVE · [ESC] CANCEL'));
   box.append(body, el('div', 'sc-scan'));
   host.append(box);
   field.focus();

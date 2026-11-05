@@ -176,6 +176,18 @@ describe('playthrough routes', () => {
     expect(built.world.questStatus(pt.player)).toEqual([]);
   });
 
+  it("world.metaAnywhere reads a key from a contact's db no room has built", async () => {
+    const { built, cfg } = await start({ others: ['cass'] });
+    const pt = built.world.active()!;
+    expect(built.world.metaAnywhere?.('contractSend.x')).toBe(false);
+    const file = path.join(cfg.playthroughsDir, pt.id, 'chars', 'cass', 'room.db');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const db = openDb(file, { defaultPlayer: pt.player });
+    db.setMeta('contractSend.x', '1');
+    db.close();
+    expect(built.world.metaAnywhere?.('contractSend.x')).toBe(true);
+  });
+
   it('ties: as written and EDIT know from before; CUSTOM and an old persona do not (Review Focus 2)', async () => {
     const { api, built, cfg } = await start({ others: ['cass'] });
     const player = built.world.active()!.player;
@@ -439,6 +451,19 @@ describe('playthrough routes', () => {
     expect((await api('DELETE', '/api/saves/..%2Fx')).status).toBe(404);
   });
 
+  it('rename save trims, rejects a bad name, 404s an unknown save', async () => {
+    const { api, built } = await start();
+    const id = built.world.active()!.id;
+    const save = (await api('POST', `/api/playthroughs/${id}/saves`, { name: 'Old' })).body;
+    expect(await api('PATCH', `/api/saves/${save.id}`, { name: '   ' })).toEqual({ status: 400, body: { error: 'bad-name' } });
+    const ok = await api('PATCH', `/api/saves/${save.id}`, { name: '  Before the weigh station ' });
+    expect(ok.status).toBe(200);
+    expect(ok.body).toMatchObject({ id: save.id, name: 'Before the weigh station' });
+    expect(built.playthroughs.saves(id)[0].name).toBe('Before the weigh station');
+    expect((await api('PATCH', '/api/saves/sv-20260101-zzzz', { name: 'a' })).status).toBe(404);
+    expect((await api('PATCH', '/api/saves/..%2Fx', { name: 'a' })).status).toBe(404);
+  });
+
   it('leads lists held leads with the receiver\'s name and place, unmet without a portrait; followed last', async () => {
     const lead = (id: string, to: string) =>
       `---\ntitle: T ${id}\nfrom: nix\nto: ${to}\nkeys: [teo]\nfill: what he owes\nplace: The Marsh\n---\n## On her mind\nm\n## Giver knows\ng\n## Receiver knows\nr\n`;
@@ -570,6 +595,7 @@ describe('playthrough routes', () => {
       ['POST', `/api/playthroughs/${pt.id}/saves`, { name: 'x' }],
       ['POST', `/api/saves/${save.id}/load`],
       ['DELETE', `/api/saves/${save.id}`],
+      ['PATCH', `/api/saves/${save.id}`, { name: 'Renamed' }],
       ['POST', '/api/playthroughs/active/location', { contactId: 'nix' }],
     ];
     for (const [method, url, payload] of changes) {
@@ -1028,7 +1054,7 @@ describe('schedules', () => {
       prepare: (c) => {
         prepare(c);
         const dir = path.join(c.charactersDir, 'nix');
-        const art = path.join(__dirname, '..', '..', 'characters', 'nix');
+        const art = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
         fs.copyFileSync(path.join(art, fs.readdirSync(art).find((f) => f.endsWith('-happy.png'))!), path.join(dir, 'happy.png'));
         fs.copyFileSync(path.join(art, fs.readdirSync(art).find((f) => f.includes('-outfit-') && f.endsWith('.png'))!), path.join(dir, 'sprite.png'));
         const file = path.join(dir, 'character.json');

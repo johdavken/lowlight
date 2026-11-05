@@ -37,10 +37,12 @@ describe('MapPanel', () => {
     expect(root.querySelector('.map-hint')!.textContent).toBe('SCROLL ZOOM · DRAG MOVE · [ESC] CLOSE');
   });
 
-  it('loads the map and opens where you are', async () => {
+  it('loads the map with your pin lit and no card open (map pins spec §1)', async () => {
     mount(async () => shipped()).open();
     await flush();
-    expect(root.querySelector('.map-heading .t')!.textContent).toBe('KARASU');
+    expect(root.querySelector('.pin.here')).not.toBeNull();
+    expect(root.querySelector('.map-strip')).toBeNull();
+    expect(root.querySelector('.map-band')).toBeNull();
   });
 
   it('names a place by its id or its room, once loaded (arrival screen spec §4)', async () => {
@@ -121,6 +123,7 @@ describe('MapPanel', () => {
     const p = mount(async () => shipped());
     p.open();
     await flush();
+    root.querySelector<HTMLElement>('.pin.here')!.click();
     esc();
     await flush();
     expect(p.isOpen).toBe(true);
@@ -140,8 +143,8 @@ describe('MapPanel', () => {
     panel = p;
     p.open();
     await flush();
-    root.querySelector<HTMLElement>('.map-bt.place[data-place="haes-noodles"]')!.click();
-    root.querySelector<HTMLButtonElement>('.map-strip .go')!.click();
+    root.querySelector<HTMLElement>('.pin[data-place="haes-noodles"]')!.click();
+    root.querySelector<HTMLButtonElement>('.map-go .go')!.click();
     expect(onTravel).toHaveBeenCalledWith('haes-noodles');
     expect(p.isOpen).toBe(false);
   });
@@ -152,7 +155,7 @@ describe('MapPanel', () => {
     panel = p;
     p.open();
     await flush();
-    root.querySelector<HTMLElement>('.map-bt.place[data-place="the-tilt"]')!.click();
+    root.querySelector<HTMLElement>('.pin[data-place="the-tilt"]')!.click();
     root.querySelector<HTMLButtonElement>('.map-strip .gig-open')!.click();
     expect(onGigs).toHaveBeenCalledTimes(1);
     expect(onGigs.mock.calls[0][0]).toMatchObject({ id: 'the-tilt', name: 'The Tilt' });
@@ -220,24 +223,44 @@ describe('MapPanel camera, keys and cues', () => {
     return panel;
   }
 
-  it('opens on the whole city even with your district open (no auto district zoom); Esc closes the district, a second Esc the map', async () => {
+  it('opens on the whole city; Esc closes a card, then (zoomed in) goes back out to the city, then closes the map', async () => {
     const p = await opened();
     expect(scale()).toBe(1);
-    expect(root.querySelector('.map-strip')).not.toBeNull();
+    root.querySelector<HTMLElement>('.pin[data-place="haes-noodles"]')!.click();
+    root.querySelector('.map-screen')!.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, clientX: 600, clientY: 400, bubbles: true, cancelable: true }));
+    expect(scale()).toBeGreaterThan(1);
+    esc();
+    expect(root.querySelector('.map-strip')).toBeNull();
+    expect(scale()).toBeGreaterThan(1);
     esc();
     expect(scale()).toBe(1);
     expect(p.isOpen).toBe(true);
     esc();
     expect(p.isOpen).toBe(false);
   });
-  it('opening or closing a district keeps your own zoom', async () => {
+
+  it("a district's name frames the camera on it (map pins spec §3)", async () => {
     await opened();
-    root.querySelector('.map-screen')!.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, clientX: 600, clientY: 400, bubbles: true, cancelable: true }));
-    const zoomed = world().style.transform;
+    root.querySelector<SVGElement>('svg.city-names text.dname.has[data-id="karasu"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(scale()).toBeGreaterThan(1);
-    esc();
-    expect(world().style.transform).toBe(zoomed);
   });
+
+  it('pins are dots far out and carry names zoomed in', async () => {
+    await opened();
+    const cm = root.querySelector<HTMLElement>('.city-map:not(.map-overlay)')!;
+    expect(cm.classList.contains('far')).toBe(true);
+    for (let i = 0; i < 4; i++) root.querySelector('.map-screen')!.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, clientX: 600, clientY: 400, bubbles: true, cancelable: true }));
+    expect(cm.classList.contains('far')).toBe(false);
+  });
+
+  it('a click on the map itself closes the card', async () => {
+    await opened();
+    root.querySelector<HTMLElement>('.pin[data-place="haes-noodles"]')!.click();
+    expect(root.querySelector('.map-strip')).not.toBeNull();
+    root.querySelector<HTMLElement>('.map-screen')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(root.querySelector('.map-strip')).toBeNull();
+  });
+
 
   it('opens at the whole city when you are not on the map', async () => {
     await opened({}, () => ({ people: [] }));
@@ -268,9 +291,12 @@ describe('MapPanel camera, keys and cues', () => {
 
   it('takes the arrows while open and moves the focus; leaves them alone while closed (Review Focus 3)', async () => {
     const p = await opened();
-    const strip = () => root.querySelector('.map-strip .t')!.textContent;
-    const first = strip();
+    const strip = () => root.querySelector('.map-strip .t')?.textContent ?? null;
+    expect(strip()).toBeNull();
     expect(key('ArrowRight').defaultPrevented).toBe(true);
+    const first = strip();
+    expect(first).not.toBeNull();
+    key('ArrowRight');
     expect(strip()).not.toBe(first);
     p.close();
     expect(key('ArrowRight').defaultPrevented).toBe(false);
@@ -279,26 +305,24 @@ describe('MapPanel camera, keys and cues', () => {
 
   it('leaves the arrows and Enter to whatever is over the map (Review Focus 3)', async () => {
     await opened({ overlayOpen: () => true });
-    const first = root.querySelector('.map-strip .t')!.textContent;
     expect(key('ArrowRight').defaultPrevented).toBe(false);
     expect(key('Enter').defaultPrevented).toBe(false);
-    expect(root.querySelector('.map-strip .t')!.textContent).toBe(first);
+    expect(root.querySelector('.map-strip')).toBeNull();
   });
 
   it('Enter at a place GO can reach travels and closes the map', async () => {
     const onTravel = vi.fn();
     const p = await opened({ onTravel });
-    root.querySelector<HTMLElement>('.map-bt.place[data-place="haes-noodles"]')!.click();
+    root.querySelector<HTMLElement>('.pin[data-place="haes-noodles"]')!.click();
     expect(key('Enter').defaultPrevented).toBe(true);
     expect(onTravel).toHaveBeenCalledWith('haes-noodles');
     expect(p.isOpen).toBe(false);
   });
 
-  it('plays confirm on opening a district and move on an arrow', async () => {
+  it("plays confirm on a district's name and move on an arrow", async () => {
     const onCue = vi.fn();
     await opened({ onCue });
-    esc();
-    root.querySelector<HTMLElement>('.map-bt.dist[data-id="karasu"]')!.click();
+    root.querySelector<SVGElement>('svg.city-names text.dname.has[data-id="karasu"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     key('ArrowLeft');
     expect(onCue.mock.calls.map((c) => c[0])).toEqual(['confirm', 'move']);
   });
@@ -653,11 +677,12 @@ describe('MapPanel scroll-zoom and drag', () => {
       expect(seen).not.toHaveBeenCalled();
     });
 
-    it('a finger on the band never starts a pinch (Review Focus 2)', async () => {
+    it('a finger on the card never starts a pinch (Review Focus 2)', async () => {
       const { s, view } = await setup();
+      root.querySelector<HTMLElement>('.pin[data-place="haes-noodles"]')!.click();
       const before = view();
       s.dispatchEvent(ptr('pointerdown', 700, 450, 1));
-      const tile = root.querySelector<HTMLElement>('.map-bt')!;
+      const tile = root.querySelector<HTMLElement>('.map-strip')!;
       tile.dispatchEvent(ptr('pointerdown', 900, 800, 2));
       tile.dispatchEvent(ptr('pointermove', 1300, 800, 2));
       expect(view()).toEqual(before);
@@ -905,7 +930,6 @@ describe('MapPanel on rendered tiles (spec 2026-10-25 §5)', () => {
     panel.dispose();
     root.innerHTML = '';
     t = await setup();
-    esc();
     t.zoomIn();
     expect(t.scale()).toBeCloseTo(4, 6);
   });
@@ -927,7 +951,6 @@ describe('MapPanel on rendered tiles (spec 2026-10-25 §5)', () => {
   it('without tiles the limit stays 5x', async () => {
     served = {};
     const t = await setup();
-    esc();
     t.zoomIn();
     expect(t.scale()).toBeCloseTo(5, 6);
   });

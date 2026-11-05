@@ -1,12 +1,13 @@
 ---
 title: Customs Line
+art: customs-line.webp
 kind: mission
 tier: 1
 with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's sister comes in on the night ferry. SDG customs has started pulling people off the stairs before they reach the street.
-pay: 60-140
+pay: 90-110
 posts: 20:00-02:00
 trust: 1 / 1
 comms: ferry-stairs
@@ -14,6 +15,7 @@ comms: ferry-stairs
 
 # client
 stranger: Mira — a client, coat still wet, a ferry schedule folded small in her fist
+face: local-01
 
 *Mira's sister is on the 01:40 from the Isle with no stamp worth the paper. Three people off last week's boat never made it up the stairs. Mira can't go down there herself; her face is on a list.*
 
@@ -40,6 +42,7 @@ blown
 
 # stairs
 stranger: A customs officer — SDG armband, a tablet, a voice that never rises
+face: sdg-12
 
 *The ferry ties up under the floodlights. The officer stands at the top of the stairs, reading faces against a tablet, pulling some aside to a folding table.*
 

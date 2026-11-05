@@ -42,12 +42,12 @@ describe('her bookkeeping belongs to the Residual', () => {
   });
 
   it('the room note no longer says the message begins with the room line (blocks come first now; final review M5)', () => {
-    const nixFile = fs.readFileSync(path.join(__dirname, '../../characters/nix/instructions.md'), 'utf8');
+    const nixFile = fs.readFileSync(path.join(__dirname, '../../characters/nix-direct/instructions.md'), 'utf8');
     for (const t of [ROOM_INSTRUCTIONS, roomInstructions('Cass'), nixFile]) expect(t).not.toMatch(/begins with a \[room/);
   });
 
   it('no prompt she reads names one', () => {
-    const nixFile = fs.readFileSync(path.join(__dirname, '../../characters/nix/instructions.md'), 'utf8');
+    const nixFile = fs.readFileSync(path.join(__dirname, '../../characters/nix-direct/instructions.md'), 'utf8');
     const texts = [
       ROOM_INSTRUCTIONS,
       roomInstructions('Cass'),

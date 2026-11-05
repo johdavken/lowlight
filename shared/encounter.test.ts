@@ -10,7 +10,8 @@ describe('parseEncounterOptions', () => {
       'Here you go:\n```json\n[{"title":"Wrong package","text":"A courier drops a box.","stranger":{"name":"Courier","voice":"clipped"}},{"title":"Blackout","text":"The grid drops.","stranger":null},{"title":"Regular","text":"An old man sits."}]\n```';
     const out = parseEncounterOptions(ans, R)!;
     expect(out).toHaveLength(3);
-    expect(out[0]).toEqual({ title: 'Wrong package', text: 'A courier drops a box.', stranger: { name: 'Courier', voice: 'clipped' } });
+    expect(out[0]).toEqual({ kind: 'stranger', title: 'Wrong package', text: 'A courier drops a box.', stranger: { name: 'Courier', voice: 'clipped' } });
+    expect(out.map((e) => e.kind)).toEqual(['stranger', 'city', 'personal']);
     expect(out[1].stranger).toBeUndefined();
     expect('stranger' in out[1]).toBe(false);
     expect(out[2].stranger).toBeUndefined();
@@ -22,6 +23,32 @@ describe('parseEncounterOptions', () => {
     expect(parseEncounterOptions(JSON.stringify([ev('x'.repeat(41), 'a.'), ev('B', 'b.'), ev('C', 'c.')]), R)).toBeNull();
     expect(parseEncounterOptions(JSON.stringify([ev('A', 'x'.repeat(601)), ev('B', 'b.'), ev('C', 'c.')]), R)).toBeNull();
     expect(parseEncounterOptions('no json here', R)).toBeNull();
+  });
+});
+
+describe("DRAW's kinds (stranger, city, personal)", () => {
+  test('each card takes the kind of its place, whatever the narrator said', () => {
+    const ans = JSON.stringify([
+      { kind: 'personal', title: 'A', text: 'a.' },
+      { title: 'B', text: 'b.' },
+      { kind: 'CITY', title: 'C', text: 'c.' },
+    ]);
+    expect(parseEncounterOptions(ans, R)!.map((e) => e.kind)).toEqual(['stranger', 'city', 'personal']);
+  });
+  test('one event keeps a kind it names, and drops one it invents', () => {
+    expect(parseEncounter({ kind: 'City', title: 'A', text: 'a.' }, R)).toEqual({ kind: 'city', title: 'A', text: 'a.' });
+    expect(parseEncounter({ kind: 'danger', title: 'A', text: 'a.' }, R)).toEqual({ title: 'A', text: 'a.' });
+  });
+  test("a stranger keeps the narrator's gender and age words, and nothing else", () => {
+    const s = (x: object) => parseEncounter({ title: 'A', text: 'a.', stranger: { name: 'Super', voice: 'gravel', ...x } }, R)!.stranger;
+    expect(s({ gender: 'Man', age: 'old' })).toEqual({ name: 'Super', voice: 'gravel', gender: 'man', age: 'old' });
+    expect(s({ gender: 'robot', age: 42 })).toEqual({ name: 'Super', voice: 'gravel' });
+  });
+  test('a face is kept only when faceOk knows it; with no faceOk, never', () => {
+    const raw = { title: 'A', text: 'a.', stranger: { name: 'Super', voice: 'gravel', face: 'local-karasu-03' } };
+    expect(parseEncounter(raw, R)!.stranger!.face).toBeUndefined();
+    expect(parseEncounter(raw, R, { faceOk: (id) => id === 'local-karasu-03' })!.stranger!.face).toBe('local-karasu-03');
+    expect(parseEncounter({ ...raw, stranger: { ...raw.stranger, face: '../../etc/passwd' } }, R, { faceOk: () => false })!.stranger!.face).toBeUndefined();
   });
 });
 
@@ -111,8 +138,12 @@ describe('a power cut event (blackouts phase 3 §2)', () => {
   });
   test('drops it where the power is already out', () => {
     expect(parseEncounter({ ...ev, power: 'out' }, [], { dark: true })).toEqual(ev);
-    const text = JSON.stringify([{ ...ev, power: 'out' }, ev, ev]);
-    expect(parseEncounterOptions(text, [], { dark: true })![0]).toEqual(ev);
-    expect(parseEncounterOptions(text, [])![0]).toEqual({ ...ev, power: 'out' });
+    const text = JSON.stringify([ev, { ...ev, power: 'out' }, ev]);
+    expect(parseEncounterOptions(text, [], { dark: true })![1]).toEqual({ ...ev, kind: 'city' });
+    expect(parseEncounterOptions(text, [])![1]).toEqual({ ...ev, kind: 'city', power: 'out' });
+  });
+  test('only THE CITY cuts the power: a power cut on another card goes, the card kept', () => {
+    const text = JSON.stringify([{ ...ev, power: 'out' }, ev, { ...ev, power: 'out' }]);
+    expect(parseEncounterOptions(text, [])!.map((e) => e.power)).toEqual([undefined, undefined, undefined]);
   });
 });

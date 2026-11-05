@@ -1,20 +1,16 @@
-/** The focused place's file, on a slanted strip at the map's right edge: who's there, then GO and GIGS. */
+/** The focused place's file, on a slanted strip at the map's right edge: its readout, who's there, then GIGS. GO rides on the pin's tag (buildGo). */
 import { her } from '../../room/her-copy';
 import type { District, Place } from '../../../../shared/map-schema';
 import type { SideRoom } from '../../../../shared/exits';
 import type { MapPerson, WhoIsWhere } from './city-map';
-import { el, placeNumber } from './band';
+import { el } from './band';
 
 const ROLE: Record<MapPerson['role'], string> = { you: 'YOU', contact: 'CONTACT', fixed: 'FIXED' };
 
 export interface FileStripOpts {
   place: Place;
-  /** The place's index in its district (its number less one). */
-  index: number;
   district: District;
   who: WhoIsWhere;
-  /** GO: walk there. Without it, no GO (a preview). */
-  onTravel?: (placeId: string, comms?: boolean) => void;
   /** GIGS: run a job from a gig place. Without it, no GIGS. */
   onGigs?: (place: Place, district: District) => void;
 }
@@ -23,15 +19,18 @@ export function buildFileStrip(o: FileStripOpts): HTMLElement {
   const strip = el('div', 'map-strip');
   strip.addEventListener('click', (e) => e.stopPropagation());
   const body = el('div', 'body');
-  body.append(el('div', 't', o.place.name.toUpperCase()), el('div', 's', `${placeNumber(o.index)} · ${o.district.name.toUpperCase()}`));
+  body.append(el('div', 't', o.place.name.toUpperCase()), el('div', 's', o.district.name.toUpperCase()));
+  // Its dossier lines (world/readouts/<id>.md): a label, then the line.
+  if (o.place.readout?.length) {
+    const dl = el('dl', 'readout');
+    for (const r of o.place.readout) dl.append(el('dt', '', r.label), el('dd', '', r.text));
+    body.append(dl);
+  }
   const names = new Map<string, string>();
   const walk = (rooms: SideRoom[]): void => rooms.forEach((r) => (names.set(r.room, r.name), walk(r.inside)));
   walk(o.who.inside?.[o.place.id] ?? []);
-  const mark = o.who.jobMarks?.[o.place.id];
-  if (mark) body.append(el('div', 'job-line', `◆ ${mark}`));
   body.append(peopleList(o.who.people.filter((m) => m.place === o.place.id), names));
   const acts = el('div', 'acts');
-  if (o.onTravel) acts.append(travelControl(o.place, o.who, o.onTravel));
   if (o.onGigs && o.place.gigs) acts.append(gigsControl(o.place, o.district, o.who, o.onGigs));
   if (acts.childElementCount) body.append(acts);
   strip.append(body);
@@ -69,6 +68,14 @@ export function goBlocked(p: Place, who: WhoIsWhere): string | null {
   if (!p.scene) return 'no room yet';
   if (who.busy) return her().waitFor;
   return null;
+}
+
+/** GO on the picked pin's tag (mockup 2026-11-02, B): slanted chips just past the name. */
+export function buildGo(p: Place, who: WhoIsWhere, onTravel: (placeId: string, comms?: boolean) => void): HTMLElement {
+  const box = el('span', 'map-go');
+  box.addEventListener('click', (e) => e.stopPropagation());
+  box.append(travelControl(p, who, onTravel));
+  return box;
 }
 
 /** GO, or a lock for a place only she can bring you to. With her deal in force and not on comms: WITH HER or ON COMMS (comms spec §1). */

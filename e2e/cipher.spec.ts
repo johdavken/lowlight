@@ -47,11 +47,11 @@ test('a clue on the page shows in LOOSE ENDS; a rewind takes it back; learning i
   await say(page, 'look under the register');
   await expect.poll(async () => (await looseEnds(page)).open.flat().map((c) => c.text), { timeout: 15_000 }).toEqual(['a thick envelope under the register']);
   await page.keyboard.press('Alt+O');
-  await expect(page.locator('.pe-tab.on')).toHaveText('LOOSE ENDS');
-  await expect(page.locator('.pe-loose-line .pe-loose-text')).toHaveText('a thick envelope under the register');
-  await expect(page.locator('.pe-loose-tab')).not.toContainText('The intake is a drop');
+  await expect(page.locator('.ql-pane')).toHaveAttribute('data-tab', 'loose');
+  await expect(page.locator('.ql-loose-line .ql-loose-text')).toHaveText('a thick envelope under the register');
+  await expect(page.locator('.ql-loose-tab')).not.toContainText('The intake is a drop');
   await page.keyboard.press('Escape');
-  await expect(page.locator('.people-screen')).toHaveCount(0);
+  await expect(page.locator('.ql-pane')).toBeHidden();
 
   await send(page, { type: 'rewind', messageId: lastBefore });
   await expect.poll(async () => (await looseEnds(page)).open.length, { timeout: 10_000 }).toBe(0);
@@ -59,6 +59,6 @@ test('a clue on the page shows in LOOSE ENDS; a rewind takes it back; learning i
   await say(page, 'tell me the truth');
   await expect.poll(async () => (await looseEnds(page)).solved.map((s) => s.truth), { timeout: 15_000 }).toEqual(['The intake is a drop for the Tilt.']);
   await page.keyboard.press('Alt+O');
-  await expect(page.locator('.pe-loose-solved .pe-loose-truth')).toHaveText('The intake is a drop for the Tilt.');
+  await expect(page.locator('.ql-loose-solved .ql-loose-truth')).toHaveText('The intake is a drop for the Tilt.');
   expect(errors).toEqual([]);
 });

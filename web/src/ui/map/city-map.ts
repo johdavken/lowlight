@@ -1,18 +1,26 @@
 /**
  * The city map's contents, over the map image: district names and borders and pins (the world, which the camera moves),
- * and the rail band, the district heading and the focused place's file strip (the overlay, fixed on screen).
- * Used by the game's MAP and Studio's preview (one host for both, no camera).
+ * and the focused place's card (the overlay, fixed on screen). Pins follow the zoom (map pins spec, 2026-10-30): small dots
+ * with a dot per person you know when far out, the full name with faces when near, a tag that would cover a more
+ * important one hiding to its pin. A district's name zooms the camera to it. Used by the game's MAP and Studio's
+ * preview (one host for both, no camera).
  */
 import { liftPct, toScreen } from '../../../../shared/map-projection';
 import type { CityMapData, District, Place } from '../../../../shared/map-schema';
 import { placesIn } from '../../../../shared/map-schema';
 import type { ExitPlace, SideRoom } from '../../../../shared/exits';
-import { bandDistricts, buildDistrictBand, buildPlaceBand, el, placeNumber } from './band';
+import { el } from './band';
 import { districtFrame, type Frame } from './camera';
-import { buildFileStrip, goBlocked } from './file-strip';
+import { buildFileStrip, buildGo, goBlocked } from './file-strip';
 import { drawNames, NAMES_BOX } from './lettering';
 import { pathD } from './path';
 import './map.css';
+
+/** At this zoom and closer, pins carry their names (map pins spec §2); further out they're dots. */
+export const NEAR_SCALE = 1.6;
+/** The pins' and tags' size on screen at zoom `scale`: small far out, growing as you come in (1 at about 2.3×). */
+export const pinSize = (scale: number): number => Math.min(1.2, 0.6 + 0.3 * (scale - 1));
+export const tagSize = (scale: number): number => Math.min(1.15, 0.8 + 0.2 * (scale - NEAR_SCALE));
 
 export interface MapPerson {
   place: string;
@@ -36,8 +44,6 @@ export interface WhoIsWhere {
   gigBlock?: string | null;
   /** Each pin's side rooms (`sideRooms`): counted on the pin, listed under it while it's lit. Information only. */
   inside?: Record<string, SideRoom[]>;
-  /** A big job's marked places still to visit, each with its line (big jobs spec §2). */
-  jobMarks?: Record<string, string>;
   /** Comms (spec 2026-10-20 §1): on the line now, and whether you can go on it (her deal in force). */
   comms?: { on: boolean; can: boolean; /** Her scheduled room now: a plain GO there. */ herAt?: string | null };
 }
@@ -51,8 +57,10 @@ export interface CityMapOpts {
   /** GO: walk there. Without it, the strip has no GO and Enter does nothing in a district. */
   onTravel?: (placeId: string, comms?: boolean) => void;
   onGigs?: (place: Place, district: District) => void;
-  /** The frame the camera should show: a district's, or null for the whole city. */
-  onFrame?: (frame: Frame | null) => void;
+  /** A district's name (or border) was clicked: the camera should frame it. */
+  onZoomTo?: (frame: Frame) => void;
+  /** The focused place changed (a click, the arrows): the camera may bring it into view. Null: none. */
+  onFocus?: (place: Place | null) => void;
   onCue?: (cue: MapCue) => void;
 }
 
@@ -91,11 +99,16 @@ export class CityMap {
   private readonly over: HTMLElement;
   private map: CityMapData | null = null;
   private who: WhoIsWhere = { people: [] };
-  private _openId: string | null = null;
-  /** The focused tile: a district at the city, a place inside one. */
+  /** The place whose card is open (a click or the arrows), or null. */
   private _focus: string | null = null;
-  /** The hovered tile or pin, the same way. */
+  /** The hovered pin. */
   private hovered: string | null = null;
+  /** The camera's zoom (1 in Studio, which has none). */
+  private scale = 1;
+  /** A tag layout waiting for the next frame. */
+  private layoutFrame = 0;
+  /** A pan's look at whether the picked tag still fits (fitFocus). */
+  private fitFrame = 0;
 
   constructor(
     host: HTMLElement,
@@ -109,113 +122,114 @@ export class CityMap {
       const t = (e.target as Element).closest<SVGElement>('text.dname.has');
       if (!t) return;
       e.stopPropagation();
-      this.openDistrict(t.dataset.id!);
+      this.zoomTo(t.dataset.id!);
     });
     this.layer = el('div', 'city-labels');
     this.root.append(this.svg, this.names, this.layer);
     host.append(this.root);
     this.over = el('div', `city-map map-overlay${still}`);
     (opts.overlay ?? host).append(this.over);
+    this.setScale(1);
   }
 
-  /** The open district, or null at the city. */
-  get openId(): string | null {
-    return this._openId;
-  }
-  /** The focused place inside the open district. */
-  get openPlace(): string | null {
-    return this._openId ? this._focus : null;
-  }
-  /** The focused band tile: a district id at the city, a place id inside one. */
+  /** The place whose card is open, or null. */
   get focus(): string | null {
     return this._focus;
   }
 
-  /** Draws the map and opens where you are: your district, your place on file (the city, when you're not on the map). */
-  /** `heights`: map px up for places on a structure (the rendered map's manifest); their pins stand at that height. */
   /** Raised places' heights (map px), when the rendered map is showing. */
   private heights: Record<string, number> = {};
 
+  /** Draws the map with no card open. `heights`: map px up for places on a structure (the rendered map's manifest). */
   render(map: CityMapData, who: WhoIsWhere, heights?: Record<string, number>): void {
     this.heights = heights ?? {};
-    map = pinned(map);
-    this.map = map;
+    this.map = pinned(map);
     this.who = who;
     this.hovered = null;
-    const here = who.here ? map.places.find((p) => p.id === who.here) : undefined;
-    this._openId = here?.district ?? null;
-    this._focus = here?.id ?? this.firstTile();
+    this._focus = null;
     this.draw();
   }
 
-  /** Redraws with a changed map (Studio's preview after an edit): what's open and focused stays while it still exists. */
+  /** Redraws with a changed map (Studio's preview after an edit): the card stays while its place still exists. */
   update(map: CityMapData, who: WhoIsWhere): void {
     if (!this.map) return this.render(map, who);
-    map = pinned(map);
-    this.map = map;
+    this.map = pinned(map);
     this.who = who;
     this.hovered = null;
-    if (this._openId && !placesIn(map, this._openId).length) this._openId = null;
-    if (!this.tiles().includes(this._focus ?? '')) this._focus = this.firstTile();
+    if (!this.map.places.some((p) => p.id === this._focus)) this._focus = null;
     this.draw();
   }
 
-  /** Opens a district (null: back to the city, that district's tile focused), with `place` on file or a sensible one. */
-  openDistrict(id: string | null, place: string | null = null): void {
-    if (!this.map) return;
-    this.hovered = null;
-    if (id === null) {
-      const was = this._openId;
-      this._openId = null;
-      this._focus = was && this.tiles().includes(was) ? was : this.firstTile();
-      return this.draw();
+  /** The camera's zoom: far out the pins are dots, near they carry names (laid out next frame, so an ease costs one pass a frame). */
+  setScale(scale: number): void {
+    // A pan doesn't change which tags overlap: only a new zoom lays them out again (review M5). It can carry the
+    // picked tag to the edge, though: that one looks again.
+    if (scale === this.scale && this.root.style.getPropertyValue('--pz')) {
+      if (this._focus && !this.fitFrame) this.fitFrame = requestAnimationFrame(() => ((this.fitFrame = 0), this.fitFocus()));
+      return;
     }
-    const places = placesIn(this.map, id);
-    if (!places.length) return;
-    const changed = id !== this._openId;
-    this._openId = id;
-    const here = places.find((p) => p.id === this.who.here)?.id;
-    this._focus = places.some((p) => p.id === place) ? place : (here ?? places[0].id);
-    if (changed) this.opts.onCue?.('confirm');
-    this.draw();
+    this.scale = scale;
+    const far = scale < NEAR_SCALE;
+    this.root.classList.toggle('far', far);
+    this.root.style.setProperty('--pz', String(pinSize(scale)));
+    this.root.style.setProperty('--tz', String(tagSize(scale)));
+    if (far) for (const p of this.layer.querySelectorAll('.pin.crowded')) p.classList.remove('crowded');
+    else this.scheduleLayout();
   }
 
-  /** The next (1) or previous (-1) band tile, wrapping. */
+  /** Opens `id`'s card (null closes it). */
+  select(id: string | null): void {
+    if (id === this._focus) return;
+    this._focus = id;
+    this.refresh();
+    this.paintCard();
+    this.opts.onFocus?.(id ? (this.map?.places.find((p) => p.id === id) ?? null) : null);
+  }
+
+  /** The next (1) or previous (-1) place, district by district, wrapping; from none, your place or the first. */
   move(delta: 1 | -1): void {
-    const ids = this.tiles();
+    const ids = this.order();
     if (!ids.length) return;
     const i = ids.indexOf(this._focus ?? '');
-    const next = ids[(i + delta + ids.length) % ids.length];
-    if (next === this._focus) return; // one tile: nothing moves, so no cue
-    this.setFocus(next);
+    const next = i < 0 ? (this.who.here && ids.includes(this.who.here) ? this.who.here : ids[0]) : ids[(i + delta + ids.length) % ids.length];
+    if (next === this._focus) return; // one place: nothing moves, so no cue
+    this.select(next);
     this.opts.onCue?.('move');
   }
 
-  /** Enter: opens the focused district at the city; GO to the focused place inside one, when GO can go. */
+  /** Enter: GO to the place whose card is open, when GO can go. */
   enter(): boolean {
     if (!this.map || !this._focus) return false;
-    if (!this._openId) {
-      this.openDistrict(this._focus);
-      return true;
-    }
     const p = this.map.places.find((x) => x.id === this._focus);
     if (!p || !this.opts.onTravel || p.inviteOnly || goBlocked(p, this.who)) return false;
     this.opts.onTravel(p.id);
     return true;
   }
 
-  /** Esc: back to the city and true; false at the city (nothing left to close here). */
+  /** Esc: closes the card and true; false with none open (the camera or the map is next). */
   handleEscape(): boolean {
-    if (this._openId === null) return false;
-    this.openDistrict(null);
+    if (this._focus === null) return false;
+    this.select(null);
     return true;
   }
 
-  /** Empties the map and forgets what was open (before a new map loads, or when one fails to). */
+  /** Frames a district: the camera eases to it (map pins spec §3). */
+  zoomTo(districtId: string): void {
+    if (!this.map) return;
+    const f = districtFrame(this.map, districtId);
+    if (!f) return;
+    this.opts.onCue?.('confirm');
+    this.opts.onZoomTo?.(f);
+  }
+
+  /** Empties the map and forgets the card (before a new map loads, or when one fails to). */
   clear(): void {
+    cancelAnimationFrame(this.layoutFrame);
+    cancelAnimationFrame(this.fitFrame);
+    this.layoutFrame = 0;
+    this.fitFrame = 0;
     this.map = null;
     this.who = { people: [] };
-    this._openId = null;
     this._focus = null;
     this.hovered = null;
     this.svg.replaceChildren();
@@ -225,67 +239,79 @@ export class CityMap {
   }
 
   dispose(): void {
+    cancelAnimationFrame(this.layoutFrame);
+    cancelAnimationFrame(this.fitFrame);
     this.root.remove();
     this.over.remove();
   }
 
-  /** The band's ids, in order: districts at the city, the open district's places inside it. */
-  private tiles(): string[] {
+  /** Every place, district by district in map order: what the arrows walk. */
+  private order(): string[] {
     if (!this.map) return [];
-    return this._openId ? placesIn(this.map, this._openId).map((p) => p.id) : bandDistricts(this.map).map((d) => d.id);
+    return this.map.districts.flatMap((d) => placesIn(this.map!, d.id).map((p) => p.id));
   }
 
-  /** At the city: your district's tile, else the first. */
-  private firstTile(): string | null {
-    const ids = this.tiles();
-    if (!this._openId && this.map && this.who.here) {
-      const d = this.map.places.find((p) => p.id === this.who.here)?.district;
-      if (d && ids.includes(d)) return d;
-    }
-    return ids[0] ?? null;
-  }
-
-  private setFocus(id: string): void {
-    this._focus = id;
-    this.refresh();
-    this.paintStrip();
-  }
-
-  /** Everything, for a new view (open, back, render, update): reports the camera's frame. */
   private draw(): void {
     if (!this.map) return;
     this.paintWorld();
-    this.paintOverlay();
-    this.opts.onFrame?.(this._openId ? districtFrame(this.map, this._openId) : null);
+    this.paintCard();
+    this.scheduleLayout();
   }
 
-  /** A focus or hover change inside one view: classes in place, so the band doesn't print again (setFocus reprints the strip). */
+  /** The focus or hover moved: classes in place (the tags print once per draw). */
   private refresh(): void {
-    const lit = (id: string) => id === this._focus || id === this.hovered;
-    for (const t of this.over.querySelectorAll<HTMLElement>('.map-bt.dist:not(.open), .map-bt.place')) {
-      const id = t.dataset.id ?? t.dataset.place!;
-      t.classList.toggle('focus', id === this._focus);
+    for (const pin of this.layer.querySelectorAll<HTMLElement>('.pin')) {
+      const id = pin.dataset.place!;
+      pin.classList.toggle('focus', id === this._focus);
+      pin.classList.toggle('on', id === this.hovered || id === this._focus);
     }
-    // The open district's tags only: another district's pin lights itself on hover alone.
-    for (const tag of this.layer.querySelectorAll<HTMLElement>('.pin.open .map-ntag')) {
-      const id = tag.closest<HTMLElement>('.pin')!.dataset.place!;
-      tag.classList.toggle('full', lit(id));
-      tag.closest('.pin')!.classList.toggle('on', lit(id));
-      tag.closest('.pin')!.classList.toggle('focus', id === this._focus);
-    }
-    if (!this._openId) {
-      for (const p of this.svg.querySelectorAll<SVGPathElement>('path.dpoly')) p.classList.toggle('open', p.dataset.id === this.hovered);
-    }
+    this.scheduleLayout();
   }
 
-  private hover(id: string | null): void {
+  private hover(id: string | null, district: string | null): void {
     this.hovered = id;
-    this.refresh();
+    // Classes only: hovering through a crowd shows the hovered tag (CSS) without reshuffling the rest (review M6).
+    for (const pin of this.layer.querySelectorAll<HTMLElement>('.pin')) pin.classList.toggle('on', pin.dataset.place === id || pin.dataset.place === this._focus);
+    // A hovered pin lights its district's border (the painting's).
+    for (const p of this.svg.querySelectorAll<SVGPathElement>('path.dpoly')) p.classList.toggle('open', p.dataset.id === district);
+  }
+
+  private scheduleLayout(): void {
+    if (this.layoutFrame) return;
+    this.layoutFrame = requestAnimationFrame(() => {
+      this.layoutFrame = 0;
+      this.layoutTags();
+    });
+  }
+
+  /**
+   * Near, every tag shows unless it would cover one more important (map pins spec §2): yours, places with people,
+   * the card's, then the rest in map order. A hidden tag shows again on hover (CSS) or further in.
+   */
+  layoutTags(): void {
+    this.fitFocus();
+    const pins = [...this.layer.querySelectorAll<HTMLElement>('.pin')];
+    for (const p of pins) p.classList.remove('crowded');
+    if (this.scale < NEAR_SCALE) return;
+    const rank = (pin: HTMLElement) => {
+      const id = pin.dataset.place!;
+      return id === this.who.here ? 0 : pin.classList.contains('peopled') ? 1 : id === this._focus ? 2 : 3;
+    };
+    const placed: DOMRect[] = [];
+    const pad = 3;
+    for (const pin of pins.map((p, i) => ({ p, i })).sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i).map((x) => x.p)) {
+      const tag = pin.querySelector<HTMLElement>('.map-ntag');
+      if (!tag) continue;
+      const r = tag.getBoundingClientRect();
+      if (!r.width) continue;
+      const hit = placed.some((q) => r.left - pad < q.right && r.right + pad > q.left && r.top - pad < q.bottom && r.bottom + pad > q.top);
+      if (hit) pin.classList.add('crowded');
+      else placed.push(r);
+    }
   }
 
   private paintWorld(): void {
     const map = this.map!;
-    const open = this._openId;
     this.svg.replaceChildren(svgEl('defs', {}));
     this.svg.firstChild!.appendChild(glowFilter());
     this.layer.replaceChildren();
@@ -296,7 +322,7 @@ export class CityMap {
     }
     drawNames(this.names, map.districts, { has: (id) => hasPlaces.has(id) });
     for (const d of map.districts) {
-      placesIn(map, d.id).forEach((p, i) => {
+      for (const p of placesIn(map, d.id)) {
         const h = this.heights[p.id];
         // A raised place's stem, from its pin down to the ground (a sibling, so its height is a share of the map's).
         if (h) {
@@ -306,142 +332,98 @@ export class CityMap {
           Object.assign(stem.style, { left: `${x}%`, top: `${y}%`, height: `${liftPct(h)}%` });
           this.layer.append(stem);
         }
-        this.layer.append(this.pin(p, d, i, d.id === open));
-      });
+        this.layer.append(this.pin(p, d));
+      }
     }
-    this.root.classList.toggle('zoomed', open !== null);
   }
 
-  private pin(p: Place, d: District, i: number, inOpen: boolean): HTMLElement {
+  private pin(p: Place, d: District): HTMLElement {
     const pin = el('div', 'pin');
     pin.dataset.place = p.id;
+    // A finger-sized target round the diamond, whatever the zoom (review I2: far-out pins on a phone).
+    pin.append(el('span', 'hit'));
     const [px, py] = toScreen(p.pin, this.heights[p.id] ?? 0);
     pin.style.left = `${px}%`;
     pin.style.top = `${py}%`;
     if (this.who.here === p.id) pin.classList.add('here');
+    pin.classList.toggle('focus', p.id === this._focus);
+    pin.classList.toggle('on', p.id === this._focus);
     // Jobs can be run from here: an amber ring.
     if (p.gigs) pin.append(el('span', 'gig-ring'));
-    // A big job has something for you here (big jobs spec §2).
-    if (this.who.jobMarks?.[p.id]) pin.append(el('span', 'job-mark'));
-    if (inOpen) {
-      const lit = p.id === this._focus || p.id === this.hovered;
-      pin.classList.add('open');
-      pin.classList.toggle('on', lit);
-      // Its side rooms drop down only while it's focused: one list at a time, whatever the mouse is over.
-      pin.classList.toggle('focus', p.id === this._focus);
-      const tag = el('span', `map-ntag${lit ? ' full' : ''}`);
-      const inner = el('span', 'in');
-      const dots = el('span', 'dots');
-      const inside = this.who.inside?.[p.id] ?? [];
-      const sideIds = new Set(flatRooms(inside).map((r) => r.room));
-      const here = this.who.people.filter((x) => x.place === p.id);
-      for (const m of here.filter((x) => !x.room || !sideIds.has(x.room))) dots.append(dot(m));
-      inner.append(el('span', 'n', placeNumber(i)), el('span', 'nm', p.name), dots);
-      if (sideIds.size) inner.append(el('span', 'sub', `+${sideIds.size}`));
-      tag.append(inner);
-      pin.append(tag);
-      // The rooms inside drop down under the tag while the pin is focused (CSS), each with who's in it. Information only: no GO.
-      if (sideIds.size) {
-        pin.append(insideList(inside, here));
-        // Clear of the band and the file strip: a pin low in the frame opens its list upward, and one on the
-        // strip's side (the strip stands opposite the district, see drawStrip) opens it away from the strip.
-        const f = districtFrame(this.map!, d.id);
-        if (f) {
-          pin.classList.toggle('inside-up', p.pin[1] > (f.y0 + f.y1) / 2);
-          const stripRight = f.x0 + f.x1 <= 100;
-          pin.classList.toggle('inside-left', stripRight && p.pin[0] > (f.x0 + f.x1) / 2);
-        }
-      }
+    const inside = this.who.inside?.[p.id] ?? [];
+    const sideIds = new Set(flatRooms(inside).map((r) => r.room));
+    const here = this.who.people.filter((x) => x.place === p.id);
+    const atPin = here.filter((x) => !x.room || !sideIds.has(x.room));
+    if (here.length) pin.classList.add('peopled');
+    // Far out: a dot per person you know, beside the pin (side rooms' people too: they're here).
+    if (here.length) {
+      const who = el('span', 'who');
+      for (const m of here) who.append(dot(m));
+      pin.append(who);
     }
-    if (inOpen) {
-      pin.addEventListener('mouseenter', () => this.hover(p.id));
-      pin.addEventListener('mouseleave', () => this.hover(null));
-    } else {
-      // Any other pin names itself while hovered (spec 2026-10-28 §1); at the city it lights its district too.
-      const tag = el('span', 'map-ntag');
-      const inner = el('span', 'in');
-      inner.append(el('span', 'nm', p.name));
-      tag.append(inner);
-      pin.append(tag);
-      const lit = (on: boolean) => {
-        pin.classList.toggle('on', on);
-        tag.classList.toggle('full', on);
-        if (!this._openId) this.hover(on ? d.id : null);
-      };
-      pin.addEventListener('mouseenter', () => lit(true));
-      pin.addEventListener('mouseleave', () => lit(false));
-    }
+    // Near (and on hover far out): the name, with the faces of who's at the pin.
+    const tag = el('span', 'map-ntag');
+    const inner = el('span', 'in');
+    const faces = el('span', 'faces');
+    for (const m of atPin) faces.append(face(m));
+    inner.append(faces, el('span', 'nm', p.name));
+    if (sideIds.size) inner.append(el('span', 'sub', `+${sideIds.size}`));
+    tag.append(inner);
+    pin.append(tag);
+    // The rooms inside drop down under the tag while its card is open (CSS), each with who's in it. Information only: no GO.
+    if (sideIds.size) pin.append(insideList(inside, here));
+    pin.addEventListener('mouseenter', () => this.hover(p.id, d.id));
+    pin.addEventListener('mouseleave', () => this.hover(null, null));
     pin.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (this._openId === d.id) this.setFocus(p.id);
-      else this.openDistrict(d.id, p.id);
+      this.select(p.id);
     });
     return pin;
   }
 
   private drawBorder(d: District, has: boolean): void {
     const dAttr = pathD(d.border!, toSvg);
-    const open = d.id === this._openId;
-    const dim = this._openId !== null && !open;
     this.svg.append(svgEl('path', { d: dAttr, class: 'dhalo' }));
-    const poly = svgEl('path', { d: dAttr, class: `dpoly${has ? ' has' : ''}${open ? ' open' : ''}${dim ? ' dim' : ''}`, 'data-id': d.id });
-    if (open) poly.setAttribute('filter', 'url(#map-glow)');
+    const poly = svgEl('path', { d: dAttr, class: `dpoly${has ? ' has' : ''}`, 'data-id': d.id });
     if (has)
       poly.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (!open) this.openDistrict(d.id);
+        this.zoomTo(d.id);
       });
     this.svg.append(poly);
   }
 
-  private paintOverlay(): void {
-    const map = this.map!;
-    this.over.replaceChildren();
-    const d = this._openId ? map.districts.find((x) => x.id === this._openId)! : null;
-    if (d) {
-      const head = el('div', 'map-heading');
-      head.append(el('div', 't', d.name.toUpperCase()));
-      if (d.area) head.append(el('div', 's', d.area));
-      this.over.append(head);
-      this.over.append(
-        buildPlaceBand({
-          district: d,
-          places: placesIn(map, d.id),
-          who: this.who,
-          focus: this._focus,
-          onBack: () => this.openDistrict(null),
-          onFocus: (id) => this.setFocus(id),
-          onHover: (id) => this.hover(id),
-        }),
-      );
-    } else {
-      const here = this.who.here ? map.places.find((p) => p.id === this.who.here)?.district : undefined;
-      this.over.append(
-        buildDistrictBand({
-          districts: bandDistricts(map),
-          counts: new Map(map.districts.map((x) => [x.id, placesIn(map, x.id).length])),
-          hereDistrict: here,
-          focus: this._focus,
-          onOpen: (id) => this.openDistrict(id),
-          onHover: (id) => this.hover(id),
-        }),
-      );
-    }
-    this.paintStrip();
+  /** The picked pin's tag, with GO past its name, turns to the pin's left when it would run off the screen's right. */
+  private fitFocus(): void {
+    const pin = this.layer.querySelector<HTMLElement>('.pin.focus');
+    for (const p of this.layer.querySelectorAll('.pin.flip')) if (p !== pin) p.classList.remove('flip');
+    const tag = pin?.querySelector<HTMLElement>('.map-ntag');
+    if (!pin || !tag) return;
+    pin.classList.remove('flip');
+    const o = this.over.getBoundingClientRect();
+    if (!o.width) return;
+    const go = tag.querySelector<HTMLElement>('.map-go')?.getBoundingClientRect();
+    const right = Math.max(tag.getBoundingClientRect().right, go?.right ?? 0);
+    pin.classList.toggle('flip', right > o.right - 12);
   }
 
-  /** The focused place's file, replaced (it prints in again); none at the city. */
-  private paintStrip(): void {
+  /** The focused place's card, replaced (it prints in again), and GO on its tag; none without a focus. */
+  private paintCard(): void {
     this.over.querySelector('.map-strip')?.remove();
-    if (!this.map || !this._openId) return;
-    const district = this.map.districts.find((x) => x.id === this._openId)!;
-    const places = placesIn(this.map, district.id);
-    const index = places.findIndex((p) => p.id === this._focus);
-    if (index < 0) return;
-    const strip = buildFileStrip({ place: places[index], index, district, who: this.who, onTravel: this.opts.onTravel, onGigs: this.opts.onGigs });
-    // A district in the map's right half meets the map's edge there, where the camera can't move it out from under the strip.
-    const f = districtFrame(this.map, district.id);
-    if (f && f.x0 + f.x1 > 100) strip.classList.add('left');
+    for (const g of this.layer.querySelectorAll('.map-go')) g.remove();
+    if (!this.map || !this._focus) return;
+    const place = this.map.places.find((p) => p.id === this._focus);
+    const district = place && this.map.districts.find((x) => x.id === place.district);
+    if (!place || !district) return;
+    const strip = buildFileStrip({ place, district, who: this.who, onGigs: this.opts.onGigs });
+    const pinEl = this.layer.querySelector<HTMLElement>(`.pin[data-place="${place.id}"]`);
+    if (this.opts.onTravel) pinEl?.querySelector('.map-ntag')?.append(buildGo(place, this.who, this.opts.onTravel));
+    this.fitFocus();
+    // The card stands on the side of the screen away from the pin (review I1: where the pin is on screen, not on the map).
+    const r = pinEl?.getBoundingClientRect();
+    const o = this.over.getBoundingClientRect();
+    const right = r && o.width ? r.left - o.left > o.width / 2 : place.pin[0] > 50;
+    if (right) strip.classList.add('left');
     this.over.append(strip);
   }
 }
@@ -459,6 +441,17 @@ const dot = (m: MapPerson): HTMLElement => {
   const b = el('b', '');
   b.style.setProperty('--c', m.accent);
   return b;
+};
+
+/** A person's face in a tag (a dot in their colour when they have none). */
+const face = (m: MapPerson): HTMLElement => {
+  if (!m.face) return dot(m);
+  const img = el('img', 'pface');
+  img.src = m.face;
+  img.alt = '';
+  img.style.setProperty('--c', m.accent);
+  img.addEventListener('error', () => img.replaceWith(dot(m)));
+  return img;
 };
 
 const flatRooms = (rooms: SideRoom[], depth = 1): (SideRoom & { depth: number })[] =>

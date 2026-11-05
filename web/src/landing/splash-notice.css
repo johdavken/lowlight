@@ -1,0 +1,51 @@
+/* The notice on the splash (docs/mockups/splash-notice.html): a layer with the art's own transform, above the scanlines so small type stays clean. */
+.sn-layer { position: absolute; left: 0; top: 0; z-index: 4; transform-origin: 0 0; pointer-events: none; }
+.sn-wrap { position: absolute; pointer-events: auto; cursor: default; filter: drop-shadow(0 10px 26px rgba(0, 0, 0, 0.7)); }
+.splash.out .sn-wrap { pointer-events: none; }
+.sn-wrap.held { visibility: hidden; }
+/* Prints down from the header, the way a file prints on the select. */
+.sn-wrap.print { animation: sn-print 0.42s steps(9) both; }
+@keyframes sn-print {
+  from { clip-path: inset(0 0 100% 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+.sn-panel {
+  --cut: polygon(0 0, calc(100% - 22px) 0, 100% 22px, 100% 100%, 0 100%);
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  clip-path: var(--cut);
+  background: linear-gradient(170deg, rgba(127, 233, 255, 0.75), rgba(127, 233, 255, 0.18) 45%, rgba(255, 79, 139, 0.32));
+}
+.sn-in { display: flex; flex-direction: column; height: 100%; clip-path: var(--cut); background: rgba(8, 4, 17, 0.9); }
+.sn-head { flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 12px 34px 6px 20px; }
+.sn-title { margin: 0; font: 500 40px/1 'Teko', 'VT323', sans-serif; letter-spacing: 0.05em; text-transform: uppercase; color: #e9defa; }
+.sn-tag { font: 22px/1 var(--pixel); letter-spacing: 0.14em; color: #ffc56b; white-space: nowrap; }
+.sn-body { position: relative; flex: 1; min-height: 0; }
+.sn-scroll { position: absolute; inset: 0 26px 0 0; overflow-y: auto; scrollbar-width: none; padding: 0 12px 26px 20px; overscroll-behavior: contain; }
+.sn-scroll::-webkit-scrollbar { display: none; }
+.sn-sec { position: sticky; top: 0; z-index: 1; margin: 0 -12px 0 -20px; padding: 5px 12px 5px 20px; font: 400 19px/1.1 var(--pixel); letter-spacing: 0.24em; text-transform: uppercase; color: #7fe9ff; background: rgb(13, 8, 26); border-block: 1px solid rgba(127, 233, 255, 0.2); }
+.sn-sec.alt { color: #ffc56b; border-color: rgba(255, 197, 107, 0.24); }
+.sn-sec + .sn-entry { margin-top: 12px; }
+.sn-entry { margin: 0 0 15px; }
+.sn-scroll > .sn-entry:first-child { margin-top: 12px; }
+.sn-entry:last-child { margin-bottom: 0; }
+.sn-entry h4 { margin: 0 0 1px; font: 400 24px/1.1 var(--pixel); letter-spacing: 0.03em; color: #e9defa; }
+.sn-entry p { margin: 0; font: 400 15px/1.5 var(--mono); color: #cfc4e6; }
+/* More below: the text dims into the foot, gone at the end. */
+.sn-body::after { content: ''; position: absolute; left: 0; right: 26px; bottom: 0; height: 44px; pointer-events: none; background: linear-gradient(transparent, rgb(8, 4, 17)); transition: opacity 0.15s; }
+.sn-body.at-end::after { opacity: 0; }
+/* One tick per entry at its real place in the text: how long the message runs, and where you are. Click or drag to move. */
+.sn-rail { position: absolute; right: 0; top: 0; bottom: 0; width: 26px; cursor: pointer; touch-action: none; }
+.sn-rail i { position: absolute; right: 8px; width: 7px; height: 2px; background: rgba(127, 233, 255, 0.32); }
+.sn-rail i.alt { background: rgba(255, 197, 107, 0.34); }
+.sn-rail i.lit { width: 12px; background: #7fe9ff; }
+.sn-rail i.alt.lit { background: #ffc56b; }
+.sn-rail b { position: absolute; right: 4px; width: 18px; border: solid #ff4f8b; border-width: 1px 0 1px 1px; opacity: 0.85; }
+.sn-foot { flex: none; padding: 5px 20px 7px; font: 18px/1 var(--pixel); letter-spacing: 0.16em; color: rgba(233, 222, 250, 0.6); border-top: 1px solid rgba(127, 233, 255, 0.14); }
+/* On a touch screen the 1600 px stage shrinks the type, and there are no arrow keys to name. */
+@media (pointer: coarse) {
+  .sn-entry h4 { font-size: 30px; }
+  .sn-entry p { font-size: 20px; line-height: 1.4; }
+  .sn-foot { display: none; }
+}

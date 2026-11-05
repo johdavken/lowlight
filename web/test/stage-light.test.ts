@@ -115,6 +115,15 @@ describe('StageLight', () => {
     expect(f.style.getPropertyValue('--light-l')).toBe('');
   });
 
+  it('flat light (Firefox): a sprite gets the one brightness too, not two sides', () => {
+    const r = fakeRenderer([N * 0.5, N * 0.5, N * 0.5], [N, N, N]);
+    const f = figure();
+    light = new StageLight(r, () => [f], { now: () => 0, flat: true });
+    r.frame();
+    expect(f.style.getPropertyValue('--fig-light')).toBe('1');
+    expect(f.style.getPropertyValue('--light-l')).toBe('');
+  });
+
   it('a figure that turns from a monogram into a sprite is lit at once, even when the numbers look alike (final review)', () => {
     // Uniform light whose luma equals its red share: the old one-number check would see "no change".
     const r = fakeRenderer([0, 0, 0]);

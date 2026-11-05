@@ -14,8 +14,8 @@ export type DeckSkin = (typeof DECK_SKINS)[number];
 export interface Deck {
   id: string;
   name: string;
-  /** Added to `grid` checks. */
-  bonus: number;
+  /** 1–4 (deck effects spec §1): above the job's tier it holds (a grid 4–5 costs no ALARM), below it's outclassed (its rolls are a step SMALLER). */
+  quality: 1 | 2 | 3 | 4;
   /** Added to heat each time it's used on a grid check, pass or fail. */
   heat: number;
   traits: DeckTrait[];
@@ -27,7 +27,7 @@ const whole = (lo: number, hi: number) => z.coerce.number().int().min(lo).max(hi
 const deckSchema = z.strictObject({
   id: z.string().regex(LORE_ID),
   name: z.string().trim().min(1).max(40),
-  bonus: whole(-50, 50),
+  quality: whole(1, 4).transform((n) => n as Deck['quality']),
   heat: whole(0, 10),
   traits: z.array(z.enum(DECK_TRAITS)).default([]),
   skin: z.enum(DECK_SKINS).optional(),

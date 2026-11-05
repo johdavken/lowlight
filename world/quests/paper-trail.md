@@ -1,5 +1,6 @@
 ---
 title: Paper Trail
+art: paper-trail.webp
 with: [nix-direct, hicks]
 starts: lowlight-intake
 after: null

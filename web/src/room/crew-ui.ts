@@ -1,4 +1,4 @@
-/** Small pieces the CREW screen's tabs share (crew spec §4). */
+/** Small pieces the CREW panel's tabs share (crew spec §4). */
 
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = ''): HTMLElementTagNameMap[K] {
   const n = document.createElement(tag);
@@ -23,4 +23,28 @@ export function face(r: { face: string | null; name: string }, cls: string): HTM
     return img;
   }
   return el('span', `${cls} cr-mono`, r.name.trim().charAt(0).toUpperCase());
+}
+
+/** A recruit's card picture, the size of SETUP's ready strip (`.cr-card84`). */
+export function cardPic(r: { face: string | null; name: string }): HTMLElement {
+  const pic = el('span', 'cr-card84');
+  pic.append(face(r, 'cr-card84-face'));
+  return pic;
+}
+
+/** A picture slot: its art, or the quiet hatch when it has none. */
+export function artSlot(cls: string, url: string | undefined): HTMLElement {
+  const n = el('span', url ? cls : `${cls} cr-noart`);
+  if (url) n.style.backgroundImage = `url(${url})`;
+  return n;
+}
+
+/** Redraws without losing where `[data-keep]` scrollers were: a refresh or a pick rebuilds the tab under them. */
+export function keepScroll(root: HTMLElement, redraw: () => void): void {
+  const at = new Map([...root.querySelectorAll<HTMLElement>('[data-keep]')].map((n) => [n.dataset.keep, [n.scrollLeft, n.scrollTop]]));
+  redraw();
+  for (const n of root.querySelectorAll<HTMLElement>('[data-keep]')) {
+    const p = at.get(n.dataset.keep);
+    if (p) [n.scrollLeft, n.scrollTop] = p;
+  }
 }

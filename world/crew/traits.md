@@ -1,12 +1,12 @@
 # Crew traits (crew spec §1)
 # <id> · <label> · <+|−> · <effect> · <specialties or any> · <what the profile says>
-# Effects: odds <kind|any> ±N · pay <kind|any> ±N% · hours ±N% · heat-on-messy +N · never-held · hurt-not-gone-once · wage-on-clean +N · busy N-in-7
+# Effects: odds <kind|any> ±N · pay <kind|any> ±N% · hours ±N% · heat-on-messy +N · never-held · hurt-not-gone-once · wage-on-clean +N · busy N-in-7 · sells-anywhere · full-route. A rule can sit beside an effect: <effect> + <rule>
 
-knows-trains · Knows the Trains · + · hours -33% · runner · Rides the freight lines nobody else will. Gets there first.
-light-feet · Light Feet · + · odds case +10 · runner · Nobody hears them on a stair.
-street-maps · Street Maps · + · odds any +5 · runner · Has the whole flooded grid in their head.
-winded · Winded · − · hours +25% · runner · Lungs gone bad on cheap air. Slower than they look.
-invisible · Invisible · + · odds scout +12 · ears · The kind of face a room forgets while it's still looking.
+knows-trains · Knows the Trains · + · hours -33% + sells-anywhere · any · Rides the freight lines nobody else will. Gets there first.
+light-feet · Light Feet · + · odds groundwork +10 · any · Nobody hears them on a stair.
+street-maps · Street Maps · + · odds any +5 · any · Has the whole flooded grid in their head.
+winded · Winded · − · hours +25% · any · Lungs gone bad on cheap air. Slower than they look.
+invisible · Invisible · + · odds groundwork +12 · ears · The kind of face a room forgets while it's still looking.
 long-memory · Long Memory · + · odds any +5 · ears · Remembers who drank with whom, three years back.
 gossip · Gossip · − · heat-on-messy +1 · ears · Trades what they hear. Sometimes what they hear is you.
 night-shift · Night Shift · − · busy 2-in-7 · ears · Still works the job that covers them. Some nights it wins.
@@ -15,13 +15,13 @@ good-story · Good Story · + · odds any +5 · face · Tells it the same way ev
 nobodys-fool · Nobody's Fool · + · never-held · face, fence · Knows when to walk. SDG never gets the cuffs on.
 expensive · Expensive Habits · − · wage-on-clean +20 · face, fence · Wants a cut of every good night.
 good-scales · Good Scales · + · pay hustle +20% · fence · Knows what it's worth before you do.
-old-buyers · Old Buyers · + · odds hustle +10 · fence · Buyers who don't ask, from before the war.
+old-buyers · Old Buyers · + · odds hustle +10 + full-route · fence · Buyers who don't ask, from before the war.
 skims · Skims · − · pay any -10% · fence · Some of it never makes it back. They'll swear it did.
 marked · Marked · − · odds any -5 · fence · The Sentinels have a file. Thin, but it exists.
-ghost-hands · Ghost Hands · + · odds records +12 · wire · In and out of a system without a log line.
-old-deck · Old Deck · + · odds any +5 · wire · Runs on a deck older than they are. It never crashes.
-burnout · Burnout · − · busy 2-in-7 · wire · Some nights the trodes stay in the drawer.
-loose-cable · Loose Cable · − · heat-on-messy +1 · wire · Leaves a trace when it goes wrong.
+ghost-hands · Ghost Hands · + · odds groundwork +12 · runner · In and out of a system without a log line.
+old-deck · Old Deck · + · odds any +5 · runner · Runs on a deck older than they are. It never crashes.
+burnout · Burnout · − · busy 2-in-7 · runner · Some nights the trodes stay in the drawer.
+loose-cable · Loose Cable · − · heat-on-messy +1 · runner · Leaves a trace when it goes wrong.
 hard-to-move · Hard to Move · + · hurt-not-gone-once · muscle · Took a round through the shoulder once and walked home.
 known-face · Known Face · + · odds collect +10 · muscle · Debtors pay before they're asked twice.
 short-fuse · Short Fuse · − · heat-on-messy +1 · muscle · Doesn't stop at a warning.

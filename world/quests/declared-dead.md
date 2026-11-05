@@ -1,5 +1,6 @@
 ---
 title: Declared Dead
+art: declared-dead.webp
 with: [nix-direct, hicks]
 starts: second-socket
 after: intake_ledger

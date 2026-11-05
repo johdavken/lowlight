@@ -10,6 +10,7 @@ import { makeFixture } from './fixtures/agents';
 import { openDb } from '../src/db';
 import { loadConfig } from '../src/config';
 import { openSettings } from '../src/settings';
+import { startStubAnthropic } from './fixtures/stub-anthropic';
 import { createPlaythroughs } from '../src/playthroughs';
 import { dispatchTool } from '../src/tools';
 import { startStubOpenRouter, chunk, okStep, type StubOpenRouter, type StubOpenRouterStep } from './fixtures/stub-openrouter';
@@ -87,14 +88,14 @@ async function start(
       path.join(dir, 'character.json'),
       JSON.stringify({ name: id[0].toUpperCase() + id.slice(1), sprite: { src: `${id}.png` }, ...(dressed ? { outfits: { indoors: `${id}.png` } } : {}) }),
     );
-    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix', 'nix-outfit-outdoors.png'), path.join(dir, `${id}.png`));
+    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix-direct', 'nix-direct-outfit-outdoors.png'), path.join(dir, `${id}.png`));
   }
   // Hae, the noodle stall's resident (a fixed character), copied from the repo.
   if (overrides.hae) fs.cpSync(path.join(__dirname, '..', '..', 'characters', 'hae'), path.join(cfg.charactersDir, 'hae'), { recursive: true });
   if (overrides.persona) {
     fs.mkdirSync(cfg.personaDir, { recursive: true });
     fs.writeFileSync(path.join(cfg.personaDir, 'persona.json'), JSON.stringify(overrides.persona));
-    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix', 'nix-outfit-outdoors.png'), path.join(cfg.personaDir, 'me.png'));
+    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix-direct', 'nix-direct-outfit-outdoors.png'), path.join(cfg.personaDir, 'me.png'));
   }
   if (overrides.dataDir) {
     fs.mkdirSync(path.join(overrides.dataDir, 'nix'), { recursive: true });
@@ -215,8 +216,10 @@ describe('buildApp / websocket hub', () => {
 
   it('sends scenes, who\'s here, room (restore), history, journal, recap, dossier page, link, then no dev_log when there are no scene errors', async () => {
     const { wsUrl } = await start();
-    const { opened, events } = connectWs(wsUrl);
+    const { opened, events: all } = connectWs(wsUrl);
     await opened;
+    // The live missions put other places' boards on QUEST (ELSEWHERE, 2026-11-01): a quest_state the order doesn't pin.
+    const events = new Proxy(all, { get: (t, k) => Reflect.get(t.filter((e) => e.type !== 'quest_state'), k) });
     await waitFor(() => events.length >= 8);
     expect(events[0].type).toBe('scenes');
     expect(events[1]).toMatchObject({ type: 'others', others: [] });
@@ -244,8 +247,9 @@ describe('buildApp / websocket hub', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { wsUrl } = await start({ scenesDir: scenesDirWithError });
     warn.mockRestore();
-    const { opened, events } = connectWs(wsUrl);
+    const { opened, events: all } = connectWs(wsUrl);
     await opened;
+    const events = new Proxy(all, { get: (t, k) => Reflect.get(t.filter((e) => e.type !== 'quest_state'), k) });
     await waitFor(() => events.length >= 13);
     expect(events[0].type).toBe('scenes');
     expect(events[1]).toMatchObject({ type: 'others', others: [] });
@@ -366,15 +370,15 @@ describe('buildApp / websocket hub', () => {
     });
     const img = await fetch(`${base}/api/persona/sprite`);
     expect(img.headers.get('content-type')).toContain('image/png');
-    expect(Buffer.from(await img.arrayBuffer())).toEqual(fs.readFileSync(path.join(__dirname, '..', '..', 'characters', 'nix', 'nix-outfit-outdoors.png')));
+    expect(Buffer.from(await img.arrayBuffer())).toEqual(fs.readFileSync(path.join(__dirname, '..', '..', 'characters', 'nix-direct', 'nix-direct-outfit-outdoors.png')));
   });
 
   it('/api/persona sends the character\'s expressions, on the same route as theirs (faces from actions)', async () => {
     const { baseUrl: base, cfg } = await start({ autoPlaythrough: false });
     const charDir = path.join(cfg.charactersDir, 'nix');
-    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix');
-    fs.copyFileSync(path.join(nixArt, 'nix-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
-    fs.copyFileSync(path.join(nixArt, 'nix-happy.png'), path.join(charDir, 'happy.png'));
+    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-happy.png'), path.join(charDir, 'happy.png'));
     fs.writeFileSync(path.join(charDir, 'character.json'), JSON.stringify({ scenePack: 'karasu', sprite: { src: 'sprite.png' }, expressions: { happy: 'happy.png' } }));
     await fetch(`${base}/api/agents`); // re-reads the registry
     const { persona } = await (await fetch(`${base}/api/persona?as=nix`)).json();
@@ -544,7 +548,7 @@ describe('buildApp / websocket hub', () => {
     const hicksDir = path.join(cfg.charactersDir, 'hicks');
     fs.mkdirSync(hicksDir, { recursive: true });
     fs.writeFileSync(path.join(hicksDir, 'character.json'), JSON.stringify({ name: 'Hicks', sprite: { src: 'hicks.png' } }));
-    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix', 'nix-outfit-outdoors.png'), path.join(hicksDir, 'hicks.png'));
+    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix-direct', 'nix-direct-outfit-outdoors.png'), path.join(hicksDir, 'hicks.png'));
 
     const app = await buildApp(cfg);
     try {
@@ -571,9 +575,9 @@ describe('buildApp / websocket hub', () => {
   it('GET /api/agents/:id/sprite/:name: 200 for a known expression, 404 for an unknown one or an agent without expressions', async () => {
     const { baseUrl: base, cfg } = await start();
     const charDir = path.join(cfg.charactersDir, 'nix');
-    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix');
-    fs.copyFileSync(path.join(nixArt, 'nix-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
-    fs.copyFileSync(path.join(nixArt, 'nix-happy.png'), path.join(charDir, 'happy.png'));
+    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-happy.png'), path.join(charDir, 'happy.png'));
     fs.writeFileSync(
       path.join(charDir, 'character.json'),
       JSON.stringify({ scenePack: 'karasu', sprite: { src: 'sprite.png' }, expressions: { happy: 'happy.png' } }),
@@ -684,9 +688,9 @@ describe('buildApp / websocket hub', () => {
   it('GET /api/agents/:id/outfit/:name: 200 for a known outfit, 404 for an unknown one or an agent without outfits', async () => {
     const { baseUrl: base, cfg } = await start();
     const charDir = path.join(cfg.charactersDir, 'nix');
-    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix');
-    fs.copyFileSync(path.join(nixArt, 'nix-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
-    fs.copyFileSync(path.join(nixArt, 'nix-outfit-indoors.png'), path.join(charDir, 'indoors.png'));
+    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-outfit-indoors.png'), path.join(charDir, 'indoors.png'));
     fs.writeFileSync(
       path.join(charDir, 'character.json'),
       JSON.stringify({ scenePack: 'karasu', sprite: { src: 'sprite.png' }, outfits: { indoors: 'indoors.png' } }),
@@ -715,8 +719,8 @@ describe('buildApp / websocket hub', () => {
   it('GET /api/agents/:id/sprite/:name: 404 for an agent with a sprite but no expressions', async () => {
     const { baseUrl: base, cfg } = await start();
     const charDir = path.join(cfg.charactersDir, 'nix');
-    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix');
-    fs.copyFileSync(path.join(nixArt, 'nix-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
+    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
     fs.writeFileSync(path.join(charDir, 'character.json'), JSON.stringify({ scenePack: 'karasu', sprite: { src: 'sprite.png' } }));
     await fetch(`${base}/api/agents`); // re-reads the registry, as the landing page does
 
@@ -728,8 +732,8 @@ describe('buildApp / websocket hub', () => {
   it('GET /api/agents/:id/thumb: 200 image/png with an ETag, honours If-None-Match with 304, 404 without a sprite or for an unknown id', async () => {
     const { baseUrl: base, cfg } = await start();
     const charDir = path.join(cfg.charactersDir, 'nix');
-    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix');
-    fs.copyFileSync(path.join(nixArt, 'nix-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
+    const nixArt = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
+    fs.copyFileSync(path.join(nixArt, 'nix-direct-outfit-outdoors.png'), path.join(charDir, 'sprite.png'));
     fs.writeFileSync(path.join(charDir, 'character.json'), JSON.stringify({ scenePack: 'karasu', sprite: { src: 'sprite.png' } }));
     await fetch(`${base}/api/agents`); // re-reads the registry, as the landing page does
 
@@ -1133,7 +1137,7 @@ describe('model routes', () => {
   });
 
   /** A direct character ('direct') on a stubbed OpenRouter catalog. */
-  async function startModelApp(opts: { key?: string | null; steps?: StubOpenRouterStep[] } = {}) {
+  async function startModelApp(opts: { key?: string | null; steps?: StubOpenRouterStep[]; anthropicKey?: string } = {}) {
     const or = await startStubOpenRouter(opts.steps ?? [{ chunks: [chunk('Hi.'), chunk(undefined, 'stop')] }]);
     cleanups.push(() => or.close());
     or.models = {
@@ -1153,6 +1157,10 @@ describe('model routes', () => {
     const key = opts.key === undefined ? 'sk-or-model-routes' : opts.key;
     if (key !== null) settings.setKey('openrouter', key);
     cfg.openrouterBaseUrl = or.url;
+    const an = await startStubAnthropic({ completion: '{"notes":[]}' });
+    cleanups.push(() => an.close());
+    cfg.anthropicBaseUrl = an.url;
+    if (opts.anthropicKey) settings.setKey('anthropic', opts.anthropicKey);
     const app = await buildApp(cfg, { settings });
     cleanups.push(() => app.close());
     await app.app.listen({ port: 0, host: '127.0.0.1' });
@@ -1160,8 +1168,31 @@ describe('model routes', () => {
     if (!address || typeof address === 'string') throw new Error('expected a network address');
     const baseUrl = `http://127.0.0.1:${address.port}`;
     const wsUrl = `ws://127.0.0.1:${address.port}/ws/direct`;
-    return { app, baseUrl, wsUrl, or, settings };
+    return { app, baseUrl, wsUrl, or, an, settings };
   }
+
+  it('only an Anthropic key: a GLM character turns on Sonnet through it, and the Residual too (Anthropic backend spec §2)', async () => {
+    const { wsUrl, or, an } = await startModelApp({ key: null, anthropicKey: 'sk-ant-app' });
+    const { opened, events, ws } = connectWs(wsUrl);
+    await opened;
+    ws.send(JSON.stringify({ type: 'user_message', text: 'hello' }));
+    await waitFor(() => events.some((e) => e.type === 'message' && e.message.role === 'agent' && e.message.status === 'ok'));
+    const turn = an.requests.find((r) => r.method === 'POST' && r.body.stream);
+    expect(turn?.body.model).toBe('claude-sonnet-5-5');
+    expect(events.some((e) => e.type === 'message' && e.message.role === 'agent' && e.message.text === 'Hi from Claude.')).toBe(true);
+    await waitFor(() => an.requests.some((r) => r.method === 'POST' && !r.body.stream));
+    expect(or.requests.filter((r) => r.method === 'POST')).toHaveLength(0);
+  });
+
+  it('both keys: a GLM character stays on OpenRouter', async () => {
+    const { wsUrl, or, an } = await startModelApp({ anthropicKey: 'sk-ant-app' });
+    const { opened, events, ws } = connectWs(wsUrl);
+    await opened;
+    ws.send(JSON.stringify({ type: 'user_message', text: 'hello' }));
+    await waitFor(() => events.some((e) => e.type === 'message' && e.message.role === 'agent' && e.message.status === 'ok'));
+    expect(or.requests.filter((r) => r.method === 'POST').at(0)?.body.model).toBe('z-ai/glm-5.2');
+    expect(an.requests.filter((r) => r.method === 'POST')).toHaveLength(0);
+  });
 
   it('the Residual runs after her reply in a playthrough: one call on her model, its note in her journal, a dev line (scribe spec §2)', async () => {
     const { wsUrl, or, app } = await startModelApp();
@@ -1308,8 +1339,8 @@ describe('model routes', () => {
 
   it('the app serves /api/link and /api/models', async () => {
     const { baseUrl } = await startModelApp();
-    const link = (await (await fetch(`${baseUrl}/api/link`)).json()) as { linked: boolean; last4: string };
-    expect(link).toMatchObject({ linked: true, last4: 'utes' });
+    const link = (await (await fetch(`${baseUrl}/api/link`)).json()) as { openrouter: { linked: boolean; last4: string } };
+    expect(link.openrouter).toMatchObject({ linked: true, last4: 'utes' });
     const models = (await (await fetch(`${baseUrl}/api/models`)).json()) as { picks: { id: string }[] };
     expect(models.picks.map((p) => p.id)).toEqual(['z-ai/glm-5.2']);
   });

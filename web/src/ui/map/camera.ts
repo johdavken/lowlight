@@ -1,5 +1,5 @@
 /**
- * The map's camera: a district's frame (in map %) and the view that fits it into the space the band and strip leave, and the
+ * The map's camera: a district's frame (in map %) and the view that fits it to the screen, and the
  * player's own scroll-zoom, drag and pinch. The map covers the screen at 1×; its edge can come as far as the screen's
  * middle, over the empty grid (spec 2026-10-28 §2).
  */
@@ -86,4 +86,15 @@ export function pinchView(start: View, from: { mid: Point; dist: number }, now: 
   const mx = (from.mid.x - start.tx) / start.scale;
   const my = (from.mid.y - start.ty) / start.scale;
   return clampView({ scale, tx: now.mid.x - mx * scale, ty: now.mid.y - my * scale }, map, screen);
+}
+
+/** A frame (map %) centred and fitted into 80 % of the screen, 1×–`maxScale` (map pins spec §3: a district name frames it). */
+export function frameView(f: Frame, map: Size, screen: Size, maxScale: number): View {
+  const fw = ((f.x1 - f.x0) / 100) * map.w;
+  const fh = ((f.y1 - f.y0) / 100) * map.h;
+  const fit = Math.min((screen.w * 0.8) / (fw || 1), (screen.h * 0.8) / (fh || 1));
+  const scale = Math.min(maxScale, Math.max(1, fit));
+  const cx = ((f.x0 + f.x1) / 200) * map.w;
+  const cy = ((f.y0 + f.y1) / 200) * map.h;
+  return clampView({ scale, tx: screen.w / 2 - cx * scale, ty: screen.h / 2 - cy * scale }, map, screen);
 }

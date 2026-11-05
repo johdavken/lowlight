@@ -15,6 +15,6 @@ describe('loadCrewBook', () => {
     expect(book.traits).toEqual([]);
     expect(book.errands).toEqual([]);
     expect(warns).toHaveLength(1);
-    expect(loadCrewBook(path.join(dir, 'nope'), () => {})).toEqual({ names: {}, traits: [], pitches: {}, errands: [] });
+    expect(loadCrewBook(path.join(dir, 'nope'), () => {})).toEqual({ names: {}, genders: {}, traits: [], abilities: [], pitches: {}, errands: [], goods: [] });
   });
 });

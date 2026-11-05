@@ -131,6 +131,33 @@ describe('EncounterPanel', () => {
   });
 });
 
+describe("DRAW's kinds on the cards", () => {
+  it("each card says its kind and shows its picture: the stranger's face, the city's and the personal one's", async () => {
+    const kinds: Encounter[] = [
+      { kind: 'stranger', title: 'The super', text: 'A door bangs open.', stranger: { name: 'Super', voice: 'gravel', face: 'local-karasu-03' } },
+      { kind: 'city', title: 'Conduit', text: 'A pipe bursts.' },
+      { kind: 'personal', title: 'A name', text: 'A phone buzzes.' },
+    ];
+    const p = open({ load: vi.fn(async () => kinds) });
+    await flush();
+    const cards = [...p.panel.el.querySelectorAll<HTMLElement>('.sp-card')];
+    expect(cards.map((c) => c.querySelector('.sp-sub-what')?.textContent)).toEqual(['STRANGER', 'THE CITY', 'PERSONAL']);
+    expect((cards[0]!.querySelector('.sp-art') as HTMLElement).style.backgroundImage).toBe('url("/api/extras/local-karasu-03")');
+    expect(cards.slice(1).map((c) => (c.querySelector('.sp-art') as HTMLElement).style.backgroundImage)).toEqual(['url("/draw/city.webp")', 'url("/draw/personal.webp")']);
+    // A stranger card the narrator gave no face shows none (no kind art for STRANGER).
+    const faceless = open({ load: vi.fn(async () => [{ ...kinds[0]!, stranger: { name: 'Super', voice: 'gravel' } }, kinds[1]!, kinds[2]!]) });
+    await flush();
+    expect(faceless.panel.el.querySelector('.sp-card .sp-art')?.getAttribute('style') ?? '').not.toContain('extras');
+  });
+
+  it('a set dealt before kinds shows as it did', async () => {
+    const p = open();
+    await flush();
+    expect(p.panel.el.querySelector('.sp-sub-what')).toBeNull();
+    expect(p.panel.el.querySelector('.sp-art')).toBeNull();
+  });
+});
+
 describe("hereLine (the header's who's-here part)", () => {
   it('nobody, one, several', () => {
     expect(hereLine([])).toBeNull();

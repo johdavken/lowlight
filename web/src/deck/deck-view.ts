@@ -33,7 +33,7 @@ function face(t: DeckThread, cls: string): HTMLElement {
 }
 
 /** The bar on every screen: the network, then the weekday and story time and the weather; tapping the time passes time. */
-function bar(header: Pick<DeckHeader, 'time' | 'weather'> | null, onPassTime?: () => void): HTMLElement {
+export function renderBar(header: Pick<DeckHeader, 'time' | 'weather'> | null, onPassTime?: () => void): HTMLElement {
   const b = el('div', 'dk-bar');
   b.append(el('span', 'dk-net', 'CORTEX//RELAY'));
   const right = [header?.time?.split('·').at(-1)?.trim(), header?.weather].filter(Boolean).join(' · ').toUpperCase();
@@ -74,14 +74,21 @@ export function renderPassTime(onWait: (b: { minutes: number } | { until: string
   return sheet;
 }
 
-/** The thread list: contacts in the order the server sends them (her first). */
-export function renderThreads(threads: readonly DeckThread[], onOpen: (id: string) => void, header: Pick<DeckHeader, 'time' | 'weather'> | null = null, onPassTime?: () => void): HTMLElement {
+/** The thread list: contacts in the order the server sends them (her first). `openId`: the thread open beside it (holo). */
+export function renderThreads(
+  threads: readonly DeckThread[],
+  onOpen: (id: string) => void,
+  header: Pick<DeckHeader, 'time' | 'weather'> | null = null,
+  onPassTime?: () => void,
+  openId: string | null = null,
+): HTMLElement {
   const root = el('div', 'dk-screen dk-list');
-  root.append(bar(header, onPassTime), el('div', 'dk-title', 'MESSAGES'));
+  root.append(renderBar(header, onPassTime), el('div', 'dk-title', 'MESSAGES'));
   const list = el('div', 'dk-rows');
   for (const t of threads) {
-    const r = el('button', `dk-row${t.unread ? ' dk-new' : ''}`);
+    const r = el('button', `dk-row${t.unread ? ' dk-new' : ''}${t.id === openId ? ' dk-on' : ''}`);
     r.type = 'button';
+    r.dataset.id = t.id;
     const text = el('div', 'dk-rtext');
     const name = el('div', 'dk-rname', t.name.toUpperCase());
     name.style.color = t.accent;
@@ -138,6 +145,15 @@ export interface ThreadView {
   /** EDIT: your text back in the box. */
   editing?: { id: string; text: string } | null;
   onCancelEdit?(): void;
+  /** Holo (in-game texts spec §3): no ‹, the list is beside the thread. */
+  hideBack?: boolean;
+  /** Holo: a click on a bubble (not a photo) opens its controls too. */
+  menuOnClick?: boolean;
+  /** Holo: Enter sends, Shift+Enter is a new line. */
+  enterSends?: boolean;
+  /** What the box starts with (a kept draft), and what's typed in it. */
+  draft?: string;
+  onDraft?(text: string): void;
 }
 
 /** One thread: the header, the bubbles (hers split on lines), typing…, and the input or why there's none. */
@@ -151,8 +167,9 @@ export function renderThread(v: ThreadView): HTMLElement {
   back.addEventListener('click', () => v.onBack());
   const who = el('div', 'dk-who');
   who.append(el('div', 'dk-name', v.contact.name.toUpperCase()), el('div', 'dk-where', [v.header.place, v.header.tail].filter(Boolean).join(' · ').toUpperCase()));
-  head.append(back, face(v.contact, 'dk-hface'), who);
-  root.append(bar(v.header, v.onPassTime), head);
+  if (v.hideBack) head.append(face(v.contact, 'dk-hface'), who);
+  else head.append(back, face(v.contact, 'dk-hface'), who);
+  root.append(renderBar(v.header, v.onPassTime), head);
 
   const msgs = el('div', 'dk-msgs');
   // When a long press last opened the menu: the tap that ends it doesn't also open a photo.
@@ -227,6 +244,11 @@ export function renderThread(v: ThreadView): HTMLElement {
       if (press && Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) cancel();
     });
     for (const t of ['pointerup', 'pointercancel', 'pointerleave'] as const) msgs.addEventListener(t, cancel);
+    if (v.menuOnClick)
+      msgs.addEventListener('click', (e) => {
+        const b = bubbleOf(e.target);
+        if (b && !b.classList.contains('dk-photo-msg')) open(b.dataset.id!);
+      });
   }
 
   if (v.readOnly) {
@@ -249,6 +271,8 @@ export function renderThread(v: ThreadView): HTMLElement {
     const input = el('form', 'dk-input');
     const box = el('textarea', 'dk-box');
     if (v.editing) box.value = v.editing.text;
+    else if (v.draft) box.value = v.draft;
+    if (v.onDraft) box.addEventListener('input', () => v.onDraft!(box.value));
     box.rows = 1;
     box.maxLength = 500;
     box.placeholder = `text ${v.contact.name.toLowerCase()}…`;
@@ -259,7 +283,14 @@ export function renderThread(v: ThreadView): HTMLElement {
       if (text === '') return;
       v.onSend(text);
       box.value = '';
+      v.onDraft?.('');
     };
+    if (v.enterSends)
+      box.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+        e.preventDefault();
+        go();
+      });
     input.addEventListener('submit', (e) => {
       e.preventDefault();
       go();

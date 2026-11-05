@@ -3,7 +3,8 @@
  * logo to her left with a CRT scan and a light glitch, and a blinking prompt. Once per session, and
  * again on every reload; back from a room skips it.
  */
-import { DEFAULT_LOGO_EFFECTS, LOGO_EFFECTS, SPLASH_GROUP_LOGO_W, SPLASH_LOGO_ASPECT, type LogoEffect, type SplashLogo } from '../../../shared/splash';
+import { DEFAULT_LOGO_EFFECTS, defaultPanel, LOGO_EFFECTS, SPLASH_GROUP_LOGO_W, SPLASH_LOGO_ASPECT, type LogoEffect, type SplashLogo, type SplashPanel } from '../../../shared/splash';
+import { mountNotice, type NoticePanel, type NoticeText } from './splash-notice';
 import { glitchOut } from './stage';
 import { STAGE_H, STAGE_W } from '../ui/game-stage';
 import './splash.css';
@@ -51,6 +52,16 @@ export interface Splash {
   refit(): void;
   /** Moves and scales the logo-and-prompt group to `logo` (Studio's drag), and swaps the logo when its src changes. */
   place(logo: ArtLogo): void;
+  /** Moves the notice (Studio's drag). */
+  placePanel(panel: SplashPanel): void;
+  /** Shows this notice, or none (Studio's NOTICE row). */
+  setNotice(notice: NoticeText | undefined): void;
+  /** Whether a pointer on this target is on the notice: it stays on the splash. */
+  inNotice(target: EventTarget | null): boolean;
+  /** Scrolls the notice for a key; false when there's none up or the key doesn't scroll it. */
+  noticeKey(key: string): boolean;
+  /** Scrolls the notice (Studio's wheel over the handle). */
+  scrollNotice(dy: number): void;
   /** Plays the logo's power-on again (Studio's REPLAY); nothing when the logo hasn't got it. */
   replayIntro(): void;
   /** Removes it at once, no glitch, and stops listening (Studio's preview, the landing's dispose). */
@@ -71,6 +82,10 @@ export interface SplashArt {
   width: number;
   height: number;
   logo: ArtLogo;
+  /** Where the notice sits; missing: defaultPanel. */
+  panel?: SplashPanel;
+  /** The message to show on it, if any. */
+  notice?: NoticeText;
 }
 
 /** The game's own splash, used whenever the library gives nothing (spec 2026-10-09 splash library §4.1). */
@@ -119,16 +134,24 @@ export async function splashArt(
   const local = o.local ?? globalThis.localStorage;
   const session = o.session ?? globalThis.sessionStorage;
   let list: SplashArt[] = [];
+  let notice: NoticeText | undefined;
   try {
     const res = await (o.fetchImpl ?? fetch)('/api/splashes', { signal: AbortSignal.timeout(o.timeoutMs ?? 1000) });
     if (res.ok) {
-      const body = (await res.json()) as { splashes?: { id: string; url: string; width: number; height: number; logo: ArtLogo }[] };
-      list = (body.splashes ?? []).map((s) => ({ id: s.id, src: s.url, width: s.width, height: s.height, logo: s.logo })).filter(isArt);
+      const body = (await res.json()) as { splashes?: { id: string; url: string; width: number; height: number; logo: ArtLogo; panel?: SplashPanel }[]; notice?: NoticeText };
+      notice = body.notice;
+      list = (body.splashes ?? []).map((s) => ({ id: s.id, src: s.url, width: s.width, height: s.height, logo: s.logo, panel: s.panel, notice })).filter(isArt);
     }
   } catch {
     // Down, slow or garbled: the built-in below.
   }
-  if (list.length === 0) return BUILT_IN;
+  if (list.length === 0) {
+    if (!notice) return BUILT_IN;
+    // Kept like a pick, so Esc back to the splash still has the message.
+    const built = { ...BUILT_IN, notice };
+    write(session, PICK_KEY, JSON.stringify(built));
+    return built;
+  }
   const last = read(local, LAST_KEY);
   const pool = list.length > 1 ? list.filter((a) => a.id !== last) : list;
   const art = pool[Math.min(pool.length - 1, Math.floor((o.random ?? Math.random)() * pool.length))]!;
@@ -226,6 +249,8 @@ export function mountSplash(
     art?: SplashArt;
     /** False: no power-on intro on this first showing (Esc back: landing's glitch-in is the entrance). */
     intro?: boolean;
+    /** The opening card's end: the notice prints then, not unseen beneath it. */
+    noticeAfter?: Promise<void>;
     /** The size to cover (default: the 1600×900 game stage): Studio's preview passes its frame. */
     viewport?: () => { width: number; height: number };
   },
@@ -236,11 +261,14 @@ export function mountSplash(
   const stage = el('div', 'splash-stage');
   // The logo and prompt, one group on the art at its logo spot: it shrinks only when the logo wouldn't fit.
   const mark = el('div', 'splash-mark');
+  // The notice's layer: the art's transform, but above the scanlines.
+  const layer = el('div', 'sn-layer');
+  let notice: NoticePanel | null = null;
   const size = () => opts.viewport?.() ?? { width: STAGE_W, height: STAGE_H };
   const fit = () => {
     const { width, height } = size();
     const b = coverBox(width, height, current);
-    stage.style.transform = `translate(${b.left}px, ${b.top}px) scale(${b.scale})`;
+    stage.style.transform = layer.style.transform = `translate(${b.left}px, ${b.top}px) scale(${b.scale})`;
     mark.style.transform = `scale(${markScale(width, height, current)})`;
   };
   const prompt = el('div', '');
@@ -285,11 +313,18 @@ export function mountSplash(
   };
   const show = (a: SplashArt) => {
     current = a;
-    stage.style.width = `${a.width}px`;
-    stage.style.height = `${a.height}px`;
+    stage.style.width = layer.style.width = `${a.width}px`;
+    stage.style.height = layer.style.height = `${a.height}px`;
     mark.style.left = `${a.logo.x}px`;
     mark.style.top = `${a.logo.y}px`;
     showLogo(a.logo);
+    if (a.notice) {
+      notice ??= mountNotice(layer, { print: opts.intro !== false, after: opts.noticeAfter });
+      notice.set(a.notice, a.panel ?? defaultPanel(a.width, a.height));
+    } else {
+      notice?.destroy();
+      notice = null;
+    }
     fit();
   };
   // A picked image that won't load: the built-in instead; the built-in failing leaves the skyline (no-art).
@@ -299,7 +334,7 @@ export function mountSplash(
       return;
     }
     artImg.src = BUILT_IN.src;
-    show(BUILT_IN);
+    show({ ...BUILT_IN, notice: current.notice });
   });
   mark.append(prompt);
   show(current);
@@ -315,7 +350,15 @@ export function mountSplash(
     prompt.textContent = SOUND_PROMPT;
   } else armed();
   stage.append(artImg, mark);
-  root.append(stage);
+  root.append(stage, layer);
+  // The wheel anywhere on the splash moves the notes; over them it scrolls them natively.
+  root.addEventListener(
+    'wheel',
+    (e) => {
+      if (!(e.target instanceof Element && e.target.closest('.sn-scroll'))) notice?.scrollBy(e.deltaY);
+    },
+    { passive: true },
+  );
   host.append(root);
 
   let leaving: Promise<void> | null = null;
@@ -328,6 +371,17 @@ export function mountSplash(
     place(logo) {
       show({ ...current, logo });
     },
+    placePanel(panel) {
+      show({ ...current, panel });
+    },
+    setNotice(n) {
+      show({ ...current, notice: n });
+    },
+    inNotice: (target) => !!notice && target instanceof Node && notice.el.contains(target),
+    noticeKey: (key) => notice?.key(key) ?? false,
+    scrollNotice(dy) {
+      notice?.scrollBy(dy);
+    },
     replayIntro() {
       if (!logo?.classList.contains('fx-power-on')) return;
       // Off, a reflow, on again: the animation starts over.
@@ -337,6 +391,7 @@ export function mountSplash(
     },
     destroy() {
       window.removeEventListener('resize', fit);
+      notice?.destroy();
       root.remove();
     },
     setSceneOk(ok) {

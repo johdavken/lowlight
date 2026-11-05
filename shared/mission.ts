@@ -1,5 +1,5 @@
 /**
- * Missions (spec 2026-10-18): a checked choice's odds, and the kit (deck, sol, heat, EDGE left)
+ * Missions (spec 2026-10-18): a checked choice's odds, and the kit (deck, sol, heat, NERVE left)
  * folded from the kit events mission runs keep. Pure: the game server, Studio and their tests share it.
  */
 import { DAY } from './clock';
@@ -17,6 +17,8 @@ export interface Check {
   red: boolean;
   /** Prep modifiers: `· if <condition> +N "label"`, applied while the condition holds. */
   mods: Mod[];
+  /** An angle's card (tier 3 contracts spec §3): what you know skips the tier's cut on this roll. */
+  angle?: true;
 }
 
 /** A modifier that applies while its condition holds, named in the card's "why" line. */
@@ -35,54 +37,19 @@ export interface Odds {
   why: string[];
 }
 
-export const ODDS_MIN = 5;
-export const ODDS_MAX = 95;
-export const PER_POINT = 7;
-/** A grid check with no deck of your own (on a booth deck). */
-export const NO_DECK = -25;
-
-/** Per ALARM level, on every roll (small jobs spec §3). */
-export const ALARM_STEP = -10;
-/** An easy or hard mark (a stranger's temper). */
-export const TEMPER = 10;
-
-const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`);
-
-export function oddsOf(
-  check: Check,
-  who: { stats: Stats; deck: Deck | null; with: string; alarm?: number; ctx?: CondCtx; temper?: 'easy' | 'hard' | null; extra?: { delta: number; label: string }[] },
-): Odds {
-  const why: string[] = [];
-  let delta = 0;
-  const add = (n: number, text: string) => {
-    delta += n;
-    why.push(text);
-  };
-  const noDeck = check.grid && who.deck === null;
-  if (check.grid) {
-    why.push('GRID');
-    if (who.deck) add(who.deck.bonus, `${who.deck.name.toUpperCase()} ${signed(who.deck.bonus)}`);
-    else add(NO_DECK, `NO DECK ${signed(NO_DECK)}`);
-  }
-  for (const c of check.crew) if (c.contact === who.with) add(c.bonus, `${c.contact.toUpperCase()} ${signed(c.bonus)}`);
-  for (const m of check.mods ?? []) if (who.ctx && holds(m.when, who.ctx)) add(m.delta, `${signed(m.delta)} ${m.label.toUpperCase()}`);
-  // Crew prep's default bonuses (crew spec §2), named as they come: `CASED +10`.
-  for (const x of who.extra ?? []) add(x.delta, `${x.label.toUpperCase()} ${signed(x.delta)}`);
-  if (who.temper === 'easy') add(TEMPER, `EASY MARK ${signed(TEMPER)}`);
-  if (who.temper === 'hard') add(-TEMPER, `HARD MARK ${signed(-TEMPER)}`);
-  const alarm = who.alarm ?? 0;
-  if (alarm > 0) add(alarm * ALARM_STEP, `ALARM ${alarm} ${signed(alarm * ALARM_STEP)}`);
-  const raw = check.base + (who.stats[check.stat] - 5) * PER_POINT + delta;
-  return { stat: check.stat.toUpperCase(), chance: Math.min(ODDS_MAX, Math.max(ODDS_MIN, raw)), noDeck, why };
-}
-
 export type Tier = 'clean' | 'messy' | 'blown';
 
 /** A job's outcome tier (small jobs spec §3). */
-export function outcomeTier(o: { take: 'full' | 'part' | 'none'; blown: boolean; alarm: number }): Tier {
+export function outcomeTier(o: { take: 'full' | 'part' | 'none'; blown: boolean; alarm: number; paidOff?: boolean }): Tier {
   if (o.blown || o.take === 'none') return 'blown';
-  if (o.take === 'part' || o.alarm >= 2) return 'messy';
+  // Paid Off (tier 3 beat play spec §2): ALARM counts as under 2.
+  if (o.take === 'part' || (o.alarm >= 2 && !o.paidOff)) return 'messy';
   return 'clean';
+}
+
+/** The heat a job leaves in its district (tier template spec §2): the ALARM you leave with (a blown job at least 2), the deck's own, less SCRUB's 1. */
+export function endHeat(o: { alarm: number; blown: boolean; deckHeat: number; scrubbed: boolean }): number {
+  return Math.max(0, Math.max(o.alarm, o.blown ? 2 : 0) + o.deckHeat - (o.scrubbed ? 1 : 0));
 }
 
 /** Rep for a job of tier `tier` (small jobs spec §2): clean +(5+T), messy +2, blown −(8+2T). */
@@ -103,7 +70,7 @@ export function crackTries(o: { tech: number; alarm: number; hasDeck: boolean; m
   return Math.max(1, t);
 }
 
-/** One change to the kit, at a story-clock minute: sol and heat add, deck replaces (null: none), edge spends. */
+/** One change to the kit, at a story-clock minute: sol and heat add, deck carries (a new one is kept; null: the carried one is gone), nerve spends. */
 export interface KitEvent {
   at: number;
   sol?: number;
@@ -111,6 +78,19 @@ export interface KitEvent {
   /** The district `heat` lands in (small jobs spec §2); absent on events from before districts. */
   district?: string;
   deck?: string | null;
+  /** Decks you own that leave, by name: a lost push takes back the ones it gave, a fragile deck dies. Carried, you carry none. */
+  lose?: string[];
+  /** `deck` is a swap (CARRY): it does nothing unless you still own that deck. */
+  carry?: true;
+  /** A purchase that keeps the deck carried (every buy since decks were kept). */
+  keep?: true;
+  /** An old save's purchase: the deck carried was traded in, so it leaves as the new one comes. */
+  trade?: true;
+  /** NERVE spent (the table spec §3), negative. */
+  nerve?: number;
+  /** This NERVE ends NERVE GONE (Second Wind and its kind, the one way back before 06:00). */
+  lift?: true;
+  /** EDGE spent before the table: folds as 1 NERVE. */
   edge?: -1;
   rep?: { district: string; delta: number };
   cover?: { id: CoverId; delta: number };
@@ -119,15 +99,20 @@ export interface KitEvent {
 export type CoverId = 'burner' | 'fall-guy';
 
 export interface Kit {
+  /** The deck carried. */
   deck: string | null;
+  /** Every deck you own, carried or not, in the order you got them. */
+  owned: string[];
   sol: number;
   /** Heat per district, 0–10. */
   heat: Record<string, number>;
   /** Rep per district, 0–100. */
   rep: Record<string, number>;
   cover: Record<CoverId, number>;
-  edgeLeft: number;
-  edgeMax: number;
+  nerveLeft: number;
+  nerveMax: number;
+  /** NERVE ran out (the table spec §3): no new job until the next 06:00. */
+  nerveGone: boolean;
 }
 
 export const heatIn = (k: Kit, district: string | null): number => (district ? (k.heat[district] ?? 0) : 0);
@@ -152,22 +137,22 @@ export interface KitHooks {
   items: { at: number }[];
   /** An item at its time: kit events to apply now, and items to queue for later (a send's landing). */
   apply(k: Kit, item: { at: number }): { events?: KitEvent[]; later?: { at: number }[] };
-  /** At each 06:00 crossed: `events` before heat cools and EDGE refills, `after` once they have. */
+  /** At each 06:00 crossed: `events` before heat cools and NERVE refills, `after` once they have. */
   six(k: Kit, at: number): { events?: KitEvent[]; after?: KitEvent[] };
 }
 
 /**
- * The kit at `now`: events folded in time order. Each 06:00 refills EDGE and cools each district's heat
+ * The kit at `now`: events folded in time order. Each 06:00 refills NERVE and cools each district's heat
  * by the rep tier held there (small jobs spec §2). `districtOf` places heat from before districts. `hooks`
  * put more on the same timeline (crew); kit events go first at the same minute.
  */
 export function foldKit(
-  start: { deck: string | null; edgeMax: number; from: number },
+  start: { deck: string | null; nerveMax: number; from: number },
   events: KitEvent[],
   now: number,
   o: { districtOf?(e: KitEvent): string | null; hooks?: KitHooks } = {},
 ): Kit {
-  const k: Kit = { deck: start.deck, sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, edgeLeft: start.edgeMax, edgeMax: start.edgeMax };
+  const k: Kit = { deck: start.deck, owned: start.deck ? [start.deck] : [], sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: start.nerveMax, nerveMax: start.nerveMax, nerveGone: false };
   const applyEvent = (e: KitEvent) => {
     if (e.sol) k.sol = Math.max(0, k.sol + e.sol);
     if (e.heat) {
@@ -176,8 +161,27 @@ export function foldKit(
     }
     if (e.rep) k.rep[e.rep.district] = Math.min(100, Math.max(0, (k.rep[e.rep.district] ?? 0) + e.rep.delta));
     if (e.cover) k.cover[e.cover.id] = Math.max(0, k.cover[e.cover.id] + e.cover.delta);
-    if (e.deck !== undefined) k.deck = e.deck;
-    if (e.edge) k.edgeLeft = Math.max(0, k.edgeLeft + e.edge);
+    // Decks by name first (review I2): a same-minute swap can't put a dead deck back in hand, or kill the wrong one.
+    if (e.lose) {
+      k.owned = k.owned.filter((d) => !e.lose!.includes(d));
+      if (k.deck && e.lose.includes(k.deck)) k.deck = null;
+    }
+    if (e.carry) {
+      if (e.deck && k.owned.includes(e.deck)) k.deck = e.deck;
+    } else if (e.deck === null && !e.lose) {
+      if (k.deck) k.owned = k.owned.filter((d) => d !== k.deck);
+      k.deck = null;
+    } else if (e.deck) {
+      if (e.trade && k.deck) k.owned = k.owned.filter((d) => d !== k.deck);
+      if (!k.owned.includes(e.deck)) k.owned.push(e.deck);
+      k.deck = e.deck;
+    }
+    const spent = (e.nerve ?? 0) + (e.edge ?? 0);
+    if (spent) {
+      k.nerveLeft = Math.max(0, k.nerveLeft + spent);
+      if (k.nerveLeft === 0) k.nerveGone = true;
+      else if (e.lift) k.nerveGone = false;
+    }
   };
   type Entry = { at: number; ev?: KitEvent; item?: { at: number }; n: number };
   let n = 0;
@@ -204,7 +208,8 @@ export function foldKit(
       const r = (six <= now ? o.hooks?.six(k, six) : undefined) ?? {};
       for (const e of r.events ?? []) applyEvent(e);
       for (const d of Object.keys(k.heat)) k.heat[d] = Math.max(0, k.heat[d] - repTier(k.rep[d] ?? 0));
-      k.edgeLeft = k.edgeMax;
+      k.nerveLeft = k.nerveMax;
+      k.nerveGone = false;
       for (const e of r.after ?? []) applyEvent(e);
     }
     t = Math.max(t, to);

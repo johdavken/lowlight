@@ -41,17 +41,25 @@ export function proseOfLength(n: number): string {
 }
 
 /** The fake narrator's opening (e2e "opening:"; arrival screen spec §3). */
-export const E2E_OPENING = { title: 'E2E After closing', text: 'Rain has shut the Ribbon early, and the light upstairs is still on.' };
+/** The opening's three (history, business, chance), as the narrator answers a new game's SUGGEST. */
+export const E2E_OPENINGS = [
+  { kind: 'history', title: 'E2E The slip', text: 'The old attendance slip is still on her desk, signed every week.' },
+  { kind: 'business', title: 'E2E The packet', text: 'Rain has shut the Ribbon early, and a sealed packet waits in his jacket.' },
+  { kind: 'chance', title: 'E2E The fuse', text: 'The power on Level 2 stutters as he reaches the top of the stairs.' },
+];
 
 /** The fake narrator's three events (e2e "encounter:"): the first brings a stranger. */
 export const E2E_ENCOUNTERS = [
-  { title: 'E2E Wrong package', text: 'A courier drops a sealed box on the counter with her name on it.', stranger: { name: 'Courier', voice: 'clipped, chewing gum' } },
-  { title: 'E2E Blackout', text: 'The grid drops and every sign on the street dies at once.', stranger: null },
-  { title: 'E2E Regular', text: 'An old man takes the last stool and orders without looking.', stranger: null },
+  { kind: 'stranger', title: 'E2E Wrong package', text: 'A courier drops a sealed box on the counter with her name on it.', stranger: { name: 'Courier', voice: 'clipped, chewing gum', gender: 'man', age: 'young' } },
+  { kind: 'city', title: 'E2E Blackout', text: 'The grid drops and every sign on the street dies at once.', stranger: null },
+  { kind: 'personal', title: 'E2E Regular', text: 'An old man takes the last stool and orders without looking.', stranger: null },
 ];
 
 /** The fake SUGGEST line (e2e "suggest:"). */
 export const E2E_SUGGESTION = '*I tap the counter twice.* "E2E suggested line."';
+/** SUGGEST's PUSH and TURN lines, after the PLAIN one (E2E_SUGGESTION) when the prompt asks for three angles. */
+export const E2E_SUGGESTION_PUSH = '*I lean in.* "E2E pushed line."';
+export const E2E_SUGGESTION_TURN = '*I glance at the door.* "E2E turned line."';
 
 /**
  * A fake OpenRouter for every chat: `a bowl, Hae` gets a reply with a line of Hae's,
@@ -85,9 +93,9 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         const data = DIRECT.models.map((m) => ({ ...m, pricing: { prompt: '0.0000004', completion: '0.0000016' } }));
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data }));
       }
-      // Scenario cards' narrator (one non-streaming request): three fixed setups.
+      // The opening's narrator (one non-streaming request): three fixed openings.
       if ((body as { stream?: boolean }).stream === false && body.messages?.[0]?.content?.startsWith('You write openings')) {
-        const content = JSON.stringify(E2E_OPENING);
+        const content = JSON.stringify(E2E_OPENINGS);
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }));
       }
       // Encounter cards' narrator: three fixed events.
@@ -95,11 +103,12 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         const content = JSON.stringify(E2E_ENCOUNTERS);
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }));
       }
-      // SUGGEST: the player's next line, with a "Name:" in front to be cleaned off; a steer is echoed back.
+      // SUGGEST: the player's next line, with a "Name:" in front to be cleaned off; a steer is echoed back. Asked for three angles, PLAIN is that line.
       if ((body as { stream?: boolean }).stream === false && body.messages?.[0]?.content?.startsWith('You help the user play')) {
         const steer = /means to do next \([^)]*\): (.*)$/s.exec(body.messages.at(-1)?.content ?? '')?.[1];
         const who = /^You help the user play (.+?) in a roleplay/.exec(body.messages[0].content)?.[1] ?? 'Nobody';
-        const content = `${who}: ${E2E_SUGGESTION}${steer ? ` (${steer})` : ''}`;
+        const line = `${who}: ${E2E_SUGGESTION}${steer ? ` (${steer})` : ''}`;
+        const content = body.messages[0].content.includes('\nPUSH:') ? `PLAIN: ${line}\nPUSH: ${E2E_SUGGESTION_PUSH}\nTURN: ${E2E_SUGGESTION_TURN}` : line;
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }));
       }
       /** The first `[places: …]` id that isn't the `[room: <id>` she's in (her plans e2e). */
@@ -162,6 +171,10 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
       // Her reaction to an encounter: the courier gets a line of his own.
       if (last?.role === 'user' && last.content?.includes('[event:')) {
         return sse(res, [choice({ content: '*Nix sets the chopsticks down.* That is not my name.\n\nCourier: Print here or I eat the fine.' }), choice({}, 'stop')]);
+      }
+      // On comms with a quest stranger (e2e/comms.spec.ts, the speaker slot): her page, then the clerk's.
+      if (last?.role === 'user' && last.content?.includes('Dock Clerk is here')) {
+        return sse(res, [choice({ content: '*Nix keeps her voice low in your ear.* Let him talk first.\n\nDock Clerk: Papers. Both of you.' }), choice({}, 'stop')]);
       }
       // Cipher (e2e/cipher.spec.ts): a reply the clue can be on.
       if (last?.role === 'user' && last.content?.includes('look under the register')) {

@@ -3,7 +3,7 @@
  * her own dice and the bids. She reads your bids as a sign of what you hold, bluffs with the most
  * believable raise her dice don't back, and calls LIAR only when a bid is more likely false.
  */
-import { rng } from '../gig/generate';
+import { rng } from '../rng';
 import { bid, callLiar, countFace, lastBid, minRaise, newGame, totalDice, type DiceState, type Face, type Side } from './rules';
 
 export interface DiceSettings {

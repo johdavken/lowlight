@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import Fastify from 'fastify';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { registerMapRoute } from '../src/map-route';
+import { loadReadouts, registerMapRoute } from '../src/map-route';
 
 let dir: string;
 let file: string;
@@ -15,7 +15,7 @@ afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 async function get() {
   const app = Fastify();
-  registerMapRoute(app, file);
+  registerMapRoute(app, file, path.join(dir, 'readouts'));
   return app.inject({ method: 'GET', url: '/api/map' });
 }
 
@@ -28,6 +28,21 @@ const valid = {
 };
 
 describe('GET /api/map', () => {
+  it("adds each place's readout from its file; a place without one stays as it is", async () => {
+    const places = [{ id: 'p1', name: 'P one', district: 'a', pin: [2, 2] }, { id: 'p2', name: 'P two', district: 'a', pin: [3, 3] }];
+    fs.writeFileSync(file, JSON.stringify({ ...valid, places }));
+    fs.mkdirSync(path.join(dir, 'readouts'));
+    fs.writeFileSync(path.join(dir, 'readouts', 'p1.md'), "WHAT: A bar.\n\nWHO RUNS IT: Cass's house.\nnot a line\n");
+    const res = await get();
+    expect(res.json().places).toEqual([{ ...places[0], readout: [{ label: 'WHAT', text: 'A bar.' }, { label: 'WHO RUNS IT', text: "Cass's house." }] }, places[1]]);
+  });
+
+  it('every pinned place in the shipped map has a readout', () => {
+    const map = JSON.parse(fs.readFileSync('map/lowlight.json', 'utf8')) as { places: { id: string; side?: boolean }[] };
+    const readouts = loadReadouts('world/readouts');
+    expect(map.places.filter((p) => !p.side && !readouts[p.id]).map((p) => p.id)).toEqual([]);
+  });
+
   it('serves the file as it is', async () => {
     fs.writeFileSync(file, JSON.stringify(valid));
     const res = await get();

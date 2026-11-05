@@ -7,6 +7,7 @@ import {
   DEFAULT_SHARED_STANDING,
   parseSharedStanding,
   parseStandingConfig,
+  VOUCH_CELLS,
   parseStored,
   sharedStandingErrors,
   STANDING,
@@ -193,5 +194,26 @@ describe('standingBlock', () => {
     expect(b).not.toContain('secret');
     expect(b).not.toContain("something you don't talk about");
     expect(b.trimEnd().endsWith("Let this colour how you act; don't announce it.]")).toBe(true);
+  });
+});
+
+describe('standing.vouches (crew spec §5)', () => {
+  it('reads a specialty; an unknown one warns and drops', () => {
+    expect(parseStandingConfig({ vouches: 'runner' }, () => {})!.vouches).toBe('runner');
+    expect(parseStandingConfig({ vouches: 'wire' }, () => {})!.vouches).toBe('runner');
+    const warns: string[] = [];
+    expect(parseStandingConfig({ vouches: 'chef' }, (m) => warns.push(m))!.vouches).toBeUndefined();
+    expect(warns).toEqual(['standing.vouches: not a specialty you can hire (runner, ears, face, fence, muscle); dropped']);
+    expect(parseStandingConfig({}, () => {})!.vouches).toBeUndefined();
+  });
+});
+
+describe('VOUCH_CELLS (crew spec §5)', () => {
+  it('top trust with warmth not low', () => {
+    const vouches = (trust: number, warmth: number) => VOUCH_CELLS.includes(cellOf({ trust, warmth }));
+    expect(vouches(5, 0)).toBe(true);
+    expect(vouches(10, 10)).toBe(true);
+    expect(vouches(5, -5)).toBe(false);
+    expect(vouches(4, 10)).toBe(false);
   });
 });

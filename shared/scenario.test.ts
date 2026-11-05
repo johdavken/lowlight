@@ -1,22 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { parseSceneDraft, sceneBlock, SCENE_TEXT_MAX, SCENE_TITLE_MAX } from './scenario';
+import { parseSceneOptions, sceneBlock, SCENE_TEXT_MAX, SCENE_TITLE_MAX } from './scenario';
 
 const oneLine = (s: string) => s.replace(/\s*\n\s*/g, ' ').replace(/\]/g, ')');
 const opt = (n: number, text = `Setup ${n} text.`) => ({ title: `Setup ${n}`, text });
 
-describe('parseSceneDraft (arrival screen spec §3)', () => {
-  it('reads one opening, bare or as a one-element array, in a fence or not', () => {
-    expect(parseSceneDraft('{"title":"T","text":"Rain."}')).toEqual({ title: 'T', text: 'Rain.' });
-    expect(parseSceneDraft('```json\n[{"title":"T","text":"Rain."}]\n```')).toEqual({ title: 'T', text: 'Rain.' });
-    expect(parseSceneDraft('Here it is:\n\n```json\n{"title":"T","text":"Rain."}\n```')).toEqual({ title: 'T', text: 'Rain.' });
+describe('parseSceneOptions (three openings for the pair)', () => {
+  it('reads three, in a fence or not, each taking the kind of its place whatever it said', () => {
+    const three = [{ kind: 'chance', ...opt(1) }, opt(2), { kind: 'HISTORY', ...opt(3) }];
+    const out = parseSceneOptions('Here:\n```json\n' + JSON.stringify(three) + '\n```')!;
+    expect(out).toEqual([
+      { kind: 'history', ...opt(1) },
+      { kind: 'business', ...opt(2) },
+      { kind: 'chance', ...opt(3) },
+    ]);
+    expect(parseSceneOptions(JSON.stringify([opt(1), opt(2), opt(3)]))!.map((o) => o.kind)).toEqual(['history', 'business', 'chance']);
   });
 
-  it('returns null for three, none, too long, missing fields or not JSON', () => {
-    expect(parseSceneDraft(JSON.stringify([opt(1), opt(2), opt(3)]))).toBeNull();
-    expect(parseSceneDraft('[]')).toBeNull();
-    expect(parseSceneDraft(JSON.stringify(opt(1, 'x'.repeat(SCENE_TEXT_MAX + 1))))).toBeNull();
-    expect(parseSceneDraft(JSON.stringify({ text: 'no title' }))).toBeNull();
-    expect(parseSceneDraft('Sorry, I cannot.')).toBeNull();
+  it('returns null for one, none, too long, a 41-character title, missing fields or not JSON', () => {
+    expect(parseSceneOptions(JSON.stringify(opt(1)))).toBeNull();
+    expect(parseSceneOptions(JSON.stringify([opt(1)]))).toBeNull();
+    expect(parseSceneOptions('[]')).toBeNull();
+    expect(parseSceneOptions(JSON.stringify([opt(1, 'x'.repeat(SCENE_TEXT_MAX + 1)), opt(2), opt(3)]))).toBeNull();
+    expect(parseSceneOptions(JSON.stringify([{ title: 'x'.repeat(SCENE_TITLE_MAX + 1), text: 'a.' }, opt(2), opt(3)]))).toBeNull();
+    expect(parseSceneOptions(JSON.stringify([{ text: 'no title' }, opt(2), opt(3)]))).toBeNull();
+    expect(parseSceneOptions('Sorry, I cannot.')).toBeNull();
   });
 });
 

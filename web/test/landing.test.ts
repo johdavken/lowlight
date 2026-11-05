@@ -1,10 +1,11 @@
+import { BUILT_IN } from '../src/landing/splash';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelEvent } from '../../shared/types';
 import type { Match } from '../src/room/identity';
 import { COPY } from '../src/landing/copy';
 import { ApiError, type PlaythroughApi } from '../src/net/playthroughs';
 import { mountLanding, POLL_MS, type AgentsResponse, type LandingAgent, type LandingApi } from '../src/landing/landing';
-import type { LinkError, LinkInfo } from '../src/net/link';
+import type { LinkError, LinkInfo, LinkStatus } from '../src/net/link';
 
 const agent = (o: Partial<LandingAgent> & { id: string; name: string }): LandingAgent => ({
   pronoun: 'she', description: `${o.name} desc`, accent: '#ff4f8b', avatarKind: 'mask', rooms: ['default/workspace'], startRoom: 'default/workspace', legacyDistrict: null, group: null, backend: 'direct', modelLabel: null, connectionError: null,
@@ -38,7 +39,7 @@ const catalog: ModelEvent = {
 };
 /** The in-game link's routes, linked and answering. */
 const linkApi = () => ({
-  link: vi.fn(async (): Promise<LinkInfo> => ({ linked: true, last4: '3f9a', credit: 4.12, state: 'ok' })),
+  link: vi.fn(async (): Promise<LinkStatus> => ({ state: 'ok', openrouter: { linked: true, last4: '3f9a', credit: 4.12, state: 'ok' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } })),
   putLink: vi.fn(async (): Promise<LinkInfo | { error: LinkError }> => ({ linked: true, last4: '3f9a', credit: 4.12, state: 'ok' })),
   deleteLink: vi.fn(async () => {}),
   searchModels: vi.fn(async () => ({ picks: catalog.choices!, recent: [], results: [] })),
@@ -804,6 +805,37 @@ describe('select splash', () => {
     expect(titling()).toBe(true);
   });
 
+  describe('with a notice up', () => {
+    const splashArt = { ...BUILT_IN, notice: { title: 'New', tag: '', text: 'Texts. Text your contacts.' } };
+    const press = (sel: string) => document.querySelector(sel)!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+
+    it('scroll keys stay on the splash; any other key goes on', async () => {
+      const { onSplashDismiss } = await mount({ splash: true, splashArt });
+      for (const k of ['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End']) key(k);
+      expect(onSplashDismiss).not.toHaveBeenCalled();
+      key('Enter');
+      expect(onSplashDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('a press on the panel stays; a press on the art goes on', async () => {
+      const { onSplashDismiss } = await mount({ splash: true, splashArt });
+      press('.sn-entry h4');
+      expect(onSplashDismiss).not.toHaveBeenCalled();
+      press('.splash-art');
+      expect(onSplashDismiss).toHaveBeenCalledTimes(1);
+    });
+
+    it('needing sound: a scroll key or a press on the panel starts it and stays', async () => {
+      for (const start of [() => key('ArrowDown'), () => press('.sn-entry h4')]) {
+        document.body.innerHTML = '<div id="root"></div>';
+        const { onSplashDismiss } = await mount({ splash: true, needsSound: true, splashArt });
+        start();
+        expect(prompt()).toBe('[ ENTER TO CONTINUE ]');
+        expect(onSplashDismiss).not.toHaveBeenCalled();
+      }
+    });
+  });
+
   it('needing sound: a click also takes two steps', async () => {
     const { onSplashDismiss } = await mount({ splash: true, needsSound: true });
     const down = () => document.querySelector('.splash')!.dispatchEvent(new Event('pointerdown', { bubbles: true }));
@@ -1043,7 +1075,7 @@ describe('title menu (save/load)', () => {
     keys('ArrowRight', 'Enter');
     await tick();
     expect(document.querySelector('.title-menu')).toBeNull();
-    expect(document.querySelector('.load-screen .fighter.p1 .pt b')!.textContent).toBe('Old run');
+    expect(document.querySelector('.load-screen .ld-pts .pt .pt-name')!.textContent).toBe('Old run');
     expect(titling()).toBe(true);
     // The select underneath doesn't hear the screen's keys (Enter would lock P1).
     keys('Enter');
@@ -1060,7 +1092,7 @@ describe('title menu (save/load)', () => {
 
 describe('the in-game link (spec 2026-10-08)', () => {
   const unlinked: AgentsResponse = { ...crew, agents: crew.agents.map((a) => (a.id === 'nix' ? { ...a, link: 'no-link' as const } : a)) };
-  const noLink = vi.fn(async (): Promise<LinkInfo> => ({ linked: false, last4: null, credit: null, state: 'no-link' }));
+  const noLink = vi.fn(async (): Promise<LinkStatus> => ({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } }));
   const chips = () => [...document.querySelectorAll<HTMLElement>('.tile')].filter((t) => t.querySelector('.tile-chip')).map((t) => t.dataset.id);
 
   it('a no-link contact is lit and tagged NO LINK on the band', async () => {
@@ -1091,7 +1123,7 @@ describe('the in-game link (spec 2026-10-08)', () => {
     const before = agents.mock.calls.length;
     key('Enter');
     await tick(800);
-    expect(api.putLink).toHaveBeenCalledExactlyOnceWith('sk-or-v1-abc');
+    expect(api.putLink).toHaveBeenCalledExactlyOnceWith('sk-or-v1-abc', 'openrouter');
     expect(document.querySelector('.link-panel')).toBeNull();
     expect(document.querySelector('.model-panel')).not.toBeNull();
     expect(document.querySelector('.select-title')!.textContent).toBe(COPY.link.titleModel('she'));
@@ -1143,18 +1175,18 @@ describe('the in-game link (spec 2026-10-08)', () => {
 
 describe('the in-game link: stale answers (review fixes)', () => {
   it('Esc while the link status loads: no panel appears later; re-locking opens a fresh, focused one', async () => {
-    let resolve!: (i: LinkInfo) => void;
-    const link = vi.fn(() => new Promise<LinkInfo>((r) => (resolve = r)));
+    let resolve!: (i: LinkStatus) => void;
+    const link = vi.fn(() => new Promise<LinkStatus>((r) => (resolve = r)));
     const data: AgentsResponse = { ...crew, agents: crew.agents.map((a) => (a.id === 'nix' ? { ...a, link: 'no-link' as const } : a)) };
     await mount({ data, api: { link } });
     await toModel();
     key('Escape');
     expect(phase()).toBe('p2');
-    resolve({ linked: false, last4: null, credit: null, state: 'no-link' });
+    resolve({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } });
     await tick();
     expect(document.querySelector('.link-panel')).toBeNull();
     expect(document.querySelector('.model-panel')).toBeNull();
-    link.mockImplementation(async () => ({ linked: false, last4: null, credit: null, state: 'no-link' }));
+    link.mockImplementation(async () => ({ state: 'no-link' as const, openrouter: { linked: false, last4: null, credit: null, state: 'no-link' as const }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' as const } }));
     key('Enter');
     await tick();
     expect(document.querySelector('.link-panel')).not.toBeNull();
@@ -1199,7 +1231,7 @@ describe('the in-game link: stale answers (review fixes)', () => {
 
 describe('the in-game link: her own link decides (final review)', () => {
   it('a contact whose own link is fine opens her model list even with no OpenRouter key linked', async () => {
-    const link = vi.fn(async (): Promise<LinkInfo> => ({ linked: false, last4: null, credit: null, state: 'no-link' }));
+    const link = vi.fn(async (): Promise<LinkStatus> => ({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } }));
     await mount({ api: { link } }); // nix: link 'ok' in the roster (a local endpoint, say)
     await toModel();
     expect(document.querySelector('.link-panel')).toBeNull();

@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { FastifyInstance } from 'fastify';
-import { BUILT_IN_THEME, checkSplash, readSplashTheme, songTitle, clampLogo, DEFAULT_LOGO_EFFECTS, logoAspect, logoEffects, readSplashEntry, readSplashLogo, splashEntries, splashLogoEntries, SPLASH_LOGO_ASPECT, type LogoEffect, type SplashEntry, type SplashLogoEntry } from '../../shared/splash';
+import { BUILT_IN_THEME, checkSplash, clampPanel, defaultPanel, readSplashNotice, readSplashTheme, songTitle, clampLogo, DEFAULT_LOGO_EFFECTS, logoAspect, logoEffects, readSplashEntry, readSplashLogo, splashEntries, splashLogoEntries, SPLASH_LOGO_ASPECT, type LogoEffect, type SplashEntry, type SplashLogoEntry, type SplashNotice, type SplashPanel } from '../../shared/splash';
 
 const TYPES: Record<string, string> = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' };
 
@@ -20,6 +20,8 @@ export interface GameSplash {
   height: number;
   /** Where the logo sits, and which: its image, aspect (width over height) and effects. */
   logo: { x: number; y: number; width: number; src: string; aspect: number; effects: LogoEffect[]; promptGap?: number };
+  /** Where the notice sits on it. */
+  panel: SplashPanel;
 }
 
 /** The game's own logo (web/public). */
@@ -27,9 +29,9 @@ const BUILT_IN_SRC = '/lowlight-logo.webp';
 
 export function registerSplashRoutes(app: FastifyInstance, dir: string, warn: (m: string) => void, scenesDir: string): void {
   /** Every entry and logo the manifest has (none when it's missing or invalid, with a warning for invalid). */
-  function library(): { splashes: SplashEntry[]; logos: SplashLogoEntry[] } {
+  function library(): { splashes: SplashEntry[]; logos: SplashLogoEntry[]; notice: SplashNotice | null } {
     const file = path.join(dir, 'splashes.json');
-    const none = { splashes: [], logos: [] };
+    const none = { splashes: [], logos: [], notice: null };
     if (!fs.existsSync(file)) return none;
     try {
       const json: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -51,7 +53,9 @@ export function registerSplashRoutes(app: FastifyInstance, dir: string, warn: (m
         if (l.entry) logos.push(l.entry);
         else warn(`splash: skipping logo ${i + 1}: ${l.problem}`);
       });
-      return { splashes, logos };
+      const { notice, problem } = readSplashNotice(json);
+      if (problem) warn(`splash: ${problem}: showing no notice`);
+      return { splashes, logos, notice };
     } catch (err) {
       warn(`splash: couldn't read ${file}: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -70,7 +74,7 @@ export function registerSplashRoutes(app: FastifyInstance, dir: string, warn: (m
     return { ...clampLogo({ x, y, width }, e.width, e.height), ...builtIn };
   }
 
-  app.get('/api/splashes', async (): Promise<{ splashes: GameSplash[] }> => {
+  app.get('/api/splashes', async (): Promise<{ splashes: GameSplash[]; notice?: Omit<SplashNotice, 'on'> }> => {
     const splashes: GameSplash[] = [];
     const lib = library();
     for (const e of lib.splashes) {
@@ -82,9 +86,10 @@ export function registerSplashRoutes(app: FastifyInstance, dir: string, warn: (m
         warn(`splash: skipping '${e.id}': ${problem}`);
         continue;
       }
-      splashes.push({ id: e.id, url: `/api/splash-art/${e.file}`, width: e.width, height: e.height, logo: logoFor(e, lib.logos) });
+      splashes.push({ id: e.id, url: `/api/splash-art/${e.file}`, width: e.width, height: e.height, logo: logoFor(e, lib.logos), panel: clampPanel(e.panel ?? defaultPanel(e.width, e.height), e.width, e.height) });
     }
-    return { splashes };
+    const n = lib.notice;
+    return n?.on && n.text.trim() ? { splashes, notice: { title: n.title, tag: n.tag, text: n.text } } : { splashes };
   });
 
   app.get<{ Params: { file: string } }>('/api/splash-art/:file', async (req, reply) => {

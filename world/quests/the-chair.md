@@ -1,5 +1,6 @@
 ---
 title: The Chair
+art: the-chair.webp
 with: [nix-direct]
 starts: lowlight-intake
 after: trust=high and chair!=yes
@@ -18,7 +19,7 @@ view any: She's already decided something. You just don't know what.
 - wait: Sit down and let her say it first. → asked [clock +30m]
 
 ## asked
-*"Say a number," she says. "Not a cut. A number. I don't put anything on my ears until it's cleared."*
+*"Say a share," she says. "Not a flat fee. A cut of whatever comes back up the stairs. If the job comes back empty, so do I."*
 → offer
 
 # offer
@@ -28,27 +29,27 @@ view any: She's already decided something. You just don't know what.
 view nix-direct: The house used to tell you what you were worth, and the number was always theirs. This time the number's theirs to say, and yours to take or not. Listen to how they say it.
 view any: Whatever you write on that line, she'll hold you to.
 
-- low: Offer a hundred a night. → cheap [set chair=yes]
-- fair: Offer a hundred and fifty a night. → fair [set chair=yes]
-- high: Offer two hundred a night. → square [set chair=yes]
-- two: Offer two hundred a night, for two jobs a night. → two-jobs [needs trust=high and warmth=high, set chair=yes]
+- low: Offer her a fifth of every job. → cheap [set chair=yes]
+- fair: Offer her a quarter of every job. → fair [set chair=yes]
+- high: Offer her three in ten of every job. → square [set chair=yes]
+- two: Offer her three in ten, for two jobs a night. → two-jobs [needs trust=high and warmth=high, set chair=yes]
 
 ## cheap
-*She looks at the number a while. "That's what a house pays a girl in her first month," she says, and writes it down anyway. "One job a night. You'll pay it before I'm on your ears, every time."*
-arrangement: chair 100 / 1
+*She looks at the number a while. "That's what a house pays a girl in her first month," she says, and writes it down anyway. "One job a night. It comes off the top, every time."*
+arrangement: chair-cut 20 / 1
 → end
 
 ## fair
 *She writes it on the line in her square hand. "One job a night. Nobody from my stairs on your list. When I say stop, you stop."*
-arrangement: chair 150 / 1
+arrangement: chair-cut 25 / 1
 → end
 
 ## square
 *She writes it down without comment, which is its own kind of comment. "One job a night. The room stays out of it. You'll never think my name where anyone can read it."*
-arrangement: chair 200 / 1
+arrangement: chair-cut 30 / 1
 → end
 
 ## two-jobs
 *"Two," she says, like she's tasting it. Then she writes it. "Two jobs, and if the second one smells wrong I walk, and you don't ask why."*
-arrangement: chair 200 / 2
+arrangement: chair-cut 30 / 2
 → end

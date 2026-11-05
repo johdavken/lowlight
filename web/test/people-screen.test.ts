@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ContactEntry, LeadView } from '../../shared/types';
 import { openPeople, type PeopleOpts, type PeopleHandle } from '../src/room/people-screen';
 import { contactsTab } from '../src/room/people-contacts';
-import { leadsTab } from '../src/room/people-leads';
 import type { JournalView } from '../src/ui/journal';
 import { closeBugReport, openBugReport } from '../src/ui/bug-report';
 import { SCREEN_GLITCH_OUT_MS } from '../src/ui/screen';
@@ -14,7 +13,7 @@ const key = (k: string, init: KeyboardEventInit = {}, target: EventTarget = docu
   target.dispatchEvent(e);
   return e;
 };
-const alt = (letter: 'C' | 'L' | 'J') => key(letter.toLowerCase(), { altKey: true, code: `Key${letter}` });
+const alt = (letter: 'C' | 'L' | 'J' | 'O') => key(letter.toLowerCase(), { altKey: true, code: `Key${letter}` });
 
 function fakeJournal() {
   const element = document.createElement('div');
@@ -26,7 +25,7 @@ let handle: PeopleHandle | null = null;
 function open(o: Partial<PeopleOpts> = {}) {
   const journal = (o.journal ?? fakeJournal()) as ReturnType<typeof fakeJournal>;
   const opts: PeopleOpts = {
-    tab: 'contacts',
+    tab: 'file',
     contacts: async () => [] as ContactEntry[],
     leads: async () => [] as LeadView[],
     journal,
@@ -51,28 +50,37 @@ afterEach(() => {
 });
 
 describe('PEOPLE', () => {
-  it('opens on the asked tab, PEOPLE in the head, the tab lit', () => {
-    const { handle } = open({ tab: 'leads' });
-    expect($('.people-screen .scr-head')!.textContent).toBe('// PEOPLE[ESC] CLOSE');
-    expect($$('.pe-tab').map((t) => t.textContent)).toEqual(['CONTACTS', 'LEADS', 'JOURNAL', 'LOOSE ENDS']);
-    expect(lit()).toEqual(['leads']);
-    expect(handle.tab).toBe('leads');
-    expect($('.pe-pane')!.dataset.tab).toBe('leads');
+  it('opens on the asked page, the holo pane with PEOPLE and who you are in the head, the tab lit', () => {
+    const { handle } = open({ tab: 'journal' });
+    expect($('.people-screen')!.classList.contains('scr-holo')).toBe(true);
+    expect($('.people-screen .scr-head')!.textContent).toBe('◆ PEOPLEAS HICKSESC');
+    expect($$('.pe-tab').map((t) => t.textContent)).toEqual(['FILE', 'JOURNAL']);
+    expect(lit()).toEqual(['journal']);
+    expect(handle.tab).toBe('journal');
+    expect($('.pe-pane')!.dataset.tab).toBe('journal');
   });
 
-  it("Alt+C/L/J switch tabs; the open tab's key closes it", () => {
-    const { handle, opts } = open({ tab: 'contacts' });
+  it("Alt+C/J turn the page; the open page's key closes it", () => {
+    const { handle, opts } = open({ tab: 'file' });
     alt('J');
     expect(handle.tab).toBe('journal');
-    alt('L');
-    expect(handle.tab).toBe('leads');
-    expect(alt('L').defaultPrevented).toBe(true);
+    alt('C');
+    expect(handle.tab).toBe('file');
+    expect(alt('C').defaultPrevented).toBe(true);
     expect(opts.onClose).toHaveBeenCalledTimes(1);
     expect($('.people-screen')).toBeNull();
   });
 
+  it('Alt+L and Alt+O go to QUEST', () => {
+    const toQuest = vi.fn();
+    open({ toQuest });
+    expect(alt('L').defaultPrevented).toBe(true);
+    alt('O');
+    expect(toQuest.mock.calls).toEqual([['leads'], ['loose']]);
+  });
+
   it('Alt+P (PEOPLE itself) closes it from any tab', () => {
-    const { opts } = open({ tab: 'leads' });
+    const { opts } = open({ tab: 'journal' });
     key('p', { altKey: true, code: 'KeyP' });
     expect($('.people-screen')).toBeNull();
     expect(opts.onClose).toHaveBeenCalledTimes(1);
@@ -84,36 +92,36 @@ describe('PEOPLE', () => {
     expect(handle.tab).toBe('journal');
   });
 
-  it('← / → move between tabs and wrap, even with the chat prompt focused behind; not while typing in a field of its own', () => {
+  it('← / → turn the page, even with the chat prompt focused behind; not while typing in a field of its own', () => {
     const prompt = document.createElement('textarea');
     document.body.prepend(prompt);
     prompt.focus();
-    const { handle } = open({ tab: 'contacts' });
+    const { handle } = open({ tab: 'file' });
     expect(key('ArrowLeft', {}, prompt).defaultPrevented).toBe(true);
-    expect(handle.tab).toBe('loose');
+    expect(handle.tab).toBe('journal');
     key('ArrowRight', {}, prompt);
-    expect(handle.tab).toBe('contacts');
+    expect(handle.tab).toBe('file');
     const own = document.createElement('textarea');
     $('.pe-pane')!.append(own);
     own.focus();
     key('ArrowRight', {}, own);
-    expect(handle.tab).toBe('contacts');
+    expect(handle.tab).toBe('file');
   });
 
   it('Enter, ↑ and ↓ never reach the room while it is up, whatever the tab handles', () => {
     const room = vi.fn();
     window.addEventListener('keydown', room);
-    open({ tab: 'leads' });
+    open({ tab: 'journal' });
     for (const k of ['Enter', 'ArrowUp', 'ArrowDown']) expect(key(k).defaultPrevented).toBe(true);
     window.removeEventListener('keydown', room);
     expect(room).not.toHaveBeenCalled();
   });
 
   it('with a bug report open over it, its keys are left alone', () => {
-    const { handle } = open({ tab: 'contacts' });
+    const { handle } = open({ tab: 'file' });
     openBugReport({ from: 'scene', screenshot: null, onClose: () => {} });
     alt('J');
-    expect(handle.tab).toBe('contacts');
+    expect(handle.tab).toBe('file');
     key('Escape');
     expect($('.people-screen')).not.toBeNull();
     closeBugReport();
@@ -123,7 +131,7 @@ describe('PEOPLE', () => {
     vi.useFakeTimers();
     const room = vi.fn();
     window.addEventListener('keydown', room);
-    open({ tab: 'contacts', reducedMotion: false });
+    open({ tab: 'file', reducedMotion: false });
     key('Escape');
     key('Escape');
     expect(room).not.toHaveBeenCalled();
@@ -135,28 +143,76 @@ describe('PEOPLE', () => {
     handle = null;
   });
 
-  it('busy journal work on another tab: Esc and the backdrop bring JOURNAL up and flash its SAVE', () => {
+  it('busy journal work on another page: Esc and the backdrop bring JOURNAL up and flash its SAVE', () => {
     const journal = fakeJournal();
-    const { handle } = open({ tab: 'contacts', journal });
+    const { handle } = open({ tab: 'file', journal });
     journal.busy = true;
     key('Escape');
     expect(handle.tab).toBe('journal');
     expect(journal.flashSave).toHaveBeenCalledTimes(1);
-    handle.show('leads');
+    handle.show('file');
     $('.people-screen')!.click();
     expect(handle.tab).toBe('journal');
     expect(journal.flashSave).toHaveBeenCalledTimes(2);
   });
 
-  it('a tab loads once per open: switching back keeps it (and its selection) without a new load', async () => {
+  it('the roster loads once per open: turning the page keeps it, and who is selected', async () => {
     const contacts = vi.fn(async () => CONTACTS);
-    const { handle } = open({ tab: 'contacts', contacts });
+    const { handle } = open({ tab: 'file', contacts });
     await new Promise((r) => setTimeout(r, 0));
-    key('ArrowUp');
     handle.show('journal');
-    handle.show('contacts');
+    handle.show('file');
+    key('ArrowUp');
     expect(contacts).toHaveBeenCalledTimes(1);
     expect($$('.pe-tile.on').map((t) => t.dataset.id)).toEqual(['cass']);
+  });
+
+  it('JOURNAL is the one you are with: another selected turns the tab off and shows FILE; Alt+J brings her back', async () => {
+    const journal = fakeJournal();
+    const { handle } = open({ tab: 'journal', contacts: async () => CONTACTS, journal });
+    await new Promise((r) => setTimeout(r, 0));
+    const tab = $<HTMLButtonElement>('.pe-tab[data-tab="journal"]')!;
+    expect($('.pe-right')!.contains(journal.element)).toBe(true);
+    expect(tab.disabled).toBe(false);
+    key('ArrowUp');
+    expect(handle.tab).toBe('file');
+    expect(tab.disabled).toBe(true);
+    expect($('.pe-right')!.contains(journal.element)).toBe(false);
+    expect(handle.turnPage(1)).toBe(false);
+    alt('J');
+    expect(handle.tab).toBe('journal');
+    expect($$('.pe-tile.on').map((t) => t.dataset.id)).toEqual(['nix']);
+    expect($('.pe-right')!.contains(journal.element)).toBe(true);
+  });
+
+  it("in a stranger's room, off the roster, JOURNAL stays on whoever is picked", async () => {
+    const journal = fakeJournal();
+    const { handle } = open({ tab: 'file', contacts: async () => CONTACTS, current: 'stranger', journal });
+    await new Promise((r) => setTimeout(r, 0));
+    expect($<HTMLButtonElement>('.pe-tab[data-tab="journal"]')!.disabled).toBe(false);
+    key('ArrowDown');
+    expect(handle.turnPage(1)).toBe(true);
+    expect($('.pe-right')!.contains(journal.element)).toBe(true);
+  });
+
+  it('turnPage: FILE to JOURNAL and back; past either end it says no (the cycle goes on)', async () => {
+    const { handle } = open({ contacts: async () => CONTACTS });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(handle.turnPage(-1)).toBe(false);
+    expect(handle.turnPage(1)).toBe(true);
+    expect(handle.tab).toBe('journal');
+    expect(handle.turnPage(1)).toBe(false);
+    expect(handle.turnPage(-1)).toBe(true);
+    expect(handle.tab).toBe('file');
+  });
+
+  it('with nobody listed, or a failed load, JOURNAL still shows', async () => {
+    const journal = fakeJournal();
+    const { handle } = open({ contacts: () => Promise.reject(new Error('no')), journal });
+    await new Promise((r) => setTimeout(r, 0));
+    expect($('.pe-error')!.textContent).toBe("Couldn't load your contacts.");
+    handle.show('journal');
+    expect($('.pe-pane')!.contains(journal.element)).toBe(true);
   });
 
   it('Esc closes; with the journal busy it flashes SAVE and stays open', () => {
@@ -200,17 +256,10 @@ describe('PEOPLE', () => {
     expect($('.people-screen')).toBeNull();
   });
 
-  it('a fetch that resolves after a tab switch or close draws nothing', async () => {
+  it('a fetch that resolves after a close draws nothing', async () => {
     let resolve!: (v: ContactEntry[]) => void;
     const contacts = () => new Promise<ContactEntry[]>((r) => (resolve = r));
-    const { handle } = open({ tab: 'contacts', contacts });
-    handle.show('leads');
-    resolve([{ id: 'cass', name: 'Cass' } as ContactEntry]);
-    await new Promise((r) => setTimeout(r, 0));
-    expect($('.pe-pane')!.dataset.tab).toBe('leads');
-    expect($('.pe-roster')).toBeNull();
-
-    handle.show('contacts');
+    const { handle } = open({ tab: 'file', contacts });
     handle.close();
     resolve([{ id: 'cass', name: 'Cass' } as ContactEntry]);
     await new Promise((r) => setTimeout(r, 0));
@@ -291,7 +340,7 @@ describe('CONTACTS', () => {
     expect($$('.pe-bio p', file()).map((p) => p.textContent)).toEqual(['Cass Arden, 31.', 'Keeps the peace.']);
     expect(file().querySelector('.pe-facts dt')!.textContent).toBe('TELL');
     expect(file().querySelector('.pe-facts dd')!.textContent).toBe('Slides a drink.');
-    const sub = file().querySelector('.pe-where')!.nextElementSibling!;
+    const sub = file().querySelector('.pe-top')!.nextElementSibling!.firstElementChild!;
     expect(sub.className).toBe('pe-sub');
     expect(sub.textContent).toBe('FILE');
   });
@@ -368,7 +417,7 @@ describe('CONTACTS', () => {
     const prompt = document.createElement('textarea');
     document.body.prepend(prompt);
     prompt.focus();
-    open({ tab: 'contacts', contacts: async () => CONTACTS, pick });
+    open({ tab: 'file', contacts: async () => CONTACTS, pick });
     await new Promise((r) => setTimeout(r, 0));
     key('ArrowUp', {}, prompt);
     key('Enter', {}, prompt);
@@ -377,70 +426,20 @@ describe('CONTACTS', () => {
 
   it('Enter on a focused button in the screen is that button\'s (GO goes; a tab button shows its tab)', async () => {
     const pick = vi.fn();
-    const { handle } = open({ tab: 'contacts', contacts: async () => CONTACTS, pick });
+    const { handle } = open({ tab: 'file', contacts: async () => CONTACTS, pick });
     await new Promise((r) => setTimeout(r, 0));
-    const tabBtn = $<HTMLButtonElement>('.pe-tab[data-tab="leads"]')!;
+    const tabBtn = $<HTMLButtonElement>('.pe-tab[data-tab="journal"]')!;
     tabBtn.focus();
     expect(key('Enter', {}, tabBtn).defaultPrevented).toBe(false);
     expect(pick).not.toHaveBeenCalled();
-    expect(handle.tab).toBe('contacts');
-  });
-});
-
-describe('LEADS', () => {
-  const LEADS = [
-    lead({ id: 'a', to: 'cass', title: 'SDG at the Tilt', details: 'A man in plain clothes asked about Hicks. He stayed two hours.', place: 'The Tilt', portrait: '/p/cass.png', met: true }),
-    lead({ id: 'b', to: 'vesna', title: 'The Orchid owes', details: 'Ask Vesna.', met: false, followed: true }),
-    lead({ id: 'c', to: 'ines', title: 'Clean water', details: 'Pump Nine is short.', met: false, place: null }),
-  ];
-  const mount = (list = LEADS) => {
-    const tab = leadsTab(list);
-    document.body.replaceChildren(tab);
-    return tab;
-  };
-  const detail = () => $('.pe-lead-detail')!;
-
-  it('open leads first, then FOLLOWED with the followed ones dimmed; unmet shows ?', () => {
-    mount();
-    expect($$('.pe-lead').map((l) => l.dataset.id)).toEqual(['a', 'c', 'b']);
-    expect($('.pe-leadlist .pe-sub')!.textContent).toBe('FOLLOWED');
-    expect($('.pe-lead[data-id="b"]')!.classList.contains('followed')).toBe(true);
-    expect($('.pe-lead[data-id="c"] .pe-unknown')!.textContent).toBe('?');
-    expect($('.pe-lead[data-id="a"] img')!.getAttribute('src')).toBe('/p/cass.png');
-  });
-
-  it('the detail shows the whole text and who and where it points, with or without a place', () => {
-    const tab = mount();
-    expect(detail().querySelector('.pe-lead-title')!.textContent).toBe('SDG at the Tilt');
-    expect(detail().querySelector('.pe-lead-text')!.textContent).toBe('A man in plain clothes asked about Hicks. He stayed two hours.');
-    expect(detail().querySelector('.pe-lead-to')!.textContent).toBe('→ CASS · The Tilt');
-    tab.handleKey!(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    expect(detail().querySelector('.pe-lead-to')!.textContent).toBe('→ INES');
-    $('.pe-lead[data-id="b"]')!.click();
-    expect(detail().querySelector('.pe-lead-title')!.textContent).toBe('The Orchid owes');
-  });
-
-  it('↑ / ↓ move through the list in its order, without wrapping', () => {
-    const tab = mount();
-    const at = () => $$('.pe-lead.on').map((l) => l.dataset.id);
-    tab.handleKey!(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
-    expect(at()).toEqual(['a']);
-    tab.handleKey!(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    tab.handleKey!(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    tab.handleKey!(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
-    expect(at()).toEqual(['b']);
-  });
-
-  it('no leads', () => {
-    mount([]);
-    expect($('.pe-empty')!.textContent).toBe('No leads yet. People tell you things; the useful ones end up here.');
+    expect(handle.tab).toBe('file');
   });
 });
 
 describe('PEOPLE, switching screens', () => {
   it('requestClose(true) closes at once (a switch); with busy journal work it still refuses', () => {
     const journal = fakeJournal();
-    const { handle } = open({ tab: 'contacts', journal, reducedMotion: false });
+    const { handle } = open({ tab: 'file', journal, reducedMotion: false });
     journal.busy = true;
     expect(handle.requestClose(true)).toBe(false);
     expect($('.people-screen')).not.toBeNull();
@@ -459,7 +458,7 @@ describe('PEOPLE, switching screens', () => {
 describe('PEOPLE, final review', () => {
   it('Enter with a clicked (focused) tile goes to the selected contact, through the real screen', async () => {
     const pick = vi.fn();
-    open({ tab: 'contacts', contacts: async () => CONTACTS, pick });
+    open({ tab: 'file', contacts: async () => CONTACTS, pick });
     await new Promise((r) => setTimeout(r, 0));
     const cass = $<HTMLButtonElement>('.pe-tile[data-id="cass"]')!;
     cass.focus();
@@ -472,7 +471,7 @@ describe('PEOPLE, final review', () => {
 
   it('requestClose refuses over busy journal work (JOURNAL up, SAVE lit); the own-tab key does too', () => {
     const journal = fakeJournal();
-    const { handle } = open({ tab: 'contacts', journal });
+    const { handle } = open({ tab: 'file', journal });
     journal.busy = true;
     expect(handle.requestClose()).toBe(false);
     expect(handle.tab).toBe('journal');
@@ -517,10 +516,10 @@ describe('main.ts switches between YOU, PEOPLE and MAP', () => {
 });
 
 describe('main.ts wires PEOPLE', () => {
-  it('PEOPLE (the bar and Alt+P) opens on the tab last shown, CONTACTS the first time', async () => {
+  it('PEOPLE (the bar and Alt+P) opens on the page last shown, FILE the first time', async () => {
     const { readFileSync } = await import('node:fs');
     const main = readFileSync('web/src/main.ts', 'utf8');
-    expect(main).toMatch(/let lastPeopleTab: PeopleTab = 'contacts';/);
+    expect(main).toMatch(/let lastPeopleTab: PeopleTab = 'file';/);
     expect(main).toMatch(/hud\.setPeople\(\(\) => [^\n]*openPeopleOn\(lastPeopleTab\)/);
     expect(main).toMatch(/k === 'people'\) openPeopleOn\(lastPeopleTab\)/);
   });
@@ -551,9 +550,10 @@ describe('her arrangement line (spec 2026-10-20 §3)', () => {
       document.body.replaceChildren(tab);
       return $('.pe-file .pe-arrangement')?.textContent ?? null;
     };
-    expect(one({ retainer: 150, nights: 1, active: true })).toBe('YOUR OPERATOR · 150 A NIGHT · ONE JOB A NIGHT');
-    expect(one({ retainer: 200, nights: 2, active: true })).toBe('YOUR OPERATOR · 200 A NIGHT · TWO JOBS A NIGHT');
-    expect(one({ retainer: 150, nights: 1, active: false })).toBe('STEPPED BACK');
+    expect(one({ cut: 25, nights: 1, tier: 1, active: true })).toBe('YOUR OPERATOR · 25% A JOB · ONE JOB A NIGHT');
+    expect(one({ cut: 30, nights: 2, tier: 1, active: true })).toBe('YOUR OPERATOR · 30% A JOB · TWO JOBS A NIGHT');
+    expect(one({ cut: 20, nights: 3, tier: 2, active: true })).toBe('YOUR OPERATOR · 20% A JOB · THREE JOBS A NIGHT');
+    expect(one({ cut: 25, nights: 1, tier: 1, active: false })).toBe('STEPPED BACK');
     expect(one(null)).toBeNull();
   });
 });

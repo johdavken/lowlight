@@ -77,7 +77,8 @@ export class TileLayer {
 
   constructor(
     world: HTMLElement,
-    private readonly opts: { base: string; cacheSize?: number },
+    /** `bust`: tile URLs carry the render's time, so a newer render's tiles replace ones the page already loaded (Studio's RENDER). */
+    private readonly opts: { base: string; cacheSize?: number; bust?: boolean },
   ) {
     this.cacheSize = opts.cacheSize ?? 200;
     this.el = document.createElement('div');
@@ -156,7 +157,8 @@ export class TileLayer {
   }
 
   private url(t: TileRef): string {
-    return `${this.opts.base}tiles/${t.scale}/${t.key}.webp`;
+    const v = this.opts.bust && this.m ? `?v=${encodeURIComponent(this.m.rendered)}` : '';
+    return `${this.opts.base}tiles/${t.scale}/${t.key}.webp${v}`;
   }
 
   private make(t: TileRef, levelIndex: number): HTMLImageElement {

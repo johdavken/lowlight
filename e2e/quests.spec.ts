@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { DIRECT, awaitGreeting, send, skipSplash } from './fixtures';
+import { awaitGreeting, DIRECT, questRow, send, skipSplash, startQuest } from './fixtures';
 
 // Each test plays from her greeting and rewinds to it at the end (the write log undoes the runs and the clock):
 // on one worker the second would otherwise find Paper Trail still at a beat from the first.
@@ -32,16 +32,17 @@ test('quest: QUEST at the Intake, a beat and its cards, a typed choice held, JUS
   // QUEST lists Paper Trail; START plays its first beat and pins the cards.
   await page.locator('.hud-quest').click();
   await expect(page.locator('.hud-quest.quest-new')).toHaveCount(0);
-  await expect(page.locator('.ql-row .ql-title')).toHaveText(['Back Door', 'Night Shift', 'Paper Trail', 'Ready Test']);
-  await expect(page.locator('.ql-row', { hasText: 'Paper Trail' }).locator('.ql-pitch')).toHaveText('A Sentinel wants one page from the ledger.');
-  await expect(page.locator('.ql-row', { hasText: 'Paper Trail' }).locator('.ql-timed')).toHaveText('HAS A DEADLINE');
+  await expect(page.locator('.ql-row .ql-title')).toHaveText(['Paper Trail', 'Ready Test', 'Back Door', 'Night Shift']);
+  await questRow(page, 'Paper Trail').click();
+  await expect(page.locator('.ql-file .ql-pitch')).toHaveText('A Sentinel wants one page from the ledger.');
+  await expect(page.locator('.ql-file .ql-timed')).toHaveText('HAS A DEADLINE');
   const before = await replies.count();
-  await page.locator('.ql-row', { hasText: 'Paper Trail' }).locator('.ql-start').click();
+  await startQuest(page, 'Paper Trail');
   await expect(page.locator('.qc-card')).toHaveCount(3, { timeout: 10_000 });
   await expect(page.locator('.qc-story')).toContainText('Boots on the stairs.');
   await expect(replies).toHaveCount(before + 1, { timeout: 10_000 });
   // Nothing else can start while it runs (QUEST itself stays for the Intake's fixer, e2e/serve.ts's stock).
-  await expect(page.locator('.ql-row .ql-start')).toHaveCount(0);
+  await expect(page.locator('.ql-start')).toHaveCount(0);
   await expect(page.locator('.qc-hint')).toContainText('Talk it over with');
   // Venn has a face: his framed bust stands beside the subtitles while he's here, and the panel has none.
   await expect(page.locator('.sp-portrait[data-name="Arlo Venn"]:not(.sp-leaving) img')).toBeVisible();
@@ -89,7 +90,7 @@ test('quest waits: HAND parks the story until morning at the Intake; WAIT UNTIL 
   const greetingId = (await page.locator('.msg.agent.s-ok').last().getAttribute('data-id'))!;
 
   await page.locator('.hud-quest').click();
-  await page.locator('.ql-row', { hasText: 'Paper Trail' }).locator('.ql-start').click();
+  await startQuest(page, 'Paper Trail');
   await expect(page.locator('.qc-card')).toHaveCount(3, { timeout: 10_000 });
   await page.locator('.qc-card[data-choice="hand"]').click();
 
@@ -112,11 +113,14 @@ test('quest waits: HAND parks the story until morning at the Intake; WAIT UNTIL 
 
   // A ready wait: CONTINUE plays the next beat.
   await page.locator('.hud-quest').click();
-  await page.locator('.ql-row', { hasText: 'Ready Test' }).locator('.ql-start').click();
+  await startQuest(page, 'Ready Test');
   await expect(page.locator('.qc-card')).toHaveCount(2, { timeout: 10_000 });
+  const replies = page.locator('.msg.agent.s-ok');
+  const picked = await replies.count();
   await page.locator('.qc-card[data-choice="go"]').click();
   await expect(page.locator('.qc-continue')).toBeVisible({ timeout: 10_000 });
-  const replies = page.locator('.msg.agent.s-ok');
+  // GO's beat gets its own reply; under load it lands after CONTINUE shows, so count after it.
+  await expect(replies).toHaveCount(picked + 1, { timeout: 10_000 });
   const continued = await replies.count();
   await page.locator('.qc-continue').click();
   await expect(page.locator('.qc-story')).toContainText('The second beat.', { timeout: 10_000 });

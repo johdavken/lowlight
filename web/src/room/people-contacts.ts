@@ -1,13 +1,16 @@
 /**
- * PEOPLE's CONTACTS tab (2026-10-18 spec §2): a roster of the contacts you know in this playthrough on the left
- * (face, name in her accent, her standing word, `● HERE` on the one you're with), and the selected one's file on
- * the right: her figure, standing, where she is and her last line, her file (the select screen's bio and facts,
- * spec 2026-10-28 §4), and the leads that point to her. GO (or Enter) goes to her.
+ * PEOPLE's body (2026-10-18 spec §2; panel 2026-11-04): a roster of the contacts you know in this playthrough on the
+ * left (face, name in her accent, her standing word, `● HERE` on the one you're with), and the selected one on the
+ * right. FILE: her bust, standing, where she is and her last line, her file (the select screen's bio and facts, spec
+ * 2026-10-28 §4), and the leads that point to her; GO (or Enter) goes to her. JOURNAL: her page on you and her notes,
+ * so only the one you're with has it.
  */
 import type { ContactEntry, LeadView } from '../../../shared/types';
 
-/** A tab that takes the screen's ↑ / ↓ / Enter (true: handled). */
-export type KeyedTab = HTMLElement & { handleKey?(e: KeyboardEvent): boolean };
+/** The right side's two pages. */
+export type PeoplePage = 'file' | 'journal';
+/** The body: it takes the screen's ↑ / ↓ / Enter (true: handled) and turns its right side's page. Neither without a roster. */
+export type KeyedTab = HTMLElement & { handleKey?(e: KeyboardEvent): boolean; page?(p: PeoplePage): void };
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text = ''): HTMLElementTagNameMap[K] {
   const n = document.createElement(tag);
@@ -43,7 +46,19 @@ function face(c: ContactEntry, cls: string): HTMLElement {
   return img;
 }
 
-export function contactsTab(list: ContactEntry[], leads: LeadView[], o: { current: string; dev: boolean; pick(id: string): void }): KeyedTab {
+export function contactsTab(
+  list: ContactEntry[],
+  leads: LeadView[],
+  o: {
+    current: string;
+    dev: boolean;
+    pick(id: string): void;
+    /** What JOURNAL shows. */
+    journal?: HTMLElement;
+    /** A contact was selected; `here`: she's the one you're with. */
+    onSelect?(here: boolean): void;
+  },
+): KeyedTab {
   const root: KeyedTab = el('div', 'pe-contacts');
   if (!list.length) {
     root.append(el('div', 'pe-empty', 'Nobody yet.'));
@@ -51,6 +66,8 @@ export function contactsTab(list: ContactEntry[], leads: LeadView[], o: { curren
   }
   const roster = el('div', 'pe-roster');
   const file = el('div', 'pe-file');
+  const right = el('div', 'pe-right');
+  right.append(file);
   let at = Math.max(0, list.findIndex((c) => c.id === o.current));
 
   const tiles = list.map((c, i) => {
@@ -74,15 +91,17 @@ export function contactsTab(list: ContactEntry[], leads: LeadView[], o: { curren
 
   function drawFile(c: ContactEntry): void {
     file.style.setProperty('--c', c.accent);
-    // Her figure: her sprite, then her portrait, then her initial.
+    // Her bust: the top of her sprite, then her portrait, then her initial.
     const fig = el('div', 'pe-fig');
     const mono = () => el('div', 'pe-mono pe-big', c.name.charAt(0).toUpperCase());
     const img = el('img', 'pe-figure');
     img.alt = c.name;
     img.src = `/api/agents/${encodeURIComponent(c.id)}/sprite`;
     img.addEventListener('error', () => {
-      if (c.portrait && img.getAttribute('src') !== c.portrait) img.src = c.portrait;
-      else img.replaceWith(mono());
+      if (c.portrait && img.getAttribute('src') !== c.portrait) {
+        img.src = c.portrait;
+        img.classList.add('pe-flat');
+      } else img.replaceWith(mono());
     });
     fig.append(img);
     const info = el('div', 'pe-info');
@@ -93,28 +112,31 @@ export function contactsTab(list: ContactEntry[], leads: LeadView[], o: { curren
       info.append(word);
     }
     // Her deal (arrangement spec 2026-10-20 §3): her terms while it's in force, else that she's stepped back.
-    if (c.arrangement) info.append(el('div', 'pe-arrangement', c.arrangement.active ? `YOUR OPERATOR · ${c.arrangement.retainer} A NIGHT · ${c.arrangement.nights === 1 ? 'ONE JOB' : 'TWO JOBS'} A NIGHT` : 'STEPPED BACK'));
+    if (c.arrangement) info.append(el('div', 'pe-arrangement', c.arrangement.active ? `YOUR OPERATOR · ${c.arrangement.cut}% A JOB · ${['ONE JOB', 'TWO JOBS', 'THREE JOBS'][c.arrangement.nights - 1]} A NIGHT` : 'STEPPED BACK'));
     info.append(el('div', 'pe-where', lineFor(c)));
+    const top = el('div', 'pe-top');
+    top.append(fig, info);
+    const body = el('div', 'pe-body');
     // Her file (spec 2026-10-28 §4): the select screen's bio and facts, for anyone listed, heard-of ones too.
     const bio = c.bio ?? [];
     const facts = c.facts ?? [];
-    if (bio.length || facts.length) info.append(el('div', 'pe-sub', 'FILE'));
+    if (bio.length || facts.length) body.append(el('div', 'pe-sub', 'FILE'));
     if (bio.length) {
       const b = el('div', 'pe-bio');
       b.append(...bio.map((para) => el('p', '', para)));
-      info.append(b);
+      body.append(b);
     }
     if (facts.length) {
       const dl = el('dl', 'pe-facts');
       for (const f of facts) dl.append(el('dt', '', f.label), el('dd', '', f.value));
-      info.append(dl);
+      body.append(dl);
     }
     const hers = leads.filter((l) => l.to === c.id);
     if (hers.length) {
-      info.append(el('div', 'pe-sub', 'LEADS TO HER'));
+      body.append(el('div', 'pe-sub', 'LEADS TO HER'));
       const ul = el('ul', 'pe-leads');
       for (const l of hers) ul.append(el('li', l.followed ? 'followed' : '', l.title));
-      info.append(ul);
+      body.append(ul);
     }
     const go = el('button', 'pe-go', 'GO');
     go.type = 'button';
@@ -122,15 +144,25 @@ export function contactsTab(list: ContactEntry[], leads: LeadView[], o: { curren
       go.disabled = true;
       go.title = "you're here";
     } else go.addEventListener('click', () => o.pick(c.id));
-    info.append(go);
-    file.replaceChildren(fig, info);
+    const foot = el('div', 'pe-foot');
+    foot.append(go);
+    file.replaceChildren(top, body, foot);
   }
 
   function select(i: number): void {
     at = Math.min(list.length - 1, Math.max(0, i));
     tiles.forEach((t, j) => t.classList.toggle('on', j === at));
     drawFile(list[at]);
+    // In a stranger's room the one you're with isn't listed: JOURNAL stays theirs whoever is picked.
+    o.onSelect?.(list[at].id === o.current || !list.some((c) => c.id === o.current));
   }
+
+  root.page = (p) => {
+    // JOURNAL is the one you're with: asked for by key from another's file, she comes up.
+    const here = list.findIndex((c) => c.id === o.current);
+    if (p === 'journal' && here >= 0 && here !== at) select(here);
+    right.replaceChildren(p === 'journal' && o.journal ? o.journal : file);
+  };
 
   root.handleKey = (e) => {
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -144,7 +176,7 @@ export function contactsTab(list: ContactEntry[], leads: LeadView[], o: { curren
     return false;
   };
 
-  root.append(roster, file);
+  root.append(roster, right);
   select(at);
   return root;
 }

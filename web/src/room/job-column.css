@@ -1,0 +1,103 @@
+/* The JOB column (job-column.ts): the right of the subtitle band while a Graft table is up, the job's written
+   text in the chat font, its head in amber like a stranger's tag. From the band's floor to its height at rest
+   (the table ends there, table.css), so it never grows into the cards; long text scrolls inside it. */
+:root { --job-w: 460px; }
+/* Its own layer on the game stage, with the bust's (speaker-portrait.css): over the table and the scrim, under the input. */
+.jc-layer { position: absolute; inset: 0; z-index: 24; pointer-events: none; }
+.jc {
+  position: absolute;
+  right: var(--sub-x);
+  bottom: var(--feed-bottom, 70px);
+  width: var(--job-w);
+  height: var(--box-h, 216px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 0 10px 18px;
+  border-left: 1px solid rgba(255, 197, 107, 0.45);
+  pointer-events: auto;
+  animation: jc-in 220ms ease-out;
+}
+.jc[hidden] { display: none; }
+.jc-head { flex: none; font: 15px var(--pixel); letter-spacing: 0.22em; color: #ffc56b; text-shadow: 0 0 8px rgba(255, 197, 107, 0.45); }
+.jc-sub { flex: none; font: 13px var(--pixel); letter-spacing: 0.16em; color: rgba(255, 197, 107, 0.6); }
+.jc-sub[hidden] { display: none; }
+.jc-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--chat-font, var(--mono));
+  font-size: calc(14.5px * var(--text-scale, 1));
+  line-height: 1.5;
+  color: #e6dcf2;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 197, 107, 0.4) transparent;
+}
+.jc-body em { color: #b9a7d6; }
+/* Scrolled down: the top fades, so the cut reads as more above. */
+.jc.jc-more .jc-body { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px); mask-image: linear-gradient(180deg, transparent 0, #000 28px); }
+@keyframes jc-in { from { opacity: 0; transform: translateX(14px); } }
+/* New words (job-column.ts), and her line starting while the column is up (feed.ts): an amber wash and a bright edge pulse
+   three times, and the head says NEW until they stop. */
+.jc.jc-new::before,
+.feed-root.feed-stage.job-col.line-new:not(.expanded) .feed::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-left: 3px solid #ffc56b;
+  background: linear-gradient(90deg, rgba(255, 197, 107, 0.26), rgba(255, 197, 107, 0) 75%);
+  animation: jc-new 800ms ease-in-out 3;
+}
+.jc.jc-new .jc-head::after,
+.feed-root.feed-stage.job-col.line-new:not(.expanded) .msg.agent .name::after { content: ' · NEW'; color: #fff; text-shadow: 0 0 10px #ffc56b; }
+@keyframes jc-new { 0%, 100% { opacity: 0; } 35% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .jc { animation: none; }
+  .jc.jc-new::before,
+  .feed-root.feed-stage.job-col.line-new:not(.expanded) .feed::before { animation: jc-new 2400ms ease-out 1; }
+}
+/* Only on the stage's subtitles, as the bust: the archive and the classic feed carry the quest row instead. */
+:has(> .feed-root:not(.feed-stage)) > .jc-layer,
+:has(> .feed-root.expanded) > .jc-layer { display: none; }
+/* Her line moves over for the column while it's up, at once (the feed re-pages it at the new width as it
+   changes), and keeps to the box's height at rest: the table ends there, so past it she pages instead of growing. */
+.feed-root.feed-stage.job-col:not(.expanded) .feed {
+  right: calc(var(--sub-x) + var(--job-w) + 24px);
+  max-height: var(--box-h);
+}
+/* A phone's table keeps its own prose (table.css), so the column stays out. */
+:has(> .tb.phone:not([hidden])) > .jc-layer { display: none; }
+
+/* HUD (2026-11-02, mockup graft-layouts.html A): while the job table is up the column stands in its log region, left
+   of the moment (job-table.ts publishes the region's place), and her line has the box back. */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .jc-layer .jc { left: var(--hud-log-x); top: var(--hud-log-y); width: var(--hud-log-w); height: var(--hud-log-h); right: auto; bottom: auto; padding: 0; border-left: 0; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
+/* Her line becomes a subtitle at the right, by her: the box no longer runs under the table. */
+/* It keeps to her side, near the edge now the scene's keys step out for the job (table.css), and to the box's height, paging a long reply
+   instead of growing up over the cards (playtest). 320px of text, and a gutter for the pulse's edge. */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .feed { left: auto; right: 36px; width: 332px; padding-left: 12px; box-sizing: border-box; }
+/* A stranger's bust steps aside while the job table is up: the subtitle's head names who speaks (playtest: the photo looked out of place). */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .sp-layer { display: none; }
+/* Her subtitle stands taller by her than the band did under the table, so more of a reply reads before it pages (playtest). The feed reads its rest height from here, so the paging follows. */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage { --box-h: 320px; --box-max: 320px; }
+
+/* A debrief's rolls under the ending (mockup graft-results.html D): the dice, then the line; words only for a roll with no dice. */
+.jc .db-rolls { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; white-space: normal; }
+.jc .db-checks, .jc .db-pushes { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; border: 0; }
+.jc .db-check, .jc .db-push { display: grid; grid-template-columns: auto 1fr; gap: 1px 9px; align-items: start; font: 13.5px/1.3 var(--mono); color: #e3f6fb; }
+.jc .db-line { grid-column: 2; }
+.jc .db-roll:has(.db-die) { grid-column: 1; grid-row: 1 / span 2; display: flex; gap: 3px; }
+.jc .db-roll:not(:has(.db-die)) { grid-column: 1 / -1; white-space: normal; }
+.jc .db-kw { display: none; }
+.jc .db-die { display: grid; place-items: center; width: 22px; height: 22px; font: 17px/1 var(--pixel); color: #05020a; background: var(--die); }
+.jc .db-die + .db-die { color: var(--die); background: none; box-shadow: inset 0 0 0 1px var(--die); }
+.jc .db-roll { --die: #7dff9b; }
+.jc .db-roll.k-crit { --die: #7fe9ff; }
+.jc .db-roll.k-cost { --die: #ffc56b; }
+.jc .db-roll.k-miss { --die: #ff5a5a; }
+.jc .db-push .db-gain { grid-column: 2; min-width: 0; text-align: left; }
+.jc :is(.db-check, .db-push):not(:has(.db-die)) > * { grid-column: 1 / -1; }
+.jc .db-push-head { font: 13px var(--pixel); letter-spacing: 0.25em; color: #ffc56b; }

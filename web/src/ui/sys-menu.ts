@@ -1,6 +1,6 @@
 /**
  * The SYS dropdown under the HUD's SYS button (spec 2026-10-15): volume, music, ambient, text speed,
- * text size, font, chat keys, her model, narrator thinking and the link, one row each. While it's open its keys are taken from the chat prompt: ↑ ↓ pick a row,
+ * text size, font, chat keys, tips, mirror, her model, narrator thinking and the link, one row each. While it's open its keys are taken from the chat prompt: ↑ ↓ pick a row,
  * ← → (or the wheel) change it, Enter mutes or opens the MODEL menu, Esc closes. Text goes in
  * through textContent only.
  */
@@ -10,11 +10,11 @@ import type { TextSpeed } from './typing';
 import type { ChatKeys } from './chat-keys';
 import { CHAT_FONT_FAMILY, CHAT_FONT_LABEL, type ChatFont } from './chat-font';
 
-export type SysRow = 'save' | 'sound' | 'music' | 'ambient' | 'text' | 'size' | 'font' | 'keys' | 'model' | 'think' | 'link';
+export type SysRow = 'pause' | 'sound' | 'music' | 'ambient' | 'text' | 'size' | 'font' | 'keys' | 'tips' | 'mirror' | 'model' | 'think' | 'link';
 
 export interface SysMenuHandlers {
-  /** SAVE (opens the save card), until there's an Esc menu; SYS closes first. */
-  onSave?(): void;
+  /** MENU: the pause menu, for a pointer or a phone (Esc opens it from the keyboard); SYS closes first. */
+  onPause?(): void;
   /** +1 louder, −1 quieter. */
   onVolume(steps: number): void;
   onMute(): void;
@@ -32,6 +32,12 @@ export interface SysMenuHandlers {
   onFontStep(d: number): void;
   /** CHAT KEYS: the chat box's stacks as glyphs or words. */
   onChatKeys(k: ChatKeys): void;
+  /** TIPS: Graft's tips on or off. */
+  onTips(on: boolean): void;
+  /** TIPS → SHOW AGAIN: every tip unseen. */
+  onTipsAgain(): void;
+  /** MIRROR: her figure on the stage flipped to face the other way, or not. */
+  onMirror(on: boolean): void;
   /** Opens the MODEL menu (SYS has closed by then). */
   onModel(): void;
   /** NARRATOR THINKING: a word picked (a click, or ← → stepping to the next one). */
@@ -63,8 +69,6 @@ function lightMeter(meter: HTMLElement, level: number): void {
 export class SysMenu {
   readonly el = el('div', 'sys-menu');
   private readonly rows: Record<SysRow, HTMLElement>;
-  private readonly saveValue = el('span', 'sys-value', 'ALT+S');
-  private saveBusy = false;
   private readonly soundValue = el('span', 'sys-value');
   private readonly meter = el('span', 'sys-meter');
   private readonly musicMeter = el('span', 'sys-meter');
@@ -78,6 +82,10 @@ export class SysMenu {
   private readonly fontValue = el('span', 'sys-font-name');
   private readonly keys = el('span', 'sys-value sys-keys');
   private chatKeys: ChatKeys = 'glyphs';
+  private readonly tips = el('span', 'sys-value sys-keys sys-tips');
+  private tipsOn = true;
+  private readonly mirror = el('span', 'sys-value sys-keys sys-mirror');
+  private mirrorOn = false;
   private readonly model = el('span', 'sys-value hud-model');
   private readonly think = el('span', 'sys-value sys-keys sys-think');
   private thinking: NarratorThinking = 'auto';
@@ -85,6 +93,7 @@ export class SysMenu {
   private focus: SysRow = 'sound';
   private readonly idBase = `sys-${++menus}`;
   private readonly onKey = (e: KeyboardEvent) => this.handleKey(e);
+  private readonly pauseValue = el('span', 'sys-value', 'ESC');
 
   constructor(private readonly h: SysMenuHandlers) {
     this.el.hidden = true;
@@ -100,9 +109,6 @@ export class SysMenu {
       });
       this.speeds.append(w);
     }
-    const save = this.row('save', 'SAVE', this.saveValue);
-    save.hidden = true;
-    save.addEventListener('click', () => this.save());
     const sound = this.row('sound', 'SOUND', this.meter, this.soundValue);
     const music = this.row('music', 'MUSIC', this.musicMeter, this.musicValue);
     const ambient = this.row('ambient', 'AMBIENT', this.ambientMeter, this.ambientValue);
@@ -134,6 +140,32 @@ export class SysMenu {
       this.keys.append(w);
     }
     const keys = this.row('keys', 'CHAT KEYS', this.keys);
+    for (const on of [true, false]) {
+      const w = el('i', '', on ? 'ON' : 'OFF');
+      w.dataset.tips = on ? 'on' : 'off';
+      w.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.h.onTips(on);
+      });
+      this.tips.append(w);
+    }
+    const again = el('i', 'sys-tips-again', 'SHOW AGAIN');
+    again.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.h.onTipsAgain();
+    });
+    this.tips.append(again);
+    const tips = this.row('tips', 'TIPS', this.tips);
+    for (const on of [true, false]) {
+      const w = el('i', '', on ? 'ON' : 'OFF');
+      w.dataset.mirror = on ? 'on' : 'off';
+      w.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.h.onMirror(on);
+      });
+      this.mirror.append(w);
+    }
+    const mirror = this.row('mirror', 'MIRROR', this.mirror);
     const model = this.row('model', 'MODEL', this.model);
     for (const t of NARRATOR_THINKING) {
       const w = el('i', '', t.toUpperCase());
@@ -146,7 +178,10 @@ export class SysMenu {
     }
     const think = this.row('think', 'NARRATOR THINKING', this.think);
     const link = this.row('link', 'LINK', this.link);
-    this.rows = { save, sound, music, ambient, text, size, font, keys, model, think, link };
+    const pause = this.row('pause', 'MENU', this.pauseValue);
+    pause.hidden = true;
+    pause.addEventListener('click', () => this.pause());
+    this.rows = { pause, sound, music, ambient, text, size, font, keys, tips, mirror, model, think, link };
     model.hidden = think.hidden = music.hidden = ambient.hidden = true;
     sound.addEventListener('click', () => this.h.onMute());
     model.addEventListener('click', () => {
@@ -159,7 +194,7 @@ export class SysMenu {
     text.addEventListener('wheel', (e) => this.wheel(e, (d) => this.h.onTextStep(d)), { passive: false });
     size.addEventListener('wheel', (e) => this.wheel(e, (d) => this.h.onSizeStep(d)), { passive: false });
     font.addEventListener('wheel', (e) => this.wheel(e, (d) => this.h.onFontStep(d)), { passive: false });
-    this.el.append(save, sound, music, ambient, text, size, font, keys, model, think, link, el('div', 'sys-foot', '← → OR SCROLL TO CHANGE · ESC CLOSES'));
+    this.el.append(pause, sound, music, ambient, text, size, font, keys, tips, mirror, model, think, link, el('div', 'sys-foot', '← → OR SCROLL TO CHANGE · ESC CLOSES'));
     // Clicks inside stay inside: the document's click closes SYS (and the MODEL menu).
     this.el.addEventListener('click', (e) => e.stopPropagation());
     // Listening from the start (the HUD is built before the dice table or any panel), so while open
@@ -189,6 +224,16 @@ export class SysMenu {
     else this.open();
   }
 
+  /** The MENU row shows once the room has a pause menu to open. */
+  showPause(on: boolean): void {
+    this.rows.pause.hidden = !on;
+  }
+
+  private pause(): void {
+    this.close();
+    this.h.onPause?.();
+  }
+
   showSound(v: SoundView): void {
     // No sound at all (the engine couldn't start): the row has nothing to offer. MUSIC and AMBIENT
     // only show once sound plays.
@@ -206,24 +251,6 @@ export class SysMenu {
     this.soundValue.textContent = v.kind === 'on' ? (v.muted ? 'MUTED' : `${Math.round(v.volume * 100)}%`) : 'CLICK FOR SOUND';
   }
 
-  /** The SAVE row shows once the room has a save to offer. */
-  showSave(on: boolean): void {
-    this.rows.save.hidden = !on;
-    if (this.isOpen && this.rows[this.focus].hidden) this.setFocus(this.shown()[0]);
-  }
-
-  /** While `name`'s reply streams SAVE reads WAIT FOR <NAME> and does nothing; null restores it. */
-  showSaveBusy(name: string | null): void {
-    this.saveBusy = name !== null;
-    this.saveValue.textContent = name === null ? 'ALT+S' : `WAIT FOR ${name.toUpperCase()}`;
-    this.rows.save.classList.toggle('busy', name !== null);
-  }
-
-  private save(): void {
-    if (this.saveBusy) return;
-    this.close();
-    this.h.onSave?.();
-  }
 
   showTextSpeed(s: TextSpeed): void {
     for (const w of this.speeds.children) w.classList.toggle('on', (w as HTMLElement).dataset.speed === s);
@@ -233,6 +260,18 @@ export class SysMenu {
   showChatKeys(k: ChatKeys): void {
     this.chatKeys = k;
     for (const w of this.keys.children) w.classList.toggle('on', (w as HTMLElement).dataset.keys === k);
+  }
+
+  /** Lights TIPS's ON or OFF. */
+  showTips(on: boolean): void {
+    this.tipsOn = on;
+    for (const w of this.tips.querySelectorAll<HTMLElement>('[data-tips]')) w.classList.toggle('on', w.dataset.tips === (on ? 'on' : 'off'));
+  }
+
+  /** Lights MIRROR's ON or OFF. */
+  showMirror(on: boolean): void {
+    this.mirrorOn = on;
+    for (const w of this.mirror.children) w.classList.toggle('on', (w as HTMLElement).dataset.mirror === (on ? 'on' : 'off'));
   }
 
   showTextSize(percent: number): void {
@@ -309,8 +348,8 @@ export class SysMenu {
       return;
     }
     const d = k === 'ArrowRight' ? 1 : k === 'ArrowLeft' ? -1 : 0;
-    if (this.focus === 'save') {
-      if (d === 0) this.save();
+    if (this.focus === 'pause') {
+      if (d === 0) this.pause();
     } else if (this.focus === 'sound') {
       if (d !== 0) this.h.onVolume(d);
       else this.h.onMute();
@@ -327,6 +366,12 @@ export class SysMenu {
     } else if (this.focus === 'keys') {
       // Two words: either arrow picks the one not in use.
       if (d !== 0) this.h.onChatKeys(this.chatKeys === 'glyphs' ? 'labels' : 'glyphs');
+    } else if (this.focus === 'tips') {
+      // ← → flip it; Enter shows them again.
+      if (d !== 0) this.h.onTips(!this.tipsOn);
+      else this.h.onTipsAgain();
+    } else if (this.focus === 'mirror') {
+      if (d !== 0) this.h.onMirror(!this.mirrorOn);
     } else if (this.focus === 'think') {
       if (d !== 0) {
         const n = NARRATOR_THINKING.length;

@@ -486,7 +486,12 @@
     ]
   ],
   "sound": {
-    "indoor": false
+    "indoor": false,
+    "music": {
+      "songs": [
+        "Forty and Forty-One.ogg"
+      ]
+    }
   },
   "effects": [
     {

@@ -7,6 +7,7 @@ An audit of everything Lowlight ships, made on 2026-10-23 before the SillyTavern
 - **Code: GPL-3.0.** This includes the renderer, map and audio code bundled into the SillyTavern extension. The license has to be in place before that package goes public.
 - **Farban's own content: CC BY-NC-SA 4.0.** That's the writing (identities, bios, lore, quests, gigs), the art and the Suno songs.
 - **Restricted third-party assets ship only inside official builds** (itch.io, Patreon). Public repos never carry their raw files, and those files are not offered as a separate pack, paid or free. The licenses allow shipping inside a finished game and forbid redistributing the raw files. Since 2026-10-28 no shipped file is restricted; the rule stands for anything added later.
+- **Graft's rules borrow from Blades in the Dark** (2026-11-02): the d6 pool, position and effect, clocks, and stress as NERVE. Its SRD is CC BY 3.0 Unported, which needs this credit wherever the rules ship (it's in the README's Licences): "This work is based on Blades in the Dark (found at http://www.bladesinthedark.com/), product of One Seven Design, developed and authored by John Harper, and licensed for our use under the Creative Commons Attribution 3.0 Unported license (http://creativecommons.org/licenses/by/3.0/)."
 
 ## Summary
 

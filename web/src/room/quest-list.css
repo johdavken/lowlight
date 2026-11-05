@@ -1,0 +1,146 @@
+/* QUEST (quest panel 2026-10-31): TEXTS' holo pane in the quest cyan, a size up; tabs over a list and the picked quest's file. ql- only. */
+.ql-host {
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  pointer-events: auto;
+  background: rgba(2, 1, 6, 0.35);
+  backdrop-filter: blur(3px) brightness(0.45) saturate(0.8);
+}
+.ql-host[hidden] { display: none; }
+
+.ql-pane {
+  --ql-teko: var(--cs-teko, 'Teko', var(--pixel));
+  position: absolute;
+  left: 14%;
+  top: 9%;
+  width: 72%;
+  height: 84%;
+  display: flex;
+  flex-direction: column;
+  color: #e3f6fb;
+  background: linear-gradient(135deg, rgba(127, 233, 255, 0.16), rgba(255, 79, 139, 0.05) 60%, rgba(9, 4, 18, 0.6));
+  border: 1px solid rgba(127, 233, 255, 0.55);
+  box-shadow: 0 0 34px rgba(127, 233, 255, 0.14) inset;
+  clip-path: polygon(0 0, 96% 0, 100% 4%, 100% 100%, 4% 100%, 0 96%);
+  backdrop-filter: blur(3px);
+}
+/* A projection coming up: TEXTS' flicker. */
+/* (ql-flicker, not ql-in: .ql-in is the file column below, and its -38px margin lifted the whole pane under the keys bar.) */
+.ql-pane.ql-flicker { animation: ql-flicker-in 0.32s steps(1, end); }
+@keyframes ql-flicker-in {
+  0% { opacity: 0; }
+  20% { opacity: 0.7; }
+  35% { opacity: 0.1; }
+  55% { opacity: 0.9; }
+  70% { opacity: 0.4; }
+  85% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ql-pane.ql-flicker { animation: none; }
+}
+
+.ql-head { display: flex; align-items: baseline; padding: 16px 25px 6px; font: 27px var(--pixel); letter-spacing: 0.3em; color: #7fe9ff; }
+.ql-esc { margin-left: auto; font-size: 18px; letter-spacing: 0.2em; color: #8fb3bd; }
+.ql-nerve,
+.ql-changed { margin: 6px 25px 0; padding: 5px 13px; font: 18px var(--pixel); letter-spacing: 0.18em; color: #ff5a5a; border: 1px solid rgba(255, 90, 90, 0.55); background: rgba(255, 90, 90, 0.08); }
+.ql-changed { font: 16px var(--mono); letter-spacing: 0; color: #ffb3a6; border-color: rgba(255, 179, 166, 0.45); background: none; }
+
+.ql-tabs { display: flex; gap: 4px; padding: 11px 25px 0; }
+.ql-tab { font: 19px var(--pixel); letter-spacing: 0.2em; padding: 4px 18px; cursor: pointer; color: #8fb3bd; background: none; border: 1px solid rgba(127, 233, 255, 0.25); border-bottom: 0; }
+.ql-tab[aria-selected='true'] { color: #04131a; background: #7fe9ff; }
+.ql-tab i { font-style: normal; opacity: 0.7; }
+
+.ql-body { flex: 1; display: grid; grid-template-columns: 36% 1fr; min-height: 0; border-top: 1px solid rgba(127, 233, 255, 0.3); }
+.ql-pane[data-tab='fixer'] .ql-body, .ql-pane[data-tab='loose'] .ql-body { grid-template-columns: 1fr; }
+
+/* The list, as TEXTS' contacts. */
+.ql-list { overflow-y: auto; padding: 0 11px 13px 18px; border-right: 1px solid rgba(127, 233, 255, 0.25); scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
+.ql-group { padding: 11px 0 4px; font: 16px var(--pixel); letter-spacing: 0.24em; color: #8fb3bd; }
+.ql-list .ql-row { display: flex; align-items: center; gap: 11px; width: 100%; margin-top: 2px; padding: 8px 9px; text-align: left; cursor: pointer; color: #e3f6fb; background: none; border: 0; border-left: 3px solid transparent; }
+.ql-list .ql-row:hover,
+.ql-list .ql-row[aria-selected='true'] { background: rgba(127, 233, 255, 0.1); border-left-color: #7fe9ff; }
+.ql-list .ql-row:first-child { margin-top: 11px; }
+.ql-icon { flex: none; display: grid; place-items: center; width: 34px; height: 45px; object-fit: cover; image-rendering: pixelated; font: 20px var(--pixel); color: #7fe9ff; background: repeating-linear-gradient(135deg, rgba(127, 233, 255, 0.1) 0 6px, rgba(127, 233, 255, 0.03) 6px 12px), #0b0618; }
+.ql-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ql-title { font: 22px/1 var(--ql-teko); letter-spacing: 0.04em; }
+.ql-mission,
+.ql-kind { font: 16px var(--pixel); letter-spacing: 0.14em; color: #ffb347; }
+.ql-kind { color: #7fe9ff; }
+.ql-once-tag { align-self: flex-start; padding: 0 5px; font: 14px var(--pixel); letter-spacing: 0.16em; color: #05020a; background: #b48cff; }
+.ql-row.ql-locked,
+.ql-row.ql-capped { opacity: 0.45; }
+/* A locked Tier 2 Chair (spec 2026-11-01 §1): the row dims but its checklist doesn't; the list shows on hover or focus. */
+.ql-list .ql-row.ql-locked:has(.ql-checks) { flex-wrap: wrap; opacity: 1; }
+.ql-row.ql-locked:has(.ql-checks) > .ql-icon,
+.ql-row.ql-locked:has(.ql-checks) > .ql-text { opacity: 0.45; }
+.ql-checks { margin: 0; padding: 8px 10px; list-style: none; font: 15px/1.35 var(--pixel); letter-spacing: 0.08em; color: #e3f6fb; background: #0b0618; border: 1px solid rgba(127, 233, 255, 0.5); }
+/* Opened under the row, inside the list: the list scrolls, so a card beside it would be clipped. */
+.ql-row > .ql-checks { display: none; flex-basis: 100%; margin-top: 4px; }
+.ql-row:hover > .ql-checks,
+.ql-row:focus-visible > .ql-checks { display: block; }
+.ql-check { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; color: #ff8fa3; }
+.ql-check.ok { color: #a8ff60; }
+.ql-check-progress { color: #8fb3bd; }
+.ql-in .ql-checks { margin-top: 10px; }
+.ql-waiting .ql-title,
+.ql-elsewhere .ql-title { color: #8fb3bd; }
+.ql-waiting .ql-kind,
+.ql-elsewhere .ql-kind { color: #8fb3bd; }
+/* Another place's board (2026-11-01): someone else's job, or one not posted yet, sits back a little. */
+.ql-row.ql-later { opacity: 0.6; }
+
+/* The file, as TEXTS' thread: banner art, the terms, the pitch, START at the foot. */
+.ql-file { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
+.ql-art { flex: none; height: 168px; background: center / cover; image-rendering: pixelated; mask-image: linear-gradient(#000 60%, transparent); }
+.ql-noart { background: repeating-linear-gradient(135deg, rgba(127, 233, 255, 0.1) 0 6px, rgba(127, 233, 255, 0.03) 6px 12px), #0b0618; }
+.ql-in { position: relative; flex: 1; display: flex; flex-direction: column; gap: 11px; margin-top: -38px; padding: 0 29px 22px; }
+.ql-file-title { font: 49px/0.9 var(--ql-teko); letter-spacing: 0.03em; color: #fff; text-shadow: 0 0 11px #000; }
+.ql-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 16px; }
+.ql-file-tag { font: 16px var(--pixel); letter-spacing: 0.14em; color: #ffb347; }
+.ql-file-tag.ql-trust { color: #ff4f8b; }
+.ql-file-tag.ql-storytag { color: #7fe9ff; }
+.ql-chip { padding: 0 7px; font: 15px var(--pixel); letter-spacing: 0.14em; border: 1px solid currentColor; }
+.ql-timed { color: #ffb3a6; }
+.ql-file-once { color: #b48cff; }
+.ql-cased { color: #7dff9b; }
+.ql-with { color: #b48cff; }
+.ql-pitch,
+.ql-line { margin: 0; font: 17px/1.5 var(--chat-font, var(--mono)); color: #e3f6fb; }
+.ql-line { color: #8fb3bd; }
+.ql-scouted { font: 16px var(--pixel); letter-spacing: 0.12em; color: #7dff9b; }
+.ql-capped-note,
+.ql-locked-note { font: 16px var(--pixel); letter-spacing: 0.16em; color: #ff7fa8; }
+.ql-go { margin-top: auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
+.ql-hint { margin-right: auto; font: 16px var(--pixel); letter-spacing: 0.14em; color: #8fb3bd; }
+.ql-start,
+.ql-goto { font: 20px var(--pixel); letter-spacing: 0.2em; padding: 4px 20px; cursor: pointer; color: #04131a; background: #7fe9ff; border: 0; }
+.ql-start:disabled { cursor: default; color: rgba(207, 239, 247, 0.4); background: rgba(127, 233, 255, 0.18); }
+.ql-walk { font: 18px var(--pixel); letter-spacing: 0.18em; padding: 3px 13px; cursor: pointer; color: #ff8fa3; background: none; border: 1px solid #ff8fa3; }
+
+/* FIXER: what you can buy here, the whole pane. */
+.ql-fixer { overflow-y: auto; padding: 14px 29px 22px; }
+.ql-fixer .ql-row { display: flex; align-items: center; justify-content: space-between; gap: 11px; padding: 8px 0; border-bottom: 1px dashed rgba(255, 179, 71, 0.25); }
+.ql-item-name { font: 18px var(--pixel); letter-spacing: 0.12em; color: #ffe1c8; }
+.ql-item-why { font: 15px var(--pixel); letter-spacing: 0.16em; color: #ffb3a6; }
+.ql-item.locked .ql-item-name { color: #6f8a92; }
+.ql-buy { font: 17px var(--pixel); letter-spacing: 0.16em; padding: 2px 13px; cursor: pointer; color: #04131a; background: #ffb347; border: 0; }
+.ql-buy:disabled { cursor: default; color: rgba(255, 225, 200, 0.4); background: rgba(255, 179, 71, 0.18); }
+
+/* LEADS (from PEOPLE, 2026-11-04): QUEST's list and file, with no art over the file. */
+.ql-in.ql-plain { flex: none; margin-top: 0; padding-top: 22px; }
+.ql-followed { opacity: 0.5; }
+.ql-lead-text { margin: 0; font: calc(17px * var(--text-scale, 1))/1.5 var(--chat-font, var(--mono)); color: #e3f6fb; white-space: pre-wrap; }
+.ql-body > .ql-none { grid-column: 1 / -1; }
+.ql-none { padding: 24px 29px; font: 18px var(--pixel); letter-spacing: 0.2em; color: #8fb3bd; }
+
+/* LOOSE ENDS (cipher spec §2.8): unlabelled clusters of what you noticed, then what you solved, the whole pane. */
+.ql-loose-tab { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; padding: 16px 29px 22px; scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
+.ql-loose-tab > .ql-none { padding: 8px 0; }
+.ql-loose-group { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid rgba(127, 233, 255, 0.18); }
+.ql-loose-line { display: flex; flex-direction: column; gap: 2px; }
+.ql-loose-text { font: calc(17px * var(--text-scale, 1))/1.5 var(--chat-font, var(--mono)); color: #e3f6fb; }
+.ql-loose-where { font: 15px var(--pixel); letter-spacing: 0.16em; color: #8fb3bd; text-transform: uppercase; }
+.ql-loose-solved { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-left: 2px solid #7fe9ff; background: rgba(127, 233, 255, 0.06); }
+.ql-loose-truth { font: 28px/1.1 var(--ql-teko); letter-spacing: 0.03em; color: #7fe9ff; }
+.ql-loose-label { margin-top: 4px; font: 15px var(--pixel); letter-spacing: 0.24em; color: #8fb3bd; }

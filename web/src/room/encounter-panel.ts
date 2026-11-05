@@ -1,12 +1,12 @@
 /**
  * ENCOUNTER (spec 2026-10-09 encounter cards §2): from ◆ DRAW in the room, three events her model
- * deals for this moment. Enter plays one (she reacts at once), R redraws, Esc cancels. It wears
- * SET THE SCENE's look (scene.css) in the room. Text goes in through textContent.
+ * deals for this moment. Enter plays one (she reacts at once), R redraws, Esc cancels. The modal
+ * itself is cards-panel.ts, which SUGGEST shares.
  */
-import type { Encounter } from '../../../shared/encounter';
+import type { Encounter, EncounterKind } from '../../../shared/encounter';
 import { NarratorFailure } from '../net/scenario';
 import { her } from './her-copy';
-import '../landing/scene.css';
+import { CardsPanel, el } from './cards-panel';
 
 export const ENCOUNTER_COPY = {
   title: 'ENCOUNTER',
@@ -18,6 +18,17 @@ export const ENCOUNTER_COPY = {
   foot: "Written from: the room's lore and art, the time and weather, both public files, who else is here, and the last 8 lines.",
   noKey: 'Link a key at select to have events dealt.',
 } as const;
+
+/** Each kind's word beside a card's title. */
+export const KIND_WORD: Record<EncounterKind, string> = { stranger: 'STRANGER', city: 'THE CITY', personal: 'PERSONAL' };
+/** Each kind's picture (art/cards/sheet-04.png, cut like the table cards); STRANGER shows the stranger's face instead. */
+export const KIND_ART: Partial<Record<EncounterKind, string>> = { city: '/draw/city.webp', personal: '/draw/personal.webp' };
+
+/** The picture down an event's card: the stranger's face, else its kind's art. */
+export function encounterArt(e: Encounter): string | undefined {
+  if (e.stranger?.face) return `/api/extras/${e.stranger.face}`;
+  return e.kind ? KIND_ART[e.kind] : undefined;
+}
 
 /** The header's who's-here part: `SILAS IS HERE`, `HAE, SILAS ARE HERE`; null with no one else here. */
 export function hereLine(names: string[]): string | null {
@@ -43,138 +54,51 @@ export interface EncounterPanelOptions {
   onCache(e: Encounter[]): void;
 }
 
-function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
-  const n = document.createElement(tag);
-  n.className = cls;
-  if (text !== undefined) n.textContent = text;
-  return n;
-}
-
+/** DRAW's events on the three-card modal (cards-panel.ts). */
 export class EncounterPanel {
-  readonly el: HTMLElement;
-  private readonly body: HTMLElement;
-  private readonly refusal: HTMLElement;
-  private options: Encounter[] | null;
-  private index = 0;
-  private loading = false;
-  private error: string | null = null;
-  /** Bumped by every load and by destroy: a late answer for an older one is dropped. */
-  private seq = 0;
+  private readonly panel: CardsPanel<Encounter>;
 
-  constructor(host: HTMLElement, private readonly o: EncounterPanelOptions) {
-    this.el = el('div', 'encounter-host');
-    const title = el('div', 'ep-title', ENCOUNTER_COPY.title);
-    const panel = el('div', 'scene-panel encounter-panel');
-    const head = el('div', 'sp-head');
-    head.append(el('span', 'sp-who', o.header), el('span', 'sp-gap'));
-    if (o.model) head.append(el('span', 'sp-model', o.model));
-    this.body = el('div', 'sp-body');
-    this.refusal = el('div', 'sp-why');
-    this.refusal.hidden = true;
-    panel.append(head, this.body, this.refusal, el('div', 'ep-foot', ENCOUNTER_COPY.foot));
-    this.el.append(title, panel, el('div', 'ep-hints', ENCOUNTER_COPY.hints));
-    host.append(this.el);
-    this.options = o.cached;
-    if (this.options) this.render();
-    else this.load();
+  constructor(host: HTMLElement, o: EncounterPanelOptions) {
+    this.panel = new CardsPanel<Encounter>(host, {
+      copy: ENCOUNTER_COPY,
+      header: o.header,
+      ...(o.model ? { model: o.model } : {}),
+      cached: o.cached,
+      load: o.load,
+      card: (e) => {
+        const art = encounterArt(e);
+        const look = { ...(e.kind ? { sub: KIND_WORD[e.kind] } : {}), ...(art ? { art } : {}) };
+        if (!e.stranger) return { title: e.title, text: e.text, ...look };
+        const who = el('span', 'ep-who', `+ ${e.stranger.name.toUpperCase()}`);
+        who.append(el('em', 'ep-voice', e.stranger.voice));
+        return { title: e.title, text: e.text, extra: who, ...look };
+      },
+      failed: (err) => {
+        if (err instanceof EncounterNotice) return err.message;
+        // The raw reason is for whoever's debugging, never on screen (spec 2026-10-14 §1).
+        console.warn('[narrator] events:', err instanceof Error ? err.message : String(err));
+        // Plain words for the player (spec 2026-10-14 §4).
+        return ENCOUNTER_COPY.failed(her().encounters.failedWhy(err instanceof NarratorFailure ? err.kind : 'unknown'));
+      },
+      onPlay: o.onPlay,
+      onCancel: o.onCancel,
+      onCache: o.onCache,
+    });
   }
 
-  /** The cards on screen: none while a load runs or after one failed. */
-  private get shown(): Encounter[] | null {
-    return this.loading || this.error ? null : this.options;
+  get el(): HTMLElement {
+    return this.panel.el;
   }
 
-  /** The panel's keys; true when it used the key. */
   key(e: KeyboardEvent): boolean {
-    const k = e.key;
-    if (k === 'Escape') this.o.onCancel();
-    else if (k === 'ArrowDown' || k === 'ArrowUp') {
-      const shown = this.shown;
-      if (!shown) return true;
-      this.index = Math.max(0, Math.min(shown.length - 1, this.index + (k === 'ArrowDown' ? 1 : -1)));
-      this.render();
-    } else if (k === 'Enter') {
-      const shown = this.shown;
-      if (shown) this.o.onPlay(shown[this.index]);
-    } else if (k === 'r' || k === 'R') this.load();
-    else return false;
-    return true;
+    return this.panel.key(e);
   }
 
-  /** The server refused the play (busy, no key): said under the cards, which stay. */
   showRefusal(text: string): void {
-    this.refusal.textContent = text;
-    this.refusal.hidden = false;
+    this.panel.showRefusal(text);
   }
 
   destroy(): void {
-    this.seq++;
-    this.el.remove();
-  }
-
-  private load(): void {
-    // One deal at a time: R while one runs would pay for a second.
-    if (this.loading) return;
-    const seq = ++this.seq;
-    this.loading = true;
-    this.error = null;
-    this.refusal.hidden = true;
-    this.render();
-    this.o.load().then(
-      (options) => {
-        if (seq !== this.seq) return;
-        this.loading = false;
-        this.options = options;
-        this.index = 0;
-        this.o.onCache(options);
-        this.render();
-      },
-      (err: unknown) => {
-        if (seq !== this.seq) return;
-        this.loading = false;
-        if (err instanceof EncounterNotice) this.error = err.message;
-        else {
-          // Plain words for the player (spec 2026-10-14 §4).
-          this.error = ENCOUNTER_COPY.failed(her().encounters.failedWhy(err instanceof NarratorFailure ? err.kind : 'unknown'));
-          // The raw reason is for whoever's debugging, never on screen (spec 2026-10-14 §1).
-          console.warn('[narrator] events:', err instanceof Error ? err.message : String(err));
-        }
-        this.render();
-      },
-    );
-  }
-
-  private render(): void {
-    const C = ENCOUNTER_COPY;
-    this.body.replaceChildren();
-    if (this.loading) this.body.append(el('div', 'sp-loading', C.loading));
-    else if (this.error) this.body.append(el('div', 'sp-error', this.error));
-    else
-      this.options?.forEach((e, i) => {
-        const card = el('div', `sp-card${i === this.index ? ' on' : ''}`);
-        card.dataset.index = String(i);
-        card.append(el('span', 'sp-n', String(i + 1)), el('div', 'sp-title', e.title), el('div', 'sp-card-text', e.text));
-        if (e.stranger) {
-          const who = el('span', 'ep-who', `+ ${e.stranger.name.toUpperCase()}`);
-          who.append(el('em', 'ep-voice', e.stranger.voice));
-          card.append(who);
-        }
-        card.onclick = () => this.o.onPlay(e);
-        card.onmouseenter = () => {
-          if (this.index === i) return;
-          this.index = i;
-          this.render();
-        };
-        this.body.append(card);
-      });
-    const row = el('div', 'sp-options');
-    const redraw = el('button', 'sp-reroll', C.redraw);
-    redraw.type = 'button';
-    redraw.onclick = () => this.load();
-    const cancel = el('button', 'sp-cancel', C.cancel);
-    cancel.type = 'button';
-    cancel.onclick = () => this.o.onCancel();
-    row.append(redraw, cancel);
-    this.body.append(row);
+    this.panel.destroy();
   }
 }

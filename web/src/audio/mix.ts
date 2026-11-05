@@ -23,6 +23,8 @@ export interface Mix {
   neon: NeonVoice[];
   /** High-shelf cut from fog, in dB (0 to −9). */
   fogDb: number;
+  /** The outdoor reverb send for rain, wind and neon (0 = dry). */
+  space: number;
 }
 
 export const SILENT: Mix = {
@@ -32,6 +34,7 @@ export const SILENT: Mix = {
   bed: null,
   neon: [],
   fogDb: 0,
+  space: 0,
 };
 
 const OUTDOOR_WIND_FLOOR = 0.15;
@@ -96,5 +99,6 @@ export function soundMix(state: RoomState, scene: SceneDef, base: string): Mix {
     bed,
     neon,
     fogDb: FOG_DB * fog,
+    space: sound.reverb ?? 0,
   };
 }

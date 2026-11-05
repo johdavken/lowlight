@@ -8,7 +8,7 @@ import { writeHabits } from '../src/habits';
 import { at, intakeRelay, lastUser, parse } from './fixtures/intake-relay';
 import { COMMS_BACK_INSTRUCTIONS, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, LEAVE_INSTRUCTIONS, LIGHTS_LINE, TRAVEL_INSTRUCTIONS, TRAVEL_LINE } from '../src/instructions';
 
-const withDeal = (r: ReturnType<typeof intakeRelay>) => r.db.setMeta(arrangementKey('hicks'), JSON.stringify({ role: 'operator', retainer: 150, nights: 1, since: 0 }));
+const withDeal = (r: ReturnType<typeof intakeRelay>) => r.db.setMeta(arrangementKey('hicks'), JSON.stringify({ role: 'operator', tier: 1, cut: 25, nights: 1, since: 0 }));
 const comms = (r: ReturnType<typeof intakeRelay>) => parseComms(r.db.getMeta(commsKey('hicks')));
 const rows = (r: ReturnType<typeof intakeRelay>) => r.db.recentMessages('hicks', 80);
 
@@ -113,10 +113,13 @@ describe('comms: her prompt', () => {
 describe('comms: dropping the line', () => {
   /** Back Door at the Intake with Nix among its crew (not one of her own), its desk path run without a roll. */
   const job = parse(JOB.replace('tier: 2', 'tier: 1').replace('starts: haes-noodles', 'starts: lowlight-intake'), 'back-door');
-  async function finish(r: ReturnType<typeof intakeRelay>) {
+  /** Runs the job to its end; `drop`: her trust falls a step before the last pick (the deal goes suspended mid-job). */
+  async function finish(r: ReturnType<typeof intakeRelay>, drop = false) {
     await r.relay.startQuest('hicks', 'back-door');
     const run = () => parseRun(r.db.metaWithPrefix('quest.hicks.back-door@').at(-1)?.v ?? null)!;
     await r.relay.chooseQuest('hicks', { id: 'back-door', beat: run().beat!, choice: 'wait' });
+    // A cut can't go unpaid (Tier 2 spec §2): the deal now goes suspended by a trust move, as a burned favour would.
+    if (drop) r.deps.trust!.move('hicks', -1, 'A test drop', 'drop');
     await r.relay.chooseQuest('hicks', { id: 'back-door', beat: 'desk', choice: 'skim' });
   }
   const onComms = (r: ReturnType<typeof intakeRelay>) => {
@@ -130,7 +133,7 @@ describe('comms: dropping the line', () => {
   it('suspended on comms: one sign-off, then solo', async () => {
     const r = intakeRelay({ book: [job], trust: 5, sol: 0 });
     onComms(r);
-    await finish(r);
+    await finish(r, true);
     expect(lastUser(r.backend.reqs.at(-1)!)).toContain(DROP);
     expect(comms(r)).toEqual({ on: false, at: 'karasu/lowlight-intake' });
     expect(r.deps.goSolo).toHaveBeenCalledTimes(1);
@@ -148,7 +151,7 @@ describe('comms: dropping the line', () => {
   it('not a loop: after the drop, the next turn carries no sign-off', async () => {
     const r = intakeRelay({ book: [job], trust: 5, sol: 0 });
     onComms(r);
-    await finish(r);
+    await finish(r, true);
     await r.relay.send('hicks', 'hello?');
     expect(lastUser(r.backend.reqs.at(-1)!)).not.toContain('[comms');
     expect(r.deps.goSolo).toHaveBeenCalledTimes(1);
@@ -233,7 +236,7 @@ describe('the shipped desk jobs (world/quests)', () => {
       expect(q).toMatchObject({ kind: 'mission', tier: 1, starts: 'lowlight-intake', posts: [1200, 120], trust: [1, 1], commsAt: s.at });
       expect(ownedBy(q)).toBe('nix-direct');
       const first = q.beats.get(q.first)!.flatMap((b) => b.choices);
-      for (const c of first) for (const id of [c.to, c.close, c.fail].filter((x): x is string => !!x)) {
+      for (const c of first) for (const id of [c.to, c.fail].filter((x): x is string => !!x)) {
         const w = q.outcomes.get(id)?.wait;
         expect(w, `${s.id}: ${id} waits for comms there`).toMatchObject({ at: s.at, comms: true });
         expect(w!.by).not.toBeNull();

@@ -33,17 +33,18 @@ describe('mission rows and cards', () => {
       title: 'Night Shift',
       beat: 'door',
       choices: [
-        { id: 'roof', line: 'Loop the cameras from the roof.', odds: { stat: 'TECH', chance: 74, noDeck: false, why: [] } },
-        { id: 'jack', line: 'Jack the door.', odds: { stat: 'TECH', chance: 34, noDeck: true, why: [] } },
+        { id: 'roof', line: 'Loop the cameras from the roof.', pool: { stat: 'TECH', base: 4, dice: 4, parts: [], position: 'open', noDeck: false, deck: { match: 'holds', broke: false, hidden: true, chrome: false } } },
+        { id: 'jack', line: 'Jack the door.', pool: { stat: 'TECH', base: 3, dice: 2, parts: [{ label: 'NO DECK', dice: -1 }], position: 'open', noDeck: true } },
         { id: 'wait', line: 'Wait.' },
       ],
     });
-    expect([...h.querySelectorAll('.qc-card')].map((c) => c.querySelector('.qc-odds')?.textContent ?? null)).toEqual(['· TECH 74%', '· TECH 34% · NO DECK', null]);
+    expect([...h.querySelectorAll('.qc-card')].map((c) => c.querySelector('.qc-odds')?.textContent ?? null)).toEqual(['· TECH ●●●● · IN THE OPEN · DECK HOLDS · HIDDEN · NO DECK HEAT', '· TECH ●●● −NO DECK ○ · IN THE OPEN', null]);
   });
 });
 
 const KIT: KitView = {
-  deck: { id: 'stall-build', name: 'Stall build', bonus: 15, heat: 0, traits: ['fragile'] },
+  deck: { id: 'stall-build', name: 'Stall build', quality: 2, heat: 0, traits: ['fragile'] },
+  owned: [{ id: 'stall-build', name: 'Stall build', quality: 2, heat: 0, traits: ['fragile'] }],
   sol: 400,
   crewLatest: null,
   heat: 4,
@@ -51,62 +52,76 @@ const KIT: KitView = {
   hottest: { district: 'karasu', heat: 4 },
   rep: {},
   cover: { burner: 0, 'fall-guy': 0 },
-  edgeLeft: 2,
-  edgeMax: 2,
+  nerveLeft: 2,
+  nerveMax: 2,
   stats: { body: 4, reflex: 6, tech: 7, cool: 7, wits: 6, edge: 4 },
 };
 
 describe('the YOU sheet with a kit', () => {
-  it('STATS, HEAT, SOL and DECK go live; the rest stays NOT YET', () => {
-    openCharacterSheet(document.body, { player: { name: 'Hicks', sprite: null, kit: KIT } });
-    const sec = (id: string) => document.querySelector<HTMLElement>(`.cs-sec[data-section="${id}"]`)!;
-    expect([...sec('stats').querySelectorAll('.cs-v')].map((n) => n.textContent)).toEqual(['4', '6', '7', '7', '6', '4']);
-    expect(sec('stats').querySelectorAll('.cs-stat')[2].querySelectorAll('.cs-bar i.on')).toHaveLength(7);
-    for (const id of ['stats', 'condition', 'sol', 'gear']) {
-      expect(sec(id).classList.contains('planned'), id).toBe(false);
-      expect(sec(id).querySelector('.cs-scale')!.textContent, id).not.toBe('NOT YET');
-    }
-    expect(sec('skills').classList.contains('planned')).toBe(true);
-    expect(sec('condition').querySelector('.cs-heat .cs-top')!.textContent).toContain('4 / 10');
-    const rowPlanned = (sel: string) => document.querySelector(sel)!.classList.contains('cs-row-planned');
-    expect(rowPlanned('.cs-health')).toBe(true);
-    expect(rowPlanned('.cs-hum')).toBe(true);
-    expect(rowPlanned('.cs-heat')).toBe(false);
-    expect(sec('sol').querySelector('.cs-wallet.live .cs-amt')!.textContent).toBe('400sol');
-    const slots = [...sec('gear').querySelectorAll('.cs-slot')];
-    const deck = slots.find((s) => s.querySelector('.cs-k')!.textContent === 'DECK')!;
-    expect(deck.textContent).toBe('DECKStall build · +15 GRID · HEAT 0 · fragile');
-    const key = (s: Element) => s.querySelector('.cs-k')!.textContent;
-    expect(slots.filter((s) => key(s) === 'CHROME' || key(s) === 'JACK').every((s) => s.classList.contains('cs-row-planned'))).toBe(true);
+  const open = (kit: KitView, page: 'stats' | 'street' | 'kit', onCarry?: (id: string) => void) => openCharacterSheet(document.body, { player: { name: 'Hicks', sprite: null, kit }, page, onCarry });
+  const districts = () => [...document.querySelectorAll('.cs-dist:not(.cs-dist-head)')].map((r) => [r.querySelector('.cs-dist-name')!.textContent, r.querySelector('.cs-rep-n')!.textContent, r.querySelector('.cs-heat-n')!.textContent]);
+  const said = () => document.querySelector('[data-section="districts"]')!.textContent;
+  it('STATS: the kit fills the six numbers; skills stay NOT YET', () => {
+    open(KIT, 'stats');
+    const stats = document.querySelector<HTMLElement>('[data-section="stats"]')!;
+    expect([...stats.querySelectorAll('.cs-v')].map((n) => n.textContent)).toEqual(['4', '6', '7', '7', '6', '4']);
+    expect(stats.querySelectorAll('.cs-stat')[2].querySelectorAll('.cs-bar i.on')).toHaveLength(7);
+    expect(stats.classList.contains('planned')).toBe(false);
+    expect(document.querySelector('[data-section="skills"]')!.classList.contains('planned')).toBe(true);
   });
-
-  it('HEAT is the district here, with a hotter district named', () => {
-    openCharacterSheet(document.body, { player: { name: 'Hicks', sprite: null, kit: { ...KIT, heatHere: 2, hottest: { district: 'velvet', heat: 7 } } } });
-    expect(document.querySelector('.cs-heat .cs-top')!.textContent).toBe('HEAT2 / 10 · VELVET 7');
+  it('REP: the district here with its tier, then the others, highest first', () => {
+    open({ ...KIT, here: 'velvet', rep: { velvet: 100, karasu: 30, spine: 8, strand: 0 }, heatBy: {}, hottest: null }, 'street');
+    expect(districts().map((d) => d.slice(0, 2))).toEqual([['VELVET', '100'], ['KARASU', '30'], ['SPINE', '8']]);
+    expect(said()).toContain('VELVET HOLDS YOU AS A NAME.');
+    expect(document.querySelector<HTMLElement>('.cs-track.cs-rep')!.style.getPropertyValue('--fill')).toBe('100%');
+  });
+  it('REP where you have none reads 0, NOBODY', () => {
+    open({ ...KIT, here: 'marsh', rep: {}, heatBy: {}, hottest: null }, 'street');
+    expect(districts()).toEqual([['MARSH', '0', '4']]);
+    expect(said()).toContain('MARSH HOLDS YOU AS NOBODY.');
+  });
+  it('HEAT from an older server (no heatBy): the district here, and a hotter district still shows', () => {
+    open({ ...KIT, here: 'karasu', rep: {}, heatHere: 2, heatBy: undefined, hottest: { district: 'velvet', heat: 7 } }, 'street');
+    expect(districts()).toEqual([['KARASU', '0', '2'], ['VELVET', '0', '7']]);
+  });
+  it('HEAT shows in every district that has any, with no rep needed; off the map the headings go', () => {
+    open({ ...KIT, heatHere: 2, here: 'karasu', rep: {}, heatBy: { karasu: 2, velvet: 7, 'the-spine': 1 }, hottest: { district: 'velvet', heat: 7 } }, 'street');
+    expect(districts()).toEqual([['KARASU', '0', '2'], ['VELVET', '0', '7'], ['THE SPINE', '0', '1']]);
     document.body.innerHTML = '';
-    openCharacterSheet(document.body, { player: { name: 'Hicks', sprite: null, kit: { ...KIT, heatHere: 4, hottest: { district: 'karasu', heat: 4 } } } });
-    expect(document.querySelector('.cs-heat .cs-top')!.textContent).toBe('HEAT4 / 10');
+    open({ ...KIT, here: null, rep: {}, heatBy: {}, hottest: null }, 'street');
+    expect(document.querySelector('.cs-dist')).toBeNull();
   });
-
-  it('CARRY is live with the cover held', () => {
-    openCharacterSheet(document.body, { player: { name: 'Hicks', sprite: null, kit: { ...KIT, cover: { burner: 1, 'fall-guy': 0 } } } });
-    const carry = [...document.querySelectorAll('.cs-slot')].find((s) => s.querySelector('.cs-k')!.textContent === 'CARRY')!;
-    expect(carry.querySelector('.cs-sub')!.textContent).toBe('BURNER ×1 · FALL GUY ×0');
-    expect(carry.classList.contains('cs-row-planned')).toBe(false);
+  it('NERVE shows what is left of the night (the table spec §3)', () => {
+    open({ ...KIT, nerveLeft: 3, nerveMax: 5 }, 'street');
+    expect(document.querySelector('.cs-meter .cs-top')!.textContent).toBe('NERVE3 / 5');
+    expect(document.querySelector<HTMLElement>('.cs-track.cs-nerve')!.style.getPropertyValue('--fill')).toBe('60%');
   });
-
+  it('KIT shows the sol held and the cover', () => {
+    open({ ...KIT, cover: { burner: 1, 'fall-guy': 0 } }, 'kit');
+    expect(document.querySelector('.cs-wallet.live .cs-amt')!.textContent).toBe('400WHAT YOU HOLD');
+    expect([...document.querySelectorAll('.cs-chip')].map((n) => n.textContent)).toEqual(['BURNER×1', 'FALL GUY×0']);
+  });
+  it('decks you own but don\'t carry have CARRY; a click asks, setKit redraws, a refusal shows', () => {
+    const pocket = { id: 'pocket-deck', name: 'Pocket deck', quality: 1 as const, heat: 0, traits: ['hidden' as const] };
+    const onCarry = vi.fn();
+    const s = open({ ...KIT, owned: [KIT.deck!, pocket] }, 'kit', onCarry);
+    const on = () => document.querySelector('.cs-deck.on')!;
+    expect(on().querySelector('.cs-deck-name')!.textContent).toBe('Stall build');
+    const other = document.querySelector('.cs-deck:not(.on)')!;
+    expect(other.querySelector('.cs-deck-terms')!.textContent).toBe('Q1 · 1 SLOT · HEAT 0 · HIDDEN');
+    other.querySelector<HTMLButtonElement>('.cs-carry')!.click();
+    expect(onCarry).toHaveBeenCalledWith('pocket-deck');
+    s.setKit({ ...KIT, deck: pocket, owned: [KIT.deck!, pocket] });
+    expect(on().querySelector('.cs-deck-name')!.textContent).toBe('Pocket deck');
+    expect(document.querySelector('.cs-deck:not(.on) .cs-deck-name')!.textContent).toBe('Stall build');
+    s.refusal('not while a job is in progress');
+    expect(document.querySelector('.cs-deck-why')!.textContent).toBe('not while a job is in progress');
+  });
   it('no deck reads NONE', () => {
-    openCharacterSheet(document.body, { player: { name: 'Nix', sprite: null, kit: { ...KIT, deck: null } } });
-    const deck = [...document.querySelectorAll('.cs-slot')].find((s) => s.querySelector('.cs-k')!.textContent === 'DECK')!;
-    expect(deck.querySelector('.cs-sub')!.textContent).toBe('NONE');
-  });
-
-  it('without a kit the sheet is as before', () => {
-    openCharacterSheet(document.body, { player: { name: 'Nix', sprite: null } });
-    for (const s of document.querySelectorAll('.cs-sec')) expect(s.classList.contains('planned')).toBe(true);
+    open({ ...KIT, deck: null, owned: [] }, 'kit');
+    expect(document.querySelector('[data-section="decks"] .cs-line')!.textContent).toBe('NONE');
   });
 });
-
 describe('the quest picture on the panel', () => {
   it('draws the picture above the story, muted; none without one', () => {
     const h = host();

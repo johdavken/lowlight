@@ -1,12 +1,13 @@
 ---
 title: The Marker
+art: the-marker.webp
 kind: mission
 tier: 1
 with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's son put his residency card down as a marker at the Low Roller. The house won't give it back.
-pay: 50-130
+pay: 90-110
 posts: 20:00-02:00
 trust: 1 / 1
 comms: low-roller
@@ -14,6 +15,7 @@ comms: low-roller
 
 # client
 stranger: Otto — a client, sixty, hands that shake when he talks about his son
+face: local-05
 
 *Otto's son put his residency card on a table at the Low Roller as a marker, and lost the hand. Without the card he can't work, can't rent, can't leave. The house keeps markers in the cage until the debt's paid, and the debt grows by the week.*
 
@@ -40,6 +42,7 @@ blown
 
 # cage
 stranger: The cashier — behind the mesh, counting chips into stacks of twenty
+face: local-03
 
 *The cage holds the night's markers in a drawer of small envelopes, each with a name on it. The cashier doesn't look up.*
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CityMapData } from '../../shared/map-schema';
-import { cityView, clampView, coverSize, districtFrame, pinchView, zoomAt } from '../src/ui/map/camera';
+import { cityView, clampView, coverSize, districtFrame, frameView, pinchView, zoomAt } from '../src/ui/map/camera';
 
 const map = (): CityMapData => ({
   version: 1,
@@ -99,5 +99,22 @@ describe('pinchView (spec 2026-10-28 §4)', () => {
 
   it('the result is clamped', () => {
     expect(pinchView(start, from, { mid: { x: 5400, y: 300 }, dist: 100 }, map, screen, 5).tx).toBe(screen.w / 2);
+  });
+});
+
+describe('frameView (map pins spec §3: a district name frames the camera on it)', () => {
+  const map = { w: 1600, h: 900 };
+  const screen = { w: 1600, h: 900 };
+  it('centres the frame and fits it in 80 % of the screen, capped at the max zoom', () => {
+    const v = frameView({ x0: 70, y0: 20, x1: 90, y1: 40 }, map, screen, 8);
+    // 20 % of 1600 = 320 px wide, 180 px tall: 0.8 × 1600 / 320 = 4, 0.8 × 900 / 180 = 4.
+    expect(v.scale).toBeCloseTo(4);
+    // Its centre (80 %, 30 %) lands on the screen's centre, or as near as the edge allows.
+    const cx = 0.8 * 1600 * v.scale + v.tx;
+    expect(cx).toBeLessThanOrEqual(800 + 1e-6);
+    expect(frameView({ x0: 70, y0: 20, x1: 90, y1: 40 }, map, screen, 3).scale).toBe(3);
+  });
+  it('never zooms out past the whole city', () => {
+    expect(frameView({ x0: 0, y0: 0, x1: 100, y1: 100 }, map, screen, 8).scale).toBe(1);
   });
 });

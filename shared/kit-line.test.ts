@@ -4,10 +4,10 @@ import type { Deck } from './gear';
 import type { Kit } from './mission';
 
 const DECKS: Deck[] = [
-  { id: 'stall-build', name: 'Stall build', bonus: 15, heat: 0, traits: ['fragile'] },
-  { id: 'old-karasu', name: 'Old Karasu deck', bonus: 5, heat: 0, traits: ['ghost'] },
+  { id: 'stall-build', name: 'Stall build', quality: 2, heat: 0, traits: ['fragile'] },
+  { id: 'old-karasu', name: 'Old Karasu deck', quality: 1, heat: 0, traits: ['ghost'] },
 ];
-const kit = (o: Partial<Kit>): Kit => ({ deck: null, sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, edgeLeft: 1, edgeMax: 1, ...o });
+const kit = (o: Partial<Kit>): Kit => ({ deck: null, owned: [], sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: 1, nerveMax: 1, nerveGone: false, ...o });
 
 describe('kitLine', () => {
   it('a deck and heat', () => {

@@ -8,7 +8,7 @@ import { loadGigBriefs, registerGigRoute } from '../src/gigs';
 let dir: string;
 let gigsDir: string;
 let mapFile: string;
-const job = (place: string, tier = 'easy') => `---\ntitle: A Job\ntier: ${tier}\nplace: ${place}\nclient: C\ntarget: T\ntake: K\n---\nDo it.\n`;
+const job = (place: string, tier = 'easy') => `---\ntitle: A Job\ntier: ${tier}\nkind: papers\nplace: ${place}\nclient: C\ntarget: T\ntake: K\n---\nDo it.\n`;
 const map = {
   version: 1,
   image: '/map/x.webp',
@@ -39,6 +39,15 @@ describe('loadGigBriefs', () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('bad.md');
   });
+  it('a hack or slip brief (no kind, or kind: slip) is skipped with a warning: hack and slip are gone', () => {
+    fs.writeFileSync(path.join(gigsDir, 'good.md'), job('bar'));
+    fs.writeFileSync(path.join(gigsDir, 'hack.md'), job('bar').replace('kind: papers\n', ''));
+    fs.writeFileSync(path.join(gigsDir, 'slip.md'), job('bar').replace('kind: papers', 'kind: slip'));
+    const warn = vi.fn();
+    expect(loadGigBriefs(gigsDir, map as never, warn).map((b) => b.id)).toEqual(['good']);
+    expect(warn).toHaveBeenCalledTimes(2);
+    expect(warn.mock.calls.map((c) => String(c[0])).join('\n')).toContain('hack and slip are gone');
+  });
   it('a missing folder has no briefs', () => {
     expect(loadGigBriefs(path.join(dir, 'none'), null, () => {})).toEqual([]);
   });
@@ -66,15 +75,13 @@ describe('GET /api/gigs', () => {
 });
 
 describe('the shipped world', () => {
-  it("world/gigs/ loads against map/lowlight.json with no warnings, and the Glass Orchid's slips (dealt Under the Cat, its street) come at every tier", () => {
+  it('world/gigs/ loads against map/lowlight.json with no warnings: ten papers jobs; only the Tilt and the Ferry Stairs post jobs', () => {
     const real = JSON.parse(fs.readFileSync('map/lowlight.json', 'utf8'));
-    expect(real.places.find((p: { id: string }) => p.id === 'under-the-cat').gigs).toBe(true);
+    expect(real.places.filter((p: { gigs?: boolean }) => p.gigs).map((p: { id: string }) => p.id).sort()).toEqual(['ferry-stairs', 'the-tilt']);
     const warn = vi.fn();
     const briefs = loadGigBriefs('world/gigs', real, warn);
     expect(warn).not.toHaveBeenCalled();
-    const slips = briefs.filter((b) => b.kind === 'slip');
-    // At least one slip per tier (the author adds more through COPY FOR OPUS → IMPORT).
-    expect([...new Set(slips.filter((b) => b.place === 'under-the-cat').map((b) => b.tier))].sort()).toEqual(['easy', 'hard', 'medium']);
-    expect(slips.some((b) => b.place === 'the-tilt' && b.tier === 'medium')).toBe(true);
+    expect(briefs).toHaveLength(10);
+    expect(briefs.every((b) => b.kind === 'papers')).toBe(true);
   });
 });

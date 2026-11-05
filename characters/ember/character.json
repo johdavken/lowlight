@@ -109,6 +109,7 @@
     }
   },
   "standing": {
+    "vouches": "runner",
     "start": {
       "trust": 1,
       "warmth": 3

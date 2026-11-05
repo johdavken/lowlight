@@ -157,7 +157,7 @@ describe('/api/agents (Review Focus 2)', () => {
     const { base, ws, cfg } = await startTwo();
     // alpha gets a sprite through a character file (fixtures write none by default)
     fs.mkdirSync(path.join(cfg.charactersDir, 'alpha'), { recursive: true });
-    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix', 'nix-outfit-outdoors.png'), path.join(cfg.charactersDir, 'alpha', 'sprite.png'));
+    fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix-direct', 'nix-direct-outfit-outdoors.png'), path.join(cfg.charactersDir, 'alpha', 'sprite.png'));
     const alphaJson = path.join(cfg.charactersDir, 'alpha', 'character.json');
     fs.writeFileSync(alphaJson, JSON.stringify({ ...JSON.parse(fs.readFileSync(alphaJson, 'utf8')), sprite: { src: 'sprite.png' } }));
     await fetch(`${base}/api/agents`); // re-reads the registry, as the landing page does
@@ -176,8 +176,8 @@ describe('/api/agents (Review Focus 2)', () => {
 
   it("Nix's shipped character uses her sprite and has happy, annoyed, concerned and tired expressions", async () => {
     const { loadCharacter } = await import('../src/character');
-    const nix = loadCharacter(path.join(__dirname, '..', '..', 'characters', 'nix'));
-    expect(nix?.sprite).toMatchObject({ src: 'nix-outfit-outdoors.png' });
+    const nix = loadCharacter(path.join(__dirname, '..', '..', 'characters', 'nix-direct'));
+    expect(nix?.sprite).toMatchObject({ src: 'nix-direct-outfit-outdoors.png' });
     expect(Object.keys(nix?.expressions as Record<string, string>)).toEqual(['happy', 'annoyed', 'concerned', 'tired']);
   });
 

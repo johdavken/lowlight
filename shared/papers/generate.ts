@@ -5,7 +5,7 @@
  * editing those data files never changes what the puzzle is.
  */
 import type { Pronoun } from '../pronoun';
-import type { Tier } from '../gig/rules';
+import type { Tier } from '../gig/brief';
 import { allGiven, reasonFor, type AgeBand, type PapersData } from './data';
 import { firstNightBoard } from './first-night';
 import { FIELDS, holds, valuesFor, type Identity, type Rule } from './rules';

@@ -1,23 +1,27 @@
-/** The in-game link routes (spec 2026-10-08 §4): the OpenRouter key and the model lists. The key goes up once; only its last 4 come back. */
+/** The in-game link routes (spec 2026-10-08 §4): the OpenRouter and Anthropic keys and the model lists. A key goes up once; only its last 4 come back. */
 import type { LinkState, ModelChoice, NarratorThinking } from '../../../shared/types';
 
 export type LinkInfo = { linked: boolean; last4: string | null; credit: number | null; state: LinkState };
+export type Provider = 'openrouter' | 'anthropic';
+export const PROVIDERS: readonly Provider[] = ['openrouter', 'anthropic'];
+/** Both links; `state` is ok when either key works. */
+export type LinkStatus = { state: LinkState; openrouter: LinkInfo; anthropic: LinkInfo };
 export type LinkError = 'bad-key' | 'key-rejected' | 'unreachable';
 export type ModelLists = { picks: ModelChoice[]; recent: ModelChoice[]; results: ModelChoice[] };
 
 const json = { 'content-type': 'application/json' };
 
-export async function getLink(): Promise<LinkInfo> {
+export async function getLink(): Promise<LinkStatus> {
   const res = await fetch('/api/link');
   if (!res.ok) throw new Error(`/api/link: HTTP ${res.status}`);
-  return (await res.json()) as LinkInfo;
+  return (await res.json()) as LinkStatus;
 }
 
-/** Saves the key once OpenRouter accepts it; a refusal comes back as its reason, never thrown. */
-export async function putLink(apiKey: string): Promise<LinkInfo | { error: LinkError }> {
+/** Saves the key once its provider accepts it; a refusal comes back as its reason, never thrown. */
+export async function putLink(apiKey: string, provider: Provider = 'openrouter'): Promise<LinkInfo | { error: LinkError }> {
   let res: Response;
   try {
-    res = await fetch('/api/link', { method: 'PUT', headers: json, body: JSON.stringify({ apiKey }) });
+    res = await fetch(`/api/link/${provider}`, { method: 'PUT', headers: json, body: JSON.stringify({ apiKey }) });
   } catch {
     return { error: 'unreachable' };
   }
@@ -26,8 +30,8 @@ export async function putLink(apiKey: string): Promise<LinkInfo | { error: LinkE
   return { error: body.error === 'bad-key' || body.error === 'key-rejected' ? body.error : 'unreachable' };
 }
 
-export async function deleteLink(): Promise<void> {
-  const res = await fetch('/api/link', { method: 'DELETE' });
+export async function deleteLink(provider: Provider = 'openrouter'): Promise<void> {
+  const res = await fetch(`/api/link/${provider}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`/api/link: HTTP ${res.status}`);
 }
 

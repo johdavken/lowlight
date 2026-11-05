@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { DIRECT, arriveGo, awaitGreeting, dialIn, orRequests, pickTitle, send, skipSplash, toTitle } from './fixtures';
 
 const completions = async () => (await orRequests()).filter((r) => r.method === 'POST' && r.url.endsWith('/chat/completions') && r.body.stream !== false);
-import { E2E_OPENING } from './serve';
+import { E2E_OPENINGS } from './serve';
 
 // Each test starts a NEW GAME; the playthrough it found is put back afterwards, so the specs after this
 // one in the worker (crew, jobs) don't play in it.
@@ -36,12 +36,10 @@ async function toOpening(page: Page): Promise<void> {
 /** From the room, the map's GO to Hae's Noodles: the arrival screen for it. */
 async function goToHaes(page: Page): Promise<void> {
   await page.locator('.hud-map').click();
+  // A pin's card (map pins spec §1): the pin is a 0×0 box, so the click is dispatched.
+  await page.locator('.city-map .pin[data-place="haes-noodles"]').dispatchEvent('click');
   await expect(page.locator('.map-strip')).toBeVisible();
-  // The map remembers an open district: its band tile shows only while it's closed.
-  const place = page.locator('.map-bt.place', { hasText: "Hae's Noodles" });
-  if (!(await place.isVisible())) await page.locator('.map-bt.dist[data-id="karasu"]').click();
-  await place.click();
-  await page.locator('.map-strip .go').click();
+  await page.locator('.map-go .go').click();
   await expect(page.locator('#map')).toBeHidden();
   await expect(page.locator('.ar-rule')).toHaveText('HEADING TO');
   await expect(page.locator('.ar-name')).toHaveText("HAE'S NOODLES");
@@ -70,10 +68,46 @@ test('new game: an empty box is the plain greeting', async ({ page }) => {
   await expect(page.locator('#hud')).toBeVisible();
 });
 
-test('SUGGEST at the opening fills the box from the narrator', async ({ page }) => {
+test('SUGGEST at the opening deals three for the pair; Enter on one starts the game with it', async ({ page }) => {
   await toOpening(page);
+  // Clicked: the panel opens under the mouse, but a card under it isn't chosen until the mouse moves.
   await page.locator('.ar-suggest').click();
-  await expect(page.locator('.ar-box textarea')).toHaveValue(E2E_OPENING.text, { timeout: 10_000 });
+  const panel = page.locator('.ar-stage .opening-host');
+  await expect(panel.locator('.ep-title')).toHaveText('OPENING');
+  await expect(panel.locator('.sp-card')).toHaveCount(3, { timeout: 10_000 });
+  await expect(panel.locator('.sp-title')).toHaveText([/^HISTORY/, /^BUSINESS/, /^CHANCE/]);
+  // The pair: her face and name, and yours once the set says who you are.
+  await expect(panel.locator('.op-hername')).toHaveText('NIX');
+  await expect(panel.locator('.op-her')).toHaveAttribute('style', /\/api\/agents\/nix-direct\/thumb/);
+  await expect(panel.locator('.op-face:not(.op-her)')).toHaveAttribute('style', /\/api\/agents\/.+\/thumb/);
+  await shot(page, 'opening-cards');
+  // ↓ Enter: BUSINESS opens the game, as if typed and ENTER pressed.
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.ar-root')).toHaveCount(0);
+  await awaitGreeting(page);
+  await expect(page.locator('.scene-entry .sb-text')).toHaveText(E2E_OPENINGS[1]!.text);
+});
+
+test('the opening cards: E puts one in the box to edit; Esc goes back with the box as it was', async ({ page }) => {
+  await toOpening(page);
+  const area = page.locator('.ar-box textarea');
+  await area.fill('the fence again');
+  await page.keyboard.press('Alt+g');
+  const panel = page.locator('.ar-stage .opening-host');
+  await expect(panel.locator('.sp-note')).toHaveText('STEER: the fence again');
+  await expect(panel.locator('.sp-card')).toHaveCount(3, { timeout: 10_000 });
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await expect(area).toHaveValue('the fence again');
+  // The same steer again: the kept set, at once.
+  await page.locator('.ar-suggest').click();
+  await expect(panel.locator('.sp-card')).toHaveCount(3);
+  await page.keyboard.press('e');
+  await expect(panel).toHaveCount(0);
+  await expect(area).toHaveValue(E2E_OPENINGS[0]!.text);
+  await expect(area).toBeFocused();
+  await expect(page.locator('.ar-root')).toHaveCount(1);
 });
 
 test('GO with a line: one travel row with both, and the room changes; BACK changes nothing', async ({ page }) => {

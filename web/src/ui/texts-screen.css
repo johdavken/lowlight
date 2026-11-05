@@ -1,0 +1,64 @@
+/* TEXTS (in-game texts spec §2): the room dimmed and blurred under a holo glass pane, as the crack holo skin. tx- only. */
+.tx-root {
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(2, 1, 6, 0.35);
+  backdrop-filter: blur(3px) brightness(0.45) saturate(0.8);
+}
+.tx-root.tx-closing {
+  animation: tx-backdrop-out 0.25s ease-in forwards;
+  pointer-events: none;
+}
+
+/* QUEST's box exactly (quest-list.css .ql-pane), so the two holo panes are one size. */
+.tx-pane {
+  position: absolute;
+  left: 14%;
+  top: 9%;
+  width: 72%;
+  height: 84%;
+  background: linear-gradient(135deg, rgba(255, 79, 139, 0.18), rgba(127, 233, 255, 0.07) 60%, rgba(9, 4, 18, 0.55));
+  border: 1px solid rgba(255, 79, 139, 0.55);
+  box-shadow: 0 0 30px rgba(255, 79, 139, 0.15) inset;
+  clip-path: polygon(0 0, 96% 0, 100% 4%, 100% 100%, 4% 100%, 0 96%);
+  backdrop-filter: blur(3px);
+}
+.tx-deck {
+  height: 100%;
+}
+
+/* A projection coming up: a few flickers, then steady. */
+.tx-pane.tx-in {
+  animation: tx-flicker-in 0.32s steps(1, end);
+}
+.tx-closing .tx-pane {
+  animation: tx-flicker-out 0.25s steps(1, end) forwards;
+}
+@keyframes tx-flicker-in {
+  0% { opacity: 0; }
+  20% { opacity: 0.7; }
+  35% { opacity: 0.1; }
+  55% { opacity: 0.9; }
+  70% { opacity: 0.4; }
+  85% { opacity: 1; }
+}
+@keyframes tx-flicker-out {
+  0% { opacity: 1; }
+  30% { opacity: 0.2; }
+  50% { opacity: 0.7; }
+  70% { opacity: 0; }
+  100% { opacity: 0; }
+}
+@keyframes tx-backdrop-out {
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tx-pane.tx-in,
+  .tx-closing .tx-pane {
+    animation: none;
+  }
+}

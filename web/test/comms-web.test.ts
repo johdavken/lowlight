@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CityMapData } from '../../shared/map-schema';
 import { CityMap, type WhoIsWhere } from '../src/ui/map/city-map';
 import { mountCommsInset } from '../src/room/comms-inset';
+import { PORTRAIT_SWITCH_MS } from '../src/room/speaker-portrait';
 import { WhosHere } from '../src/room/whos-here';
 import { mountInput } from '../src/ui/input';
 import { setHerPronoun } from '../src/room/her-copy';
@@ -35,15 +36,15 @@ describe('the map on comms (spec 2026-10-20 §1)', () => {
   const strip = (comms: WhoIsWhere['comms'], onTravel = vi.fn()) => {
     const cm = new CityMap(host, { onTravel });
     cm.render(MAP, { here: 'a2', people: [], ...(comms ? { comms } : {}) });
-    cm.openDistrict('a', 'a1');
-    return { cm, onTravel, go: () => [...host.querySelectorAll<HTMLButtonElement>('.map-strip .go, .map-strip .go-comms')] };
+    cm.select('a1');
+    return { cm, onTravel, go: () => [...host.querySelectorAll<HTMLButtonElement>('.map-go .go, .map-go .go-comms')] };
   };
   it('with a deal and not on comms: WITH HER and ON COMMS', () => {
     const s = strip({ on: false, can: true });
     expect(s.go().map((b) => b.textContent)).toEqual(['WITH HER', 'ON COMMS']);
-    host.querySelector<HTMLButtonElement>('.map-strip .go-comms')!.click();
+    host.querySelector<HTMLButtonElement>('.map-go .go-comms')!.click();
     expect(s.onTravel).toHaveBeenCalledWith('a1', true);
-    host.querySelector<HTMLButtonElement>('.map-strip .go')!.click();
+    host.querySelector<HTMLButtonElement>('.map-go .go')!.click();
     expect(s.onTravel).toHaveBeenLastCalledWith('a1');
     s.cm.dispose();
   });
@@ -64,13 +65,26 @@ describe('the map on comms (spec 2026-10-20 §1)', () => {
 });
 
 describe('the comms inset (mockup C)', () => {
-  it('her face on the old monitor, ON COMMS · where she is; gone with null', () => {
+  it('her face on the old monitor, ON COMMS · where she is; with null it leaves, then is gone', () => {
+    vi.useFakeTimers();
     const inset = mountCommsInset(host);
     inset.show({ name: 'Nix', face: '/api/agents/nix-direct/sprite', where: 'Lowlight Intake', accent: '#ff4fa3' });
     expect(host.querySelector('.ci-cap')!.textContent).toBe('ON COMMS · LOWLIGHT INTAKE');
     expect(host.querySelector('.ci-face')).not.toBeNull();
     inset.show(null);
+    expect(host.querySelector('.ci:not(.ci-leaving)')).toBeNull();
+    vi.advanceTimersByTime(PORTRAIT_SWITCH_MS);
     expect(host.querySelector('.ci')).toBeNull();
+    vi.useRealTimers();
+  });
+
+  it('at bust size beside a stranger (speaker slot): the line moves over as for the bust', () => {
+    const inset = mountCommsInset(host);
+    inset.show({ name: 'Nix', face: '/api/agents/nix-direct/sprite', where: 'Lowlight Intake', bust: true });
+    expect(host.querySelector('.ci.ci-bust')).not.toBeNull();
+    expect(host.classList.contains('comms-bust')).toBe(true);
+    inset.show({ name: 'Nix', face: '/api/agents/nix-direct/sprite', where: 'Lowlight Intake' });
+    expect(host.classList.contains('comms-bust')).toBe(false);
   });
 });
 

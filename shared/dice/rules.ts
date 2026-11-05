@@ -36,7 +36,7 @@ export interface DiceState {
   /** The winner, once someone is out of dice. */
   over: Side | null;
   rounds: RoundRecord[];
-  /** mulberry32's accumulator (shared/gig/generate.ts's rng), carried so the state stays plain data. */
+  /** mulberry32's accumulator (shared/rng.ts's rng), carried so the state stays plain data. */
   rngState: number;
 }
 

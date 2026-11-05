@@ -551,6 +551,7 @@ describe('scene sound fields', () => {
 
   it.each([
     ['hum above 1', { hum: 1.2 }, 'hum'],
+    ['reverb above 1', { reverb: 1.5 }, 'reverb'],
     ['negative bed level', { bed: { src: 'a.ogg', level: -1 } }, 'level'],
     ['non-boolean indoor', { indoor: 'yes' }, 'indoor'],
     ['a bed escaping its folder', { bed: { src: '../x.ogg' } }, 'bed'],
@@ -659,6 +660,7 @@ describe('scene sound fields', () => {
     const neon = (pack: string, id: string) => get(pack, id).lights.filter((l) => l.sound === 'neon').map((l) => l.id).sort();
     expect(get('karasu', 'lowlight-intake').sound).toMatchObject({ indoor: true, hum: 0.3 });
     expect(get('default', 'workspace').sound).toMatchObject({ indoor: true, hum: 0.3 });
+    expect(get('karasu', 'intake-back-alley').sound).toMatchObject({ reverb: 0.3 });
     for (const [pack, id] of [['karasu', 'noodle-stall'], ['karasu', 'ribbon-rooftop'], ['default', 'rooftop']]) {
       expect(get(pack, id).sound?.indoor ?? false).toBe(false);
     }

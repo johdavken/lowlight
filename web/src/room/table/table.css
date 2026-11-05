@@ -1,0 +1,803 @@
+/* The table (the hand spec §5): a card table over the dimmed room. */
+/* Above the subtitle box and its input (she talks through a job), under the HUD and the input. */
+.tb {
+  position: absolute;
+  inset: 0 0 calc(var(--feed-bottom, 70px) + var(--box-h, 216px)) 0;
+  z-index: 24;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 'prose prose' 'middle middle' 'bottom bottom';
+  gap: 10px;
+  /* Clear of the HUD's top corners; air under the hand before the JOB column's head and her line. */
+  padding: 64px 24px 30px;
+  color: #cfeff7;
+  font-family: var(--pixel);
+}
+.tb[hidden] { display: none; }
+/* The room dims under a table all the way down, the chat box's band included: over the room and the figures
+   (z 19, after them), under the subtitles (z 20), so there's no edge where the table stops. The table itself
+   stays clear and still takes the clicks over the room. */
+#game.tb-dim::after { content: ''; position: absolute; inset: 0; z-index: 19; background: rgba(5, 2, 12, 0.55); pointer-events: none; }
+/* A polite notice (quests that can start here) would run across the rail; it waits out the job. */
+#game.tb-dim .feed-notice.polite { display: none; }
+.tb-right { display: flex; }
+.tb-prose { grid-area: prose; justify-self: center; max-width: 64ch; padding: 8px 14px; font: 15px/1.5 var(--mono); background: rgba(9, 4, 18, 0.75); }
+.tb-middle { grid-area: middle; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 0; }
+.tb-bottom { grid-area: bottom; display: flex; justify-content: center; gap: 16px; align-items: flex-end; }
+
+.tb-deal { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; }
+.tb-card,
+.tb-slot {
+  min-width: 44px;
+  min-height: 44px;
+  font: 17px/1.2 var(--pixel);
+  letter-spacing: 0.08em;
+  color: inherit;
+  text-align: left;
+  background: #120a22;
+  border: 1px solid rgba(127, 233, 255, 0.5);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 140ms ease-out, box-shadow 140ms ease-out, opacity 140ms;
+}
+.tb-card { width: 220px; min-height: 120px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.tb-card:hover[data-state='up'] { box-shadow: 0 0 0 2px var(--user); }
+.tb-card.s-down,
+.tb-slot.s-down { opacity: 0.4; cursor: default; background: repeating-linear-gradient(45deg, #120a22 0 6px, #0b0618 6px 12px); }
+.tb-card.s-locked { opacity: 0.5; cursor: default; border-style: dashed; }
+.tb-card.dealt { animation: tb-deal 260ms ease-out both; animation-delay: calc(var(--i) * 70ms); }
+@keyframes tb-deal {
+  from { opacity: 0; transform: translateY(24px) rotate(-3deg); }
+}
+
+.tb-hand { display: flex; gap: 18px; align-items: flex-end; }
+.tb-hand.scroll-x { overflow-x: auto; max-width: 100%; padding-bottom: 6px; }
+.tb-group-label { font-size: 13px; letter-spacing: 0.2em; margin-bottom: 4px; }
+.g-people .tb-group-label { color: var(--nix); }
+.g-pockets .tb-group-label,
+.g-deck .tb-group-label { color: var(--tool); }
+/* What the job leans on (programs spec §1.2a), under the DECK label at SETUP. */
+.g-deck .ts-lean { color: var(--tool); opacity: 0.75; font-size: 0.72em; letter-spacing: 0.08em; margin: -2px 0 4px; }
+.ts-tierline { color: var(--tool); opacity: 0.75; font-size: 0.72em; letter-spacing: 0.08em; margin: 0 0 4px; }
+.tb-tag.tier.lifted { color: var(--tool); }
+.tb-slots { display: flex; gap: 8px; }
+.tb-slot { width: 96px; height: 128px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+.g-people .tb-slot { border-color: var(--nix); color: var(--nix); }
+.g-pockets .tb-slot,
+.g-deck .tb-slot { border-color: var(--tool); color: var(--tool); }
+.tb-slot.s-empty { border-style: dashed; opacity: 0.4; cursor: default; }
+.tb-slot.locked { border-style: dashed; border-color: rgba(180, 140, 255, 0.4); color: rgba(180, 140, 255, 0.55); cursor: default; }
+.tb-lock { margin-top: auto; font-size: 12px; letter-spacing: 0.16em; }
+.tb-slot.lifted { transform: translateY(-14px); box-shadow: 0 0 12px var(--nix); }
+/* A recruit's card (crew abilities spec §2): one card that turns over (hand.ts), its ability tabs hanging under it, out
+   of the row's flow, so the recruit lines up with the pockets. The hand leaves room under the row for them. */
+.tb-crew-stack { position: relative; }
+.tb-flip { perspective: 900px; }
+.tb-flip-in { display: grid; transform-style: preserve-3d; transition: transform 320ms ease-in-out; }
+.tb-flip-in > .tb-slot { grid-area: 1 / 1; backface-visibility: hidden; }
+.tb-flip-in > .tb-side-b { transform: rotateY(180deg); }
+.tb-flip-in > .tb-side-b.lifted { transform: rotateY(180deg) translateY(-14px); }
+.tb-cardback { display: block; border-color: #b48cff; cursor: default; }
+.tb-cardback .tbc-art { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+/* Its abilities as index tabs hanging off the card's bottom edge (picked from docs/mockups/ability-marks.html, option C):
+   the card's own pink, a square in the timing's colour, the effect in words. They ride up with a lifted card. */
+.tb-hand:has(.tb-tabs) { padding-bottom: 22px; }
+.tb-tabs { position: absolute; top: calc(100% - 3px); left: 6px; right: 0; display: flex; flex-wrap: wrap; gap: 3px; transition: transform 160ms; }
+.tb-crew-stack:has(.tb-slot.lifted) .tb-tabs { transform: translateY(-14px); }
+.tb-tab { --c: #a8ff60; display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 2px 7px; font: 14px/1 var(--pixel); letter-spacing: 0.12em; color: #05020a; background: rgba(255, 79, 139, 0.7); border: 0; clip-path: polygon(0 0, 100% 0, 100% 70%, calc(100% - 5px) 100%, 0 100%); cursor: pointer; transition: background 120ms, transform 120ms; }
+.tb-tab-dot { width: 6px; height: 6px; flex: none; background: var(--c); outline: 1px solid #05020a; }
+.tb-tab.t-after { --c: #7fe9ff; }
+.tb-tab.t-end, .tb-tab.t-auto { --c: #ffc56b; }
+.tb-tab:hover:not(:disabled) { background: var(--nix); transform: translateY(1px); }
+/* The side up: the full pink. */
+.tb-tab.on { background: var(--nix); }
+.tb-tab.ready .tb-tab-dot { animation: tb-tab-ready 1.1s steps(2) infinite; box-shadow: 0 0 5px var(--c); }
+@keyframes tb-tab-ready { 50% { opacity: 0.25; } }
+.tb-tab.used { background: rgba(255, 79, 139, 0.28); color: rgba(5, 2, 10, 0.75); }
+/* Out of reach for want of NERVE (effect and NERVE spec §3): dimmed, still turns the card to say why. */
+.tb-tab.off { background: rgba(255, 79, 139, 0.4); color: rgba(5, 2, 10, 0.6); }
+.tb-tab.used .tb-tab-dot { background: rgba(5, 2, 10, 0.5); }
+.tb-tab:disabled { background: rgba(255, 79, 139, 0.2); cursor: default; }
+.tb-slot.tb-after { box-shadow: 0 0 0 2px #7fe9ff, 0 0 14px #7fe9ff; animation: tb-after 1.4s ease-in-out infinite; }
+@keyframes tb-after { 50% { box-shadow: 0 0 0 2px #7fe9ff, 0 0 4px #7fe9ff; } }
+.tbc-ability { display: flex; align-items: flex-start; justify-content: flex-start; background: linear-gradient(160deg, rgba(168, 255, 96, 0.18), rgba(8, 3, 16, 0.9)); }
+.tbc-ability.t-after { background: linear-gradient(160deg, rgba(127, 233, 255, 0.2), rgba(8, 3, 16, 0.9)); }
+.tbc-ability.t-end, .tbc-ability.t-auto { background: linear-gradient(160deg, rgba(255, 197, 107, 0.2), rgba(8, 3, 16, 0.9)); }
+.g-pockets .tb-slot.lifted { box-shadow: 0 0 12px var(--tool); }
+/* Programs in the DECK group (programs spec §2.1): a tap toggles them, so they don't pulse like an AFTER A ROLL card; one marked
+   to load or run glows in the tool colour. */
+.g-deck .tb-slot.tb-after { box-shadow: none; animation: none; }
+.g-deck .tb-slot.on { box-shadow: 0 0 0 2px var(--tool), 0 0 14px var(--tool); }
+.g-deck .tb-slot[data-id^='prog-pick:'] { box-shadow: 0 0 0 1px rgba(127, 233, 255, 0.6); }
+.tbc-prog .tbc-art { width: 100%; height: 100%; object-fit: cover; }
+
+.tb.phone { grid-template-columns: minmax(0, 1fr); grid-template-areas: 'prose' 'middle' 'bottom'; padding: 10px 16px; overflow-y: auto; }
+.tb.phone .tb-deal { flex-direction: column; align-items: stretch; }
+.tb.phone .tb-card { width: auto; min-height: 64px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tb-card,
+  .tb-slot { transition: none; }
+  .tb-slot.tb-after,
+  .tb-tab.ready .tb-tab-dot { animation: none; }
+  .tb-tabs { transition: none; }
+  .tb-flip-in { transition: none; }
+}
+
+/* Card faces */
+.tb-face { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+.tb-name { font-size: 18px; letter-spacing: 0.1em; }
+.tb-sub { font-size: 13px; letter-spacing: 0.12em; opacity: 0.75; }
+.tb-line { font: 15px/1.35 var(--mono); color: #e3f6fb; }
+.tb-odds { font-size: 15px; letter-spacing: 0.1em; color: var(--user); }
+.tb-odds.preview { color: var(--nix); text-shadow: 0 0 6px rgba(255, 79, 139, 0.6); }
+.tb-odds.none { opacity: 0.45; }
+.tb-flag { font-size: 13px; letter-spacing: 0.16em; color: var(--tool); }
+.tb-flag.red { color: #ff5a5a; }
+.tb-said { font: italic 14px/1.4 var(--mono); color: var(--user); }
+.tb-actions { display: flex; gap: 8px; margin-top: 4px; }
+.tb-actions button,
+.tb-push,
+.tb-close,
+.ts-buttons button {
+  min-height: 44px;
+  padding: 4px 14px;
+  font: 16px var(--pixel);
+  letter-spacing: 0.14em;
+  color: var(--user);
+  background: rgba(9, 4, 18, 0.85);
+  border: 1px solid var(--user);
+  cursor: pointer;
+}
+.tb-push.on { color: #fff; text-shadow: 0 0 8px var(--user); }
+.tb-push.on .tb-chip { filter: drop-shadow(0 0 6px var(--user)) brightness(1.25); }
+.tb-push[hidden] { display: none; }
+.tb-head { display: flex; gap: 14px; align-items: baseline; font-size: 17px; letter-spacing: 0.16em; }
+.tb-title { color: var(--user); }
+.tb-extra { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 520px; }
+.tb-card.cover { border-color: var(--tool); }
+.tb-card.tb-debrief { width: min(520px, 100%); cursor: default; }
+.tb-hand[hidden] { display: none; }
+
+/* The check plays on the card that rolled (check-anim.ts) */
+.tb-card { position: relative; overflow: hidden; }
+.tb-deal:has(> .tb-card.is-locked) > .tb-card:not(.is-locked) { opacity: 0.3; }
+.tb-card.is-locked { border-color: var(--user); box-shadow: 0 0 0 2px var(--user); }
+.tb-card.is-pass { border-color: #7dff9b; }
+.tb-card.is-pass .qc-stamp { color: #7dff9b; opacity: 1; transform: scale(1); }
+.tb-card.is-cost { border-color: #ffc56b; }
+.tb-card.is-cost .qc-stamp { color: #ffc56b; opacity: 1; transform: none; }
+.tb-card.is-fail { border-color: #ff5a5a; }
+.tb-card.is-fail .qc-stamp { color: #ff5a5a; opacity: 1; transform: scale(1); }
+.tb-card.is-rolling .qc-die { animation: qc-tumble 0.12s steps(2) infinite; }
+/* The table's pixel dice (pixel-dice.ts): the card slides left, the others fade away entirely (playtest:
+   cleaner), the dice roll in beside it and the stamp lands after the last die. */
+/* As specific as the lock's 0.3 above (its :has counts .is-locked), or that one wins and they stay up. */
+.tb-deal:has(> .tb-roll):has(> .tb-card.is-locked) > .tb-card:not(.is-locked),
+.tb-deal:has(> .tb-roll) > .tb-card:not(.is-locked) { opacity: 0; pointer-events: none; }
+.tb-card { transition: transform 140ms ease-out, box-shadow 140ms ease-out, opacity 0.3s, translate 0.35s cubic-bezier(0.3, 0.7, 0.3, 1); }
+.tb-roll { position: absolute; z-index: 2; pointer-events: none; }
+.tb-roll-dice { display: block; image-rendering: pixelated; }
+.tb-roll .qc-stamp { position: absolute; left: calc(var(--rest) + 4px); right: auto; top: auto; bottom: 22%; font: 44px/1 var(--pixel); letter-spacing: 0.08em; white-space: nowrap; text-shadow: 0 0 14px currentColor; transform-origin: left center; }
+.tb-roll.is-pass .qc-stamp { color: #7dff9b; opacity: 1; transform: scale(1) rotate(-6deg); }
+.tb-roll.is-cost .qc-stamp { color: #ffc56b; opacity: 1; transform: rotate(-6deg); }
+.tb-roll.is-fail .qc-stamp { color: #ff5a5a; opacity: 1; transform: scale(1) rotate(-6deg); }
+/* What the roll did, under the stamp (check-anim.ts rollLine): through or failed, TAKE, ALARM, heat. Shows as it lands. */
+.tb-roll .qc-says { position: absolute; left: calc(var(--rest) + 8px); top: calc(78% + 6px); white-space: nowrap; font: 16px/1.2 var(--pixel); letter-spacing: 0.1em; color: #e6dcf2; text-shadow: 0 1px 2px #000, 0 0 6px #000; opacity: 0; transition: opacity 0.2s 0.1s; }
+.tb-roll:is(.is-pass, .is-cost, .is-fail) .qc-says { opacity: 1; }
+.tb-card > .qc-says { display: block; margin-top: 6px; font: 14px var(--pixel); letter-spacing: 0.12em; color: #e6dcf2; }
+/* A roll waiting on STEADY / TAKE IT (job-table.ts parkRoll): its card, dice and stamp at the front of the deal, STEADY
+   over TAKE IT in a column beside it, all in about one card row's height so the hand stays clear. The tray keeps only the
+   dice and the stamp's room, its empty headroom hanging up into the prose's margin; the card narrows to two lines, and
+   goes at four dice and up (.many), where the dice alone fill the row. */
+.tb-parked { display: flex; align-items: flex-end; gap: 12px; }
+.tb-job:not(.phone) .tb-parked .tb-card { width: 240px; }
+.tb-parked .tb-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+/* A phone's dice are on the card itself: it stays. */
+.tb:not(.phone) .tb-parked.many .tb-card { display: none; }
+.tb:not(.phone) .tb-deal:has(> .tb-parked) { display: grid; grid-template-rows: auto auto; grid-auto-flow: column; justify-content: center; align-items: end; column-gap: 14px; row-gap: 8px; }
+.tb:not(.phone) .tb-deal > .tb-parked { grid-row: 1 / span 2; align-self: end; }
+/* A dealt roll's costs (roll lifecycle spec §1.5, mockup cost-cards.html A): a row of cards beside the waiting roll. */
+.tb:not(.phone) .tb-deal > .tb-costs { grid-row: 1 / span 2; align-self: end; }
+.tb-costs { display: flex; flex-direction: column; gap: 8px; }
+.tb-costs-head { font: 16px/1 var(--pixel); letter-spacing: 0.22em; color: var(--amber, #ffc56b); }
+.tb-costs-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.tb-cost { position: relative; display: flex; flex-direction: column; gap: 6px; width: 210px; min-height: 150px; padding: 10px 10px 8px; color: var(--ink, #cfeff7); background: rgba(5, 2, 10, 0.92); border: 1px solid #3a4a54; }
+.tb-cost.pickable { cursor: pointer; }
+.tb-cost.pickable:hover, .tb-cost.pickable:focus-visible { border-color: var(--user); outline: none; }
+.tb-cost.picked { border-color: var(--amber, #ffc56b); box-shadow: 0 0 0 1px var(--amber, #ffc56b), 0 0 14px rgba(255, 197, 107, 0.35); }
+.tb-cost.settled { opacity: 0.5; }
+.tb-cost.settled .tb-cost-line { text-decoration: line-through; }
+.tb-cost-tag { font: 500 26px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.06em; color: #fff; }
+.tb-cost-line { font: 13px/1.45 var(--mono, 'IBM Plex Mono', monospace); opacity: 0.6; font-style: italic; }
+/* The GM's line fades in over the written one. */
+.tb-cost-line.gm { opacity: 0.95; font-style: normal; animation: tb-cost-in 450ms ease-out; }
+@keyframes tb-cost-in { from { opacity: 0; } to { opacity: 0.95; } }
+@media (prefers-reduced-motion: reduce) { .tb-cost-line.gm { animation: none; } }
+.tb-cost-btns { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
+.tb-cost-btn { font: 15px/1.1 var(--pixel); letter-spacing: 0.14em; padding: 3px 8px 2px; border: 1px solid currentColor; background: none; color: var(--ink, #cfeff7); text-align: left; cursor: pointer; }
+.tb-cost-btn small { margin-left: 6px; opacity: 0.7; letter-spacing: 0.06em; }
+.tb-cost-btn.resist { color: var(--user); }
+.tb-cost-btn.armour { color: var(--amber, #ffc56b); }
+.tb-cost-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.tb-cost-btn:focus-visible { outline: 1px solid var(--user); outline-offset: 2px; }
+.tb-cost-how { margin-top: auto; font: 15px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--user); }
+.tb-cost-dice { margin-left: 8px; opacity: 0.8; }
+.tb-job .tb-deal:has(> .tb-parked) > .tb-card.pic { height: 62px; }
+/* Its result's colour on the edge, not the lock's ring: a save turns it from the miss's to the cost's. */
+.tb-parked .tb-card { pointer-events: none; box-shadow: none; }
+/* Room for the stamp and, under it, the longest line (`THROUGH · +1 TAKE · ALARM +1 · HEAT +1`), clear of STEADY. */
+.tb-parked .tb-roll { position: relative; flex: 0 0 auto; width: calc(var(--rest) + 300px); }
+.tb:not(.phone) .tb-parked .tb-roll { margin-top: -52px; }
+.tb.phone .tb-parked { flex-direction: column; align-items: stretch; }
+/* A save glitches the waiting miss to a cost (check-anim.ts glitchSave): the stamp tears and splits while it scrambles. */
+.is-glitching .qc-stamp { animation: tb-glitch 0.1s steps(2) infinite; text-shadow: -3px 0 #ff3b5c, 3px 0 #7fe9ff; }
+.tb-card.is-glitching { animation: tb-glitch-edge 0.1s steps(2) infinite; }
+@keyframes tb-glitch { 0% { translate: -2px 0; clip-path: inset(0 0 45% 0); } 50% { translate: 3px 1px; clip-path: inset(40% 0 0 0); } 100% { translate: 0 -1px; clip-path: none; } }
+@keyframes tb-glitch-edge { 0% { border-color: #ff5a5a; } 50% { border-color: #ffc56b; } }
+.tb.tb-shake { animation: tb-shake 0.6s steps(9) both; }
+@keyframes tb-shake { 0%, 100% { translate: 0 0; } 20% { translate: -9px 2px; } 40% { translate: 9px -2px; } 60% { translate: -5px 1px; } 80% { translate: 4px -1px; } }
+@media (prefers-reduced-motion: reduce) {
+  .tb-card { transition: none; }
+  .tb.tb-shake { animation: none; }
+  .is-glitching .qc-stamp,
+  .tb-card.is-glitching { animation: none; }
+}
+
+/* The setup card */
+.ts-pitch { grid-area: prose; justify-self: center; display: flex; flex-direction: column; gap: 4px; max-width: 520px; padding: 10px 16px; text-align: center; background: #120a22; border: 1px solid rgba(127, 233, 255, 0.5); border-radius: 4px; }
+/* SETUP's title on a plate cut like the hand's cards, an amber edge, the tier as a chip (mockup setup-frames.html, B). */
+.tb:not(.phone) .ts-pitch { padding: 0; background: none; border: 0; border-radius: 0; }
+.ts-title { display: flex; align-items: center; gap: 14px; padding: 8px 30px 8px 18px; background: linear-gradient(90deg, rgba(30, 18, 54, 0.97), rgba(24, 14, 44, 0.86)); box-shadow: inset 0 1px 0 rgba(127, 233, 255, 0.4), inset 0 -1px 0 rgba(127, 233, 255, 0.15); border-left: 4px solid var(--tool, #ffb347); clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); }
+.ts-title-t { font: 30px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.06em; color: #f1eaff; }
+.ts-tier { padding: 1px 7px; font: 14px var(--pixel); letter-spacing: 0.14em; color: #05020a; background: #ffc56b; }
+.ts-line { font: 14px/1.4 var(--mono); }
+.ts-approach { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.ts-approach .tb-group-label { color: var(--user); }
+.ts-approach .tb-card { width: 180px; min-height: 84px; }
+.tb-card.chosen { box-shadow: 0 0 0 2px var(--user), 0 0 14px var(--user); }
+.ts-refusal { min-height: 1.2em; font-size: 16px; letter-spacing: 0.14em; color: #ff5a5a; }
+.ts-ready { display: flex; flex-direction: column; gap: 6px; }
+.ts-ready .tb-group-label { color: var(--nix); }
+.ts-ready .tb-slot { width: 120px; height: auto; min-height: 44px; border-color: var(--nix); color: var(--nix); opacity: 0.75; }
+.ts-ready .tb-slot.s-locked { opacity: 0.35; cursor: default; }
+/* The program tray shares HOW YOU GO IN's place: one cell, the approach held there unseen so nothing below moves. */
+.ts-stage { display: grid; width: 100%; min-height: 0; }
+.ts-stage > * { grid-area: 1 / 1; min-width: 0; }
+.ts-stage.picking > .ts-mid { visibility: hidden; }
+.ts-tray { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; animation: ts-tray-in 140ms ease-out; }
+.ts-tray[hidden] { display: none; }
+/* The slot it's open for, lit from inside: the card's cut would clip a glow outside it. */
+.tb-hand .g-deck .tb-slot.on { position: relative; box-shadow: none; }
+.tb-hand .g-deck .tb-slot.on::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: inset 0 0 0 2px var(--tool), inset 0 0 22px rgba(255, 179, 71, 0.45); }
+.ts-tray-head { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.ts-tray-head .tb-group-label { margin-bottom: 0; }
+.ts-tray-shut { min-height: 0; padding: 0; display: flex; align-items: center; gap: 6px; font: 13px var(--pixel); letter-spacing: 0.2em; color: rgba(255, 179, 71, 0.65); background: none; border: 0; cursor: pointer; }
+.ts-tray-shut:hover { color: var(--tool); }
+.ts-tray-shut kbd { font: 12px var(--pixel); padding: 0 4px; border: 1px solid currentColor; }
+/* A phone's SETUP scrolls: the middle keeps its height (it collapsed under the hand), the tray in the approach's stead. */
+.tb.phone.tb-setup > .tb-middle { min-height: auto; }
+.tb.phone .ts-stage.picking > .ts-mid { display: none; }
+.tb.phone .ts-tray { align-items: stretch; }
+.tb.phone .ts-tray .tb-slots { overflow-x: auto; scrollbar-width: none; }
+.tb.phone .ts-tray .tb-slot { flex: none; }
+@keyframes ts-tray-in {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ts-tray { animation: none; }
+}
+/* GO IN and BACK beside the approach cards (pick how, then go), not in the hand's row, which is full. */
+.ts-mid { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; column-gap: 36px; width: 100%; }
+.ts-mid > .ts-approach { grid-column: 2; }
+.ts-mid > .ts-buttons { grid-column: 3; justify-self: start; margin-bottom: 4px; }
+.ts-buttons { flex: none; display: flex; flex-direction: column; gap: 10px; width: 170px; }
+/* GO IN: a slab in the hand's cards' cut (the clipped top-right corner), ▸ at its end, its key under the word. */
+.ts-buttons .ts-go { position: relative; min-height: 0; height: 64px; padding: 0 40px 0 20px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 2px; font: 30px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.1em; color: #04131a; background: var(--user); border: 0; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%); filter: drop-shadow(0 0 10px rgba(127, 233, 255, 0.45)); transition: filter 120ms; }
+.ts-buttons .ts-go::after { content: '▸'; position: absolute; right: 18px; top: 50%; transform: translateY(-50%); font-size: 24px; }
+.ts-buttons .ts-go:hover { filter: drop-shadow(0 0 16px rgba(127, 233, 255, 0.8)); }
+.ts-key { font: 12px var(--pixel); letter-spacing: 0.2em; opacity: 0.65; }
+/* BACK: a quiet word under it with its key. */
+.ts-buttons .ts-back { align-self: flex-start; min-height: 0; padding: 2px 0; display: flex; align-items: center; gap: 8px; font: 16px var(--pixel); letter-spacing: 0.2em; color: rgba(127, 233, 255, 0.6); background: none; border: 0; }
+.ts-buttons .ts-back:hover { color: var(--user); }
+.ts-back kbd { font: 13px var(--pixel); padding: 0 4px; border: 1px solid rgba(127, 233, 255, 0.4); }
+.tb.phone .tb-bottom { flex-direction: column; align-items: stretch; }
+.tb.phone .tb-prose { justify-self: stretch; }
+.tb.phone .ts-ready { flex-direction: row; flex-wrap: wrap; }
+.tb.phone .ts-mid { grid-template-columns: minmax(0, 1fr); row-gap: 10px; }
+.tb.phone .ts-mid > * { grid-column: 1; }
+
+.tb-strip { display: flex; gap: 16px; font-size: 15px; letter-spacing: 0.14em; color: #ffb36b; }
+.tb-pay,
+.tb-pot { color: #ffc56b; }
+.tb-art { display: block; width: min(520px, 100%); height: 110px; object-fit: cover; object-position: center 45%; image-rendering: pixelated; filter: saturate(0.45) brightness(0.6) contrast(0.95); -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent); mask-image: linear-gradient(to bottom, #000 55%, transparent); }
+.tb-art[hidden] { display: none; }
+
+/* Cards in the hand (the hand spec §5): a recruit as the crew panel's hire card draws them, scaled down; the other
+   cards as their picture in the same frame. Angled corners like the hire card. */
+.tb-slot {
+  width: 192px;
+  height: 256px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.tb-slot.s-empty { background: transparent; }
+.tbc { display: flex; flex-direction: column; width: 100%; height: 100%; text-align: left; }
+.tbc-pic {
+  position: relative;
+  flex: none;
+  height: 108px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 90%, color-mix(in srgb, currentColor 18%, transparent), transparent 70%), #05020a;
+}
+.tbc-face { height: 100%; image-rendering: pixelated; }
+.tbc-face.cr-mono { width: 58px; height: 58px; margin-bottom: 22px; display: grid; place-items: center; border-radius: 50%; border: 2px solid currentColor; font: 30px var(--pixel); }
+.tbc-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.tbc-spec { position: absolute; z-index: 1; top: 4px; left: 6px; font: 12px var(--pixel); letter-spacing: 0.16em; text-shadow: 0 1px 2px #000, 0 0 4px #000; }
+.tbc-grade { position: absolute; z-index: 1; top: 4px; right: 6px; padding: 0 5px; font: 12px var(--pixel); letter-spacing: 0.12em; }
+.tbc-grade { color: #05020a; background-color: var(--tbc-c, #7fe9ff); }
+.tbc-body { display: flex; flex-direction: column; gap: 3px; padding: 6px 8px; min-height: 0; overflow: hidden; }
+.tbc-name { font: 24px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; }
+.tbc-note { font: 13px/1.1 var(--pixel); letter-spacing: 0.08em; opacity: 0.9; }
+.tbc-tr { font: 11px/1.1 var(--pixel); letter-spacing: 0.06em; color: #7dff9b; }
+.tbc-tr.bad { color: #ff8fa3; }
+.tbc-ab { font: 11px/1.1 var(--pixel); letter-spacing: 0.06em; color: #a8ff60; }
+.g-people .tb-slot { --tbc-c: var(--nix); }
+.g-pockets .tb-slot,
+.g-deck .tb-slot { --tbc-c: var(--tool); }
+.tb-slot.locked { --tbc-c: #b48cff; }
+.tb-slot.locked .tbc-art,
+.tb-slot.s-empty .tbc-art { filter: grayscale(0.7) brightness(0.55); }
+.tb-slot.s-down .tbc { opacity: 0.75; }
+.tb-slot.s-down { background: #120a22; }
+
+/* The setup card: pictures on the approaches, the ready crew as smaller cards in a row. */
+.ts-approach .tb-card { width: 168px; min-height: 0; padding: 0; overflow: hidden; --tbc-c: var(--user); }
+.ts-approach .tbc-pic { height: 92px; }
+.ts-approach .tbc-name { font-size: 22px; color: var(--user); }
+.ts-contacts { flex-direction: row !important; flex-wrap: wrap; align-items: flex-end; max-width: 380px; }
+.ts-contacts .tb-group-label { width: 100%; }
+.ts-ready:not(.ts-contacts) { flex-direction: column !important; flex: none; width: 348px; min-width: 0; }
+.ts-ready-head { display: flex; align-items: center; gap: 6px; }
+.ts-count { margin-left: 2px; opacity: 0.6; }
+.ts-cycle { min-width: 28px; min-height: 22px; padding: 0 6px; font: 16px/1 var(--pixel); color: var(--nix); background: rgba(9, 4, 18, 0.85); border: 1px solid var(--nix); border-radius: 3px; cursor: pointer; }
+.ts-cycle:first-of-type { margin-left: auto; }
+.ts-cycle:hover { box-shadow: 0 0 8px var(--nix); }
+.ts-ready-strip { min-width: 0; max-width: 100%; display: flex; gap: 6px; align-items: flex-end; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding-top: 16px; margin-top: -16px; }
+.ts-ready-strip::-webkit-scrollbar { display: none; }
+.ts-ready-strip > .tb-slot { flex: none; scroll-snap-align: start; }
+.ts-ready .tb-slot { width: 112px; height: 172px; --tbc-c: var(--nix); }
+.ts-ready .tbc-pic { height: 84px; }
+.ts-ready .tbc-name { font-size: 20px; }
+
+/* Room for the bigger hand: the prose scrolls, the job's picture shrinks. */
+.tb-prose { max-height: 84px; overflow-y: auto; }
+.tb-art { height: 64px; }
+/* Fitting the job table above the subtitle box with the bigger hand. */
+.tb { gap: 6px; }
+.tb-middle { gap: 6px; }
+.tb-job .tb-card { min-height: 92px; padding: 8px 10px; }
+.tb-art { height: 40px; }
+.tbc-pic { height: 98px; }
+.tb-slot.s-empty { display: grid; place-items: center; font-size: 13px; letter-spacing: 0.16em; color: rgba(207, 239, 247, 0.3); }
+
+/* The rail: TAKE, ALARM and NERVE as three bare stacks side by side, filling from the bottom. */
+.tb-right { flex-direction: row; gap: 10px; align-items: flex-end; filter: drop-shadow(0 1px 2px #000) drop-shadow(0 0 4px rgba(0, 0, 0, 0.8)); }
+.tb-take,
+.tb-alarm,
+.tb-nerve { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.tb-take { color: var(--tool); }
+.tb-alarm { color: #ff3b5c; }
+.tb-nerve { color: var(--user); }
+.tb-nerve.gone { color: rgba(127, 233, 255, 0.4); }
+.tb-num { font-size: 22px; line-height: 1; }
+.tb-stack { display: flex; flex-direction: column-reverse; gap: 3px; }
+.tb-stack i { width: 30px; height: 12px; border: 1px solid currentColor; opacity: 0.5; }
+.tb-stack i.f { background: currentColor; opacity: 1; box-shadow: 0 0 6px currentColor; }
+.tb-word { font-size: 13px; letter-spacing: 0.18em; writing-mode: vertical-rl; transform: rotate(180deg); }
+.tb-alarm.out .tb-word { text-shadow: 0 0 8px rgba(255, 59, 92, 0.7); animation: tb-out 900ms steps(2) infinite; }
+@keyframes tb-out {
+  50% { opacity: 0.35; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-alarm.out .tb-word { animation: none; }
+}
+.tb-chip { width: 34px; height: 34px; vertical-align: middle; }
+/* PUSH in the rail after NERVE: a narrow column, its chip over the word. */
+.tb-push { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; align-self: flex-end; min-width: 52px; padding: 6px 4px; font-size: 13px; letter-spacing: 0.12em; }
+.tb-push .tb-chip { width: 30px; height: 30px; }
+/* Bare: no box, only the chip and its words (pressed, they glow). */
+.tb-push { background: none; border: 0; }
+.tb-push:focus-visible { outline: 1px solid var(--user); outline-offset: 2px; }
+/* SAFE and BOLD stacked beside PUSH (mockup effect-rail.html A): framed words, one or neither lit; off says why on hover. */
+.tb-trade { display: flex; flex-direction: column; gap: 4px; align-self: flex-end; padding-bottom: 6px; }
+.tb-trade[hidden] { display: none; }
+.tb-trade button { padding: 2px 8px 1px; font: 14px/1.1 var(--pixel); letter-spacing: 0.14em; color: rgba(207, 239, 247, 0.55); background: none; border: 1px solid currentColor; cursor: pointer; }
+.tb-trade .tb-safe.on { color: #fff; text-shadow: 0 0 8px var(--user); border-color: var(--user); }
+.tb-trade .tb-bold.on { color: #ffc56b; text-shadow: 0 0 8px rgba(255, 197, 107, 0.7); border-color: #ffc56b; }
+.tb-trade button:disabled { opacity: 0.35; cursor: not-allowed; }
+.tb-trade button:focus-visible { outline: 1px solid var(--user); outline-offset: 2px; }
+/* Choice cards: solid on the felt, their edge in their position's colour, its mark in the corner. */
+.tb-job .tb-card { position: relative; background: rgba(12, 6, 22, 0.94); border-left-width: 4px; padding-right: 46px; }
+.tb-job .tb-card[data-pos='dark'] { border-left-color: #4f9dff; }
+.tb-job .tb-card[data-pos='open'] { border-left-color: #ffb347; }
+.tb-job .tb-card[data-pos='wire'] { border-left-color: #ff3b5c; }
+.tb-pos { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; }
+/* A blown job's debrief, stamped. */
+.tb-seal { position: absolute; top: -10px; right: -6px; width: 92px; height: 92px; transform: rotate(12deg); filter: drop-shadow(0 3px 4px #000); pointer-events: none; }
+.tb-card.tb-debrief { overflow: visible; }
+.tb-setup { background-position: center bottom; }
+/* The rail sits at the right end of the bottom row: the hand, then the rail with PUSH. The prose never shrinks away; wider choices. */
+.tb-right { align-self: center; }
+.tb-right { order: 2; }
+.tb-right:not(:has(:is(.tb-take, .tb-alarm, .tb-nerve):not([hidden]))) { display: none; }
+.tb-prose { flex: none; }
+.tb-job .tb-card { width: 280px; }
+/* The debrief isn't a choice: wide enough that its lines don't stack a word at a time. */
+.tb-job .tb-card.tb-debrief { width: min(720px, 100%); padding-right: 12px; }
+.tb-slot.s-empty .tbc-name { color: rgba(255, 179, 71, 0.75); }
+.tb-slot.s-empty .tbc-note { color: rgba(255, 225, 200, 0.6); }
+.tb.phone .tb-right { order: -3; align-self: center; }
+
+/* Graft tips (tips.ts): one callout at a time, pointing at the piece it explains. Only it takes the pointer. Over the
+   table (24), under the full screens (29) and the HUD with SYS (30). */
+.gt-tip { position: absolute; z-index: 26; width: 300px; max-width: calc(100% - 16px); padding: 10px 12px; background: rgba(12, 6, 22, 0.96); border: 1px solid var(--user); box-shadow: 0 0 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(127, 233, 255, 0.25); color: #cfeff7; pointer-events: auto; animation: tb-deal 200ms ease-out both; }
+.gt-tip.strip { left: 16px; right: 16px; bottom: calc(var(--feed-bottom, 70px) + var(--box-h, 216px) + 210px); width: auto; max-width: none; }
+.gt-title { display: block; font: 13px var(--pixel); letter-spacing: 0.16em; color: var(--user); }
+.gt-text { margin: 6px 0 8px; font: 13px/1.45 var(--mono); }
+.gt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.gt-ok,
+.gt-skip { font: 12px var(--pixel); letter-spacing: 0.14em; background: none; border: 0; color: #cfeff7; cursor: pointer; padding: 2px 4px; }
+.gt-ok { border: 1px solid var(--user); padding: 4px 10px; color: var(--user); }
+.gt-skip { color: rgba(207, 239, 247, 0.5); }
+.gt-arrow { position: absolute; width: 10px; height: 10px; background: inherit; border: inherit; left: calc(50% - 5px); transform: rotate(45deg); }
+.gt-tip[data-side='above'] .gt-arrow { bottom: -6px; border-top: 0; border-left: 0; }
+.gt-tip[data-side='below'] .gt-arrow { top: -6px; border-bottom: 0; border-right: 0; }
+.gt-tip[data-side='left'] .gt-arrow,
+.gt-tip[data-side='right'] .gt-arrow,
+.gt-tip.strip .gt-arrow { display: none; }
+
+/* Cards in the hand fill with their picture (the full-bleed look picked 2026-10-31): the faces and pictures are
+   all 3:4, so the card shows them whole. The specialty and grade sit over the top, the words on a fade at the foot. */
+.tb-slot .tbc { position: relative; }
+.tb-slot .tbc-pic { position: absolute; inset: 0; height: auto; background: #05020a; }
+/* An ability's card without its picture yet shows its timing's colour (faces.ts). */
+.tb-slot .tbc-pic.tbc-ability { background: linear-gradient(160deg, rgba(168, 255, 96, 0.22), #05020a 70%); }
+.tb-slot .tbc-pic.tbc-ability.t-after { background: linear-gradient(160deg, rgba(127, 233, 255, 0.24), #05020a 70%); }
+.tb-slot .tbc-pic.tbc-ability.t-end, .tb-slot .tbc-pic.tbc-ability.t-auto { background: linear-gradient(160deg, rgba(255, 197, 107, 0.24), #05020a 70%); }
+.tb-slot .tbc-face:not(.cr-mono) { width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; }
+.tb-slot .tbc-face.cr-mono { align-self: center; margin: 0 0 40px; }
+.tb-slot .tbc-body { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 28px 8px 7px; background: linear-gradient(to bottom, transparent, rgba(5, 2, 10, 0.82) 38%, rgba(5, 2, 10, 0.96)); }
+.tb-slot .tbc-name { text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); }
+.tb-slot.locked .tbc-face { filter: grayscale(0.7) brightness(0.55); }
+
+/* The hand's words, sized to its card; the ready strip keeps the small ones. */
+.tb-hand .tbc-name, .tb-load-tray .tbc-name { font-size: 30px; }
+.tb-hand .tbc-note, .tb-load-tray .tbc-note { font-size: 15px; }
+.tb-hand .tbc-spec, .tb-hand .tbc-grade, .tb-load-tray .tbc-spec, .tb-load-tray .tbc-grade { font-size: 14px; }
+.tb-hand .tbc-tr, .tb-hand .tbc-ab { font-size: 13px; }
+/* A full hand of six tucks in a little, to clear the line keys and her subtitle (hand.ts). */
+.tb-hand.tuck .tb-slots > * + * { margin-left: -15px; }
+.tb-hand.tuck:not(.scroll-x) { position: relative; left: 14px; }
+/* SETUP has less height, and the ready strip beside it: its hand sits smaller, and the tray's row smaller still. */
+.ts-hand .tb-slot { zoom: 0.875; }
+.tb-load-tray .tb-slot { zoom: 0.7; }
+.tb-load-tray .tb-slots { flex-wrap: wrap; justify-content: center; }
+/* A job's LOAD: the tray stands over the moment, which steps aside without moving. */
+.tb-middle > .tb-load-tray { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+.tb-middle > .tb-load-tray[hidden] { display: none; }
+.tb-middle:has(> .tb-load-tray:not([hidden])) { position: relative; }
+.tb-middle:has(> .tb-load-tray:not([hidden])) > :not(.tb-load-tray) { visibility: hidden; }
+
+/* Face down: the whole back, the name and why on a strip. */
+.tbc-back { position: relative; display: block; width: 100%; height: 100%; }
+.tbc-back .tbc-art { filter: brightness(0.8); }
+.tbc-strip { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 2px 8px 3px; color: #d9c08a; background: rgba(5, 2, 10, 0.88); }
+.tbc-strip .tbc-name { font-size: 20px; }
+.tbc-strip .tbc-note { font-size: 12px; }
+.tb-slot.s-down:has(.tbc-back) { opacity: 0.85; border-color: rgba(207, 180, 120, 0.6); }
+.tb-slot.s-down .tbc-back { opacity: 1; }
+
+/* A job's hand is dealt face down and turns over a card at a time (hand.ts). */
+.tb-slot.dealt-down { animation: tb-flip-in 620ms ease-out backwards; animation-delay: calc(var(--i) * 140ms); }
+.tb-slot.dealt-down:not(.s-down)::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: url('/cards/back.webp') center / cover; image-rendering: pixelated; animation: tb-back-off 620ms steps(1) both; animation-delay: calc(var(--i) * 140ms); }
+.tb-slot.dealt-down { position: relative; }
+@keyframes tb-flip-in {
+  0% { opacity: 0; transform: translateY(30px) rotateY(0); }
+  20% { opacity: 1; transform: translateY(0) rotateY(0); }
+  55% { transform: rotateY(90deg); }
+  100% { transform: rotateY(0); }
+}
+@keyframes tb-back-off {
+  0% { opacity: 1; }
+  55%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-slot.dealt-down { animation: none; }
+  .tb-slot.dealt-down::after { display: none; }
+}
+
+/* STEADY and TAKE IT after a costly roll: picture cards the size of the other choices (a taller card pushes the job's
+   title over the top bar), the art as a banner cropped to its subject, the words on a fade at the foot. */
+.tb-job .tb-card.pic { width: 280px; min-height: 0; height: 92px; padding: 0; border-left-width: 1px; --tbc-c: var(--user); }
+.tb-card.pic .tb-face,
+.tb-card.pic .tbc { position: relative; height: 100%; }
+.tb-card.pic .tbc-pic { position: absolute; inset: 0; height: auto; background: #05020a; }
+.tb-card.pic .tbc-body { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; padding: 18px 10px 6px; background: linear-gradient(to bottom, transparent, rgba(5, 2, 10, 0.82) 38%, rgba(5, 2, 10, 0.96)); }
+.tb-card.pic .tbc-name { font-size: 24px; color: var(--user); text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); }
+.tb-card.pic[data-choice='!take'] { border-color: #ff5a5a; --tbc-c: #ff5a5a; }
+.tb-card.pic[data-choice='!take'] .tbc-name { color: #ff8f8f; }
+.tb-card.pic[data-choice='!steady'] .tbc-art { object-position: 50% 28%; }
+.tb-card.pic[data-choice='!take'] .tbc-art { object-position: 50% 30%; }
+/* The job's written text reads in the JOB column beside the subtitles (job-column.ts): the table keeps the
+   SETUP title and a beat's head and strip, and its cards get the height. A phone's table keeps its prose. */
+.tb:not(.phone) .tb-prose,
+.tb:not(.phone) .ts-pitch .ts-line,
+.tb:not(.phone) .ts-pitch .tb-sub { display: none; }
+
+/* A checked choice as the hand's cards (mockup call-cards.html, D): cut like them, in its position's colour, the
+   position's picture down the left. Nothing sits on the line: the deck's words and ONE SHOT have a row of their own
+   over the tray, and the card grows rather than stack them on it. The clip reaches under the foot for the source tabs. */
+.tb-job .tb-card[data-pos='dark'] { --pc: #4f9dff; }
+.tb-job .tb-card[data-pos='open'] { --pc: #ffb347; }
+.tb-job .tb-card[data-pos='wire'] { --pc: #ff3b5c; }
+/* Its colour all round, under a roll's (.is-pass and the rest win on specificity). */
+:where(.tb-job) .tb-card:where([data-pos]) { border-color: var(--pc); }
+.tb-job .tb-card:has(> .tb-call) {
+  width: 300px;
+  min-height: 112px;
+  padding: 0;
+  border-left-width: 1px;
+  background: radial-gradient(ellipse 50% 90% at 100% 0%, color-mix(in srgb, var(--pc) 14%, transparent), transparent 70%), rgba(12, 6, 22, 0.96);
+  overflow: visible;
+  /* The cut corners, with a notch at the bottom-left so the clip can still reach under the foot for two rows of tabs. */
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% calc(100% + 60px), 0 calc(100% + 60px), 0 100%, 12px 100%, 0 calc(100% - 12px));
+}
+.tb-job .tb-card:has(> .tb-call):hover[data-state='up'] { box-shadow: 0 0 14px color-mix(in srgb, var(--pc) 45%, transparent); }
+.tb-job.phone .tb-card:has(> .tb-call) { width: auto; }
+.tb-call { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 0; min-height: 110px; }
+.tb-call.none { opacity: 0.45; }
+.tb-side { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, color-mix(in srgb, var(--pc) 30%, transparent), #05020a 75%); border-right: 1px solid color-mix(in srgb, var(--pc) 60%, transparent); }
+.tb-side .tb-pos { position: absolute; top: 10px; left: 50%; right: auto; width: 48px; height: 48px; transform: translateX(-50%); image-rendering: pixelated; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--pc) 60%, transparent)); }
+.tb-side-word { position: absolute; left: 0; right: 0; bottom: 7px; text-align: center; font: 500 20px/0.85 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: var(--pc); }
+.tb-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 7px 10px; }
+.tb-call .tb-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+.tb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+.tb-flags { display: flex; flex-wrap: wrap; gap: 3px; }
+.tb-tag,
+.tb-flags .tb-flag { padding: 1px 5px 0; font: 13px/1.1 var(--pixel); letter-spacing: 0.12em; border: 1px solid; }
+.tb-tag { color: var(--user); border-color: rgba(127, 233, 255, 0.4); }
+.tb-tag.move { color: var(--nix); border-color: var(--nix); }
+/* Below the job's tier the lacquer notices (programs spec §1.3). */
+.tb-tag.lacquer { color: var(--alert); border-color: currentColor; }
+.tb-tag.route { color: var(--alert); border-color: currentColor; }
+.tb-tag.hot { color: var(--tool); border-color: currentColor; }
+.tb-flags .tb-flag.red { color: #05020a; background: #ff5a5a; border-color: #ff5a5a; }
+.tb-tray { display: flex; align-items: center; gap: 7px; }
+/* The card's effect (effect and NERVE spec §3) under its dice: SMALL dim, FAIR plain, BIG amber. */
+.tb-eff { align-self: flex-start; font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--ink, #cfeff7); }
+.tb-eff.small { color: rgba(207, 239, 247, 0.45); }
+.tb-eff.big { color: #ffc56b; text-shadow: 0 0 6px rgba(255, 197, 107, 0.55); }
+.tb-stat { font: 22px/0.8 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.06em; color: var(--user); }
+.tb-cells { display: inline-flex; gap: 3px; }
+/* The dice in their hand's colours: the stat cyan, PEOPLE pink, POCKETS amber, the setup green; a minus an empty cell. */
+:where(.tb-cells i, .tb-src) { --c: #c9b8ff; }
+.tb-cells i { width: 14px; height: 14px; background: var(--c); border: 1px solid var(--c); box-shadow: 0 0 5px var(--c); }
+.k-stat { --c: var(--user); }
+.k-people { --c: var(--nix); }
+.k-pocket { --c: var(--tool); }
+.k-setup { --c: #a8ff60; }
+.k-push { --c: #e8fbff; }
+.tb-cells i.minus { background: transparent; border: 1px dashed #ff5a5a; box-shadow: none; }
+/* A lifted card's dice blink in. */
+.tb-cells i.lift { animation: tb-lift 1s steps(2) infinite; }
+@keyframes tb-lift { 50% { opacity: 0.3; } }
+.tb-sum { margin-left: auto; font: 26px/0.8 var(--cs-teko, 'Teko', var(--pixel)); color: var(--user); }
+.tb-sum small { margin-left: 2px; font: 13px var(--pixel); letter-spacing: 0.14em; opacity: 0.7; }
+/* The pool in words, for screen readers. */
+.tb-odds.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+/* Where the dice came from: index tabs off the foot from under the picture, as on a recruit's card. */
+.tb-srcs { position: absolute; top: 100%; left: 8px; right: 0; display: flex; flex-wrap: wrap; gap: 3px; pointer-events: none; }
+.tb-src { padding: 3px 8px 2px 7px; font: 13px/1 var(--pixel); letter-spacing: 0.12em; color: #05020a; background: var(--c); clip-path: polygon(0 0, 100% 0, 100% 70%, calc(100% - 5px) 100%, 0 100%); }
+/* A border, not an outline: an inset outline drops its bottom edge at some of the stage's zooms. */
+.tb-src.minus { padding: 2px 7px 1px 6px; color: #ff8f8f; background: rgba(5, 2, 10, 0.7); border: 1px dashed #ff5a5a; clip-path: none; }
+.tb-job .tb-deal:has(.tb-srcs) { padding-bottom: 18px; }
+/* A roll parked beside STEADY keeps its card short: no tabs under it. */
+.tb-parked .tb-srcs { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .tb-cells i.lift { animation: none; }
+}
+/* A choice with no dice (LET HIM GO, the cover cards, WALK IT OFF): the call card's cut and size, no picture. */
+.tb-job .tb-card:has(> .tb-plain) { width: 300px; min-height: 112px; padding: 0; border-left-width: 1px; background: rgba(12, 6, 22, 0.96); clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 12px 100%, 0 calc(100% - 12px)); }
+.tb-job .tb-card:has(> .tb-plain):hover[data-state='up'] { box-shadow: 0 0 14px rgba(127, 233, 255, 0.35); }
+.tb-job.phone .tb-card:has(> .tb-plain) { width: auto; }
+.tb-plain { min-height: 110px; }
+.tb-plain.none { opacity: 0.45; }
+.tb-plain .tb-main { flex: 1; }
+.tb-noroll { font: 20px/0.8 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.08em; color: rgba(127, 233, 255, 0.4); }
+.tb-plain .tb-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+
+/* HUD (2026-11-02, mockup graft-layouts.html A): the job table's regions over the dimmed room, no panels behind them.
+   The title and clocks across the top; the job's words left of the moment, the levers right of it; the hand below. */
+.tb.hud {
+  grid-template-columns: minmax(220px, 19%) 1fr minmax(120px, 9%);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: 'top top top' 'log middle levers' 'bottom bottom bottom';
+  column-gap: 22px;
+}
+/* The table spans the stage, so its bare box and its regions' gaps let clicks through to what's under them (the line
+   keys at the box's corner, playtest); what sits in a region takes them as before. */
+.tb.hud:not(.phone), .tb.hud:not(.phone) > * { pointer-events: none; }
+.tb.hud:not(.phone) > * > * { pointer-events: auto; }
+.tb.hud .tb-top { grid-area: top; display: flex; align-items: center; gap: 28px; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8); }
+.tb.hud .tb-top-l { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tb.hud .tb-top-l .tb-head { font-size: 22px; }
+.tb.hud .tb-log { grid-area: log; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scrollbar-width: thin; }
+.tb.hud .tb-log .tb-art { width: 100%; }
+.tb.hud .tb-prose { max-width: none; justify-self: stretch; padding: 0; background: none; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
+.tb.hud .tb-levers { grid-area: levers; display: flex; flex-direction: column; align-items: stretch; gap: 10px; align-self: start; }
+.tb.hud .tb-levers .tb-push { align-self: stretch; }
+.tb.hud .tb-levers .tb-trade { padding-bottom: 0; }
+/* The clocks: a wide bar each, its word over it and its number after it. */
+.tb.hud .tb-right { margin-left: auto; order: 0; align-self: center; gap: 30px; }
+.tb.hud .tb-take, .tb.hud .tb-alarm, .tb.hud .tb-nerve { display: grid; grid-template-columns: auto auto; grid-template-areas: 'word word' 'cells num'; align-items: center; column-gap: 8px; row-gap: 4px; }
+.tb.hud .tb-take[hidden], .tb.hud .tb-alarm[hidden], .tb.hud .tb-nerve[hidden] { display: none; }
+.tb.hud .tb-word { grid-area: word; writing-mode: horizontal-tb; transform: none; font-size: 14px; letter-spacing: 0.24em; }
+.tb.hud .tb-stack { grid-area: cells; flex-direction: row; gap: 4px; }
+.tb.hud .tb-stack i { width: 34px; height: 13px; }
+.tb.hud .tb-num { grid-area: num; font-size: 20px; }
+.tb.hud .tb-bottom { justify-content: center; }
+/* The JOB column stands over the log region on a desktop (job-column.css): the region's own picture and prose step aside. */
+.tb.hud:not(.phone) .tb-log > .tb-art, .tb.hud:not(.phone) .tb-prose { display: none; }
+/* HUD: the table reaches down to the input line (her line is a subtitle at the right now, job-column.css). */
+.tb.hud:not(.phone) { bottom: calc(var(--feed-bottom, 70px) + 10px); }
+/* HUD: the log region runs the moment's full height (the JOB column fills it), the moment's cards start at its top. */
+.tb.hud > .tb-log { align-self: stretch; }
+.tb.hud > .tb-middle { align-self: stretch; justify-content: flex-start; padding-top: 20px; }
+/* A waiting roll and its costs stand taller than the choices: they start at the region's top, clear of the hand below. */
+.tb.hud:not(.phone) > .tb-middle:has(.tb-parked) { padding-top: 0; }
+/* A waiting roll in the HUD: its row (card, dice, stamp) over its costs, the costs in one row, all centred. */
+.tb.hud:not(.phone) .tb-deal:has(> .tb-parked) { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px; }
+.tb.hud:not(.phone) .tb-deal > .tb-parked,
+.tb.hud:not(.phone) .tb-deal > .tb-costs { grid-row: auto; align-self: center; }
+.tb.hud .tb-costs-row { flex-wrap: nowrap; }
+/* HUD: the contact stands at the far right, clear of the cards and out of the dim (2026-11-02). The table leaves
+   her the screen's right fifth (the clocks bar still spans it); the dim drops under the stage, and your own figure on
+   the left steps out. */
+.tb.hud:not(.phone) {
+  grid-template-columns: minmax(200px, 15%) 1fr minmax(110px, 7%) 19%;
+  column-gap: 16px;
+  grid-template-areas: 'top top top top' 'log middle levers .' 'bottom bottom bottom .';
+}
+/* The room's dim drops just under the stage (z 19), so she stands clear of it and her subtitle (z 20) stays over her. */
+#game.tb-dim:has(> .tb.hud:not([hidden]):not(.phone))::after { z-index: 18; }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) .stage-right[data-kind='sprite'] { right: -170px; transition: right 320ms ease; }
+/* Your own figure steps out during a job: the table is your side of the scene. */
+#game:has(> .tb.hud:not([hidden]):not(.phone)) .stage-left { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  #game:has(> .tb.hud:not([hidden]):not(.phone)) .stage-right[data-kind='sprite'] { transition: none; }
+}
+/* The job's title reads as the job, not the place (amber, Teko, lower than the room name);
+   three choices fit on one row, and a wrapped row clears the source tabs hanging under the one above. */
+.tb.hud:not(.phone) { padding-top: 84px; }
+.tb.hud .tb-top-l .tb-title { font: 500 30px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.06em; color: #ffc56b; text-shadow: 0 0 10px rgba(255, 197, 107, 0.35), 0 1px 2px #000; }
+.tb.hud .tb-top-l .tb-strip { font-size: 14px; }
+.tb.hud .tb-deal { row-gap: 34px; }
+/* SAFE and BOLD stand out in the HUD (playtest: easy to miss): a TRADE head over them, each in its own
+   colour at rest, larger, on a faint fill; lit, they fill brighter. */
+.tb.hud:not(.phone) .tb-trade { gap: 6px; margin-top: 4px; }
+.tb.hud:not(.phone) .tb-trade:not([hidden])::before { content: 'TRADE'; font: 12px var(--pixel); letter-spacing: 0.22em; color: rgba(230, 220, 242, 0.6); text-align: center; }
+.tb.hud:not(.phone) .tb-trade button { padding: 5px 8px 3px; font: 20px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.16em; text-shadow: 0 1px 2px #000; }
+.tb.hud:not(.phone) .tb-trade .tb-safe { color: #7fe9ff; background: rgba(127, 233, 255, 0.1); }
+.tb.hud:not(.phone) .tb-trade .tb-bold { color: #ffc56b; background: rgba(255, 197, 107, 0.1); }
+.tb.hud:not(.phone) .tb-trade .tb-safe.on { color: #fff; background: rgba(127, 233, 255, 0.32); box-shadow: 0 0 10px rgba(127, 233, 255, 0.5); }
+.tb.hud:not(.phone) .tb-trade .tb-bold.on { color: #fff; background: rgba(255, 197, 107, 0.32); box-shadow: 0 0 10px rgba(255, 197, 107, 0.5); }
+.tb.hud:not(.phone) .tb-trade button:hover:not(:disabled) { filter: brightness(1.3); }
+/* A job at the table has no use for the scene's own keys (playtest): SUGGEST, DICE, DRAW, END SCENE and
+   LEAVE (the whole stack, so its fold arrow with them) step out while it's up. */
+#game:has(> .tb.tb-job:not([hidden])) .scene-keys { display: none; }
+/* A picked cost (playtest): it stands at the front of the row, the others fade out where they stood,
+   and its answers branch off it as panels, one after another. */
+.tb-costs-leaving { position: absolute; z-index: 1; display: flex; flex-direction: column; gap: 8px; pointer-events: none; margin: 0; }
+.tb-costs-row.focus { align-items: stretch; }
+.tb-cost-panel { display: flex; flex-direction: column; justify-content: center; gap: 6px; width: 150px; min-height: 150px; padding: 10px 12px; background: rgba(5, 2, 10, 0.92); border: 1px solid currentColor; text-align: left; }
+.tb-cost-panel .tb-cost-panel-word { font: 500 28px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.08em; }
+.tb-cost-panel small { margin-left: 0; font: 12px/1.3 var(--pixel); letter-spacing: 0.12em; }
+.tb-cost-panel:hover:not(:disabled), .tb-cost-panel:focus-visible { box-shadow: 0 0 12px rgba(127, 233, 255, 0.3); }
+.tb-cost-panel.take:hover:not(:disabled), .tb-cost-panel.take:focus-visible { box-shadow: 0 0 12px rgba(255, 90, 90, 0.4); }
+.tb-cost-panel.armour:hover:not(:disabled), .tb-cost-panel.armour:focus-visible { box-shadow: 0 0 12px rgba(255, 197, 107, 0.3); }
+.tb-costs-branching .tb-cost-panel { animation: tb-branch 300ms cubic-bezier(0.3, 0.7, 0.3, 1) both; animation-delay: calc(180ms + var(--n, 0) * 90ms); }
+.tb-costs-branching .tb-cost-panel.take { --n: 0; }
+.tb-costs-branching .tb-cost-panel.resist { --n: 1; }
+.tb-costs-branching .tb-cost-panel.armour { --n: 2; }
+@keyframes tb-branch { from { opacity: 0; translate: -40px 0; } }
+@media (prefers-reduced-motion: reduce) { .tb-costs-branching .tb-cost-panel { animation: none; } }
+/* The answers' pictures (sheet 8): the camera fills the panel, its words on a dark fade at the foot. */
+.tb-cost-panel { justify-content: flex-end; background-size: cover, cover; background-position: center, 50% 30%; background-repeat: no-repeat; image-rendering: pixelated; }
+.tb-cost-panel.take { background-image: linear-gradient(to bottom, transparent 35%, rgba(5, 2, 10, 0.92) 78%), url('/cards/take.webp'); }
+.tb-cost-panel.resist { background-image: linear-gradient(to bottom, transparent 35%, rgba(5, 2, 10, 0.92) 78%), url('/cards/resist.webp'); }
+.tb-cost-panel.armour { background-image: linear-gradient(to bottom, transparent 35%, rgba(5, 2, 10, 0.92) 78%), url('/cards/firewall.webp'); }
+.tb-cost-panel .tb-cost-panel-word, .tb-cost-panel small { text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
+.tb-cost-panel.take { color: #ff8f8f; }
+.tb-cost-panel:hover:not(:disabled), .tb-cost-panel:focus-visible { filter: brightness(1.2); }
+/* The roll's slide (check-anim.ts beside) measures the card and places the dice from the deal's own box: in the HUD the
+   deal stands in the middle column, so it's their frame, or the card overshoots into the job's words (playtest). */
+.tb.hud:not(.phone) .tb-deal { position: relative; }
+/* Every answer panel at its picture's own shape, 3:4 (playtest). */
+.tb-cost-panel { width: 156px; min-height: 0; aspect-ratio: 3 / 4; }
+/* WALK and PRESS ON (sheet 9) as the answers' panels are: the picture, the word on a dark fade at the foot. */
+.tb-job .tb-card.art-panel { display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; width: 186px; min-height: 0; aspect-ratio: 3 / 4; padding: 10px 12px; border: 1px solid currentColor; background-size: cover, cover; background-position: center, 50% 30%; background-repeat: no-repeat; image-rendering: pixelated; }
+.tb-job .tb-card.art-panel[data-choice='!walk'] { color: #7fe9ff; background-image: linear-gradient(to bottom, transparent 40%, rgba(5, 2, 10, 0.92) 80%), url('/cards/walk.webp'); }
+.tb-job .tb-card.art-panel[data-choice='!press'] { color: #ffc56b; background-image: linear-gradient(to bottom, transparent 40%, rgba(5, 2, 10, 0.92) 80%), url('/cards/press.webp'); }
+.tb-card.art-panel .tb-face { display: flex; flex-direction: column; gap: 6px; }
+.tb-card.art-panel .tb-panel-word { font: 500 32px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.08em; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
+.tb-card.art-panel .tb-panel-sub { font: 12px/1.3 var(--pixel); letter-spacing: 0.12em; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
+.tb-card.art-panel:hover, .tb-card.art-panel:focus-visible { filter: brightness(1.2); box-shadow: 0 0 12px currentColor; }
+/* The HUD has the height: a choice's whole line shows, its card growing a row rather than cutting it off (playtest: a ONE SHOT line lost its end). The phone keeps the three-line clamp. */
+.tb.hud:not(.phone) .tb-call .tb-line { display: block; -webkit-line-clamp: none; line-clamp: none; overflow: visible; }
+
+/* A card in words (card-info.ts): beside the card, never over it, and it takes no clicks. */
+.tb-info { position: absolute; z-index: 30; width: 300px; max-width: calc(100% - 16px); box-sizing: border-box; padding: 8px 12px; pointer-events: none; background: rgba(4, 16, 22, 0.95); border: 1px solid rgba(127, 233, 255, 0.45); }
+.tb-info[hidden] { display: none; }
+.tb-info-title { font: 14px var(--pixel); letter-spacing: 0.16em; color: var(--user); margin-bottom: 4px; }
+.tb-info-line { font: 13px/1.45 var(--mono); color: #d9eef3; }
+/* A long press on a card opens its panel, not the browser's image menu. */
+.tb button[data-id] img { -webkit-touch-callout: none; }
+
+/* The debrief at the HUD table (mockup graft-results.html D): no card, no frame. The bag's picture beside the outcome and
+   its sums, the crew along the foot where the hand stood; the rolls are in the JOB column and the clocks stayed up. */
+.tb.hud:not(.phone) > .tb-middle:has(.tb-debrief) { padding-top: 8px; }
+.tb.hud:not(.phone) .tb-deal:has(> .tb-debrief) { flex: 1; align-items: stretch; justify-content: flex-start; }
+.tb.hud:not(.phone) .tb-job .tb-card.tb-debrief, .tb.hud:not(.phone).tb-job .tb-card.tb-debrief { position: relative; width: 100%; padding: 0; border: 0; background: none; box-shadow: none; clip-path: none; text-align: left; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
+.tb.hud:not(.phone) .tb-debrief .db { --db: #7dff9b; --db-glow: rgba(125, 255, 155, 0.5); position: relative; flex: 1; display: grid; grid-template-columns: 306px minmax(0, 420px); grid-template-rows: repeat(6, auto) 1fr auto; column-gap: 30px; margin: 0; padding: 0; background: none; border: 0; }
+.tb.hud:not(.phone) .tb-debrief .db-messy { --db: #ffc56b; --db-glow: rgba(255, 197, 107, 0.5); }
+.tb.hud:not(.phone) .tb-debrief .db-blown { --db: #ff5a5a; --db-glow: rgba(255, 90, 90, 0.5); }
+.tb.hud:not(.phone) .tb-debrief .db > * { grid-column: 2; }
+/* The picture: the bag from WALK and PRESS ON (sheet 9), open on a clean job; the camera (sheet 8) on a blown one. */
+.tb.hud:not(.phone) .tb-debrief .db > .db-art { display: block; grid-column: 1; grid-row: 1 / span 7; align-self: start; width: 306px; aspect-ratio: 3 / 4; background: url('/cards/press.webp') center / cover; image-rendering: pixelated; box-shadow: 0 0 0 1px var(--db), 0 10px 26px rgba(0, 0, 0, 0.7); }
+.tb.hud:not(.phone) .tb-debrief .db-messy > .db-art { background-image: url('/cards/walk.webp'); }
+.tb.hud:not(.phone) .tb-debrief .db-blown > .db-art { background-image: url('/cards/take.webp'); }
+.tb.hud:not(.phone) .tb-debrief .tb-seal { top: -16px; right: auto; left: 214px; width: 118px; height: 118px; }
+.tb.hud:not(.phone) .tb-debrief .db-tier { margin: 0 0 6px; font: 500 104px/0.82 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.05em; color: var(--db); text-shadow: 0 0 22px var(--db-glow), 0 2px 3px #000; }
+.tb.hud:not(.phone) .tb-debrief .db-take { display: none; }
+.tb.hud:not(.phone) .tb-debrief .db-totals { display: block; margin: 0; font: 18px/1.35 var(--pixel); letter-spacing: 0.13em; }
+.tb.hud:not(.phone) .tb-debrief .db-sums { display: block; margin-bottom: 10px; }
+.tb.hud:not(.phone) .tb-debrief .db-sum { display: flex; justify-content: space-between; font: 21px/1.35 var(--pixel); letter-spacing: 0.14em; }
+.tb.hud:not(.phone) .tb-debrief .db-sum .db-sep { display: none; }
+.tb.hud:not(.phone) .tb-debrief .db-pay-word { display: inline; }
+.tb.hud:not(.phone) .tb-debrief .db-pay { color: #ffc56b; }
+.tb.hud:not(.phone) .tb-debrief .db-unpaid { font-size: 21px; letter-spacing: 0.14em; }
+.tb.hud:not(.phone) .tb-debrief .db-keep { display: flex; align-items: baseline; justify-content: space-between; margin-top: 6px; padding-top: 4px; font-size: 19px; letter-spacing: 0.14em; color: #ffc56b; border-top: 1px solid color-mix(in srgb, var(--db) 40%, transparent); }
+.tb.hud:not(.phone) .tb-debrief .db-keep b { font: 500 60px/0.95 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.03em; font-variant-numeric: tabular-nums; }
+/* The foot: a card each, their picture and what happened to them. */
+.tb.hud:not(.phone) .tb-debrief .db > .db-row { grid-column: 1 / -1; grid-row: 8; display: grid; grid-template-columns: auto minmax(240px, 1fr); grid-template-rows: auto 1fr; column-gap: 18px; row-gap: 6px; margin-top: 12px; }
+.tb.hud:not(.phone) .tb-debrief .db-crew { grid-row: 1 / span 2; display: flex; align-items: flex-start; gap: 14px; margin: 0; padding: 0; border: 0; }
+.tb.hud:not(.phone) .tb-debrief .db-mate { position: relative; display: flex; flex-direction: column; width: 112px; --fate: #7dff9b; }
+.tb.hud:not(.phone) .tb-debrief .db-face { display: grid; place-items: center; width: 112px; height: 150px; object-fit: cover; font: 500 60px var(--cs-teko, 'Teko', var(--pixel)); color: #fff; background: #0b0618; box-shadow: 0 0 0 1px rgba(127, 233, 255, 0.5), 0 6px 12px rgba(0, 0, 0, 0.6); }
+.tb.hud:not(.phone) .tb-debrief .db-mate.hurt .db-face, .tb.hud:not(.phone) .tb-debrief .db-mate.lost .db-face { filter: grayscale(0.85) brightness(0.65); }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-mate-name { position: absolute; left: 6px; top: 118px; font: 500 24px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: #fff; }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-sep { display: none; }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-crew-line { padding: 2px 4px 1px; font: 14px/1.05 var(--pixel); letter-spacing: 0.08em; text-align: center; text-shadow: none; color: #05020a; background: #7dff9b; }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-crew-line.messy { background: #ffc56b; }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-crew-line.hurt { background: #ffb347; }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-crew-line.lost { background: #ff3b5c; }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-crew-line + .db-crew-line { margin-top: 1px; }
+.tb.hud:not(.phone) .tb-debrief .db-mate .db-crew-line + .db-crew-line .db-mate-name { display: none; }
+.tb.hud:not(.phone) .tb-debrief .db-crew > .db-crew-line { font: 15px/1.35 var(--pixel); letter-spacing: 0.1em; }
+.tb.hud:not(.phone) .tb-debrief .db-recruit { grid-column: 2; margin: 0; font: 15px/1.3 var(--pixel); }
+.tb.hud:not(.phone) .tb-debrief .db-programs { grid-column: 2; margin: 0; padding: 0; border: 0; font: 15px/1.35 var(--pixel); letter-spacing: 0.1em; color: #e3f6fb; }
+.tb.hud:not(.phone) .tb-levers .tb-close { color: #05020a; background: #ffc56b; border-color: #ffc56b; }
+/* The line's keys stand where a long report's rolls end (playtest): they step out with the debrief up,
+   and CLOSE brings them back on her closing line. */
+#game:has(> .tb.hud:not([hidden]):not(.phone) .tb-debrief) .line-keys { display: none; }
+/* A waiting roll, its picked cost and the answers beside it ran down onto a full hand (playtest): the
+   answers stay 3:4 at a smaller size, and the roll stands closer over them. */
+.tb.hud:not(.phone) .tb-deal:has(> .tb-parked) { gap: 6px; }
+.tb.hud:not(.phone) .tb-deal > .tb-costs { gap: 6px; }
+.tb.hud:not(.phone) .tb-costs-row.focus .tb-cost-panel { width: 144px; padding: 10px; }
+.tb.hud:not(.phone) .tb-costs-row.focus .tb-cost-panel small { letter-spacing: 0.08em; }

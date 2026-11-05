@@ -1,7 +1,7 @@
 /**
  * A bug report (spec 2026-10-11 bug report §4.3): what the player wrote, the game's state, the tail of
  * server.log and, if the player allows, the scene's last turns and a screenshot. Every string that leaves
- * passes through `scrub`, so the player's OpenRouter key never goes out, even pasted into chat or a log.
+ * passes through `scrub`, so the player's keys (OpenRouter's, Anthropic's) never go out, even pasted into chat or a log.
  */
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -14,6 +14,7 @@ const LOG_WINDOW = 256 * 1024;
 const SUBJECT_MAX = 60;
 const REMOVED = '[key removed]';
 const OPENROUTER_KEY_RE = /sk-or-[A-Za-z0-9-]+/g;
+const ANTHROPIC_KEY_RE = /sk-ant-[A-Za-z0-9_-]+/g;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface BugInput {
@@ -45,7 +46,7 @@ export interface BugState {
 
 /** Replaces each of `keys` and anything shaped like an OpenRouter key with `[key removed]`. */
 export function scrub(s: string, keys: string[]): string {
-  let out = s.replace(OPENROUTER_KEY_RE, REMOVED);
+  let out = s.replace(OPENROUTER_KEY_RE, REMOVED).replace(ANTHROPIC_KEY_RE, REMOVED);
   for (const k of keys) if (k) out = out.split(k).join(REMOVED);
   return out;
 }

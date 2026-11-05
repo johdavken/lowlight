@@ -28,6 +28,36 @@ function setup(e: ModelEvent = EVENT) {
 const rows = (root: HTMLElement) => [...root.querySelectorAll<HTMLButtonElement>('.mm-row')];
 afterEach(() => (document.body.innerHTML = ''));
 
+describe('ModelMenu: the Anthropic key', () => {
+  const ON: ModelEvent = {
+    ...EVENT,
+    choices: [EVENT.choices![0]!, { id: 'anthropic/claude-sonnet-5.5', label: 'Claude Sonnet 5.5', priceIn: 2, priceOut: 10, via: 'anthropic' }],
+  };
+  it('a model through the Anthropic key says so', () => {
+    const { root } = setup(ON);
+    expect(rows(root)[1]!.querySelector('.mm-via')!.textContent).toBe('YOUR ANTHROPIC KEY');
+    expect(rows(root)[0]!.querySelector('.mm-via')).toBeNull();
+  });
+  it("her model on the Anthropic key: the header says so, not OpenRouter's credit", () => {
+    const { root } = setup({ ...ON, model: 'anthropic/claude-sonnet-5.5' });
+    expect(root.querySelector('.mm-credit')!.textContent).toBe('ON YOUR ANTHROPIC KEY');
+  });
+  it('search results through the Anthropic key say so too', async () => {
+    document.body.innerHTML = '';
+    const root = document.createElement('div');
+    document.body.append(root);
+    const menu = new ModelMenu(root, () => {}, async () => ({ results: [{ id: 'anthropic/claude-sonnet-5.5', label: 'Claude Sonnet 5.5', priceIn: 2, priceOut: 10, via: 'anthropic' as const }] }), 0);
+    menu.update(EVENT);
+    menu.open();
+    root.querySelector<HTMLButtonElement>('.mm-other')!.click();
+    const input = root.querySelector<HTMLInputElement>('.mm-input')!;
+    input.value = 'sonnet';
+    input.dispatchEvent(new Event('input'));
+    await new Promise((r) => setTimeout(r, 10));
+    expect(root.querySelector('.mm-hit .mm-via')!.textContent).toBe('YOUR ANTHROPIC KEY');
+  });
+});
+
 describe('ModelMenu', () => {
   it('lists the choices with prices as "$0.40 / $1.60" and marks the current one', () => {
     const { root } = setup();

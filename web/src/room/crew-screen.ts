@@ -1,21 +1,22 @@
 /**
- * CREW (crew spec 2026-10-19 §4): ROSTER, ASSIGN and HIRE as tabs of one screen on the shared frame, in acid green.
- * Alt+K opens it (main.ts) and closes it; Esc closes it; ← / → move between tabs, ↑ / ↓ between roster tiles.
+ * CREW (crew spec 2026-10-19 §4): ROSTER, ERRANDS (`assign` in code) and HIRE as tabs of one panel, QUEST's size, in red.
+ * It's the shared screen's holo pane (`scr-holo`, ui/screen.css): the room stays, blurred, behind it.
+ * Alt+K opens it (main.ts) and closes it; Esc closes it; ← / → move between tabs, ↑ / ↓ between roster cards.
  * Actions go out over the ws (`act`); the screen fetches again when the relay says the crew changed (`refresh`).
  */
 import type { CrewAction, CrewView } from '../../../shared/types';
 import { bugReportOpen } from '../ui/bug-report';
 import { openScreen, SCREEN_GLITCH_OUT_MS } from '../ui/screen';
-import { assignTab } from './crew-assign';
+import { assignTab, type AssignPick } from './crew-assign';
 import { hireTab } from './crew-hire';
 import { rosterTab } from './crew-roster';
-import { el, sol } from './crew-ui';
+import { el, keepScroll, sol } from './crew-ui';
 import './crew-screen.css';
 
 export type CrewTab = 'roster' | 'assign' | 'hire';
 export const CREW_TABS: CrewTab[] = ['roster', 'assign', 'hire'];
-const TAB_NAME: Record<CrewTab, string> = { roster: 'ROSTER', assign: 'ASSIGN', hire: 'HIRE' };
-export const CREW_ACCENT = '#a8ff60';
+const TAB_NAME: Record<CrewTab, string> = { roster: 'ROSTER', assign: 'ERRANDS', hire: 'HIRE' };
+export const CREW_ACCENT = '#ff4d4d';
 
 export interface CrewOpts {
   load(): Promise<CrewView | null>;
@@ -55,10 +56,15 @@ export function markCrewSeen(pt: string, at: number | null): void {
   }
 }
 
+/** The CREW word's dot: a result landed since you last looked, or a promotion's pick is waiting (crew abilities spec §4). */
+export function crewDotOn(kit: { crewLatest: number | null; crewPicks?: boolean }, seen: number): boolean {
+  return (kit.crewLatest !== null && kit.crewLatest > seen) || kit.crewPicks === true;
+}
+
 export function openCrew(host: HTMLElement, o: CrewOpts): CrewHandle {
   const screen = openScreen(host, {
     title: 'CREW',
-    className: 'crew-screen',
+    className: 'scr-holo crew-screen',
     label: 'Crew',
     accent: CREW_ACCENT,
     reducedMotion: o.reducedMotion,
@@ -88,7 +94,8 @@ export function openCrew(host: HTMLElement, o: CrewOpts): CrewHandle {
   });
   const strip = el('div', 'cr-strip');
   const refused = el('div', 'cr-refusal');
-  band.append(...tabs, refused, strip);
+  band.append(...tabs, refused);
+  screen.head.replaceChildren(el('span', 'cr-title', '◆ CREW'), strip, el('span', 'cr-esc', 'ESC'));
   let refusedTimer: ReturnType<typeof setTimeout> | null = null;
   const pane = el('div', 'cr-pane');
   screen.body.append(band, pane);
@@ -97,6 +104,7 @@ export function openCrew(host: HTMLElement, o: CrewOpts): CrewHandle {
   let v: CrewView | null = null;
   let picked: string | null = null;
   let assignFor: string | null = null;
+  const assignPick: AssignPick = { row: null, who: null, where: null };
   let token = 0;
 
   function label(t: CrewTab): [string, string] {
@@ -121,8 +129,13 @@ export function openCrew(host: HTMLElement, o: CrewOpts): CrewHandle {
     }
     if (!v) return;
     const h = Math.floor(v.nextSix / 60);
-    strip.textContent = `SOL ${sol(v.sol)} · WAGES −${sol(v.wages)}/NIGHT · 06:00 IN ${h}h ${v.nextSix % 60}m`;
+    strip.textContent = `SOL ${sol(v.sol)} · WAGES −${sol(v.wages)} TONIGHT · 06:00 IN ${h}h ${v.nextSix % 60}m`;
     pane.dataset.tab = tab;
+    keepScroll(pane, fill);
+  }
+
+  function fill(): void {
+    if (!v) return;
     if (tab === 'roster') {
       const live = v.roster.filter((m) => m.state !== 'gone');
       if (!picked || !v.roster.some((m) => m.recruit.id === picked)) picked = live[0]?.recruit.id ?? v.roster[0]?.recruit.id ?? null;
@@ -136,12 +149,14 @@ export function openCrew(host: HTMLElement, o: CrewOpts): CrewHandle {
           act: o.act,
           assign: (id) => {
             assignFor = id;
+            assignPick.row = null;
+            assignPick.who = null;
             show('assign');
           },
         }),
       );
     } else if (tab === 'assign') {
-      pane.replaceChildren(assignTab(v, { act: o.act, picked: assignFor }));
+      pane.replaceChildren(assignTab(v, { act: o.act, picked: assignFor, sel: assignPick }));
       markCrewSeen(o.playthrough, v.results[0]?.at ?? null);
     } else pane.replaceChildren(hireTab(v, { act: o.act }));
   }
@@ -197,6 +212,7 @@ export function openCrew(host: HTMLElement, o: CrewOpts): CrewHandle {
       const i = Math.max(0, ids.indexOf(picked ?? '')) + (e.key === 'ArrowUp' ? -1 : 1);
       picked = ids[(i + ids.length) % ids.length] ?? picked;
       draw();
+      pane.querySelector('.cr-tile.on')?.scrollIntoView?.({ block: 'nearest' });
     }
   };
   window.addEventListener('keydown', onKey, true);

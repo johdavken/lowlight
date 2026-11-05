@@ -30,6 +30,32 @@ describe('quest cards', () => {
     expect(h.querySelector('.qc-title')!.textContent).toBe('Paper Trail');
   });
 
+  it('an active job with push shows PRESS ON? in the head, POT +150 SOL when pot > 0, and the two cards in order WALK then PRESS ON', () => {
+    const h = host();
+    const job = {
+      ...ACTIVE,
+      beat: '!push',
+      alarm: 1,
+      edge: 2,
+      heat: 1,
+      pay: [350, 450] as [number, number],
+      choices: [
+        { id: '!walk', line: 'WALK — 550 SOL · HEAT +0' },
+        { id: '!press', line: 'PRESS ON' },
+      ],
+    };
+    const cards = mountQuestCards(h, { onChoose: vi.fn(), onTalk: vi.fn() });
+    cards.show({ ...job, push: { stage: 1, pot: 150, walk: { sol: 550, heat: 0 } } });
+    expect(h.querySelector('.qc-head .qc-push')!.textContent).toBe('PRESS ON?');
+    expect(h.querySelector('.qc-strip .qc-pot')!.textContent).toBe('POT +150 SOL');
+    expect([...h.querySelectorAll('.qc-card')].map((n) => (n as HTMLElement).dataset.choice)).toEqual(['!walk', '!press']);
+    cards.show({ ...job, push: { stage: 0, pot: 0, walk: { sol: 400, heat: 0 } } });
+    expect(h.querySelector('.qc-head .qc-push')!.textContent).toBe('PRESS ON?');
+    expect(h.querySelector('.qc-pot')).toBeNull();
+    cards.show(ACTIVE);
+    expect(h.querySelector('.qc-push')).toBeNull();
+  });
+
   it('a card click chooses it, with no typed line', () => {
     const h = host();
     const onChoose = vi.fn();
@@ -124,7 +150,7 @@ describe('the QUEST list', () => {
     list.toggle();
     expect(h.hidden).toBe(false);
     expect(h.querySelector('.ql-row .ql-title')!.textContent).toBe('Paper Trail');
-    click(h.querySelector('.ql-row .ql-start'));
+    click(h.querySelector('.ql-file .ql-start'));
     expect(onStart).toHaveBeenCalledWith('paper-trail');
     expect(h.hidden).toBe(true);
   });
@@ -217,7 +243,8 @@ describe('QUEST lists what waits, here and elsewhere', () => {
     list.show({ ...none, waiting: { id: 'paper-trail', title: 'Paper Trail', next: 'Be at the Intake.', at: null, from: null, by: null, ready: false, here: true } });
     expect(list.has()).toBe(true);
     list.toggle();
-    expect(h.querySelector('.ql-waiting')!.textContent).toBe('Paper Trail · Be at the Intake.');
+    expect(h.querySelector('.ql-waiting .ql-title')!.textContent).toBe('Paper Trail');
+    expect(h.querySelector('.ql-file .ql-line')!.textContent).toBe('Be at the Intake.');
   });
   it('quests in someone else\'s room, with no START', () => {
     const h = host();
@@ -225,8 +252,9 @@ describe('QUEST lists what waits, here and elsewhere', () => {
     list.show({ ...none, elsewhere: [{ id: 'paper-trail', title: 'Paper Trail', contact: 'nix-direct', contactName: 'Nix', next: 'Be at the Intake.' }] });
     expect(list.has()).toBe(true);
     list.toggle();
-    expect(h.querySelector('.ql-elsewhere')!.textContent).toBe('Paper Trail · with Nix · Be at the Intake.');
-    expect(h.querySelector('.ql-elsewhere .ql-start')).toBeNull();
+    expect(h.querySelector('.ql-elsewhere .ql-title')!.textContent).toBe('Paper Trail');
+    expect(h.querySelector('.ql-file .ql-line')!.textContent).toBe('With Nix · Be at the Intake.');
+    expect(h.querySelector('.ql-start')).toBeNull();
   });
 });
 

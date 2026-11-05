@@ -23,6 +23,8 @@ const arg = (name: string) => {
 const blender = process.env.BLENDER ?? 'blender';
 
 const city = loadCity(root);
+// The data this render is made from, stamped now: a save while it runs mustn't pass these tiles as current.
+const dataHash = currentDataHash(root, city);
 const versionLine = spawnSync(blender, ['--version'], { encoding: 'utf8' }).stdout?.split('\n')[0] ?? '';
 if (!versionLine) {
   console.error(`Blender not found (${blender}). Set BLENDER to its path.`);
@@ -58,6 +60,8 @@ const tileFile = (key: string, dir: TileDir = 'tiles') => path.join(pub, dir, ..
 const has = (dir: TileDir, key: string) => fs.existsSync(tileFile(key, dir));
 const plan = planJobs(prints, prev, all, (k) => outputsExist(k, has));
 console.log(`${prints.size} tiles: ${plan.render.length} to render, ${plan.keep.length} unchanged.`);
+// Studio's RENDER reads these for its progress (spec 2026-10-30 §3).
+console.log(`PROGRESS 0/${plan.render.length}`);
 
 const m = city.render.margin;
 const jobs = plan.render.map((k) => {
@@ -85,6 +89,7 @@ if (jobs.length) {
         lines.push(line);
         if (line.startsWith('TILE ')) {
           done++;
+          console.log(`PROGRESS ${done}/${jobs.length}`);
           if (done % 25 === 0 || done === jobs.length) console.log(`  ${done}/${jobs.length} tiles (${Math.round((Date.now() - t0) / 1000)} s)`);
         } else if (line.startsWith('NOTE ')) console.log(`  ${line.slice(5)}`);
       }
@@ -136,7 +141,7 @@ const manifest: TileManifest = {
   levels,
   deep: city.map.districts.filter((d) => city.styles[d.id]?.deepZoom).map((d) => d.id),
   deepAreas,
-  dataHash: currentDataHash(root, city),
+  dataHash,
   blender: blenderVersion,
   pinHeights: geometry.pinHeights,
   rendered: new Date().toISOString(),

@@ -20,7 +20,6 @@
     "hicks",
     "ines",
     "mother-rot",
-    "nix",
     "nix-direct",
     "oksana",
     "rue",
@@ -30,9 +29,5 @@
     "vesna"
   ],
   "defaultPlayer": "hicks",
-  "bugRelay": null,
-  "holdQuests": [
-    "cold-script",
-    "first-cut"
-  ]
+  "bugRelay": null
 }

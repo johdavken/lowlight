@@ -23,7 +23,7 @@ test('room exits: she takes you through the intake\'s way out, and the map shows
   // The side room has no pin: you stand at the intake.
   await page.locator('.hud-map').click();
   await expect(page.locator('#map')).toBeVisible();
-  await expect(page.locator('.pin[data-place="lowlight-intake"] .dots b').first()).toBeVisible();
+  await expect(page.locator('.pin[data-place="lowlight-intake"] .who b').first()).toBeVisible();
   // From the side room, GO to the intake is open: you stand there, but you aren't in its room.
   await page.keyboard.press('Escape');
 

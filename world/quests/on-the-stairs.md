@@ -1,12 +1,14 @@
 ---
 title: On the Stairs
+art: on-the-stairs.webp
 kind: mission
 tier: 1
+take-size: 4
 with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A collector is sitting on the Intake's stairs, waiting for a client to come out. He bought her debt this week.
-pay: 60-140
+pay: 90-110
 minutes: 20
 posts: 20:00-02:00
 trust: 1 / 1
@@ -14,6 +16,7 @@ trust: 1 / 1
 
 # stairs
 stranger: Marek — a debt collector, slate in his lap, in no hurry at all
+face: local-04
 
 *The collector sits halfway down the Intake's stairs with his slate on his knee, so anyone going up or down has to step around him. The client he wants is upstairs in the quiet room, and she isn't coming out while he's there.*
 

@@ -1,13 +1,17 @@
 import { photoMoment } from './photos';
+import { keysFor, routeFor } from './model-route';
 import { fittingPhotos } from '../../shared/photos';
 import crypto from 'node:crypto';
 import { DEFAULT_CREW_DIR, loadCrewBook } from './crew-book-load';
-import { crewView } from './crew-view';
+import { crewView, freeDraw } from './crew-view';
+import { jobRecruitCard, rescueOpen } from '../../shared/crew';
+import { fillRecruit, questKey } from '../../shared/quests';
+import { bookId } from './mission-run';
 import { boardPlaces, postedJobs, storyDay } from '../../shared/board';
 import { registerScenarioRoutes } from './scenario-routes';
 import { registerEncounterRoutes } from './encounter-routes';
 import { registerSuggestRoutes } from './suggest-routes';
-import { SUGGEST_RECENT_LINES, suggestPrompt } from './suggest';
+import { SUGGEST_RECENT_LINES, openThreads, suggestPrompt } from './suggest';
 import { readSummary } from './summary';
 import { encounterPrompt, sceneNow } from './encounter';
 import { outageRates } from './outage-rates';
@@ -21,15 +25,29 @@ import { loadLoreBook } from './lore';
 import { DEFAULT_LEADS_DIR, loadLeadBook } from './leads';
 import { DEFAULT_QUESTS_DIR, loadQuestBook } from './quests';
 import { DEFAULT_EXTRAS_DIR, extraImages, loadExtras } from './extras';
-import { DEFAULT_GEAR_DIR, loadDecks, loadStock, loadWords } from './gear';
+import { DEFAULT_GEAR_DIR, loadDecks, loadPrograms, loadStock, loadWords } from './gear';
 import { DEFAULT_STATS } from '../../shared/stats';
 import { heatIn, hottest, repTier } from '../../shared/mission';
-import type { CrewView, KitView } from '../../shared/types';
-import { extrasKnown } from '../../shared/extras';
+import type { CrewView, KitView, QuestState } from '../../shared/types';
+import { extrasKnown, pickStrangerFace } from '../../shared/extras';
 import { sharedStandingReader } from './standing';
+import { cellOf, VOUCH_CELLS } from '../../shared/standing';
 import { leadsFor } from '../../shared/leads';
 import fs from 'node:fs';
 import path from 'node:path';
+import { parseGmLines } from '../../shared/gm-lines';
+import type { CostId } from '../../shared/costs';
+
+/** The GM's written lines file, parsed; a missing file or empty costs warn and fall back to the built-in lines. */
+function loadGmLines(file: string, warn: (m: string) => void): Partial<Record<CostId, string[]>> {
+  if (!fs.existsSync(file)) {
+    warn(`gm lines: ${file} missing; using built-in lines`);
+    return {};
+  }
+  const r = parseGmLines(fs.readFileSync(file, 'utf8'));
+  for (const w of r.warnings) warn(`gm lines: ${w}`);
+  return r.lines;
+}
 import { DatabaseSync } from 'node:sqlite';
 import Fastify, { type FastifyInstance } from 'fastify';
 import fastifyWebsocket from '@fastify/websocket';
@@ -63,7 +81,7 @@ import { parseMap } from '../../shared/map-schema';
 import type { Playthroughs } from './playthroughs';
 import { openSettings, type Settings } from './settings';
 import { registerLinkRoutes } from './link-routes';
-import { createModelCatalog } from './model-catalog';
+import { createAnthropicCatalog, createModelCatalog, createRoutedCatalog } from './model-catalog';
 import { registerBugReportRoutes } from './bug-report-routes';
 import { readTurns } from './bug-report';
 import { formatClock, START } from '../../shared/clock';
@@ -147,11 +165,14 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
 
   // The deck catalog: read once at startup, before the characters that name their starting deck.
   const decks = loadDecks(cfg.gearDir ?? DEFAULT_GEAR_DIR, (m) => console.warn(m));
+  const programs = loadPrograms(cfg.gearDir ?? DEFAULT_GEAR_DIR, (m) => console.warn(m));
   // The fixers' stock (small jobs spec §5), read once at startup like the decks.
   const stock = loadStock(cfg.gearDir ?? DEFAULT_GEAR_DIR, decks, (m) => console.warn(m));
   const words = loadWords(cfg.gearDir ?? DEFAULT_GEAR_DIR, (m) => console.warn(m));
   // The crew tables (crew spec §1–§2), read once at startup like the decks.
   const crewBook = loadCrewBook(cfg.crewDir ?? DEFAULT_CREW_DIR, (m) => console.warn(m));
+  // The GM's written lines (roll lifecycle spec §1.4), beside the crew book; missing: the built-in ones.
+  const gmWritten = loadGmLines(path.join(path.dirname(cfg.crewDir ?? DEFAULT_CREW_DIR), 'gm', 'costs.md'), (m) => console.warn(m));
   /** The crew's seed: the playthrough's id. Test-only (e2e): NIX_TEST_CREW_SEED pins it, so hires and rolls repeat. */
   const crewSeed = (ptId: string) => process.env.NIX_TEST_CREW_SEED || ptId;
   const settings = deps.settings ?? openSettings(cfg.dataDir);
@@ -443,6 +464,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         onText: (contact, e, player) => deck?.onText(contact, e, player),
         unreadTexts: () => deck?.unreadNow() ?? [],
         settings,
+        ...(cfg.anthropicBaseUrl ? { anthropicBaseUrl: cfg.anthropicBaseUrl } : {}),
         planPlaces,
         dataDir: cfg.dataDir,
         stateDir: world.stateDir(),
@@ -461,6 +483,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
           book: () => questBook,
           extras: () => extras,
           decks: () => decks,
+          programs: () => programs,
           placeOf: (sceneId) => places.locate(sceneId).placeId,
           placeName: (placeId) => places.placeName(placeId),
           contactName: (id) => records.find((r) => r.info.id === id)?.info.name ?? id,
@@ -472,6 +495,26 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
             const pt = world.active();
             return pt ? (world.kitOf(pt.player)?.crew ?? null) : null;
           },
+          crewTraits: () => crewBook.traits,
+          crewAbilities: () => crewBook.abilities,
+          gmWritten: () => gmWritten,
+          contactCards: () => {
+            const pt = world.active();
+            return pt ? world.contactCards(pt.player) : [];
+          },
+          crewToldUntil: () => {
+            const pt = world.active();
+            return pt ? world.crewToldUntil(pt.player) : null;
+          },
+          // A debrief's recruit line (crew spec §5): the card the CREW screen will show, drawn the same way.
+          jobRecruit: (j) => {
+            const pt = world.active()!;
+            const k = world.kitOf(pt.player)!;
+            const districts = [...new Set((loreMap?.places ?? []).map((p) => p.district))];
+            const draw = freeDraw({ crew: k.crew, book: crewBook, seed: crewSeed(pt.id), extras, districts, now: world.clockNow() ?? START });
+            return jobRecruitCard({ ...draw, runKey: j.runKey, title: j.title, place: j.place, district: j.district, spec: j.spec, grade: j.grade }).recruit!;
+          },
+          districtName: (id) => world.districtName(id),
         },
         // Leads apply to the playthrough's player only; a take being rewritten doesn't hold what it replaces.
         leads: (contactId, player, recent, replaced) => {
@@ -605,16 +648,20 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     return {
       kit: {
         deck: decks.find((d) => d.id === k.kit.deck) ?? null,
+        owned: k.kit.owned.flatMap((id) => decks.filter((d) => d.id === id)),
         sol: k.kit.sol,
         heat: hot?.heat ?? 0,
         heatHere: heatIn(k.kit, here),
+        here,
+        heatBy: Object.fromEntries(Object.entries(k.kit.heat).filter(([, n]) => n > 0)),
         hottest: hot,
         rep: k.kit.rep,
         cover: k.kit.cover,
-        edgeLeft: k.kit.edgeLeft,
-        edgeMax: k.kit.edgeMax,
+        nerveLeft: k.kit.nerveLeft,
+        nerveMax: k.kit.nerveMax,
         stats: k.stats,
         crewLatest: k.crew.latest,
+        crewPicks: k.crew.members.some((m) => m.state !== 'gone' && m.picks.length > 0),
       } satisfies KitView,
     };
   });
@@ -632,11 +679,15 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     const day = storyDay(now);
     const mapPlaces = loreMap?.places ?? [];
     const districts = [...new Set(mapPlaces.map((p) => p.district))];
-    const posted = boardPlaces(questBook).flatMap((place) => {
-      const district = places.districtOf(place) ?? '';
-      return postedJobs({ book: questBook, place, tier: repTier(k.kit.rep[district] ?? 0), day, seed: pt.id }).map((job) => ({ job, place, district }));
+    // A contract's groundwork (tier 3 contracts spec §3): its run, while it waits for its night.
+    const contracts = world.questStatus(pt.player)?.flatMap((s) => {
+      const q = questBook.find((x) => x.id === s.id.split('@')[0]);
+      if (!q?.contract || s.run.done || s.run.contract?.stage !== 'waiting') return [];
+      const nightsLeft = Math.max(1, Math.ceil(((s.run.contract.wait?.from ?? now) - now) / 1440));
+      return [{ run: s.id, title: q.title, nightsLeft, art: q.art, pieces: q.contract.pieces }];
     });
     return crewView({
+      ...(contracts?.length ? { contracts } : {}),
       crew: k.crew,
       kit: k.kit,
       book: crewBook,
@@ -644,10 +695,44 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       seed: crewSeed(pt.id),
       places: mapPlaces.filter((p) => p.hires && p.hires.length > 0).map((p) => ({ id: p.id, name: p.name, district: p.district, hires: p.hires! })),
       extras,
-      posted,
       here,
       districts,
-      names: { job: (id) => questBook.find((q) => q.id === id)?.title ?? id, district: (id) => loreMap?.districts.find((d) => d.id === id)?.name ?? id },
+      names: {
+        job: (id) => questBook.find((q) => q.id === id)?.title ?? id,
+        district: (id) => loreMap?.districts.find((d) => d.id === id)?.name ?? id,
+        contact: (id) => records.find((r) => r.info.id === id)?.info.name ?? id,
+        place: (id) => mapPlaces.find((p) => p.id === id)?.name ?? id,
+      },
+      vouchers: vouchersNow(pt.player),
+      jobCards: (world.questStatus(pt.player) ?? []).flatMap(({ id, run }) => {
+        const q = run.done && run.recruit && run.setup?.endAt !== undefined ? questBook.find((x) => x.id === bookId(id)) : undefined;
+        if (!q || !run.recruit) return [];
+        // A rescue's card (crew spec §5) is at its post's place, as its debrief drew it.
+        const place = run.spring?.place ?? q.starts;
+        const p = mapPlaces.find((x) => x.id === place);
+        const title = run.spring ? fillRecruit(q.title, k.crew.members.find((m) => m.recruit.id === run.spring!.recruit)?.recruit.name.split(' ')[0] ?? null) : q.title;
+        return [{ runKey: questKey(pt.player, id), title, place, placeName: p?.name ?? place, district: places.districtOf(place) ?? 'unknown', spec: run.recruit.spec, grade: run.recruit.grade, endAt: run.contract?.closedAt ?? run.setup!.endAt! }];
+      }),
+      springs: questBook.some((q) => q.spring),
+      rescuing: (world.questStatus(pt.player) ?? []).flatMap(({ run }) => (run.spring && rescueOpen(run, now) ? [run.spring.recruit] : [])),
+    });
+  }
+  /**
+   * Who vouches tonight (crew spec §5): contacts whose trust is in the top band and warmth not in the bottom one, at
+   * the map place of their first room; a contact whose first room isn't on the map vouches nowhere.
+   */
+  function vouchersNow(player: string): NonNullable<Parameters<typeof crewView>[0]['vouchers']> {
+    const mapPlaces = loreMap?.places ?? [];
+    // The card holds all week: its grade reads rep as the story week began (06:00 on its first day).
+    const week = Math.floor(storyDay(world.clockNow() ?? START) / 7);
+    const rep = world.kitOf(player, 360 + week * 7 * 1440)?.kit.rep ?? {};
+    return world.standingAll(player).flatMap(({ contact, values }) => {
+      if (!VOUCH_CELLS.includes(cellOf(values))) return [];
+      const rec = records.find((r) => r.info.id === contact);
+      const place = rec ? places.locate(rec.info.startRoom).placeId : null;
+      const p = place ? mapPlaces.find((x) => x.id === place) : undefined;
+      if (!rec || !p) return [];
+      return [{ contact, name: rec.info.name, accent: rec.info.accent, place: p.id, placeName: p.name, district: p.district, spec: world.standingConfig(contact)?.vouches ?? null, tier: repTier(rep[p.district] ?? 0) }];
     });
   }
   app.get<{ Querystring: { as?: string } }>('/api/persona', async (req) => {
@@ -766,6 +851,13 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     if (!file || !fs.existsSync(file)) return reply.code(404).send({ error: 'no such picture' });
     return reply.type(m![1] === 'jpg' ? 'image/jpeg' : `image/${m![1]}`).header('Cache-Control', 'no-cache').send(fs.readFileSync(file));
   });
+  // A goods picture (crew goods spec §8): world/crew/art/<file>.
+  app.get<{ Params: { file: string } }>('/api/crew/art/:file', (req, reply) => {
+    const m = QUEST_ART.exec(req.params.file);
+    const file = m ? path.join(cfg.crewDir ?? DEFAULT_CREW_DIR, 'art', req.params.file) : null;
+    if (!file || !fs.existsSync(file)) return reply.code(404).send({ error: 'no such picture' });
+    return reply.type(m![1] === 'jpg' ? 'image/jpeg' : `image/${m![1]}`).header('Cache-Control', 'no-cache').send(fs.readFileSync(file));
+  });
   app.get<{ Params: { id: string } }>('/api/extras/:id', (req, reply) => {
     const face = extrasPng.get(req.params.id);
     if (!face) return reply.code(404).send({ error: 'no such extra' });
@@ -825,14 +917,19 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     return reply.code(204).send();
   });
 
-  registerMapRoute(app, cfg.mapFile ?? DEFAULT_MAP_FILE);
+  registerMapRoute(app, cfg.mapFile ?? DEFAULT_MAP_FILE, cfg.readoutsDir);
   registerGigRoute(app, { gigsDir: cfg.gigsDir ?? DEFAULT_GIGS_DIR, mapFile: cfg.mapFile ?? DEFAULT_MAP_FILE });
   registerPapersRoutes(app, { papersDir: cfg.papersDir ?? DEFAULT_PAPERS_DIR, dataDir: cfg.dataDir, loreIds: () => loreIds });
   const openrouterUrl = cfg.openrouterBaseUrl ?? OPENROUTER_BASE_URL;
   registerLinkRoutes(app, {
     settings,
     baseUrl: openrouterUrl,
-    catalog: createModelCatalog({ baseUrl: openrouterUrl, apiKey: () => settings.key('openrouter') }),
+    ...(cfg.anthropicBaseUrl ? { anthropicBaseUrl: cfg.anthropicBaseUrl } : {}),
+    catalog: createRoutedCatalog({
+      openrouter: createModelCatalog({ baseUrl: openrouterUrl, apiKey: () => settings.key('openrouter') }),
+      anthropic: createAnthropicCatalog({ apiKey: () => settings.key('anthropic'), ...(cfg.anthropicBaseUrl ? { baseUrl: cfg.anthropicBaseUrl } : {}) }),
+      keys: () => ({ openrouter: settings.key('openrouter'), anthropic: settings.key('anthropic') }),
+    }),
     runtimes: () => [...runtimes.values()],
     originAllowed,
   });
@@ -844,7 +941,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     reportsDir: cfg.reportsDir ?? path.join(cfg.dataDir, 'bug-reports'),
     version: cfg.appVersion ?? '0.0.0',
     build: cfg.appBuild ?? null,
-    keys: () => [settings.key('openrouter') ?? ''],
+    keys: () => [settings.key('openrouter') ?? '', settings.key('anthropic') ?? ''],
     originAllowed,
     context: () => {
       const pt = world.active();
@@ -896,8 +993,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       if (!direct) return null;
       return {
         kind: 'direct',
-        // Her key (none needed for an address without auth).
-        ready: () => direct.keyName === null || Boolean(settings.key(direct.keyName)),
+        // A key her model's route can use (none needed for an address without auth).
+        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel) !== null,
         narrate: async (messages) => {
           const rt = await runtime(ai);
           if (!rt?.narrate) throw new Error('her model is not reachable');
@@ -914,16 +1011,44 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       const you = world.players.resolve(undefined);
       const picks = selectLore(loreBook, { ...places.locate(room.id), recent: [] }).picks.map((p) => p.entry);
       const { timeOfDay, weather } = rt.room.state.atmosphere;
-      return scenePrompt({
-        room: { name: room.name, art: roomArt(room.folder ?? room.id, room.description), timeOfDay, weather },
-        lore: loreBlock(picks),
-        you: you.whosHere ?? `[who's here: ${you.name}]`,
-        her: whosHereBlock(rec.info.name, rec.info.pronoun, { tagline: rec.info.tagline, bio: rec.info.bio, facts: rec.info.facts }),
-        player: you.name,
-        steer,
-      });
+      // What's already between them: her line on him (his `knows`), for HISTORY; null when they haven't met.
+      const tie = world.tieFor(ai, you.id);
+      return {
+        pair: { player: { id: you.id, name: you.name }, tie },
+        messages: scenePrompt({
+          room: { name: room.name, art: roomArt(room.folder ?? room.id, room.description), timeOfDay, weather },
+          lore: loreBlock(picks),
+          you: you.whosHere ?? `[who's here: ${you.name}]`,
+          her: whosHereBlock(rec.info.name, rec.info.pronoun, { tagline: rec.info.tagline, bio: rec.info.bio, facts: rec.info.facts }),
+          player: you.name,
+          steer,
+          tie,
+          herName: rec.info.name,
+        }),
+      };
     },
   });
+
+  // Open threads (SUGGEST's TURN, DRAW's PERSONAL): only what the player's own panels show (quest panel, plan card, LEADS, LOOSE ENDS), and only
+  // for the playthrough's player, whom those readers serve. A reader that can't answer adds nothing.
+  const suggestThreads = (ai: string, her: string, you: { id: string; name: string }, rt: { relay: { questState(player: string): QuestState } }): string[] => {
+    if (world.active()?.player !== you.id) return [];
+    const safe = <T,>(f: () => T, none: T): T => {
+      try {
+        return f();
+      } catch {
+        return none;
+      }
+    };
+    return openThreads({
+      quest: safe(() => rt.relay.questState(you.id), null),
+      plan: safe(() => world.planNow(ai), null),
+      her,
+      player: you.name,
+      leads: safe(() => world.leads(), []),
+      looseEnds: safe(() => world.looseEnds().open, []),
+    });
+  };
 
   // Encounter cards: three events for this moment in her room, from the room as it stands.
   registerEncounterRoutes(app, {
@@ -934,7 +1059,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       if (!direct) return null;
       return {
         kind: 'direct',
-        ready: () => direct.keyName === null || Boolean(settings.key(direct.keyName)),
+        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel) !== null,
         narrate: async (messages) => {
           const rt = await runtime(ai);
           if (!rt?.narrate) throw new Error('her model is not reachable');
@@ -954,14 +1079,18 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       const others = rt.othersNow().map((o) => ({ name: o.name, pronoun: o.pronoun, voice: (o.kind === 'contact' ? o.tagline || o.voice : o.voice).slice(0, OTHER_VOICE_MAX) }));
       const { recent, loreRecent, stranger } = sceneNow(rows, { player: you.name, contact: rec.info.name, others: others.map((o) => o.name) });
       const picks = selectLore(loreBook, { ...places.locate(room.id), recent: loreRecent }).picks.map((p) => p.entry);
-      const reserved = [you.name, rec.info.name, ...others.map((o) => o.name)];
+      // The stranger still here counts as taken: a new STRANGER card is someone else (with a face of their own).
+      const reserved = [you.name, rec.info.name, ...others.map((o) => o.name), ...(stranger ? [stranger.name] : [])];
       const { timeOfDay, weather } = rt.room.state.atmosphere;
       // Blackouts phase 3 §2: the narrator hears the power's out, and can't cut it again.
       const power = world.powerOf(rt.room.state.sceneId);
+      const district = places.locate(room.id).districtId;
       return {
         reserved,
         // No power card where it can't land: already dark, or the Spine's own feed (final review M1).
         dark: !world.canCut(rt.room.state.sceneId),
+        // The stranger card's face: a local of this district who fits what the narrator said (only faces we can serve).
+        face: (s) => pickStrangerFace(extras.filter((x) => extrasPng.has(x.id)), { ...(s.gender ? { gender: s.gender } : {}), ...(s.age ? { age: s.age } : {}), district }),
         messages: encounterPrompt({
           power: power.outage ? narratorPowerLine(world.districtName(power.district), power.outage.from) : null,
           room: { name: room.name, art: roomArt(room.folder ?? room.id, room.description), timeOfDay, weather },
@@ -974,6 +1103,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
           stranger,
           recent,
           reserved,
+          threads: suggestThreads(ai, rec.info.name, you, rt),
         }),
       };
     },
@@ -988,7 +1118,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       if (!direct) return null;
       return {
         kind: 'direct',
-        ready: () => direct.keyName === null || Boolean(settings.key(direct.keyName)),
+        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel) !== null,
         narrate: async (messages) => {
           const rt = await runtime(ai);
           if (!rt?.narrate) throw new Error('her model is not reachable');
@@ -1024,6 +1154,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
           summary: readSummary(rt.db, you.id)?.text ?? null,
           recent,
           steer,
+          angles: !travel,
+          threads: travel ? [] : suggestThreads(ai, rec.info.name, you, rt),
           travel: travel ? { ...travel, contact: rec.info.name } : null,
         }),
       };

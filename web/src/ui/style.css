@@ -451,6 +451,7 @@
   mask-image: none;
 }
 .text.paged { overflow: hidden; }
+.text.paged::after { content: ''; display: block; height: var(--page-tail, 0); }
 .continue {
   align-self: flex-end;
   margin-top: 8px;
@@ -651,15 +652,15 @@
 
 /* ───────────────────────── Journal ───────────────────────── */
 
-.hud-you, .hud-people, .hud-crew, .hud-map {
+.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-map {
   pointer-events: auto;
   cursor: pointer;
   margin-left: 1.1em;
   color: #e9def9;
 }
 /* The Alt letter: underlined in her colour, only while Alt is held (plain words the rest of the time). */
-:is(.hud-you, .hud-people, .hud-crew) u { text-decoration: none; }
-.hud-bar.alt-held :is(.hud-you, .hud-people, .hud-crew) u {
+:is(.hud-you, .hud-people, .hud-tx, .hud-crew) u { text-decoration: none; }
+.hud-bar.alt-held :is(.hud-you, .hud-people, .hud-tx, .hud-crew) u {
   text-decoration: underline;
   text-decoration-color: var(--agent);
   text-decoration-thickness: 2px;
@@ -668,19 +669,24 @@
 .hud-you:hover, .hud-you:focus-visible,
 .hud-map:hover, .hud-map:focus-visible,
 .hud-people:hover, .hud-people:focus-visible,
+.hud-tx:hover, .hud-tx:focus-visible,
 .hud-crew:hover, .hud-crew:focus-visible { outline: none; color: #fff; }
-/* Texts you haven't seen on the deck (promised texts spec §6): NIX · 1 TEXT in her pink, opens the deck. */
+/* Texts you haven't seen on the deck (promised texts spec §6): NIX · 1 TEXT in her pink, opens TEXTS. */
 .hud-power { color: #ffb347; text-shadow: 0 0 8px rgba(255, 179, 71, 0.5); }
-.hud-texts { cursor: pointer; color: #ff4f8b; text-shadow: 0 0 8px rgba(255, 79, 139, 0.6); }
+.hud-texts { pointer-events: auto; cursor: pointer; color: #ff4f8b; text-shadow: 0 0 8px rgba(255, 79, 139, 0.6); }
 .hud-texts::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 0.15em; background: #ff4f8b; box-shadow: 0 0 6px #ff4f8b; }
 .hud-texts:hover, .hud-texts:focus-visible { outline: none; color: #fff; }
 /* A crew result not seen yet (crew spec §4): a dot after CREW. */
-.hud-crew.crew-new::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 5px; vertical-align: 0.35em; border-radius: 50%; background: #a8ff60; box-shadow: 0 0 6px #a8ff60; }
-/* The open screen (YOU, PEOPLE or MAP) lit like an open SYS: filled in its blue, dark type. A box-shadow, not
+.hud-crew.crew-new::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 5px; vertical-align: 0.35em; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 6px #ff4d4d; }
+/* Someone texted you unseen (in-game texts spec §4): a pink dot after TEXTS. */
+.hud-tx.texts-new::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 5px; vertical-align: 0.35em; border-radius: 50%; background: #ff4f8b; box-shadow: 0 0 6px #ff4f8b; }
+/* The open screen (YOU, PEOPLE, TEXTS, QUEST, CREW or MAP) lit like an open SYS: filled in its blue, dark type. A box-shadow, not
    padding, so the bar's width (and its fit) doesn't change. */
-:is(.hud-you, .hud-people, .hud-crew, .hud-map).open,
-:is(.hud-you, .hud-people, .hud-crew, .hud-map).open:hover { color: #05020c; background: var(--hud); box-shadow: 0 0 0 4px var(--hud); text-shadow: none; }
-:is(.hud-you, .hud-people, .hud-crew).open u { text-decoration-color: #05020c; }
+:is(.hud-you, .hud-people, .hud-tx, .hud-quest, .hud-crew, .hud-map).open,
+:is(.hud-you, .hud-people, .hud-tx, .hud-quest, .hud-crew, .hud-map).open:hover { color: #05020c; background: var(--hud); box-shadow: 0 0 0 4px var(--hud); text-shadow: none; }
+:is(.hud-you, .hud-people, .hud-tx, .hud-quest, .hud-crew).open u { text-decoration-color: #05020c; }
+/* CREW's word in its panel's red. */
+.hud-crew.open, .hud-crew.open:hover { background: #ff4d4d; box-shadow: 0 0 0 4px #ff4d4d; }
 /* The SAVE row of SYS while her reply streams: WAIT FOR <HER>, dimmed, and it doesn't open. */
 .sys-row[data-row='save'].busy { cursor: default; }
 .sys-row[data-row='save'].busy .sys-value { color: var(--hud-dim); }
@@ -778,6 +784,8 @@
 .mm-row.current { color: #fff; border-color: rgba(127, 233, 255, 0.35); }
 .mm-row:hover, .mm-row:focus-visible, .mm-other:hover, .mm-other:focus-visible { outline: none; color: #04121a; background: var(--hud); }
 .mm-price { opacity: 0.7; white-space: nowrap; }
+.mm-row:has(.mm-via) { flex-wrap: wrap; row-gap: 0; }
+.mm-via { flex-basis: 100%; font-size: 11px; letter-spacing: 0.2em; color: var(--hud); opacity: 0.8; }
 .mm-input {
   font: inherit;
   color: #fff;
@@ -973,6 +981,8 @@
 .stage-right[data-kind='sprite'] { right: var(--fig-x); }
 .stage-left[data-kind='sprite'] .stage-art,
 .stage-right[data-kind='sprite'] .stage-art { background-size: 100% 100%; background-position: center top; }
+/* SYS → MIRROR: the art flipped. The light filter flips with it, so stage-light.ts swaps its sides. */
+.stage-figure[data-mirror] .stage-art { transform: scaleX(-1); }
 /* Snapped art (Studio SNAP, sprite.pixel): hard pixels, not the browser's smoothing. */
 .stage-figure[data-pixel] .stage-art { image-rendering: pixelated; }
 /* The room's light on a sprite figure (stage-light.ts, spec 2026-10-15): an SVG filter on her art
@@ -1153,11 +1163,9 @@
   height: 30px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(8, 3, 16, 0.6);
 }
-.keys-glyphs .key:hover:not(:disabled) { border-color: currentColor; }
-.keys-glyphs .key .glyph { width: 18px; height: 18px; }
+.keys-glyphs .key:hover:not(:disabled) { color: #fff; }
+.keys-glyphs .key .glyph { width: 18px; height: 18px; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.9)); }
 .keys-glyphs .key .lb {
   position: absolute;
   top: 50%;
@@ -1628,9 +1636,6 @@
 /* Encounter cards (mockups 1–4): amber is everything the narrator writes. ◆ DRAW beside END SCENE. */
 /* ◆ DRAW is a key in the scene stack (see the corner stacks); disabled, it greys rather than dims. */
 .key.draw:disabled, .key.dice:disabled { color: #5a5070; opacity: 1; }
-/* SUGGEST pulses while her model drafts your line. */
-.key.suggest.working { animation: suggest-working 0.9s steps(2) infinite; }
-@keyframes suggest-working { 50% { opacity: 0.35; } }
 
 /* The event in play: an amber card under the HUD; fades once her reaction is in. It takes the opening scene's place. */
 .encounter-banner {
@@ -1726,7 +1731,33 @@
   padding: 60px 16px 18px;
   background: rgba(4, 2, 10, 0.62);
 }
-.encounter-host .ep-title { margin-bottom: 18px; font: 52px var(--pixel); letter-spacing: 0.3em; color: #ffc56b; text-shadow: 0 0 18px #ffc56b; }
+.encounter-host .ep-title { margin-bottom: 18px; font: 52px var(--pixel); letter-spacing: 0.3em; color: var(--amber); text-shadow: 0 0 18px var(--amber); }
+/* SUGGEST's lines on the same panel (suggest-panel.ts): cyan, the player's colour, where DRAW is amber. */
+.encounter-host.suggest-host { --amber: #7fe9ff; }
+/* A new game's openings (opening-panel.ts) over the arrival screen: the pair's head, both faces and the tie. */
+.encounter-host.opening-host { padding-top: 40px; background: rgba(4, 2, 10, 0.72); }
+.encounter-host.opening-host .scene-panel { width: 980px; }
+.op-pair { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed #3a2f50; }
+.op-face { flex: none; width: 64px; height: 80px; background: #120a20 center top / cover no-repeat; border: 1px solid rgba(127, 233, 255, 0.5); }
+.op-face.op-her { border-color: rgba(255, 79, 139, 0.6); }
+.op-mid { flex: 1; text-align: center; }
+.op-names { font: 30px var(--pixel); letter-spacing: 0.24em; }
+.op-you { color: #7fe9ff; }
+.op-x { margin: 0 10px; color: #6b5f85; }
+.op-hername { color: #ff4f8b; }
+.op-where { font: 17px var(--pixel); letter-spacing: 0.22em; color: #b8acd0; }
+.op-tie { margin-top: 4px; font: italic 12.5px var(--mono); color: #8a7fa0; }
+.encounter-host.suggest-host .scene-panel { border-color: rgba(127, 233, 255, 0.45); }
+.encounter-host.suggest-host .sp-card.on { background: rgba(127, 233, 255, 0.08); border-color: rgba(127, 233, 255, 0.6); border-left-color: var(--amber); }
+.encounter-host .sp-sub-what { margin-left: 12px; font: 12px var(--mono); letter-spacing: 0; text-transform: none; color: #8a7fa0; }
+.encounter-host .sp-card-text em { color: #a99cc4; }
+/* A card's picture (SUGGEST's angles): a 3:4 tile down its left edge, the number on its corner; dim until chosen. */
+.encounter-host .sp-card.has-art { min-height: 120px; padding-left: 118px; }
+.encounter-host .sp-art { position: absolute; left: 10px; top: 10px; bottom: 10px; width: 92px; background-size: cover; background-position: center; border: 1px solid rgba(255, 255, 255, 0.12); filter: saturate(0.85) brightness(0.8); transition: filter 150ms; }
+.encounter-host .sp-card.on .sp-art { filter: none; border-color: color-mix(in srgb, var(--amber) 70%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--amber) 30%, transparent); }
+.encounter-host .sp-card.has-art .sp-n { z-index: 1; left: 14px; top: 12px; padding: 0 5px; font-size: 24px; line-height: 24px; background: rgba(8, 4, 16, 0.85); }
+/* DRAW's stranger: a face, so its top (the head) stays in the tile. */
+.encounter-host:not(.suggest-host) .sp-art { background-position: center 15%; }
 .encounter-host .scene-panel { width: min(900px, 100%); max-height: calc(900px - 220px); }
 .encounter-host .ep-who { display: inline-block; margin-top: 6px; padding: 0 8px; font: 16px var(--pixel); letter-spacing: 0.2em; color: #ffc56b; border: 1px solid rgba(255, 197, 107, 0.5); }
 .encounter-host .ep-voice { margin-left: 6px; font: 12px var(--mono); font-style: normal; letter-spacing: 0.05em; color: #b89a6a; }
@@ -1812,22 +1843,6 @@ body.ui-hidden > #devpanel {
   border: 0;
 }
 .qc-actions .qc-talk { color: #e3f6fb; background: transparent; border: 1px solid rgba(227, 246, 251, 0.5); }
-.ql-host {
-  position: absolute;
-  z-index: 40;
-  top: 56px;
-  right: 24px;
-  min-width: 280px;
-  padding: 12px 16px;
-  pointer-events: auto;
-  background: rgba(4, 16, 22, 0.94);
-  border: 1px solid rgba(127, 233, 255, 0.55);
-}
-.ql-head { font: 18px var(--pixel); letter-spacing: 0.3em; color: #7fe9ff; margin-bottom: 8px; }
-.ql-row { display: flex; align-items: center; gap: 12px; margin-top: 6px; font: 15px var(--mono); color: #e3f6fb; }
-.ql-title { flex: 1; }
-.ql-start { font: 15px var(--pixel); letter-spacing: 0.15em; padding: 2px 10px; cursor: pointer; color: #0b0612; background: #7fe9ff; border: 0; }
-.ql-changed { font: 14px var(--mono); color: #ffb3a6; }
 /* A quest row in the archive and the box: its title, the pick line as yours, then the written text. */
 .msg.quest-row .qr-head { font: 16px var(--pixel); letter-spacing: 0.25em; color: #7fe9ff; }
 .msg.quest-row .qr-pick { font: 14px/1.5 var(--mono); color: #d9c7ff; margin: 4px 0; }
@@ -1860,8 +1875,6 @@ body.ui-hidden > #devpanel {
 .qc-when { margin-top: 6px; font: 16px var(--pixel); letter-spacing: 0.15em; color: #b8eaf5; }
 .qc-host.qc-folded .qc-when, .qc-host.qc-folded .qc-continue { display: none; }
 .qc-continue { margin-top: 8px; font: 15px var(--pixel); letter-spacing: 0.15em; padding: 2px 12px; cursor: pointer; color: #0b0612; background: #7fe9ff; border: 0; }
-.ql-waiting { color: #b8eaf5; }
-.ql-elsewhere { color: #8fb3bd; font-size: 14px; }
 
 /* Quest panel layout (2026-10-16): a narrow column between the figures, the cards stacked under
    the beat, its text in SYS → FONT's chat font; while it's up the figures step out to make room. */
@@ -1877,23 +1890,15 @@ body.ui-hidden > #devpanel {
 #game.quest-up { --fig-x: 40px; }
 .qc-story { scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
 /* New-player quick wins: the list's pitch and deadline, the hint under the cards, the lit card's question, WAIT UNTIL, QUEST's glow. */
-.ql-row { align-items: flex-start; }
-.ql-text { flex: 1; }
-.ql-pitch { margin-top: 2px; font: 14px/1.4 var(--chat-font, var(--mono)); color: #b8eaf5; }
-.ql-timed { margin-top: 3px; font: 13px var(--pixel); letter-spacing: 0.2em; color: #ffd36b; }
-.ql-mission { margin-top: 3px; font: 13px var(--pixel); letter-spacing: 0.2em; color: #7fe9ff; }
-.ql-scouted { margin-top: 2px; font: 12px var(--pixel); letter-spacing: 0.14em; color: rgba(255, 217, 230, 0.7); }
-.ql-cased { margin-top: 2px; font: 12px var(--pixel); letter-spacing: 0.2em; color: #a8ff60; }
 .qc-hint { margin-top: 6px; font: 13px/1.4 var(--chat-font, var(--mono)); color: #8fb3bd; font-style: italic; }
 .qc-ask { margin-top: 6px; font: 13px var(--mono); color: #ffd36b; }
 .qc-wait { margin-top: 8px; font: 15px var(--pixel); letter-spacing: 0.15em; padding: 2px 12px; cursor: pointer; color: #0b0612; background: #7fe9ff; border: 0; }
 .qc-host.qc-folded .qc-wait { display: none; }
 .hud-quest.quest-new { color: #ffd36b; animation: hud-breathe 1.6s ease-in-out infinite; }
-.ql-host { max-width: 380px; }
 /* Small jobs (spec 2026-10-19 §6): the job's strip, each card's odds bar and why line, ONE SHOT, a crack's size, passive labels, the FIXER. */
 .qc-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: -2px 0 8px; font: 14px var(--pixel); letter-spacing: 0.16em; color: #8fb3bd; }
 .qc-alarm { display: inline-flex; align-items: center; gap: 3px; }
-.qc-alarm b { font-weight: normal; margin-right: 5px; }
+.qc-alarm b, .qc-take b { font-weight: normal; margin-right: 5px; }
 .qc-alarm i { width: 14px; height: 8px; background: rgba(255, 90, 90, 0.16); border: 1px solid rgba(255, 90, 90, 0.45); }
 .qc-alarm i.on { background: #ff5a5a; box-shadow: 0 0 6px rgba(255, 90, 90, 0.7); }
 .qc-heat { color: #ffb36b; }
@@ -1905,12 +1910,6 @@ body.ui-hidden > #devpanel {
 .qc-red { color: #ff5a5a; }
 .qc-crack { color: #7dff9b; }
 .qr-passive { font: 12px var(--pixel); letter-spacing: 0.18em; color: #7fe9ff; opacity: 0.7; font-style: normal; }
-.ql-fixer { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(127, 233, 255, 0.2); }
-.ql-item-name { font: 14px var(--mono); color: #e3f6fb; }
-.ql-item-why { margin-top: 2px; font: 12px var(--pixel); letter-spacing: 0.18em; color: #ff9b8a; }
-.ql-item.locked .ql-item-name { color: #6f8a92; }
-.ql-buy { font: 15px var(--pixel); letter-spacing: 0.15em; padding: 2px 10px; cursor: pointer; color: #0b0612; background: #ffc56b; border: 0; }
-.ql-buy:disabled { cursor: default; color: #6f8a92; background: rgba(127, 233, 255, 0.12); }
 /* A job's check on its card (small jobs spec §6, the Check Feel audition): lock, scan and ticker, the landing, the reroll spark, a dying deck. */
 .qc-card { position: relative; }
 .qc-card.is-locked { border-color: #7fe9ff; }
@@ -1922,6 +1921,9 @@ body.ui-hidden > #devpanel {
 .qc-bar .qc-mark { top: -6px; width: 2px; height: 15px; background: #fff; transform: translateX(-1px); }
 .qc-tick { position: absolute; right: 12px; bottom: 8px; font: 22px/1 var(--pixel); color: #e3f6fb; font-variant-numeric: tabular-nums; }
 .qc-stamp { position: absolute; right: 12px; top: 6px; font: 24px/1 var(--pixel); letter-spacing: 0.08em; opacity: 0; transform: scale(1.6); transition: opacity 0.12s, transform 0.18s; }
+/* What the roll did, under the card's dice (check-anim.ts rollLine). */
+.qc-says { display: block; margin-top: 4px; font: 14px var(--pixel); letter-spacing: 0.12em; color: #e6dcf2; }
+.qc-says:empty { display: none; }
 .qc-card.is-pass { border-color: #7fe9ff; animation: qc-passflash 0.5s ease-out; }
 .qc-card.is-pass .qc-stamp { color: #7dff9b; opacity: 1; transform: scale(1); }
 .qc-card.is-pass .qc-bar::after { background: #7fe9ff; }
@@ -1938,6 +1940,38 @@ body.ui-hidden > #devpanel {
 @media (prefers-reduced-motion: reduce) { .qc-card, .qc-card * { animation: none !important; transition: none !important; } }
 /* A job's debrief (small jobs spec §6) and its cover cards. */
 .qc-blown { font: 16px var(--pixel); letter-spacing: 0.25em; color: #ff5a5a; }
+.qc-push { font: 16px var(--pixel); letter-spacing: 0.25em; color: #ffc56b; }
+.qc-pot { color: #ffc56b; }
+/* The table (spec 2026-10-29 §4): the card's dice and position, the clocks, PUSH, GET OUT, the roll's dice. */
+.qc-pos { letter-spacing: 0.08em; }
+.qc-pos-dark { color: #7fe9ff; }
+.qc-pos-open { color: #ffc56b; }
+.qc-pos-wire { color: #ff5a5a; }
+/* Effect (effect and NERVE spec §3): SMALL dim, FAIR plain, BIG amber. */
+.qc-eff { letter-spacing: 0.08em; }
+.qc-eff-small { color: rgba(207, 239, 247, 0.45); }
+.qc-eff-big { color: #ffc56b; text-shadow: 0 0 6px rgba(255, 197, 107, 0.5); }
+.qc-take { display: inline-flex; align-items: center; gap: 3px; }
+.qc-take i { width: 14px; height: 8px; background: rgba(255, 197, 107, 0.16); border: 1px solid rgba(255, 197, 107, 0.45); }
+.qc-take i.on { background: #ffc56b; box-shadow: 0 0 6px rgba(255, 197, 107, 0.7); }
+.qc-nerve { color: #7fe9ff; }
+.qc-getaway { font: 16px var(--pixel); letter-spacing: 0.25em; color: #ff5a5a; animation: qc-getaway 0.8s steps(2) infinite; }
+@keyframes qc-getaway { 50% { opacity: 0.35; } }
+.qc-push-toggle { margin: 6px 0; padding: 4px 10px; font: 14px var(--pixel); letter-spacing: 0.16em; color: #7fe9ff; background: transparent; border: 1px solid rgba(127, 233, 255, 0.45); cursor: pointer; }
+.qc-push-toggle.on { color: #04131a; background: #7fe9ff; }
+.qc-dice { display: flex; gap: 6px; margin-top: 6px; }
+.qc-die { display: inline-grid; place-items: center; width: 24px; height: 24px; font: 18px/1 var(--pixel); color: #c9e6ee; border: 1px solid rgba(127, 233, 255, 0.35); background: rgba(4, 16, 22, 0.7); }
+.qc-card.is-rolling .qc-die { animation: qc-tumble 0.12s steps(2) infinite; }
+@keyframes qc-tumble { 50% { transform: rotate(8deg); } }
+.qc-die.kept { color: #04131a; background: #ffc56b; border-color: #ffc56b; box-shadow: 0 0 10px rgba(255, 197, 107, 0.7); }
+.qc-card.is-cost { border-color: #ffc56b; }
+.qc-card.is-cost .qc-stamp { color: #ffc56b; opacity: 1; transform: none; }
+.db-take { display: flex; align-items: center; gap: 3px; margin-top: 6px; font: 13px var(--pixel); letter-spacing: 0.16em; color: #ffc56b; }
+.db-take b { margin-right: 6px; font-weight: normal; }
+.db-take i { width: 10px; height: 10px; border: 1px solid currentColor; opacity: 0.45; }
+.db-take i.on { opacity: 1; background: currentColor; }
+.db-nerve { color: #7fe9ff; }
+@media (prefers-reduced-motion: reduce) { .qc-getaway, .qc-card.is-rolling .qc-die { animation: none; } }
 .qc-card.qc-cover { border-color: rgba(255, 197, 107, 0.7); }
 .db { margin-top: 8px; padding: 10px 14px; background: rgba(4, 16, 22, 0.88); border: 1px solid rgba(127, 233, 255, 0.35); }
 .db-tier { font: 28px/1 var(--pixel); letter-spacing: 0.25em; margin-bottom: 8px; animation: db-stamp 0.25s ease-out; }
@@ -1947,6 +1981,15 @@ body.ui-hidden > #devpanel {
 .db-blown .db-tier { color: #ff5a5a; }
 .db-check { display: flex; justify-content: space-between; gap: 12px; font: 13px/1.5 var(--mono); color: #c9e6ee; }
 .db-roll { font: 13px var(--pixel); letter-spacing: 0.12em; color: #8fb3bd; white-space: nowrap; }
+.db-pushes { margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(127, 233, 255, 0.25); }
+.db-push-head { font: 13px var(--pixel); letter-spacing: 0.25em; color: #ffc56b; }
+.db-crew { margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255, 79, 139, 0.3); }
+.db-crew-line { font: 13px var(--pixel); letter-spacing: 0.12em; color: #ff8fb5; }
+/* gives: recruit (crew spec §5): someone from the job wants in. */
+.db-recruit { font: 13px var(--pixel); letter-spacing: 0.12em; color: #a8ff60; margin-top: 4px; }
+.db-push { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; font: 13px/1.5 var(--mono); color: #c9e6ee; }
+.db-gain { font: 13px var(--pixel); letter-spacing: 0.12em; color: #ffc56b; white-space: nowrap; }
+.db-push .db-gain:where(:not(:empty)) { min-width: 5em; text-align: right; }
 .db-totals { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; font: 15px var(--pixel); letter-spacing: 0.16em; color: #e3f6fb; }
 .db-sol { color: #ffc56b; font-variant-numeric: tabular-nums; }
 .db-heat { color: #ffb36b; }
@@ -1961,37 +2004,13 @@ body.ui-hidden > #devpanel {
 .lore-card { position: absolute; z-index: 60; max-width: 340px; padding: 8px 12px; pointer-events: none; background: rgba(4, 16, 22, 0.94); border: 1px solid rgba(127, 233, 255, 0.45); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); }
 .lore-card-title { font: 14px var(--pixel); letter-spacing: 0.2em; color: #7fe9ff; text-transform: uppercase; margin-bottom: 3px; }
 .lore-card-text { font: 13px/1.45 var(--mono); color: #d9eef3; font-style: normal; }
-/* Big jobs (spec 2026-10-19 big jobs §5): the section and go hour on the strip, clues, marked places, the read board, route labels. */
-.qc-section { color: #7fe9ff; }
-.qc-go { color: #ffd36b; }
-.qc-clues { margin: 0 0 8px; font: 13px/1.5 var(--mono); color: #c9e6ee; }
-.qc-clues summary { cursor: pointer; font: 14px var(--pixel); letter-spacing: 0.18em; color: #8fb3bd; }
-.qc-clues ul, .qc-marks { margin: 4px 0 8px; padding-left: 18px; }
-.qc-marks { font: 13px/1.5 var(--mono); color: #ffd36b; }
-.qc-gig { display: inline-block; margin-left: 0.5em; font: 13px var(--pixel); letter-spacing: 0.16em; color: #ffc56b; white-space: nowrap; }
-.rb { padding: 10px 14px; background: rgba(4, 16, 22, 0.88); border: 1px solid rgba(127, 233, 255, 0.35); }
-.rb-sentence { font: 16px/2 var(--chat-font, var(--mono)); color: #e3f6fb; }
-.rb-slot { margin: 0 4px; padding: 0 10px; min-width: 7em; font: inherit; color: #ffd36b; background: rgba(255, 211, 107, 0.06); border: 0; border-bottom: 2px solid rgba(255, 211, 107, 0.45); cursor: pointer; }
-.rb-slot.on { border-bottom-color: #ffd36b; background: rgba(255, 211, 107, 0.14); }
-.rb-bank { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
-.rb-chip { padding: 3px 10px; font: 13px var(--mono); color: #e3f6fb; background: rgba(127, 233, 255, 0.1); border: 1px solid rgba(127, 233, 255, 0.4); cursor: pointer; }
-.rb-chip.used { opacity: 0.35; }
-.rb-chip:focus-visible, .rb-slot:focus-visible { outline: 1px solid #7fe9ff; }
-.rb-read { font: 15px var(--pixel); letter-spacing: 0.15em; padding: 2px 14px; cursor: pointer; color: #0b0612; background: #7fe9ff; border: 0; }
-.rb-read:disabled { cursor: default; color: #6f8a92; background: rgba(127, 233, 255, 0.12); }
-.ql-big { margin-top: 3px; font: 13px var(--pixel); letter-spacing: 0.2em; color: #ffc56b; }
-.ql-walk { font: 15px var(--pixel); letter-spacing: 0.15em; padding: 2px 10px; cursor: pointer; color: #ffb3a6; background: transparent; border: 1px solid rgba(255, 90, 90, 0.6); }
-/* A big job's marked place (big jobs spec §2): a small amber diamond on the pin, its line in the file strip. */
-.pin .job-mark { position: absolute; right: -6px; top: -6px; width: 9px; height: 9px; background: #ffc56b; transform: rotate(45deg); box-shadow: 0 0 8px rgba(255, 197, 107, 0.8); pointer-events: none; }
-.map-strip .job-line { margin: 4px 0; font: 13px var(--pixel); letter-spacing: 0.14em; color: #ffc56b; }
-/* The big debrief (big jobs spec §4): clues found, the read, the gig. */
-.db-clues { margin: 4px 0 6px; padding-left: 18px; font: 13px/1.5 var(--mono); color: #c9e6ee; }
-.db-read, .db-gig { margin-top: 4px; font: 14px var(--pixel); letter-spacing: 0.16em; color: #7fe9ff; }
+/* The HUD table's pieces (table.css) stay out of the plain card: its crew lines, sums and rolls read as they always did. */
+.db-art, .db-face, .db-face.cr-mono, .db-keep, .db-pay-word { display: none; }
+.db-sums, .db-mate, .db-row { display: contents; }
+.db-die, .db-crew-line b { font-weight: normal; }
 
-/* The arrangement's nights cap (spec 2026-10-20 §2): a job she won't do tonight. */
-.ql-row.ql-capped { opacity: 0.5; }
-.ql-capped-note { color: #ff7fa8; letter-spacing: 0.12em; font-size: 0.8em; }
 .db-retainer { color: #ffd27f; }
+.db-cut { color: #ffd27f; }
 .db-unpaid { color: #ff7fa8; }
 .pe-arrangement { color: #ffd27f; letter-spacing: 0.12em; font-size: 0.8em; }
 

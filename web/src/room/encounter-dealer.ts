@@ -1,22 +1,23 @@
 /**
  * The room's deals (encounter cards): one narrator call at a time, outliving the panel that asked
  * for it — Esc while it deals, then DRAW again, waits on the same call instead of paying for a
- * second. A finished set is kept for the next DRAW until the moment changes (`clear`).
+ * second. A finished set is kept for the next DRAW until the moment changes (`clear`). SUGGEST's
+ * drafts use one too.
  */
 import type { Encounter } from '../../../shared/encounter';
 
-export interface Dealer {
+export interface Dealer<T = Encounter> {
   /** The running deal, or a new one. */
-  load(): Promise<Encounter[]>;
+  load(): Promise<T[]>;
   /** The last set dealt for this moment; null when there's none. */
-  readonly cached: Encounter[] | null;
+  readonly cached: T[] | null;
   /** A new turn or a move: the set (and any deal still running) no longer fits. */
   clear(): void;
 }
 
-export function createDealer(deal: () => Promise<Encounter[]>): Dealer {
-  let running: Promise<Encounter[]> | null = null;
-  let cached: Encounter[] | null = null;
+export function createDealer<T = Encounter>(deal: () => Promise<T[]>): Dealer<T> {
+  let running: Promise<T[]> | null = null;
+  let cached: T[] | null = null;
   /** Bumped by clear: a deal from before it isn't kept. */
   let moment = 0;
   return {

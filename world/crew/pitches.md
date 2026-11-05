@@ -1,21 +1,5 @@
 # Crew pitches (crew spec §1): what a hire says on the HIRE card. ## <specialty> <GRADE>, then lines.
 
-## runner GREEN
-- "Drove a cab four years. I know every flooded underpass between here and the rail."
-- "I'm fast and I'm cheap. Pick one if you have to. You don't have to."
-
-## runner HAND
-- "Give me an address and an hour. I'll give you back the hour."
-- "I've run packages for people worse than you. Better paid, too."
-
-## runner PRO
-- "Twelve years on these streets and I've never been caught carrying."
-- "The trains, the roofs, the drains. I go where the cameras don't."
-
-## runner VET
-- "I was running this city before the canals came in. I'll be running it after."
-- "Don't tell me the way. Tell me where. I'll pick the way."
-
 ## ears GREEN
 - "Nobody looks at the cleaner. I clean everywhere."
 - "I sit at the bar and drink one beer all night. People forget I'm there."
@@ -64,19 +48,19 @@
 - "I moved goods for the Counting House before Mother Rot. I'll be moving them after."
 - "Don't haggle with me. I've already done it for both of us."
 
-## wire GREEN
-- "I'm not good enough to be a netrunner. I'm good enough for cameras."
+## runner GREEN
+- "I've been inside buildings I've never seen."
 - "Old deck, new tricks. Mostly old tricks."
 
-## wire HAND
+## runner HAND
 - "Give me a terminal and ten minutes. You'll have the schedules."
 - "I loop cameras. I pull records. I don't ask what for."
 
-## wire PRO
+## runner PRO
 - "I was almost somebody, once. Now I'm the somebody you call."
 - "Every system in this city has a back door. I keep a list."
 
-## wire VET
+## runner VET
 - "I jacked into the old grid before they buried it. I know where the bodies are."
 - "I'm slow now. I'm also never wrong."
 

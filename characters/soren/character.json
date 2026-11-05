@@ -88,6 +88,14 @@
       ]
     },
     {
+      "from": "17:00",
+      "to": "18:00",
+      "room": "spine/deck-market",
+      "days": [
+        "mon"
+      ]
+    },
+    {
       "from": "15:00",
       "to": "18:00",
       "room": "spine/listening-post",
@@ -99,9 +107,69 @@
       ]
     },
     {
+      "from": "15:00",
+      "to": "18:00",
+      "room": "spine/soren-hab",
+      "days": [
+        "sat",
+        "sun"
+      ]
+    },
+    {
       "from": "18:00",
       "to": "19:00",
-      "room": "spine/oksanas-counter"
+      "room": "spine/oksanas-counter",
+      "days": [
+        "mon",
+        "tue",
+        "thu",
+        "fri",
+        "sat",
+        "sun"
+      ]
+    },
+    {
+      "from": "18:00",
+      "to": "19:00",
+      "room": "spine/long-haul",
+      "days": [
+        "wed"
+      ]
+    },
+    {
+      "from": "19:00",
+      "to": "23:00",
+      "room": "spine/soren-hab"
+    },
+    {
+      "from": "23:00",
+      "to": "00:00",
+      "room": "spine/deck-market",
+      "days": [
+        "tue",
+        "fri"
+      ]
+    },
+    {
+      "from": "00:00",
+      "to": "08:00",
+      "room": "spine/soren-hab",
+      "days": [
+        "wed",
+        "sat"
+      ]
+    },
+    {
+      "from": "23:00",
+      "to": "08:00",
+      "room": "spine/soren-hab",
+      "days": [
+        "mon",
+        "wed",
+        "thu",
+        "sat",
+        "sun"
+      ]
     }
   ],
   "standing": {

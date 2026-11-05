@@ -1,20 +1,26 @@
 import { fittingPhotos } from '../../shared/photos';
 import { photoMoment } from './photos';
-import { gigsFromEnv, rollsFromEnv } from './mission-run';
+import { rollsFromEnv } from './mission-run';
+import { facesFor } from '../../shared/dice';
 import type { CrewState } from '../../shared/crew-fold';
+import type { Ability, Grade, Specialty, Trait } from '../../shared/crew-book';
+import type { Recruit } from '../../shared/crew';
 import { heatIn } from '../../shared/mission';
 import type { StockItem } from '../../shared/stock';
 import type { Deck } from '../../shared/gear';
+import type { Program } from '../../shared/programs';
 import type { RoomRegistry } from './rooms';
 import { completeOnce, completeOnceWithUsage, NARRATOR_MAX_TOKENS, NARRATOR_TEMPERATURE } from './scenario';
 import { RESIDUAL_TEMPERATURE, RESIDUAL_TIMEOUT_MS, ResidualRunner, plansApply, promisesApply } from './residual-runner';
 import type { CompletionMessage } from './turn';
+import { GM_TEMPERATURE } from './gm';
+import type { CostId } from '../../shared/costs';
 import type { LoreSelection } from '../../shared/lore';
 import type { LeadsForTurn } from '../../shared/leads';
 import { parseMap } from '../../shared/map-schema';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { CrewView, LinkState, OtherInfo, Present, ServerEvent } from '../../shared/types';
+import type { ContactCard, CrewView, LinkState, OtherInfo, Present, ServerEvent } from '../../shared/types';
 import type { AgentRecord, SpriteRecord } from './agents';
 import { wearingEntries } from './wearing';
 import { ChatRelay } from './chat-relay';
@@ -22,7 +28,9 @@ import { openDb, type Db, type RebuildResult } from './db';
 import { isConnected } from './agents';
 import type { Backend } from './backend';
 import { createDirectBackend, type DirectBackend } from './direct';
-import { createModelCatalog, createModelPicker, type ModelPicker } from './model-catalog';
+import { createAnthropicCatalog, createModelCatalog, createModelPicker, createRoutedCatalog, type ModelPicker } from './model-catalog';
+import { keysFor, routeFor, type AnthropicRoute, type Route } from './model-route';
+import type { AnthropicUsage } from './anthropic-convert';
 import { createExpressionControl, type ExpressionControl } from './expressions';
 import { residentInfo, sceneResidents, type ResidentRecord } from './residents';
 import { createHub, PICK_CHECK_TIMEOUT_MS, type Hub } from './hub';
@@ -58,9 +66,9 @@ const PROBE_CACHE_MS = 15_000;
 
 /** Missions' checks roll from NIX_TEST_ROLLS in e2e (one sequence for the whole server, read at the first roll); otherwise at random. */
 let testRolls: (() => number) | undefined | null = null;
-const roll = () => {
+const rollDice = (n: number, keep: 'high' | 'low') => {
   if (testRolls === null) testRolls = rollsFromEnv();
-  return testRolls ? testRolls() : 1 + Math.floor(Math.random() * 100);
+  return testRolls ? facesFor(testRolls(), n, keep) : Array.from({ length: n }, () => 1 + Math.floor(Math.random() * 6));
 };
 
 export interface AgentRuntime {
@@ -115,6 +123,8 @@ export interface RuntimeOptions {
   planPlaces?: () => { id: string; name: string }[];
   /** The player's settings: the linked key and each character's model. */
   settings: Settings;
+  /** Where Anthropic is reached (tests point it at a stub). */
+  anthropicBaseUrl?: string;
   /** The player's data folder (settings.json, playthroughs/). */
   dataDir: string;
   /** The world's state: her room.db is `<stateDir>/<id>/room.db` (the active playthrough's chars/). */
@@ -155,6 +165,8 @@ export interface RuntimeOptions {
     book(): QuestEntry[];
     extras?(): Extra[];
     decks?(): Deck[];
+    /** The program catalog (spec 2026-11-02-programs §1.6). */
+    programs?(): Program[];
     placeOf(sceneId: string): string | null;
     placeName(placeId: string): string;
     contactName(id: string): string;
@@ -166,6 +178,18 @@ export interface RuntimeOptions {
     crewView?(): CrewView | null;
     /** Crew (§2): the folded crew state; null without a playthrough. */
     crewState?(): CrewState | null;
+    /** The crew book's traits (the hand: never-held on a call's loss). */
+    crewTraits?(): Trait[];
+    crewAbilities?(): Ability[];
+    /** The GM's written lines (roll lifecycle spec §1.4). */
+    gmWritten?(): Partial<Record<CostId, string[]>>;
+    /** Contact cards the player holds (contact cards spec §1). */
+    contactCards?(): ContactCard[];
+    /** Crew spec §5: the latest story minute any room's `[crew]` line told up to. */
+    crewToldUntil?(): number | null;
+    /** Crew spec §5: the recruit a job's `gives: recruit` card draws. */
+    jobRecruit?(o: { runKey: string; title: string; place: string; district: string; spec: Specialty; grade: Grade }): Recruit;
+    districtName?(id: string): string;
   };
 }
 
@@ -227,6 +251,17 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
   /** SYS → NARRATOR THINKING, read on every call (OpenRouter only): the narrator's calls and her dice lines. */
   const narratorThinking = () => (direct?.provider === 'openrouter' ? { thinking: settings.narratorThinking() } : {});
   const apiKey = (): string | null => (direct?.keyName == null ? '' : settings.key(direct.keyName));
+  /** Where a call on `model` goes now (Anthropic backend spec §2): read per call, so linking or unlinking applies at once. */
+  const routeNow = (model: string): Route | null => (direct ? routeFor(direct, keysFor(settings, direct), model) : null);
+  const onUsage = (u: AnthropicUsage) =>
+    hub.emit({ type: 'dev_log', level: 'info', text: `[anthropic] ${u.model} · in ${u.input} · out ${u.output} · cache read ${u.cacheRead} · write ${u.cacheWrite}` });
+  /** A one-shot call's address, key and model on her model's route now. */
+  const wire = (): { baseUrl: string; apiKey: string | null; model: string; route?: AnthropicRoute; anthropicBaseUrl?: string; onUsage?: (u: AnthropicUsage) => void } => {
+    const m = modelStore!.get();
+    const r = routeNow(m);
+    if (r?.provider === 'anthropic') return { baseUrl: direct!.baseUrl, apiKey: null, model: r.model, route: r, ...(opts.anthropicBaseUrl ? { anthropicBaseUrl: opts.anthropicBaseUrl } : {}), onUsage };
+    return r ? { baseUrl: r.baseUrl, apiKey: r.key, model: r.model } : { baseUrl: direct!.baseUrl, apiKey: apiKey(), model: m };
+  };
   const modelStore = direct
     ? {
         get: () => settings.characterModel(id) ?? direct.defaultModel,
@@ -236,7 +271,16 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
         },
       }
     : null;
-  const catalog = direct ? createModelCatalog({ baseUrl: direct.baseUrl, apiKey }) : null;
+  // OpenRouter's list, or Anthropic's for a player with only that key; her own address's list for openai-compatible.
+  const catalog = direct
+    ? direct.provider === 'openrouter'
+      ? createRoutedCatalog({
+          openrouter: createModelCatalog({ baseUrl: direct.baseUrl, apiKey }),
+          anthropic: createAnthropicCatalog({ apiKey: () => settings.key('anthropic'), ...(opts.anthropicBaseUrl ? { baseUrl: opts.anthropicBaseUrl } : {}) }),
+          keys: () => keysFor(settings, direct),
+        })
+      : createModelCatalog({ baseUrl: direct.baseUrl, apiKey })
+    : null;
   let directBackend: DirectBackend | null = null;
   const picker =
     direct && modelStore && catalog
@@ -246,6 +290,11 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           provider: direct.provider,
           curated: () => [...MODEL_PICKS.map((p) => p.id), ...settings.recentModels()],
           store: modelStore,
+          shown: (m) => routeNow(m)?.model ?? m,
+          via: (m) => {
+            const r = routeNow(m);
+            return r?.provider === 'anthropic' && r.model === m;
+          },
           credit: async () => {
             await directBackend!.probe();
             return directBackend!.credit();
@@ -399,6 +448,8 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             const reply = db.getMessage(p, r.id);
             const line = reply?.replyTo ? db.getMessage(p, reply.replyTo) : undefined;
             if (!plansApply(reply, line, relay.commsNow(p)?.on === true)) return null;
+            // Mid-job, "let's go" is the job, not her leaving (the job panel and her card would also share a spot).
+            if (relay.questState(p).active) return null;
             // Her plans name the map's places and the rooms of her day (her home is often off the map).
             const map = opts.planPlaces?.() ?? [];
             const places = cp?.promisePlaces ? cp.promisePlaces(id, map) : map;
@@ -423,9 +474,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           },
           complete: (messages, o) =>
             completeOnceWithUsage({
-              baseUrl: direct.baseUrl,
-              apiKey: apiKey(),
-              model: modelStore.get(),
+              ...wire(),
               messages,
               temperature: RESIDUAL_TEMPERATURE,
               maxTokens: o.maxTokens,
@@ -448,7 +497,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           expressions: expressionNames,
           recent: (p) => recentLines(db.recentMessages(p, undefined, 'scene'), { player: opts.players.resolve(p).name, contact: rec.info.name }).slice(-DICE_RECENT_LINES),
           narrate: (messages, signal) =>
-            completeOnce({ baseUrl: direct.baseUrl, apiKey: apiKey(), model: modelStore.get(), messages, temperature: NARRATOR_TEMPERATURE, maxTokens: DICE_LINE_MAX_TOKENS, ...narratorThinking(), signal }),
+            completeOnce({ ...wire(), messages, temperature: NARRATOR_TEMPERATURE, maxTokens: DICE_LINE_MAX_TOKENS, ...narratorThinking(), signal }),
         })
       : undefined;
   // The quest pick check (quest lines spec §3): a small side call on her model, before a line reaches her.
@@ -459,9 +508,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           if (!at) return '{"pick":null}';
           const recent = recentLines(db.recentMessages(p, undefined, 'scene'), { player: opts.players.resolve(p).name, contact: rec.info.name }).slice(-PICK_RECENT_LINES);
           return completeOnce({
-            baseUrl: direct.baseUrl,
-            apiKey: apiKey(),
-            model: modelStore.get(),
+            ...wire(),
             messages: pickCheckMessages({ beat: at.beat, choices: at.choices, recent, line }),
             temperature: 0,
             maxTokens: PICK_CHECK_MAX_TOKENS,
@@ -523,6 +570,9 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
       tools,
       model: modelStore,
       apiKey,
+      route: routeNow,
+      ...(opts.anthropicBaseUrl ? { anthropicBaseUrl: opts.anthropicBaseUrl } : {}),
+      onUsage,
       onNotice: (text) => hub.emit({ type: 'notice', text }),
       labelFor: (m) => catalog.labelFor(m),
     });
@@ -531,8 +581,20 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
   if (!directBackend) throw new Error(`agent '${id}': no model to run her turns`);
   const backend: Backend = directBackend;
   relay = new ChatRelay({
-    roll,
-    ...(gigsFromEnv() ? { testGig: gigsFromEnv() } : {}),
+    rollDice,
+    // The GM (roll lifecycle spec §1.4): her link's model, thinking low, a line per dealt cost. No link: written lines.
+    ...(direct
+      ? {
+          gm: {
+            complete: (messages: CompletionMessage[], o: { maxTokens: number; signal: AbortSignal }) =>
+              completeOnceWithUsage({ ...wire(), messages, temperature: GM_TEMPERATURE, maxTokens: o.maxTokens, thinking: 'low', signal: o.signal }).then((r) => ({
+                text: r.text,
+                ...(r.tokensIn !== null ? { tokensIn: r.tokensIn } : {}),
+                ...(r.tokensOut !== null ? { tokensOut: r.tokensOut } : {}),
+              })),
+          },
+        }
+      : {}),
     // Comms (spec 2026-10-20 §2): her place's name (her schedule, else where the line began) and yours; a dropped line goes solo.
     ...(cp
       ? {
@@ -597,8 +659,9 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
               const kitCtx = kit ? { heat: heatIn(kit.kit, district), deck: decks.find((d) => d.id === kit.kit.deck) ?? null, stats: kit.stats } : {};
               return { flags: flagsOf(status), trust: now ? bandOf(now.values.trust) : null, warmth: now ? bandOf(now.values.warmth) : null, with: id, ...kitCtx };
             },
-            kit: (p: string, at?: number) => cp.kitOf(p, at)?.kit ?? { deck: null, sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, edgeLeft: 0, edgeMax: 0 },
+            kit: (p: string, at?: number) => cp.kitOf(p, at)?.kit ?? { deck: null, owned: [], sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: 0, nerveMax: 0, nerveGone: false },
             decks: () => opts.quests!.decks?.() ?? [],
+            programs: () => opts.quests!.programs?.() ?? [],
             districtOf: (placeId: string) => opts.quests!.districtOf?.(placeId) ?? null,
             // The nightly boards are seeded by the playthrough (small jobs spec §2).
             boardSeed: () => cp.active?.()?.id ?? '',
@@ -606,6 +669,14 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             stock: () => opts.quests!.stock?.() ?? {},
             crewView: () => opts.quests!.crewView?.() ?? null,
             crewState: () => opts.quests!.crewState?.() ?? null,
+            heard: (key: string) => cp.metaAnywhere?.(key) ?? false,
+            crewTraits: () => opts.quests!.crewTraits?.() ?? [],
+            crewAbilities: () => opts.quests!.crewAbilities?.() ?? [],
+            gmWritten: () => opts.quests!.gmWritten?.() ?? {},
+            contactCards: () => opts.quests!.contactCards?.() ?? [],
+            ...(opts.quests!.jobRecruit ? { jobRecruit: opts.quests!.jobRecruit } : {}),
+            ...(opts.quests!.crewToldUntil ? { crewToldUntil: opts.quests!.crewToldUntil } : {}),
+            ...(opts.quests!.districtName ? { districtName: (id: string) => opts.quests!.districtName!(id) } : {}),
           },
         }
       : {}),
@@ -774,9 +845,9 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           setModel: (m: string | null) => modelStore.set(m),
           credit: () => directBackend!.credit(),
           // The dial-in page waits at most 1.5 s on OpenRouter's list for a nicer label.
-          modelLabel: () => catalog.labelSoon(modelStore.get(), 1_500),
+          modelLabel: () => catalog.labelSoon(routeNow(modelStore.get())?.model ?? modelStore.get(), 1_500),
           narrate: (messages: CompletionMessage[]) =>
-            completeOnce({ baseUrl: direct!.baseUrl, apiKey: apiKey(), model: modelStore.get(), messages, temperature: NARRATOR_TEMPERATURE, maxTokens: NARRATOR_MAX_TOKENS, ...narratorThinking() }),
+            completeOnce({ ...wire(), messages, temperature: NARRATOR_TEMPERATURE, maxTokens: NARRATOR_MAX_TOKENS, ...narratorThinking() }),
         }
       : {}),
     ...(picker ? { models: picker } : {}),

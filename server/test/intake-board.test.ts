@@ -29,15 +29,33 @@ describe('the Intake board: posting', () => {
   });
 });
 
+describe('ELSEWHERE: the other places\' boards (2026-11-01)', () => {
+  it("another place's posted job, with whose it is and when it posts", () => {
+    const r = intakeRelay({ place: 'the-tilt', contact: 'vesna', clock: at(19, 0) });
+    const s = r.relay.questState('hicks');
+    expect(s.open.map((q) => q.id)).not.toContain('held-papers');
+    expect(s.boards).toEqual([{ place: 'lowlight-intake', name: 'lowlight-intake', jobs: [expect.objectContaining({ id: 'held-papers', title: 'Held Papers', tier: 1, with: 'Nix', opens: '20:00' })] }]);
+  });
+
+  it('with her, inside its hours: no tag; where you stand: on HERE, not ELSEWHERE', () => {
+    const away = intakeRelay({ place: 'the-tilt' }).relay.questState('hicks');
+    expect(away.boards![0].jobs[0]).not.toHaveProperty('with');
+    expect(away.boards![0].jobs[0]).not.toHaveProperty('opens');
+    const here = intakeRelay().relay.questState('hicks');
+    expect(here.open.map((q) => q.id)).toContain('held-papers');
+    expect(here.boards).toBeUndefined();
+  });
+});
+
 describe('the Intake board: trust as the stake', () => {
   it("clean +W, messy 0, blown −L; rep doesn't move", async () => {
-    const clean = intakeRelay({ rolls: [10] });
+    const clean = intakeRelay({ rolls: [66] });
     await play(clean, 'clean');
     expect(clean.trustNow()).toBe(1);
     const messy = intakeRelay();
     await play(messy, 'messy');
     expect(messy.trustNow()).toBe(0);
-    const blown = intakeRelay({ rolls: [95], trust: 2 });
+    const blown = intakeRelay({ rolls: [2], trust: 2 });
     await play(blown, 'blown');
     expect(blown.trustNow()).toBe(1);
     for (const r of [clean, messy, blown]) {
@@ -47,7 +65,7 @@ describe('the Intake board: trust as the stake', () => {
   });
 
   it('cover never softens trust, so a trust job offers no cover cards and spends none', async () => {
-    const r = intakeRelay({ rolls: [95], burner: 1, trust: 2 });
+    const r = intakeRelay({ rolls: [2], burner: 1, trust: 2 });
     await r.relay.startQuest('hicks', 'held-papers');
     await r.relay.chooseQuest('hicks', { id: 'held-papers', beat: r.run()!.beat!, choice: 'talk' });
     if (r.run()!.pending) await r.relay.chooseQuest('hicks', { id: 'held-papers', beat: r.run()!.beat!, choice: TAKE });
@@ -59,7 +77,7 @@ describe('the Intake board: trust as the stake', () => {
   });
 
   it('the trust move belongs to the row', async () => {
-    const r = intakeRelay({ rolls: [10] });
+    const r = intakeRelay({ rolls: [66] });
     const before = questRows(r.db).length;
     await play(r, 'clean');
     expect(r.jobMoves()).toHaveLength(1);
@@ -77,31 +95,31 @@ describe('the Intake board: trust as the stake', () => {
   });
 
   it("the debrief's trust line", async () => {
-    const up = intakeRelay({ rolls: [10], trust: 4 });
+    const up = intakeRelay({ rolls: [66], trust: 4 });
     const row = await play(up, 'clean');
     expect(row.quest!.debrief!.trust).toEqual({ name: 'Nix', before: 'Sizing you up', after: 'Trusts you' });
-    const flat = intakeRelay({ rolls: [10] });
+    const flat = intakeRelay({ rolls: [66] });
     expect((await play(flat, 'clean')).quest!.debrief!.trust).toBeNull();
-    const plain = intakeRelay({ rolls: [10], book: [parse(OWN_TEXT.replace('trust: 1 / 1\n', ''), 'held-papers')] });
+    const plain = intakeRelay({ rolls: [66], book: [parse(OWN_TEXT.replace('trust: 1 / 1\n', ''), 'held-papers')] });
     expect((await play(plain, 'clean')).quest!.debrief!.trust).toBeUndefined();
   });
 
   it('her closing note says trust moved', async () => {
-    const up = intakeRelay({ rolls: [10], trust: 4 });
+    const up = intakeRelay({ rolls: [66], trust: 4 });
     await play(up, 'clean');
     expect(lastUser(up.backend.reqs.at(-1)!)).toContain('Their standing with you went up');
-    const down = intakeRelay({ rolls: [95], trust: 5 });
+    const down = intakeRelay({ rolls: [2], trust: 5 });
     await play(down, 'blown');
     expect(lastUser(down.backend.reqs.at(-1)!)).toContain('Their standing with you went down');
     // Moved with no word change: still told.
-    const nudge = intakeRelay({ rolls: [10] });
+    const nudge = intakeRelay({ rolls: [66] });
     await play(nudge, 'clean');
     expect(lastUser(nudge.backend.reqs.at(-1)!)).toContain('Their standing with you went up');
     // Nothing moved (MESSY, or clamped at the top): not told.
     const messy = intakeRelay();
     await play(messy, 'messy');
     expect(lastUser(messy.backend.reqs.at(-1)!)).not.toContain('Their standing with you went');
-    const top = intakeRelay({ rolls: [10], trust: 10 });
+    const top = intakeRelay({ rolls: [66], trust: 10 });
     await play(top, 'clean');
     expect(lastUser(top.backend.reqs.at(-1)!)).not.toContain('Their standing with you went');
   });

@@ -647,3 +647,163 @@ describe('a text turn (deck spec §4)', () => {
     expect(stub.requests[0].body.tool_choice).toBeUndefined();
   });
 });
+
+describe('createDirectBackend: on the Anthropic route', () => {
+  const AKEY = 'sk-ant-direct-0123456789';
+  const SONNET = 'anthropic/claude-sonnet-5.5';
+  type Ev = Record<string, unknown>;
+  const usage = { input_tokens: 5, output_tokens: 1, cache_read_input_tokens: 800, cache_creation_input_tokens: 0 };
+  const start: Ev = { type: 'message_start', message: { id: 'm', type: 'message', role: 'assistant', model: 'claude-sonnet-5-5', content: [], stop_reason: null, usage } };
+  const say = (...parts: string[]): Ev[] => [start, ...parts.map((t) => ({ type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: t } })), { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 9 } }, { type: 'message_stop' }];
+  const stopWith = (reason: string, before: Ev[] = []): Ev[] => [start, ...before, { type: 'message_delta', delta: { stop_reason: reason }, usage: { output_tokens: 9 } }, { type: 'message_stop' }];
+  const sse = (events: Ev[]) => new Response(events.map((e) => `event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`).join(''), { headers: { 'content-type': 'text/event-stream' } });
+  type Answer = Ev[] | { status: number; message: string; headers?: Record<string, string> };
+
+  function anthropicWith(answers: Answer[], o: { route?: DirectBackendOptions['route'] } = {}) {
+    const requests: { url: string; body: Record<string, unknown> }[] = [];
+    const usages: unknown[] = [];
+    const notices: string[] = [];
+    const sleeps: number[] = [];
+    let chosen = SONNET;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      const body = init.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      requests.push({ url: String(url), body });
+      if (String(url).includes('/v1/models')) return new Response(JSON.stringify({ data: [], has_more: false, first_id: null, last_id: null }), { headers: { 'content-type': 'application/json' } });
+      const a = answers.shift();
+      if (!a) throw new Error('no answer left');
+      if (Array.isArray(a)) return sse(a);
+      return new Response(JSON.stringify({ type: 'error', error: { type: 'x', message: a.message } }), { status: a.status, headers: { 'content-type': 'application/json', ...(a.headers ?? {}) } });
+    }) as unknown as typeof fetch;
+    const backend = createDirectBackend({
+      setup: setupFor('http://openrouter.invalid', { defaultModel: SONNET }),
+      tools: { room: undefined as never, journal: undefined as never, player: () => 'hicks', expressions: null },
+      model: { get: () => chosen, set: (id) => (chosen = id ?? SONNET) },
+      apiKey: () => null,
+      route: o.route ?? ((m) => ({ provider: 'anthropic', key: AKEY, model: m, native: m.replace('anthropic/', '').replace(/\./g, '-') })),
+      anthropicBaseUrl: 'http://anthropic.fake',
+      fetchImpl,
+      onNotice: (t) => notices.push(t),
+      onUsage: (u) => usages.push(u),
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    return { backend, requests, usages, notices, sleeps, setChosen: (m: string) => (chosen = m) };
+  }
+
+  it('a plain reply streams and completes; the request went to /v1/messages', async () => {
+    const { backend, requests, usages } = anthropicWith([say('Hel', 'lo.')]);
+    const frames = await turn(backend);
+    expect(text(frames)).toBe('Hello.');
+    expect(frames.at(-1)?.event).toBe('run.completed');
+    expect(requests[0]!.url).toBe('http://anthropic.fake/v1/messages');
+    expect(requests[0]!.body.model).toBe('claude-sonnet-5-5');
+    expect(usages).toEqual([{ model: 'claude-sonnet-5-5', input: 5, output: 9, cacheRead: 800, cacheWrite: 0 }]);
+  });
+
+  it('a regenerate sends no temperature', async () => {
+    const { backend, requests } = anthropicWith([say('Again.')]);
+    await turn(backend, { regenerate: true });
+    expect('temperature' in requests[0]!.body).toBe(false);
+  });
+
+  it('a tool round: the call runs, the next request carries tool_use and tool_result', async () => {
+    const toolUse: Ev[] = [
+      { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'tu1', name: 'not_a_tool', input: {} } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json: '{}' } },
+      { type: 'content_block_stop', index: 0 },
+    ];
+    const { backend, requests } = anthropicWith([stopWith('tool_use', toolUse), say('Done.')]);
+    expect(text(await turn(backend))).toBe('Done.');
+    const second = requests[1]!.body.messages as { role: string; content: { type: string }[] }[];
+    expect(second.at(-2)?.content.map((c) => c.type)).toEqual(['tool_use']);
+    expect(second.at(-1)?.content[0]?.type).toBe('tool_result');
+  });
+
+  it('cut off before a word: the thinking-low retry runs once with more room', async () => {
+    const { backend, requests } = anthropicWith([stopWith('max_tokens'), say('Here.')]);
+    expect(text(await turn(backend))).toBe('Here.');
+    expect(requests).toHaveLength(2);
+    expect(requests[1]!.body.max_tokens as number).toBeGreaterThan(requests[0]!.body.max_tokens as number);
+  });
+
+  it('a 429 waits once, honouring retry-after (capped), then replies', async () => {
+    const { backend, sleeps } = anthropicWith([{ status: 429, message: 'slow', headers: { 'retry-after': '3' } }, say('Back.')]);
+    expect(text(await turn(backend))).toBe('Back.');
+    expect(sleeps).toEqual([3000]);
+  });
+
+  it('an unknown model falls back to her default with the notice', async () => {
+    const { backend, requests, notices, setChosen } = anthropicWith([{ status: 404, message: 'model: claude-nope' }, say('Fine.')]);
+    setChosen('anthropic/claude-nope');
+    expect(text(await turn(backend))).toBe('Fine.');
+    expect(notices.some((n) => /UNAVAILABLE — BACK ON/.test(n))).toBe(true);
+    expect(requests[1]!.body.model).toBe('claude-sonnet-5-5');
+  });
+
+  it('her thinking rides with her tool call into the next round', async () => {
+    const round1: Ev[] = [
+      { type: 'content_block_start', index: 0, content_block: { type: 'thinking', thinking: '', signature: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'go up' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'signature_delta', signature: 's1' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'tu1', name: 'not_a_tool', input: {} } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{}' } },
+      { type: 'content_block_stop', index: 1 },
+    ];
+    const { backend, requests } = anthropicWith([stopWith('tool_use', round1), say('Up.')]);
+    expect(text(await turn(backend))).toBe('Up.');
+    const msgs = requests[1]!.body.messages as { role: string; content: { type: string; signature?: string }[] }[];
+    const her = msgs.find((m) => m.role === 'assistant')!;
+    expect(her.content.map((b) => b.type)).toEqual(['thinking', 'tool_use']);
+    expect(her.content[0]!.signature).toBe('s1');
+  });
+
+  it('a 400 that names the model is not an unknown model: her pick stays', async () => {
+    const { backend, notices, setChosen } = anthropicWith([{ status: 400, message: 'output_config.effort: not supported for this model' }]);
+    setChosen('anthropic/claude-haiku-4.5');
+    const e = await thrown(turn(backend));
+    expect([e.kind, e.status]).toEqual(['http', 400]);
+    expect(notices.some((n) => /UNAVAILABLE/.test(n))).toBe(false);
+    expect(await backend.currentModel()).toMatchObject({ model: 'anthropic/claude-haiku-4.5' });
+  });
+
+  it('after spent credits, her link reads no-credit until it is checked afresh (final review I1)', async () => {
+    const { backend } = anthropicWith([{ status: 400, message: 'Your credit balance is too low to access the Anthropic API.' }]);
+    await thrown(turn(backend));
+    expect(await backend.probe()).toBe('no-credit');
+    backend.resetProbe();
+    expect(await backend.probe()).toBe('ok');
+  });
+
+  it('spent credits are a credit error', async () => {
+    const { backend } = anthropicWith([{ status: 400, message: 'Your credit balance is too low to access the Anthropic API.' }]);
+    const e = await thrown(turn(backend));
+    expect([e.kind, e.status]).toEqual(['credit', 402]);
+  });
+
+  it('the route is read per round; no route is no-link with nothing sent', async () => {
+    let linked = true;
+    const route: DirectBackendOptions['route'] = (m) => (linked ? { provider: 'anthropic', key: AKEY, model: m, native: 'claude-sonnet-5-5' } : null);
+    const { backend, requests } = anthropicWith([say('One.')], { route });
+    expect(backend.ready()).toBe(true);
+    await turn(backend);
+    linked = false;
+    expect(backend.ready()).toBe(false);
+    expect((await thrown(turn(backend))).kind).toBe('no-link');
+    expect(requests).toHaveLength(1);
+  });
+
+  it('probe checks the Anthropic key; no credit figure', async () => {
+    const { backend, requests } = anthropicWith([]);
+    expect(await backend.probe()).toBe('ok');
+    expect(backend.credit()).toBeNull();
+    expect(requests[0]!.url).toContain('/v1/models');
+  });
+
+  it("the key never reaches a failed turn's text", async () => {
+    const { backend } = anthropicWith([{ status: 500, message: `boom ${AKEY}` }]);
+    const e = await thrown(turn(backend));
+    expect(e.message).not.toContain(AKEY);
+  });
+});

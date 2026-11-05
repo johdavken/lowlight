@@ -11,7 +11,7 @@ export const releaseListSchema = z.object({
   defaultPlayer: z.string().min(1),
   /** Where in-game bug reports go (the relay Worker, tools/bug-relay); without it a build only saves them. */
   bugRelay: z.url().startsWith('https://').nullable().optional(),
-  /** Quests (world/quests/<id>.md) left out of the build: written, but not ready to ship (big jobs in preview.5). */
+  /** Quests (world/quests/<id>.md) left out of the build: written, but not ready to ship. */
   holdQuests: z.array(z.string().min(1)).optional(),
 });
 export type ReleaseList = z.infer<typeof releaseListSchema>;

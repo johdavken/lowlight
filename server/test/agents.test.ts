@@ -442,7 +442,7 @@ const JOURNAL_PARAGRAPH =
 describe("Nix's committed character files", () => {
   it('carry her current room and OOC instructions verbatim', async () => {
     const { ROOM_INSTRUCTIONS, OOC_INSTRUCTIONS } = await import('../src/instructions');
-    const dir = path.join(__dirname, '..', '..', 'characters', 'nix');
+    const dir = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
     // The shared room text, then her own lines (her apartment) closing on "Stay yourself." (share_contact's description says when to call it).
     const own = fs.readFileSync(path.join(dir, 'instructions.md'), 'utf8').trim();
     const shared = ROOM_INSTRUCTIONS.replace(/ Stay yourself\.$/, '');
@@ -457,7 +457,7 @@ describe("Nix's committed character files", () => {
   });
 
   it("Nix's file: tagline, two bio paragraphs, five facts, all within limits", () => {
-    const dir = path.join(__dirname, '..', '..', 'characters', 'nix');
+    const dir = path.join(__dirname, '..', '..', 'characters', 'nix-direct');
     const c = loadCharacter(dir)!;
     const warned: string[] = [];
     const p = resolveProfile([{ dir, c }], c.description ?? '', (m) => warned.push(m));

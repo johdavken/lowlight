@@ -1,12 +1,14 @@
 ---
 title: Held Papers
+art: held-papers.webp
 kind: mission
 tier: 1
+take-size: 4
 with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A woman who left a Velvet house still can't work. The house kept her papers, and sends a runner to remind her.
-pay: 50-120
+pay: 90-110
 minutes: 20
 posts: 20:00-02:00
 trust: 1 / 1
@@ -14,6 +16,7 @@ trust: 1 / 1
 
 # client
 stranger: Reva — twenty-six, coat buttoned wrong, a house tattoo half lasered off her wrist
+face: local-01
 
 *Reva sits on the edge of the client chair with her bag on her knees. Her residency card, her med file and her work cert are all in a drawer in Velvet, and every Thursday a runner from the house eats at Hae's and waits for her to come down and ask nicely.*
 
@@ -32,6 +35,7 @@ view nix-direct: You know this house. You know the drawer, the Thursday runner a
 
 # runner
 stranger: Teodor — a house runner, good shoes, an envelope in his inside pocket
+face: local-04
 
 *Teodor has the corner stool at Hae's and a bowl he isn't eating. He sees you come in, and he sees who you came with.*
 

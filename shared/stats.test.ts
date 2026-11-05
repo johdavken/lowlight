@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_STATS, edgeMax, parseStats, STAT_KEYS } from './stats';
+import { DEFAULT_STATS, nerveMax, parseStats, STAT_KEYS } from './stats';
 
 const HICKS = { body: 4, reflex: 6, tech: 7, cool: 7, wits: 6, edge: 4 };
 
@@ -14,7 +14,7 @@ describe('stats', () => {
   it('the default is 3 in everything', () => {
     expect(DEFAULT_STATS).toEqual({ body: 3, reflex: 3, tech: 3, cool: 3, wits: 3, edge: 3 });
   });
-  it('edgeMax is edge ÷ 3 rounded up', () => {
-    expect([4, 5, 7, 3].map((edge) => edgeMax({ ...HICKS, edge }))).toEqual([2, 2, 3, 1]);
+  it('nerveMax is 3 + edge ÷ 2 rounded up (the table spec §3)', () => {
+    expect([4, 5, 7, 3].map((edge) => nerveMax({ ...HICKS, edge }))).toEqual([5, 6, 7, 5]);
   });
 });

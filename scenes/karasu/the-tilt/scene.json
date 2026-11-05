@@ -543,7 +543,7 @@
     "hum": 0.04,
     "music": {
       "songs": [
-        "No Light in Lowlight.ogg"
+        "No Business Inside.ogg"
       ],
       "level": 0.3
     }
@@ -571,18 +571,6 @@
       ],
       "light": "monitors",
       "scroll": 8
-    },
-    {
-      "kind": "screen",
-      "rect": [
-        863,
-        80,
-        52,
-        55
-      ],
-      "light": "monitors",
-      "scroll": 0,
-      "picture": "static"
     },
     {
       "kind": "screen",

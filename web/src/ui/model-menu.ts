@@ -1,5 +1,5 @@
 /**
- * A direct character's MODEL menu: her provider credit, the curated models with prices, and OTHER…
+ * A direct character's MODEL menu: her provider credit (or that she's on the player's Anthropic key), the curated models with prices, and OTHER…
  * to search the catalog (or paste any id). Choosing sends `set_model`; the server answers with a new
  * `model` event, or `model_rejected`. Text goes in through textContent / value only.
  */
@@ -9,6 +9,8 @@ import { searchModels } from '../net/link';
 const SEARCH_MIN = 2;
 const SEARCH_SHOWN = 8;
 const DEBOUNCE_MS = 150;
+/** Under a model that runs through the player's Anthropic key. */
+const VIA = 'YOUR ANTHROPIC KEY';
 
 const price = (n: number | null) => (n === null ? '—' : `$${n.toFixed(2)}`);
 const rejected = (reason: string): string | undefined =>
@@ -100,12 +102,15 @@ export class ModelMenu {
     const e = this.event;
     this.panel.replaceChildren();
     if (!e) return;
-    if (typeof e.credit === 'number') this.panel.append(el('div', 'mm-credit', `$${e.credit.toFixed(2)} LEFT`));
+    // Her model on the player's Anthropic key: OpenRouter's credit isn't what she spends.
+    if (e.choices?.find((c) => c.id === e.model)?.via) this.panel.append(el('div', 'mm-credit', 'ON YOUR ANTHROPIC KEY'));
+    else if (typeof e.credit === 'number') this.panel.append(el('div', 'mm-credit', `$${e.credit.toFixed(2)} LEFT`));
     for (const c of e.choices ?? []) {
       const row = el('button', `mm-row${c.id === e.model ? ' current' : ''}`);
       row.type = 'button';
       row.title = c.id;
       row.append(el('span', 'mm-label', `${c.id === e.model ? '▸ ' : ''}${c.label}`), ' ', el('span', 'mm-price', `${price(c.priceIn)} / ${price(c.priceOut)}`));
+      if (c.via) row.append(el('span', 'mm-via', VIA));
       row.onclick = () => {
         this.choose(c.id);
         this.close();
@@ -181,6 +186,7 @@ export class ModelMenu {
       row.type = 'button';
       row.title = c.id;
       row.append(el('span', 'mm-label', c.label), ' ', el('span', 'mm-price', `${price(c.priceIn)} / ${price(c.priceOut)}`));
+      if (c.via) row.append(el('span', 'mm-via', VIA));
       row.onclick = () => {
         this.error = '';
         this.choose(c.id);

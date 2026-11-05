@@ -1,32 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
-import { DIRECT, SECOND, activeId, awaitGreeting, dialIn, pickTitle, send, skipSplash, toTitle, skipIntro } from './fixtures';
+import { DIRECT, SECOND, activeId, awaitGreeting, dialIn, nixSharesAlpha, pickTitle, say, send, skipSplash, toTitle, skipIntro } from './fixtures';
 
 // Rooms here skip the district load screen (arrival.spec covers it).
 test.beforeEach(async ({ page }) => {
   await skipIntro(page);
 });
 
-/** Says `text` in the room and waits for her reply to finish. */
-async function say(page: Page, text: string): Promise<void> {
-  const before = await page.locator('.msg.agent.s-ok').count();
-  await send(page, { type: 'user_message', text });
-  await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
-}
-
 /** A room whose history has loaded: the feed shows `line`. */
 async function inRoomWith(page: Page, contact: string, line: string): Promise<void> {
   await page.waitForURL(`**/room/${contact}*`);
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   await expect(page.locator('#feed')).toContainText(line, { timeout: 10_000 });
-}
-
-/** A new game with Nix, who shares Alpha (the fake OpenRouter's share_contact). */
-async function nixSharesAlpha(page: Page): Promise<void> {
-  await dialIn(page, DIRECT.id);
-  await page.waitForFunction(() => window.__nixRoom !== undefined);
-  await awaitGreeting(page);
-  await say(page, 'where do I find Alpha?');
-  await expect(page.locator('#feed .tool', { hasText: 'Nix shared a contact: ALPHA' })).toHaveCount(1);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -44,9 +28,9 @@ test('new game, save, talk, load forks back', async ({ page }) => {
   const original = await activeId(page);
   await say(page, 'EARLY-LINE');
 
-  // SAVE as `before`.
-  await page.locator('.hud-sys').click();
-  await page.locator('.sys-row[data-row="save"]').click();
+  // SAVE as `before`, from the pause menu (Esc).
+  await page.keyboard.press('Escape');
+  await page.locator('.pause-row[data-row="save"]').click();
   const field = page.locator('.save-card .sc-field');
   await expect(field).toBeFocused();
   await field.fill('before');
@@ -56,20 +40,21 @@ test('new game, save, talk, load forks back', async ({ page }) => {
 
   await say(page, 'LATER-LINE');
 
-  // TITLE → LOAD → the timeline → Enter on `before`.
+  // TITLE → LOAD → the saves → Enter on `before`.
   await page.locator('.hud-back').click();
   await toTitle(page);
   await pickTitle(page, 'load');
   const load = page.locator('.load-screen');
   await expect(load.locator(`.pt.on[data-id="${original}"]`)).toBeVisible();
-  await expect(load.locator('.tile[data-id="now"].on')).toBeVisible();
-  // The manual save named `before`: its tile carries the ★ tag; its id is the API's.
+  await expect(load.locator('.ss[data-id="now"].on')).toBeVisible();
+  // The manual save named `before`: its strip shows the name, under SAVES; its id is the API's.
   const saves = (await (await page.request.get(`/api/playthroughs/${original}/saves`)).json()) as { id: string; name: string }[];
   const before = saves.find((s) => s.name.startsWith('before'))!;
-  const save = load.locator(`.tile[data-id="${before.id}"]`);
+  const save = load.locator(`.ss[data-id="${before.id}"]`);
   await expect(save).toHaveCount(1);
-  await expect(save.locator('.band-tag')).toHaveText('★');
-  for (let i = 0; i < 25 && !(await save.evaluate((n) => n.classList.contains('on'))); i++) await page.keyboard.press('ArrowRight');
+  await expect(save.locator('.ss-name')).toHaveText(before.name);
+  await expect(save.locator('.ss-kind')).toHaveText('★ SAVE');
+  for (let i = 0; i < 25 && !(await save.evaluate((n) => n.classList.contains('on'))); i++) await page.keyboard.press('ArrowDown');
   await expect(save).toHaveClass(/\bon\b/);
   await page.keyboard.press('Enter');
 
@@ -85,11 +70,11 @@ test('new game, save, talk, load forks back', async ({ page }) => {
   await pickTitle(page, 'load');
   // The fork is active (and newest), so selected: its file says where it came from.
   await expect(load.locator(`.pt.on[data-id="${forked}"]`)).toBeVisible();
-  await expect(load.locator('.fighter.p1 .fighter-file > p')).toContainText('forked from');
+  await expect(load.locator('.ld-from')).toContainText('forked from');
   const row = load.locator(`.pt[data-id="${original}"]`);
-  for (let i = 0; i < 25 && !(await row.evaluate((n) => n.classList.contains('on'))); i++) await page.keyboard.press('ArrowDown');
+  for (let i = 0; i < 25 && !(await row.evaluate((n) => n.classList.contains('on'))); i++) await page.keyboard.press('ArrowRight');
   await expect(row).toHaveClass(/\bon\b/);
-  await expect(load.locator('.tile[data-id="now"].on')).toBeVisible();
+  await expect(load.locator('.ss[data-id="now"].on')).toBeVisible();
   await page.keyboard.press('Enter');
   await inRoomWith(page, DIRECT.id, 'LATER-LINE');
   expect(await activeId(page)).toBe(original);
@@ -138,5 +123,63 @@ test('continue cycles known contacts', async ({ page }) => {
   await page.keyboard.press('Enter');
   await page.waitForURL(`**/room/${SECOND.id}*`);
 
+  expect(errors).toEqual([]);
+});
+
+test('Esc pauses: LOAD over the room renames a save and comes back; SETTINGS opens SYS; Esc resumes', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  await dialIn(page, DIRECT.id);
+  await page.waitForFunction(() => window.__nixRoom !== undefined);
+  await awaitGreeting(page);
+  const pt = await activeId(page);
+
+  // SAVE from PAUSED: the card shows the strip, its name following the field.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pause-menu')).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Enter');
+  const field = page.locator('.save-card .sc-field');
+  await expect(field).toBeFocused();
+  await field.fill('first look');
+  await expect(page.locator('.save-card .sc-strip .ss-name')).toHaveText('first look');
+  await field.press('Enter');
+  await expect(page.locator('#feed')).toContainText('Saved: first look');
+
+  // LOAD over the room: the save sits under SAVES; R renames it in its strip.
+  await page.keyboard.press('Escape');
+  await page.locator('.pause-row[data-row="load"]').click();
+  const load = page.locator('.pause-load .load-screen');
+  await expect(load.locator(`.pt.on[data-id="${pt}"]`)).toBeVisible();
+  const saves = (await (await page.request.get(`/api/playthroughs/${pt}/saves`)).json()) as { id: string; name: string }[];
+  const mine = saves.find((s) => s.name === 'first look')!;
+  const strip = load.locator(`.ss[data-id="${mine.id}"]`);
+  await expect(strip.locator('.ss-name')).toHaveText('first look');
+  for (let i = 0; i < 25 && !(await strip.evaluate((n) => n.classList.contains('on'))); i++) await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('r');
+  const name = strip.locator('input');
+  await name.fill('a better name');
+  await name.press('Enter');
+  await expect(strip.locator('.ss-name')).toHaveText('a better name');
+  // Typed keys never reached the chat prompt.
+  await expect(page.locator('#input textarea')).toHaveValue('');
+
+  // Esc: back to PAUSED, then SETTINGS opens SYS; Esc closes it and the room is as it was.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pause-load')).toHaveCount(0);
+  await expect(page.locator('.pause-menu')).toBeVisible();
+  await page.locator('.pause-row[data-row="settings"]').click();
+  await expect(page.locator('.sys-menu')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.sys-menu')).toBeHidden();
+  await expect(page.locator('.pause-menu')).toHaveCount(0);
+  expect(page.url()).toContain(`/room/${DIRECT.id}`);
+
+  // Without a keyboard: SYS → MENU opens it too.
+  await page.locator('.hud-sys').click();
+  await page.locator('.sys-row[data-row="pause"]').click();
+  await expect(page.locator('.pause-menu')).toBeVisible();
+  await page.locator('.pause-row[data-row="resume"]').click();
+  await expect(page.locator('.pause-menu')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

@@ -4,8 +4,9 @@
  */
 import { z } from 'zod';
 import { LORE_ID, oneLine, splitFrontMatter, yamlScalar, zodProblems, type MapIds } from '../lore';
-import { SLIP_MAX } from '../slip/rules';
-import { TIER_MAX, type Tier } from './rules';
+
+/** A job's difficulty. */
+export type Tier = 'easy' | 'medium' | 'hard';
 
 export const BRIEF_ID_MAX = 40;
 export const BRIEF_TITLE_MAX = 40;
@@ -13,14 +14,12 @@ export const BRIEF_FIELD_MAX = 80;
 export const BRIEF_BODY_MAX = 400;
 const TIER_ORDER: Tier[] = ['easy', 'medium', 'hard'];
 
-/** Which game a job is (Slip spec §1.1, Papers spec §3.1). Absent on a brief or a saved run means a hack, so older files and rows stay as they were. */
+/** Which game a job is (Slip spec §1.1, Papers spec §3.1). Only papers runs now (hack and slip went 2026-11-01); hack and slip stay readable in old saves, and absent means a hack. */
 export type GigKind = 'hack' | 'slip' | 'papers';
 export type GigResult = 'clean' | 'close' | 'traced' | 'caught' | 'back';
 const KINDS: GigKind[] = ['hack', 'slip', 'papers'];
 export const RESULTS_FOR: Record<GigKind, readonly GigResult[]> = { hack: ['clean', 'close', 'traced'], slip: ['clean', 'close', 'caught'], papers: ['clean', 'close', 'back'] };
 export const gigKind = (x: { kind?: GigKind }): GigKind => x.kind ?? 'hack';
-/** The run's meter maximum: TRACE for a hack, HEAT for a slip. A papers board sets its own cap (Papers spec §2.4). */
-export const tierMax = (kind: 'hack' | 'slip', tier: Tier): number => (kind === 'slip' ? SLIP_MAX : TIER_MAX)[tier];
 
 export interface Brief {
   id: string;
@@ -58,6 +57,8 @@ export function parseGigFile(id: string, text: string, ids: MapIds | null): { ok
   if (s.body.length === 0) problems.push({ field: 'body', message: 'needs some text' });
   if (s.body.length > BRIEF_BODY_MAX) problems.push({ field: 'body', message: `at most ${BRIEF_BODY_MAX} characters (this is ${s.body.length})` });
   if (parsed.success && ids && !ids.places.has(parsed.data.place)) problems.push({ field: 'place', message: `no place '${parsed.data.place}' on the map` });
+  // Hack and slip are gone (2026-11-01): a job on a board is a papers job.
+  if (parsed.success && parsed.data.kind !== 'papers') problems.push({ field: 'kind', message: 'hack and slip are gone: a job here is kind: papers' });
   if (!parsed.success || problems.length > 0) return { ok: false, problems };
   return { ok: true, brief: { id, ...parsed.data, text: s.body } };
 }

@@ -9,7 +9,8 @@ import type { Pt } from './map-schema';
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'a colour as #rrggbb');
 const share = z.number().min(0).max(1);
 const range = z.tuple([z.number().min(0), z.number().min(0)]);
-const pt = z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]);
+/** A point on the map, in map %; described 'pt' so Studio's CITY tool finds every one (shared/city-points.ts). */
+const pt = z.tuple([z.number().min(0).max(100), z.number().min(0).max(100)]).describe('pt');
 const ID = z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'lowercase letters, digits and dashes');
 
 const districtSchema = z.object({
@@ -509,6 +510,11 @@ const SCHEMAS = {
   render: renderSchema,
 } as const;
 export type CityFileKind = keyof typeof SCHEMAS;
+
+/** The schema a kind of map/city/ file is checked against. */
+export function cityFileSchema(kind: CityFileKind): z.ZodType {
+  return SCHEMAS[kind];
+}
 
 /** One file of map/city/ checked against its kind's schema. */
 export function parseCityFile(kind: CityFileKind, raw: unknown): { ok: true; value: unknown } | { ok: false; errors: { path: string; message: string }[] } {

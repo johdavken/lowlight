@@ -15,9 +15,22 @@ export const SUGGEST_STEER_MAX = 600;
 /** A draft past this is cut at a sentence: a line, not a page. */
 export const SUGGEST_LINE_MAX = 1000;
 
-/** The instructions, for the player character `name`. */
-export const suggestSystem = (name: string): string =>
-  `You help the user play ${name} in a roleplay in Lowlight, a dark, gritty cyberpunk city. Write only ${name}'s next line in this scene: what ${name} does and says now, in answer to what just happened. Match how the user's earlier ${name} lines are written (person, tense, *actions* in asterisks) and who ${name} is. Keep it short: one to three sentences, terse and real, no flourish. Never write what anyone else says, does or feels, and never decide how they react. Use only the places and facts given. Answer with the line alone: no name in front, no quotes around it, no notes.`;
+/** SUGGEST's three angles (scene SUGGEST; the arrival screen's line on the way is one plain line). */
+export const SUGGEST_ANGLES = ['PLAIN', 'PUSH', 'TURN'] as const;
+export type SuggestAngle = (typeof SUGGEST_ANGLES)[number];
+/** At most this many open threads reach the draft. */
+export const SUGGEST_THREADS_MAX = 5;
+
+/** The instructions, for the player character `name`: three angles, or (`angles: false`) one line. */
+export const suggestSystem = (name: string, o: { angles?: boolean } = {}): string =>
+  [
+    `You help the user play ${name} in a roleplay in Lowlight, a dark, gritty cyberpunk city. Write only ${name}'s next line in this scene: what ${name} does and says now, in answer to what just happened. Match how the user's earlier ${name} lines are written (person, tense, *actions* in asterisks) and who ${name} is. Keep it short: one to three sentences, terse and real, no flourish.`,
+    `Write ${name} as a person, not a winner: the urge can show before the reason; a hard question can get dodged or answered sideways; ${name} needn't have the clever last word, and can be wrong or not know. Don't echo or repeat back what was just said to ${name}.`,
+    `If the user says what ${name} means to do, keep that choice exactly: don't soften, reverse or water it down; write how it's done. Stop where someone else would have to answer or react. Never write what anyone else says, does or feels, and never decide how they react. Use only the places and facts given.`,
+    o.angles
+      ? `Write three different lines, one per line, each starting with its label:\nPLAIN: the likely move for who ${name} is.\nPUSH: ${name} presses harder: a demand, a risk taken, a truth said out loud.\nTURN: ${name} takes the scene somewhere it isn't going: a sideways move, or one of the open threads picked up. Still real, never absurd.\nIf the user says what ${name} means to do, all three do it; they differ only in how. Answer with the three labelled lines alone: no name in front, no quotes around them, no notes.`
+      : `Answer with the line alone: no name in front, no quotes around it, no notes.`,
+  ].join(' ');
 
 const cut = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
 
@@ -34,6 +47,10 @@ export function suggestPrompt(o: {
   summary: string | null;
   recent: string[];
   steer: string | null;
+  /** Three angles (scene SUGGEST); off on the arrival screen. */
+  angles?: boolean;
+  /** Open threads the player already knows of (openThreads), for TURN. */
+  threads?: string[];
   /** On the arrival screen (spec 2026-10-27 §4): where they're about to go; her name for the line. */
   travel?: { from: string | null; to: string; contact: string; comms: boolean; back?: boolean } | null;
 }): CompletionMessage[] {
@@ -47,15 +64,50 @@ export function suggestPrompt(o: {
     `The other character:\n${o.her}`,
     ...o.others.map((x) => `Also here: ${named(x.name, x.pronoun)} — ${oneLine(x.voice)}`),
     o.stranger ? `Also here: ${o.stranger.name}, a stranger from an earlier event — ${o.stranger.voice}` : null,
+    o.threads && o.threads.length > 0 ? `Open threads (TURN may pick one up; never invent how they turn out):\n${o.threads.map((t) => `- ${t}`).join('\n')}` : null,
     o.summary ? `Earlier tonight: ${oneLine(o.summary)}` : null,
     o.recent.length > 0 ? `What just happened:\n${o.recent.join('\n')}` : `Nothing has been said yet in this scene: write ${o.player}'s opening line.`,
     o.travel ? travelFact(o.player, o.pronoun, o.travel) : null,
     o.steer ? `What ${o.player} means to do next (write it as ${hers} line, in ${hers} own words): ${cut(oneLine(o.steer), SUGGEST_STEER_MAX)}` : null,
   ].filter((x): x is string => Boolean(x));
   return [
-    { role: 'system', content: suggestSystem(o.player) },
+    { role: 'system', content: suggestSystem(o.player, { angles: o.angles === true }) },
     { role: 'user', content: facts.join('\n\n') },
   ];
+}
+
+/**
+ * The story's open threads as the player already sees them (quest panel, plan card, LEADS, LOOSE ENDS), one line
+ * each, at most SUGGEST_THREADS_MAX. Never her secrets: no cipher truths, no lead the player doesn't hold.
+ */
+export function openThreads(o: {
+  quest: { active: { title: string } | null; waiting: { title: string; next: string } | null; elsewhere: { title: string; contactName: string; next: string | null }[] } | null;
+  plan: { going: { place: string; until: string } | null; meet: { place: string; time: string } | null } | null;
+  her: string;
+  player: string;
+  leads: { title: string; toName: string; place: string | null; followed: boolean }[];
+  looseEnds: { text: string }[][];
+}): string[] {
+  const q = o.quest;
+  return [
+    // Only the title: `beat` is the beat's id (`!read`, `counted-badly`), never words the player sees.
+    q?.active ? `${q.active.title}: under way` : null,
+    q?.waiting ? `${q.waiting.title}: ${oneLine(q.waiting.next)}` : null,
+    ...(q?.elsewhere ?? []).map((e) => `${e.title} (with ${e.contactName})${e.next ? `: ${oneLine(e.next)}` : ''}`),
+    o.plan?.meet ? `${o.her} is meeting ${o.player} at ${o.plan.meet.place} at ${o.plan.meet.time}` : null,
+    o.plan?.going ? `${o.her} is going to ${o.plan.going.place} until ${o.plan.going.until}` : null,
+    ...o.leads
+      .filter((l) => !l.followed)
+      .slice(0, 2)
+      .map((l) => `lead: ${l.title} → ${l.toName}${l.place ? ` at ${l.place}` : ''}`),
+    ...o.looseEnds
+      .map((g) => g[g.length - 1])
+      .filter((c): c is { text: string } => Boolean(c))
+      .slice(0, 2)
+      .map((c) => `loose end: ${oneLine(c.text)}`),
+  ]
+    .filter((x): x is string => Boolean(x))
+    .slice(0, SUGGEST_THREADS_MAX);
 }
 
 /** The move they're about to make, for a line said on the way (arrival screen spec §4). */
@@ -92,4 +144,42 @@ export function cleanSuggestion(raw: string, player: string, others: string[] = 
     s = end > 0 ? head.slice(0, end + 1) : `${head.slice(0, -1)}…`;
   }
   return s === '' ? null : s;
+}
+
+/**
+ * A label where a line or a word starts, in capitals as asked: bare, bold or italic, numbered or bulleted, bracketed, with
+ * a parenthesis after it, then `:` or a dash. After the colon only a bold or italic close is eaten (`*` + space), never an
+ * action's opening `*`.
+ */
+const LABEL = new RegExp(
+  `(?:^|(?<=\\s))[ \\t>-]*(?:\\d+[.)]\\s*)?[*_[(]*(${SUGGEST_ANGLES.join('|')})(?:\\s*\\([^)\\n]*\\))?[*_\\])]*\\s*(?::|[-–—](?=\\s))[ \\t]*(?:\\*\\*|[*_](?=\\s))?\\s*`,
+  'gm',
+);
+/** A closing note in brackets on its own line, after the last draft. */
+const NOTE_AFTER = /\n\s*[([][^\n]*[)\]]\s*$/;
+
+/**
+ * The model's answer as drafts: each `PLAIN:` / `PUSH:` / `TURN:` piece, cleaned like one line (cleanSuggestion), in the
+ * order given, empties dropped. An answer with no labels is one unlabelled draft, so an off-format answer still gives a line.
+ */
+export function parseSuggestions(raw: string, player: string, others: string[] = []): { angle: SuggestAngle | null; text: string }[] {
+  const marks = [...raw.matchAll(LABEL)];
+  if (marks.length === 0) {
+    const one = cleanSuggestion(raw, player, others);
+    return one ? [{ angle: null, text: one }] : [];
+  }
+  const out: { angle: SuggestAngle | null; text: string }[] = [];
+  // Before the first label: a preamble when all three came, else most likely the unlabelled first line.
+  if (marks.length < SUGGEST_ANGLES.length) {
+    const head = cleanSuggestion(raw.slice(0, marks[0]!.index!), player, others);
+    if (head) out.push({ angle: null, text: head });
+  }
+  marks.forEach((m, i) => {
+    const from = m.index! + m[0].length;
+    const last = i + 1 === marks.length;
+    const piece = raw.slice(from, last ? raw.length : marks[i + 1]!.index!);
+    const text = cleanSuggestion(last ? piece.replace(NOTE_AFTER, '') : piece, player, others);
+    if (text) out.push({ angle: m[1] as SuggestAngle, text });
+  });
+  return out;
 }

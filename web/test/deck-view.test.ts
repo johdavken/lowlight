@@ -360,3 +360,62 @@ describe('photo bubbles (photos spec §5)', () => {
     vi.useRealTimers();
   });
 });
+
+describe('the holo look (in-game texts spec §2–3)', () => {
+  const header = { place: 'x', tail: null, time: null, weather: null };
+  const rows = [row({ id: 'u1', text: 'pic?' }), row({ id: 'a2', role: 'agent', text: 'here\n[photo: roof-cranes]', replyTo: 'u1' })];
+  const view = (o: Partial<Parameters<typeof renderThread>[0]> = {}) => {
+    const v = renderThread({ contact: thread({ id: 'nix' }), header, rows, readOnly: null, typing: false, pending: [], onSend: vi.fn(), onRetry: vi.fn(), onResend: vi.fn(), onBack: vi.fn(), ...o });
+    document.body.append(v);
+    return v;
+  };
+
+  it('openId lights its row', () => {
+    const el = renderThreads([thread({ id: 'nix' }), thread({ id: 'cass' })], vi.fn(), null, undefined, 'cass');
+    expect([...el.querySelectorAll('.dk-row')].map((r) => r.classList.contains('dk-on'))).toEqual([false, true]);
+  });
+
+  it('hideBack drops ‹', () => {
+    expect(view().querySelector('.dk-back')).not.toBeNull();
+    expect(view({ hideBack: true }).querySelector('.dk-back')).toBeNull();
+  });
+
+  it("menuOnClick: a click on her text bubble opens the menu, a click on a photo doesn't", () => {
+    const onMenu = vi.fn();
+    const v = view({ onMenu, menuOnClick: true });
+    const her = [...v.querySelectorAll<HTMLElement>('.dk-her')];
+    her[1].querySelector<HTMLElement>('.dk-photo')!.click();
+    expect(onMenu).not.toHaveBeenCalled();
+    her[0].click();
+    expect(onMenu).toHaveBeenCalledWith('a2');
+    document.querySelector('.dk-viewer')?.remove();
+  });
+
+  it('no menuOnClick: a click on a bubble opens nothing (the phone)', () => {
+    const onMenu = vi.fn();
+    view({ onMenu }).querySelector<HTMLElement>('.dk-me')!.click();
+    expect(onMenu).not.toHaveBeenCalled();
+  });
+
+  it("enterSends: Enter sends, Shift+Enter doesn't", () => {
+    const onSend = vi.fn();
+    const box = view({ onSend, enterSends: true }).querySelector<HTMLTextAreaElement>('.dk-box')!;
+    box.value = 'hi';
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true }));
+    expect(onSend).not.toHaveBeenCalled();
+    const e = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    box.dispatchEvent(e);
+    expect(onSend).toHaveBeenCalledExactlyOnceWith('hi');
+    expect(e.defaultPrevented).toBe(true);
+    expect(box.value).toBe('');
+  });
+
+  it('draft fills the box and onDraft hears input', () => {
+    const onDraft = vi.fn();
+    const box = view({ draft: 'omw', onDraft }).querySelector<HTMLTextAreaElement>('.dk-box')!;
+    expect(box.value).toBe('omw');
+    box.value = 'omw.';
+    box.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(onDraft).toHaveBeenCalledWith('omw.');
+  });
+});

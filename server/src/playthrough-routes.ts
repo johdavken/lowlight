@@ -142,6 +142,14 @@ export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pt
     return reply.code(204).send();
   });
 
+  app.patch<{ Params: { saveId: string } }>('/api/saves/:saveId', sameOrigin, async (req, reply) => {
+    const name = cleanName(field(req.body, 'name'));
+    if (name === null) return reply.code(400).send({ error: 'bad-name' });
+    const renamed = notFoundOn(reply, () => pts.renameSave(req.params.saveId, name));
+    if (renamed === undefined) return reply;
+    return renamed ?? notFound(reply);
+  });
+
   app.get('/api/playthroughs/active/contacts', async (_req, reply) => {
     if (!world.active()) return reply.code(409).send({ error: 'no-playthrough' });
     return world.contacts();

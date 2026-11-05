@@ -55,9 +55,20 @@
 @media (prefers-reduced-motion: reduce) {
   .sp-portrait, .sp-portrait.sp-leaving { animation: none; }
 }
+/* Its own layer on the game stage (mountSpeakerPortrait's layerHost): over the job table (.tb, z 24, mounted
+   earlier, so this later layer wins the tie), under the input and scene keys (z 25), the panels and the HUD. */
+.sp-layer { position: absolute; inset: 0; z-index: 24; pointer-events: none; }
+/* While a job table is up it ends at the box's resting height (table.css), so the bust shrinks to stand under
+   that edge instead of over the hand's cards; the line beside it closes up to match. */
+#game.tb-dim {
+  --sp-h: calc(var(--box-h) + 16px);
+  --sp-w: calc(var(--sp-h) * 176 / 266);
+}
 /* Only on the stage's subtitles: the archive and the classic feed don't carry it. */
 .feed-root:not(.feed-stage) .sp-portrait,
-.feed-root.expanded .sp-portrait { display: none; }
+.feed-root.expanded .sp-portrait,
+:has(> .feed-root:not(.feed-stage)) > .sp-layer,
+:has(> .feed-root.expanded) > .sp-layer { display: none; }
 /* The line moves over for the bust while one is up. */
 .feed-root.feed-stage.has-portrait:not(.expanded) .feed {
   left: calc(var(--sub-x) + var(--sp-w) + 24px);

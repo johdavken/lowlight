@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
+import { startStubAnthropic, type StubAnthropic } from './fixtures/stub-anthropic';
+import { ANTHROPIC_THINKING_ROOM } from '../src/anthropic-convert';
 import { artNarration, completeOnce, completeOnceWithUsage, forgetThinkingRefusals, NARRATOR_SYSTEM, NarratorError, scenePrompt } from '../src/scenario';
 import { registerScenarioRoutes, type ScenarioDeps } from '../src/scenario-routes';
 import { startStubOpenRouter, type StubOpenRouter } from './fixtures/stub-openrouter';
@@ -11,12 +13,15 @@ afterEach(async () => {
   forgetThinkingRefusals();
 });
 
-const GOOD = JSON.stringify({ title: 'After closing', text: 'Rain has shut the Ribbon early.' });
-const THREE = JSON.stringify([
-  { title: 'After closing', text: 'Rain has shut the Ribbon early.' },
-  { title: 'A fee that did not clear', text: 'A payment bounced again.' },
-  { title: 'The Orchid calls', text: 'A sealed card waits downstairs.' },
-]);
+const OPTIONS = [
+  { kind: 'history', title: 'The slip', text: 'The old attendance slip is still on her desk.' },
+  { kind: 'business', title: 'A fee that did not clear', text: 'A payment bounced again.' },
+  { kind: 'chance', title: 'After closing', text: 'Rain has shut the Ribbon early.' },
+];
+const GOOD = JSON.stringify(OPTIONS);
+/** One opening, as the narrator used to write: not three. */
+const ONE = JSON.stringify({ title: 'After closing', text: 'Rain has shut the Ribbon early.' });
+const PAIR = { player: { id: 'hicks', name: 'Hicks' }, tie: 'You signed his attendance slip every week.' };
 
 describe('scenePrompt', () => {
   it("gives the narrator the room's art, the lore, both public files and the time and weather — never her identity", () => {
@@ -36,8 +41,17 @@ describe('scenePrompt', () => {
     expect(all).toContain("The other character:\n[who's here: Nix");
     expect(all).not.toContain('Her (the other character)');
     expect(all).not.toContain('wants the opening');
-    expect(NARRATOR_SYSTEM).toContain('Write one opening');
-    expect(NARRATOR_SYSTEM).not.toContain('three different openings');
+    expect(all).toContain("They haven't met.");
+    expect(NARRATOR_SYSTEM).toContain('Write three openings');
+    for (const k of ['"history"', '"business"', '"chance"']) expect(NARRATOR_SYSTEM).toContain(k);
+    expect(NARRATOR_SYSTEM).toContain('Never write what the user does, says or feels.');
+    expect(NARRATOR_SYSTEM.startsWith('You write openings for a roleplay in Lowlight.')).toBe(true);
+  });
+
+  it("the tie between them, after the two characters, in place of They haven't met", () => {
+    const msgs = scenePrompt({ room: { name: 'R', art: null, timeOfDay: null, weather: null }, lore: null, you: 'Y', her: 'H', player: 'Hicks', steer: null, tie: 'You signed his\nslip every week.', herName: 'Nix' });
+    expect(msgs[1]!.content).toContain(`The other character:\nH\n\nWhat's already between them, in Nix's own note on Hicks (written to her, so "you" there is Nix): You signed his slip every week.`);
+    expect(msgs[1]!.content).not.toContain("haven't met");
   });
 });
 
@@ -60,6 +74,32 @@ describe('artNarration', () => {
 
   it('nothing to say is null', () => {
     expect(artNarration('---\npack: x\n---\n\n')).toBeNull();
+  });
+});
+
+describe('completeOnce on the Anthropic route', () => {
+  const route = { provider: 'anthropic' as const, key: 'sk-ant-sc', model: 'anthropic/claude-sonnet-5.5', native: 'claude-sonnet-5-5' };
+  let an: StubAnthropic | null = null;
+  afterEach(async () => {
+    await an?.close();
+    an = null;
+  });
+  const call = (thinking?: 'off' | 'auto' | 'low' | 'medium') =>
+    completeOnceWithUsage({ baseUrl: 'http://openrouter.invalid', apiKey: 'sk-or-unused', model: route.model, route, anthropicBaseUrl: an!.url, messages: [{ role: 'system', content: 'S' }, { role: 'user', content: 'u' }], temperature: 0.9, maxTokens: 400, ...(thinking ? { thinking } : {}) });
+
+  it('medium thinking is effort medium; the cap gets the thinking room; no temperature', async () => {
+    an = await startStubAnthropic({ completion: 'ok' });
+    expect((await call('medium')).text).toBe('ok');
+    const body = an.requests.at(-1)!.body;
+    expect(body.output_config).toEqual({ effort: 'medium' });
+    expect(body.max_tokens).toBe(400 + ANTHROPIC_THINKING_ROOM);
+    expect('temperature' in body).toBe(false);
+  });
+
+  it('off, auto and low are effort low, one call each (no reasoning retry)', async () => {
+    an = await startStubAnthropic({ completion: 'ok' });
+    for (const t of ['off', 'auto', 'low'] as const) await call(t);
+    expect(an.requests.map((r) => r.body.output_config.effort)).toEqual(['low', 'low', 'low']);
   });
 });
 
@@ -288,7 +328,7 @@ describe('POST /api/scenario/draft', () => {
       originAllowed: () => true,
       busy: () => null,
       target: (ai) => (ai === 'nix-direct' ? { kind: 'direct', ready: () => true, narrate } : null),
-      promptFor: async () => [{ role: 'system', content: NARRATOR_SYSTEM }],
+      promptFor: async () => ({ messages: [{ role: 'system', content: NARRATOR_SYSTEM }], pair: PAIR }),
       ...over,
     };
     const a = Fastify();
@@ -298,25 +338,25 @@ describe('POST /api/scenario/draft', () => {
     return { post, narrate };
   }
 
-  it("returns one opening's text, passing the steer on", async () => {
-    const promptFor = vi.fn(async () => [{ role: 'system' as const, content: NARRATOR_SYSTEM }]);
+  it('returns the three openings and the pair, passing the steer on', async () => {
+    const promptFor = vi.fn(async () => ({ messages: [{ role: 'system' as const, content: NARRATOR_SYSTEM }], pair: PAIR }));
     const { post } = await app({ promptFor });
     const r = await post({ ai: 'nix-direct', steer: '  a bounced fee ' });
-    expect([r.statusCode, r.json()]).toEqual([200, { text: 'Rain has shut the Ribbon early.' }]);
+    expect([r.statusCode, r.json()]).toEqual([200, { options: OPTIONS, pair: PAIR }]);
     expect(promptFor).toHaveBeenCalledWith('nix-direct', 'a bounced fee');
     await post({ ai: 'nix-direct' });
     expect(promptFor).toHaveBeenLastCalledWith('nix-direct', null);
   });
 
   it('retries a bad answer once (Review Focus 3)', async () => {
-    const narrate = vi.fn().mockResolvedValueOnce(THREE).mockResolvedValueOnce(GOOD);
+    const narrate = vi.fn().mockResolvedValueOnce(ONE).mockResolvedValueOnce(GOOD);
     const { post } = await app({ target: () => ({ kind: 'direct', ready: () => true, narrate }) });
     expect((await post({ ai: 'nix-direct' })).statusCode).toBe(200);
     expect(narrate).toHaveBeenCalledTimes(2);
   });
 
   it('two bad answers are 502 failed', async () => {
-    const narrate = vi.fn(async () => THREE);
+    const narrate = vi.fn(async () => ONE);
     const { post } = await app({ target: () => ({ kind: 'direct', ready: () => true, narrate }) });
     const r = await post({ ai: 'nix-direct' });
     expect(r.statusCode).toBe(502);
@@ -347,7 +387,7 @@ describe('POST /api/scenario/draft', () => {
   it("the reason given is the last try's, not the first's", async () => {
     const narrate = vi.fn().mockRejectedValueOnce(new Error('HTTP 500')).mockResolvedValueOnce('prose, no setups');
     const { post } = await app({ target: () => ({ kind: 'direct', ready: () => true, narrate }) });
-    expect((await post({ ai: 'nix-direct' })).json()).toEqual({ error: 'failed', kind: 'bad-answer', why: 'the answer was not one opening' });
+    expect((await post({ ai: 'nix-direct' })).json()).toEqual({ error: 'failed', kind: 'bad-answer', why: 'the answer was not three openings' });
   });
 
   it('the 502 says which kind of failure (spec 2026-10-14 §3); the why is logged', async () => {

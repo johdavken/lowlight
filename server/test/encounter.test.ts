@@ -114,7 +114,7 @@ describe('encounterPrompt', () => {
   it('the system message, exactly', () => {
     expect(encounterPrompt(base)[0]).toEqual({ role: 'system', content: ENCOUNTER_SYSTEM });
     expect(ENCOUNTER_SYSTEM).toBe(
-      'You write events for a roleplay in Lowlight. Write three different events that could happen right now to the two people in this scene: something from outside that cuts in — a person, a call, a failure, a discovery. Each fits the place and what just happened, in the third person and present tense, with a title of at most 40 characters and two or three sentences of at most 600 characters. Never write what the user does, says or feels. An event may bring in one new person: give them a short name (at most 24 characters, not one already taken) and a few words on how they speak. Use only the places and facts given. Only an event whose text cuts this district\'s power — the grid fails, the lights die — says so with "power": "out"; every other event leaves it out. Answer only with a JSON array of three {"title","text","stranger","power"} objects, where stranger is {"name","voice"} or null and power is "out" or absent.',
+      'You write events for a roleplay in Lowlight. Write three events that could happen right now to the two people in this scene, one of each kind, in this order. First, "stranger": someone new walks in, calls out or stops by — anyone the place might bring, a man or a woman, young, middle-aged or old; give them a short name (at most 24 characters, not one already taken), a few words on how they speak, and say whether they are a "man" or a "woman" and "young", "middle" or "old". Second, "city": the place itself acts — the weather turns, something fails or breaks, a sound, a call, something is found; no new person. Third, "personal": something in the room that touches the two of them — a name lighting up the other character\'s phone, a song, an object that means something, an open thread coming back; no new person. Each fits the place and what just happened, in the third person and present tense, with a title of at most 40 characters and two or three sentences of at most 600 characters. Write only what happens: never what the user does, says or feels, and never how the other character reacts. Use only the places and facts given. Only a "city" event whose text cuts this district\'s power — the grid fails, the lights die — says so with "power": "out"; every other event leaves it out. Answer only with a JSON array of three {"kind","title","text","stranger","power"} objects in that order, where kind is "stranger", "city" or "personal", stranger is {"name","voice","gender","age"} on the first and null on the others, and power is "out" or absent.',
     );
   });
 
@@ -193,21 +193,38 @@ describe('POST /api/encounter/options', () => {
     const r = await post({ ai: 'nix-direct' });
     expect(r.statusCode).toBe(200);
     expect(r.json().options).toEqual([
-      { title: 'Wrong package', text: 'A courier drops a box.', stranger: { name: 'Courier', voice: 'clipped' } },
-      { title: 'Blackout', text: 'The grid drops.' },
-      { title: 'Regular', text: 'An old man sits.' },
+      { kind: 'stranger', title: 'Wrong package', text: 'A courier drops a box.', stranger: { name: 'Courier', voice: 'clipped' } },
+      { kind: 'city', title: 'Blackout', text: 'The grid drops.' },
+      { kind: 'personal', title: 'Regular', text: 'An old man sits.' },
     ]);
   });
 
   it("drops a power cut card where the power's already out (blackouts phase 3 §2)", async () => {
-    const cut = JSON.stringify([{ title: 'Dark', text: 'The grid drops.', power: 'out' }, { title: 'B', text: 'b.' }, { title: 'C', text: 'c.' }]);
+    const cut = JSON.stringify([{ title: 'A', text: 'a.' }, { title: 'Dark', text: 'The grid drops.', power: 'out' }, { title: 'C', text: 'c.' }]);
     const lit = await app({ target: () => ({ kind: 'direct', ready: () => true, narrate: vi.fn(async () => cut) }) });
-    expect((await lit.post({ ai: 'nix-direct' })).json().options[0]).toEqual({ title: 'Dark', text: 'The grid drops.', power: 'out' });
+    expect((await lit.post({ ai: 'nix-direct' })).json().options[1]).toEqual({ kind: 'city', title: 'Dark', text: 'The grid drops.', power: 'out' });
     const dark = await app({
       target: () => ({ kind: 'direct', ready: () => true, narrate: vi.fn(async () => cut) }),
       promptFor: () => ({ messages: [{ role: 'system', content: ENCOUNTER_SYSTEM }], reserved: ['Hicks', 'Nix'], dark: true }),
     });
-    expect((await dark.post({ ai: 'nix-direct' })).json().options[0]).toEqual({ title: 'Dark', text: 'The grid drops.' });
+    expect((await dark.post({ ai: 'nix-direct' })).json().options[1]).toEqual({ kind: 'city', title: 'Dark', text: 'The grid drops.' });
+  });
+
+  it("gives the stranger card a face from the room's picker, and leaves the others alone", async () => {
+    const face = vi.fn(() => 'local-karasu-03');
+    const three = JSON.stringify([
+      { kind: 'stranger', title: 'A', text: 'a.', stranger: { name: 'Super', voice: 'gravel', gender: 'man', age: 'middle' } },
+      { kind: 'city', title: 'B', text: 'b.' },
+      { kind: 'personal', title: 'C', text: 'c.' },
+    ]);
+    const a = await app({
+      target: () => ({ kind: 'direct', ready: () => true, narrate: vi.fn(async () => three) }),
+      promptFor: () => ({ messages: [{ role: 'system', content: ENCOUNTER_SYSTEM }], reserved: ['Hicks', 'Nix'], face }),
+    });
+    const options = (await a.post({ ai: 'nix-direct' })).json().options;
+    expect(options[0].stranger).toEqual({ name: 'Super', voice: 'gravel', gender: 'man', age: 'middle', face: 'local-karasu-03' });
+    expect(face).toHaveBeenCalledWith({ name: 'Super', voice: 'gravel', gender: 'man', age: 'middle' });
+    expect(options[1].stranger).toBeUndefined();
   });
 
   it('a bad request, a foreign origin, no key and busy', async () => {

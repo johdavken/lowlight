@@ -9,7 +9,7 @@ import { bugReportOpen } from '../bug-report';
 import { chooseMove, type DiceSettings } from '../../../../shared/dice/opponent';
 import { bid, callLiar, isLegal, lastBid, minRaise, newGame, totalDice, type DiceState, type Face, type RoundRecord } from '../../../../shared/dice/rules';
 import { bidText, cleanStake, STAKES } from '../../../../shared/dice/text';
-import { rng } from '../../../../shared/gig/generate';
+import { rng } from '../../../../shared/rng';
 import './dice.css';
 
 export interface DiceTrayOpts {

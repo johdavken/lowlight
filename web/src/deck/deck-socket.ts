@@ -4,13 +4,23 @@ import type { DeckClientEvent, DeckServerEvent } from '../../../shared/types';
 const BACKOFF_MIN_MS = 500;
 const BACKOFF_MAX_MS = 8000;
 
-export function connectDeck(onEvent: (e: DeckServerEvent) => void, onStatus: (open: boolean) => void): { send(e: DeckClientEvent): void } {
+export interface DeckSocket {
+  send(e: DeckClientEvent): void;
+  /** No more reconnects; the open socket closes (the in-game pane put away: in-game texts spec §3). */
+  close(): void;
+}
+export type ConnectDeck = (onEvent: (e: DeckServerEvent) => void, onStatus: (open: boolean) => void) => DeckSocket;
+
+export const connectDeck: ConnectDeck = (onEvent, onStatus) => {
   let ws: WebSocket | null = null;
+  let closed = false;
+  let retry: ReturnType<typeof setTimeout> | null = null;
   let backoff = BACKOFF_MIN_MS;
   const later = () => {
+    if (closed) return;
     const delay = backoff;
     backoff = Math.min(BACKOFF_MAX_MS, backoff * 2);
-    setTimeout(connect, delay);
+    retry = setTimeout(connect, delay);
   };
   async function connect(): Promise<void> {
     let token: string;
@@ -22,6 +32,7 @@ export function connectDeck(onEvent: (e: DeckServerEvent) => void, onStatus: (op
       later();
       return;
     }
+    if (closed) return;
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const sock = new WebSocket(`${proto}//${location.host}/ws/deck?token=${encodeURIComponent(token)}`);
     ws = sock;
@@ -38,6 +49,7 @@ export function connectDeck(onEvent: (e: DeckServerEvent) => void, onStatus: (op
     };
     sock.onclose = () => {
       if (ws === sock) ws = null;
+      if (closed) return;
       onStatus(false);
       later();
     };
@@ -47,5 +59,11 @@ export function connectDeck(onEvent: (e: DeckServerEvent) => void, onStatus: (op
     send(e) {
       if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(e));
     },
+    close() {
+      closed = true;
+      if (retry) clearTimeout(retry);
+      ws?.close();
+      ws = null;
+    },
   };
-}
+};

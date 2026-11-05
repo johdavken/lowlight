@@ -305,6 +305,9 @@ export class Feed {
     this.stage = opts.stage === true;
     if (this.stage) root.classList.add('feed-stage');
     root.classList.add('feed-root');
+    root.addEventListener('animationend', (e) => {
+      if (e.animationName === 'jc-new') root.classList.remove('line-new');
+    });
     const dim = el('div', 'feed-dim');
     dim.addEventListener('click', () => this.collapse());
 
@@ -365,6 +368,11 @@ export class Feed {
     const m = this.measure(entry.msg.id);
     const { pages } = beats ?? pageLayout(m.content, m.available, m.lineHeight, this.continueReserve);
     return this.pager.page < pages - 1;
+  }
+
+  /** A page key would turn something now (SETUP leaves Enter to it). */
+  pageWaiting(): boolean {
+    return !this._expanded && (this.canTurn() || this.skipTo() !== null);
   }
 
   private isPageKey(e: KeyboardEvent): boolean {
@@ -562,7 +570,7 @@ export class Feed {
 
   /**
    * A quiet line under the feed (`// LINE DELETED · UNDO`); with an action, a button for it for 6 s. A
-   * `polite` one gives way to a notice already showing (returns false then).
+   * `polite` one gives way to a notice already showing (returns false then), and hides while a Graft table is up.
    */
   showNotice(text: string, action?: { label: string; run: () => void }, o: { polite?: boolean } = {}): boolean {
     if (o.polite && this.notice) return false;
@@ -570,7 +578,7 @@ export class Feed {
       clearTimeout(this.notice.timer);
       this.notice.node.remove();
     }
-    const node = el('div', 'feed-notice', text);
+    const node = el('div', o.polite ? 'feed-notice polite' : 'feed-notice', text);
     const close = () => {
       if (this.notice?.node === node) this.notice = null;
       node.remove();
@@ -749,12 +757,21 @@ export class Feed {
     const entry = this.entries.get(id);
     if (!entry) return this.warnUnknown('delta', id);
     if (d.length === 0) return;
+    if (entry.msg.role === 'agent' && entry.msg.text === '') this.cueLine();
     entry.msg = { ...entry.msg, text: entry.msg.text + d };
     entry.segments.push(...split(entry.markup, d));
     entry.beats = this.beatsFor(entry.msg, entry.stranger);
     // Laid out in full before paging measures it; past the typing frontier it stays hidden.
     this.render(entry, this.typing?.id === id ? this.typing.shown : null);
     this.refresh();
+  }
+
+  /** Her line starting while the JOB column is up: it pulses as the column does (job-column.css), so the eye crosses over. */
+  private cueLine(): void {
+    if (!this.root.classList.contains('job-col')) return;
+    this.root.classList.remove('line-new');
+    void this.root.offsetWidth;
+    this.root.classList.add('line-new');
   }
 
   toolLine(id: string | null, text: string): void {
@@ -1214,6 +1231,8 @@ export class Feed {
     const streaming = entry.msg.status === 'streaming';
     entry.text.classList.add('paged');
     entry.text.style.maxHeight = `${pageHeight}px`;
+    // Room under a short last page, or its scroll stops early and the tail of the page before stays up over the new text.
+    entry.text.style.setProperty('--page-tail', beats ? '0px' : `${Math.max(0, Math.ceil(pages * pageHeight - m.content))}px`);
     this.pageHeight = pageHeight;
     entry.text.dataset.page = String(this.pager.page);
     entry.text.scrollTop = this.pager.page * pageHeight;
@@ -1245,7 +1264,8 @@ export class Feed {
       const base = m.base ?? m.available;
       // A reply in beats needs the box as tall as one of its pages.
       const content = this.beatLayout(entry)?.pageHeight ?? m.content;
-      if (content > base) fit = content <= m.available ? `calc(var(--box-h) + ${Math.ceil(content - base)}px)` : 'var(--box-max)';
+      // No room over the box at rest (capped there while the JOB column is up): it pages without growing.
+      if (content > base && m.base !== undefined) fit = content <= m.available ? `calc(var(--box-h) + ${Math.ceil(content - base)}px)` : 'var(--box-max)';
     }
     // On :root too: what stands on the box from outside the feed (the dice tray) follows it as it grows.
     for (const el of [this.root, document.documentElement]) {

@@ -163,6 +163,10 @@ describe('validateClientEvent: a power cut card (blackouts phase 3 §2)', () => 
   it('passes power through, and only "out"', () => {
     expect(validateClientEvent({ type: 'encounter', encounter: { title: 'Dark', text: 'The grid drops.', power: 'out' } })).toEqual({ type: 'encounter', encounter: { title: 'Dark', text: 'The grid drops.', power: 'out' } });
     expect(validateClientEvent({ type: 'encounter', encounter: { title: 'Dark', text: 'The grid drops.', power: 'yes' } })).toEqual({ type: 'encounter', encounter: { title: 'Dark', text: 'The grid drops.' } });
+    // A face is kept in shape only (the relay checks it's one of the extras); a path isn't one.
+    const st = { name: 'Super', voice: 'gravel' };
+    expect(validateClientEvent({ type: 'encounter', encounter: { kind: 'stranger', title: 'A', text: 'a.', stranger: { ...st, face: 'local-karasu-03' } } })).toEqual({ type: 'encounter', encounter: { kind: 'stranger', title: 'A', text: 'a.', stranger: { ...st, face: 'local-karasu-03' } } });
+    expect(validateClientEvent({ type: 'encounter', encounter: { title: 'A', text: 'a.', stranger: { ...st, face: '../secret' } } })).toEqual({ type: 'encounter', encounter: { title: 'A', text: 'a.', stranger: st } });
   });
 });
 
@@ -499,6 +503,9 @@ describe('hub message controls', () => {
     const user = { ...line, role: 'user' };
     const row = { ...user, mode: 'encounter', encounter };
     expect(validateClientEvent({ type: 'restore_message', message: row })).toEqual({ type: 'restore_message', message: { ...user, mode: 'encounter', encounter } });
+    // A DRAW stranger's face comes back in shape (UNDO keeps him in who's here); their gender and age don't.
+    const faced = { title: 'T', stranger: { name: 'Colm', voice: 'flat', face: 'local-05', gender: 'man', age: 'middle' } };
+    expect(validateClientEvent({ type: 'restore_message', message: { ...user, mode: 'encounter', encounter: faced } })).toEqual({ type: 'restore_message', message: { ...user, mode: 'encounter', encounter: { title: 'T', stranger: { name: 'Colm', voice: 'flat', face: 'local-05' } } } });
     // A broken stranger goes; a broken event is no encounter row at all.
     expect(validateClientEvent({ type: 'restore_message', message: { ...row, encounter: { title: 'T', stranger: { name: '' } } } })).toEqual({
       type: 'restore_message',
@@ -1066,10 +1073,9 @@ describe('hub travel', () => {
     const gigsDir = path.join(path.dirname(mapFile), 'gigs');
     fs.mkdirSync(gigsDir);
     const brief = (place: string, tier: string) =>
-      `---\ntitle: Held Pay\ntier: ${tier}\nplace: ${place}\nclient: Nobody\ntarget: Glass Orchid · house ledger\ntake: a payout\n---\nThick lacquer.\n`;
+      `---\ntitle: Held Pay\ntier: ${tier}\nkind: papers\nplace: ${place}\nclient: Nobody\ntarget: Glass Orchid · house ledger\ntake: a payout\n---\nThick lacquer.\n`;
     fs.writeFileSync(path.join(gigsDir, 'held-pay.md'), brief('far', 'hard'));
     fs.writeFileSync(path.join(gigsDir, 'noodles.md'), brief('stall', 'easy'));
-    fs.writeFileSync(path.join(gigsDir, 'floor.md'), brief('far', 'medium').replace('tier: medium\n', 'tier: medium\nkind: slip\n'));
     const db = openDb(':memory:', { defaultPlayer: 'hicks' });
     const journal = new Journal(db);
     // Two districts with the same rooms: hers is p; q is another part of town.
@@ -1475,16 +1481,13 @@ describe('hub travel', () => {
       expect(typeof validateClientEvent({ ...run, trace: '8' })).toBe('string');
     });
 
-    it("starts her turn on the brief's snapshot", () => {
-      const { tab, gigs } = makeTravelHub();
-      tab.client(run);
-      expect(notices(tab.events)).toEqual([]);
-      expect(gigs).toEqual([
-        [
-          'hicks',
-          { title: 'Held Pay', tier: 'hard', place: 'The Tilt', client: 'Nobody', target: 'Glass Orchid · house ledger', take: 'a payout', brief: 'Thick lacquer.', result: 'clean', trace: 8, max: 14 },
-        ],
-      ]);
+    it('a hack run, a slip run and a run with no kind (an old client) are refused: hack and slip are gone', () => {
+      for (const kind of [undefined, 'hack', 'slip'] as const) {
+        const { tab, gigs } = makeTravelHub();
+        tab.client({ ...run, ...(kind ? { kind } : {}) });
+        expect(tab.events.filter((e) => e.type === 'notice')).toEqual([{ type: 'notice', text: 'hack and slip are gone', for: 'gig' }]);
+        expect(gigs).toEqual([]);
+      }
     });
 
     it.each([
@@ -1492,14 +1495,9 @@ describe('hub travel', () => {
       ['a place with gigs off', { place: 'stall' }, 'no jobs at stall'],
       ['an unknown brief', { brief: 'nope' }, "no job 'nope' here"],
       ["another place's brief", { brief: 'noodles' }, "no job 'noodles' here"],
-      ["a max that isn't the tier's", { max: 12 }, "that run doesn't add up"],
-      ['a clean run over the max', { trace: 15 }, "that run doesn't add up"],
-      ['a negative trace', { trace: -1 }, "that run doesn't add up"],
-      ['a traced run within the max', { result: 'traced', trace: 14 }, "that run doesn't add up"],
-      ['a traced run past max + 20', { result: 'traced', trace: 35 }, "that run doesn't add up"],
     ])('refuses %s', (_name, change, notice) => {
       const { tab, gigs } = makeTravelHub();
-      tab.client({ ...run, ...change });
+      tab.client({ ...run, kind: 'papers', ...change });
       expect(tab.events.filter((e) => e.type === 'notice')).toEqual([{ type: 'notice', text: notice, for: 'gig' }]);
       expect(gigs).toEqual([]);
     });
@@ -1588,77 +1586,24 @@ describe('hub travel', () => {
       });
     });
 
-    describe('a slip', () => {
-      const slip = { type: 'gig', kind: 'slip', place: 'far', brief: 'floor', result: 'clean', trace: 0, max: 8, seed: 7 } as const;
-
-      it('validates with its kind, and a hack event with no kind still does', () => {
-        expect(validateClientEvent(slip)).toEqual(slip);
-        expect(validateClientEvent({ ...slip, result: 'caught' })).toEqual({ ...slip, result: 'caught' });
-        expect(typeof validateClientEvent({ ...slip, kind: 'heist' })).toBe('string');
-        expect(typeof validateClientEvent({ ...slip, result: 'traced', trace: 9 })).toBe('string');
-        expect(typeof validateClientEvent({ type: 'gig', place: 'far', brief: 'held-pay', result: 'caught', trace: 0, max: 14, seed: 1 })).toBe('string');
-      });
-
-      it("starts her turn on the slip's snapshot, kind included", () => {
-        const { tab, gigs } = makeTravelHub();
-        tab.client(slip);
-        expect(notices(tab.events)).toEqual([]);
-        expect(gigs).toEqual([
-          [
-            'hicks',
-            { kind: 'slip', title: 'Held Pay', tier: 'medium', place: 'The Tilt', client: 'Nobody', target: 'Glass Orchid · house ledger', take: 'a payout', brief: 'Thick lacquer.', result: 'clean', trace: 0, max: 8 },
-          ],
-        ]);
-      });
-
-      it('a caught run at heat 0 goes through (a guard walked into you)', () => {
-        const { tab, gigs } = makeTravelHub();
-        tab.client({ ...slip, result: 'caught', trace: 0 });
-        expect(gigs).toHaveLength(1);
-      });
-
-      it.each([
-        ['a kind that is not the brief\'s', { kind: 'hack' }, "that run doesn't add up"],
-        ["a hack's max on a slip", { max: 12 }, "that run doesn't add up"],
-        ['caught past max + 20', { result: 'caught', trace: 29 }, "that run doesn't add up"],
-      ])('refuses %s', (_name, change, notice) => {
-        const { tab, gigs } = makeTravelHub();
-        tab.client({ ...slip, ...change });
-        expect(tab.events.filter((e) => e.type === 'notice')).toEqual([{ type: 'notice', text: notice, for: 'gig' }]);
-        expect(gigs).toEqual([]);
-      });
-
-      it('a hack run naming a slip brief is refused', () => {
-        const { tab, gigs } = makeTravelHub();
-        const { kind: _k, ...noKind } = slip;
-        tab.client({ ...noKind, max: 12 });
-        expect(tab.events.filter((e) => e.type === 'notice')).toEqual([{ type: 'notice', text: "that run doesn't add up", for: 'gig' }]);
-        expect(gigs).toEqual([]);
-      });
-    });
-
-    it('a traced run up to max + 20 goes through', () => {
-      const { tab, gigs } = makeTravelHub();
-      tab.client({ ...run, result: 'traced', trace: 34 });
-      expect(gigs).toHaveLength(1);
-    });
-
-    it('a run the relay drops (it got busy first) is refused, so the window can send again (review)', async () => {
-      const { tab, relay } = makeTravelHub();
-      (relay as unknown as { gig: () => Promise<null> }).gig = () => Promise.resolve(null);
-      tab.client(run);
+    it('a papers run the relay drops (it got busy first) is refused, so the window can send again (review)', async () => {
+      const h = makeTravelHub();
+      const b = papersBoard('hard', 42, loadPapersData(tempDir('nix-hub-papers-'), new Set(), () => {}));
+      (h.relay as unknown as { gig: () => Promise<null> }).gig = () => Promise.resolve(null);
+      h.tab.client({ ...run, kind: 'papers', trace: b.clean, max: b.cap, seed: b.seed, papers: { overlooked: null } });
       await new Promise((r) => setTimeout(r, 0));
-      expect(tab.events.filter((e) => e.type === 'notice')).toEqual([{ type: 'notice', text: 'wait for her to finish', for: 'gig' }]);
+      expect(h.tab.events.filter((e) => e.type === 'notice')).toEqual([{ type: 'notice', text: 'wait for her to finish', for: 'gig' }]);
     });
 
-    it('refuses while busy and with no key', () => {
+    it('refuses a papers run while busy and with no key', () => {
       for (const [set, notice] of [
         [(r: Record<string, unknown>) => (r.busy = true), 'wait for her to finish'],
         [(r: Record<string, unknown>) => (r.ready = false), '// NO LINK — RELINK AT SELECT'],
       ] as const) {
         const { tab, relay, gigs } = makeTravelHub();
+        const b = papersBoard('hard', 42, loadPapersData(tempDir('nix-hub-papers-'), new Set(), () => {}));
         set(relay as unknown as Record<string, unknown>);
-        tab.client(run);
+        tab.client({ ...run, kind: 'papers', trace: b.clean, max: b.cap, seed: b.seed, papers: { overlooked: null } });
         expect(tab.events.filter((e) => e.type === 'notice')).toEqual([{ type: 'notice', text: notice, for: 'gig' }]);
         expect(gigs).toEqual([]);
       }
@@ -1740,6 +1685,58 @@ describe('hub travel', () => {
       expect(room.state.sceneId).toBe('q/ribbon-rooftop');
     });
   });
+
+  describe('GO WITH HER walks you there together (her plans spec §5)', () => {
+    const goHub = (going: string | null, relayExtra: Record<string, unknown> = {}) => {
+      const dropped: string[] = [];
+      const resent: string[] = [];
+      const hub = makeTravelHub(MAP, {}, {
+        dropPlan: (p: string) => {
+          dropped.push(p);
+          return { ok: true, text: 'ok', ...(going ? { going } : {}) };
+        },
+        resendPlanCard: (p: string) => void resent.push(p),
+        ...relayExtra,
+      });
+      return { ...hub, dropped, resent };
+    };
+
+    it('drops her plan, then goes to her place as a door would: invite-only is fine, she takes you', () => {
+      const { tab, room, travels, dropped } = goHub('p/ribbon-rooftop');
+      tab.client({ type: 'plan_drop' });
+      expect(dropped).toEqual(['hicks']);
+      expect(notices(tab.events)).toEqual([]);
+      expect(room.state.sceneId).toBe('p/ribbon-rooftop');
+      expect(travels).toEqual([['hicks', { from: 'Lowlight Intake', to: "Nix's walk-up", contact: 'Nix' }]]);
+    });
+
+    it('stays put when she was heading here, nowhere, or to a room that is gone', () => {
+      for (const going of ['p/lowlight-intake', null, 'q/arcade']) {
+        const { tab, room, travels, dropped } = goHub(going);
+        tab.client({ type: 'plan_drop' });
+        expect(dropped).toEqual(['hicks']);
+        expect(room.state.sceneId).toBe('p/lowlight-intake');
+        expect(travels).toEqual([]);
+      }
+    });
+
+    it('with no key: nothing dropped, the card comes back', () => {
+      const { tab, travels, dropped, resent } = goHub('p/ribbon-rooftop', { ready: false });
+      tab.client({ type: 'plan_drop' });
+      expect(dropped).toEqual([]);
+      expect(resent).toEqual(['hicks']);
+      expect(travels).toEqual([]);
+      expect(tab.events.some((e) => e.type === 'turn_rejected')).toBe(true);
+    });
+
+    it('a refused drop moves nobody', () => {
+      const { tab, room, travels } = goHub('p/ribbon-rooftop', { dropPlan: () => ({ ok: false, error: 'busy' }) });
+      tab.client({ type: 'plan_drop' });
+      expect(room.state.sceneId).toBe('p/lowlight-intake');
+      expect(travels).toEqual([]);
+      expect(tab.events).toContainEqual({ type: 'control_rejected', reason: 'busy' });
+    });
+  });
 });
 
 describe('hub scenes event', () => {
@@ -1790,5 +1787,22 @@ describe('hub: the power (blackouts phase 3 §4)', () => {
     expect(cuts).toBe(1);
     expect(a.events.filter((e) => e.type === 'dev_log')).toEqual([]);
     db.close();
+  });
+});
+
+describe('crew actions over the ws (crew spec §5)', () => {
+  it('spring passes like bail', () => {
+    expect(validateClientEvent({ type: 'crew', action: { do: 'spring', recruit: 'r-pell' } })).toEqual({ type: 'crew', action: { do: 'spring', recruit: 'r-pell' } });
+    expect(validateClientEvent({ type: 'crew', action: { do: 'bail', recruit: 'r-pell' } })).toEqual({ type: 'crew', action: { do: 'bail', recruit: 'r-pell' } });
+  });
+  it('learn, slot and unslot pass with their ability (crew abilities spec §4)', () => {
+    const ok = (action: object) => expect(validateClientEvent({ type: 'crew', action })).toEqual({ type: 'crew', action });
+    ok({ do: 'learn', recruit: 'r-pell', ability: 'spoof', grade: 2 });
+    ok({ do: 'slot', recruit: 'r-pell', ability: 'spoof' });
+    ok({ do: 'slot', recruit: 'r-pell', ability: 'spoof', out: 'log-wipe' });
+    ok({ do: 'unslot', recruit: 'r-pell', ability: 'spoof' });
+    expect(validateClientEvent({ type: 'crew', action: { do: 'slot', recruit: 'r-pell' } })).toBe("crew slot needs a string 'ability'");
+    expect(validateClientEvent({ type: 'crew', action: { do: 'learn', recruit: 'r-pell', ability: 'spoof', grade: 7 } })).toBe('crew learn needs a grade 0–3');
+    expect(validateClientEvent({ type: 'crew', action: { do: 'slot', recruit: 'r-pell', ability: 'spoof', out: 5 } })).toBe("crew slot's 'out' must be a string");
   });
 });

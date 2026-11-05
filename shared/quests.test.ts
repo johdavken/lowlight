@@ -101,9 +101,9 @@ describe('parseQuestFile', () => {
   it('reads choices and their tags', () => {
     const q = ok(TRAIL);
     expect(q.beats.get('sentinel')![0].choices).toEqual([
-      { id: 'hand', line: 'Hand it over.', to: 'given', fail: null, check: null, crack: null, gig: null, close: null, tags: [{ kind: 'set', name: 'ledger', value: 'given' }] },
-      { id: 'stall', line: 'Stall him till morning.', to: 'stalled', fail: null, check: null, crack: null, gig: null, close: null, tags: [{ kind: 'clock', minutes: 360 }] },
-      { id: 'deny', line: "Say there's no ledger.", to: 'denied', fail: null, check: null, crack: null, gig: null, close: null, tags: [{ kind: 'needs', all: [{ kind: 'band', axis: 'trust', op: '>=', band: 'mid' }] }] },
+      { id: 'hand', line: 'Hand it over.', to: 'given', fail: null, check: null, crack: null, tags: [{ kind: 'set', name: 'ledger', value: 'given' }] },
+      { id: 'stall', line: 'Stall him till morning.', to: 'stalled', fail: null, check: null, crack: null, tags: [{ kind: 'clock', minutes: 360 }] },
+      { id: 'deny', line: "Say there's no ledger.", to: 'denied', fail: null, check: null, crack: null, tags: [{ kind: 'needs', all: [{ kind: 'band', axis: 'trust', op: '>=', band: 'mid' }] }] },
     ]);
     expect(q.beats.get('return')![0].choices[0].tags).toEqual([
       { kind: 'set', name: 'intake_ledger', value: 'faced' },
@@ -332,7 +332,9 @@ describe('beat variants', () => {
     expect(chooseVariant(q, 'return', ctx())).toMatchObject({ variant: 1 });
     expect(chooseVariant(q, 'nope', ctx())).toBeNull();
     expect(beatAt(q, 'return', 1)!.text).toBe('*Venn is back.*');
-    expect(beatAt(q, 'return', 5)).toBeUndefined();
+    // A save from before a rewrite (fewer versions now) gets the default version.
+    expect(beatAt(q, 'return', 5)!.text).toBe('*Venn is back.*');
+    expect(beatAt(q, 'nope', 0)).toBeUndefined();
   });
   it("an outcome reached only from a variant isn't an orphan", () => {
     expect(fields(VARIANTS)).toEqual([]);

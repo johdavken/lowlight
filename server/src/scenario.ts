@@ -3,6 +3,9 @@
  * the one-off, non-streaming call to her model that runs it.
  */
 import { parse as parseYaml } from 'yaml';
+import { anthropicComplete } from './anthropic';
+import type { AnthropicUsage } from './anthropic-convert';
+import type { AnthropicRoute } from './model-route';
 import type { NarratorKind } from '../../shared/narrator';
 import type { NarratorThinking } from '../../shared/types';
 import type { CompletionMessage } from './turn';
@@ -14,7 +17,7 @@ const cutSteer = (s: string) => (s.length > SUGGEST_STEER_MAX ? `${s.slice(0, SU
 
 /** The narrator's instructions (spec §2, exact). */
 export const NARRATOR_SYSTEM =
-  'You write openings for a roleplay in Lowlight. Write one opening for a first scene between these two people, in the third person and present tense: a title of at most 40 characters and two or three sentences of at most 600 characters. Use only the places and facts given. Never write what the user does, says or feels. If the user says what they want the opening to be, build it from that. Answer only with a JSON object {"title","text"}.';
+  'You write openings for a roleplay in Lowlight. Write three openings for a first scene between these two people, one of each kind, in this order. First, "history": something already between these two comes up — use what is given about them; if nothing ties them, how they have heard of each other. Second, "business": one of them needs something from the other tonight. Third, "chance": the place itself throws them together. Each in the third person and present tense, with a title of at most 40 characters and two or three sentences of at most 600 characters. Use only the places and facts given. Never write what the user does, says or feels. If the user says what they want the opening to be, build all three from that. Answer only with a JSON array of three {"kind","title","text"} objects in that order, where kind is "history", "business" or "chance".';
 export const NARRATOR_TEMPERATURE = 0.9;
 export const NARRATOR_MAX_TOKENS = 900;
 /** How long one narrator request may take before it's given up (each of the route's two tries). */
@@ -69,7 +72,7 @@ export function forgetThinkingRefusals(): void {
   mustThink.clear();
 }
 
-/** The narrator's request: the room (with what its art shows), the lore there, who you are and who she is (her public file only). */
+/** The narrator's request: the room (with what its art shows), the lore there, who you are and who she is (her public file only), and what's between you. */
 export function scenePrompt(o: {
   room: { name: string; art: string | null; timeOfDay: string | null; weather: string | null };
   lore: string | null;
@@ -78,6 +81,10 @@ export function scenePrompt(o: {
   /** The player's name, and what they typed in the box (arrival screen spec §3): null for none. */
   player: string;
   steer: string | null;
+  /** What's already between them: her note on him (the player's `knows`, written to her as "you"); null: they haven't met. */
+  tie?: string | null;
+  /** Her name, to say whose note the tie is. */
+  herName?: string;
 }): CompletionMessage[] {
   const when = [o.room.timeOfDay, o.room.weather && o.room.weather !== 'none' ? o.room.weather : null].filter(Boolean).join(', ');
   const facts = [
@@ -86,6 +93,7 @@ export function scenePrompt(o: {
     o.lore,
     `The user's character:\n${o.you}`,
     `The other character:\n${o.her}`,
+    o.tie ? `What's already between them, in ${o.herName ?? 'the other character'}'s own note on ${o.player} (written to her, so "you" there is ${o.herName ?? 'her'}): ${oneLine(o.tie)}` : "They haven't met.",
     o.steer ? `What ${o.player} wants the opening to be: ${cutSteer(oneLine(o.steer))}` : null,
   ].filter((x): x is string => Boolean(x));
   return [
@@ -112,6 +120,11 @@ type CompleteOptions = {
   timeoutMs?: number;
   /** Aborts the request early (the caller no longer wants the answer). */
   signal?: AbortSignal;
+  /** Her model routes to the player's Anthropic key (Anthropic backend spec §3): `baseUrl`/`apiKey` are unused then. */
+  route?: AnthropicRoute;
+  anthropicBaseUrl?: string;
+  /** What an Anthropic call cost, cache included (the dev log). */
+  onUsage?: (u: AnthropicUsage) => void;
 };
 
 /** Why the first call should be asked again with thinking allowed: it was refused for it, or cut off by it. */
@@ -124,6 +137,20 @@ export async function completeOnce(o: CompleteOptions): Promise<string> {
 
 /** completeOnce, plus the tokens the provider counted (null when it didn't say): the Residual logs them. */
 export async function completeOnceWithUsage(o: CompleteOptions): Promise<{ text: string; tokensIn: number | null; tokensOut: number | null }> {
+  // Claude can't think less than low: off and auto are low, and there's no reasoning-mandatory retry.
+  if (o.route)
+    return anthropicComplete({
+      key: o.route.key,
+      native: o.route.native,
+      messages: o.messages,
+      maxTokens: o.maxTokens,
+      effort: o.thinking === 'medium' ? 'medium' : 'low',
+      timeoutMs: o.timeoutMs ?? NARRATOR_TIMEOUT_MS,
+      ...(o.signal ? { signal: o.signal } : {}),
+      ...(o.anthropicBaseUrl ? { baseUrl: o.anthropicBaseUrl } : {}),
+      ...(o.fetchImpl ? { fetchImpl: o.fetchImpl } : {}),
+      ...(o.onUsage ? { onUsage: o.onUsage } : {}),
+    });
   switch (o.thinking) {
     case undefined:
       return callOnce(o, undefined, o.maxTokens, false);

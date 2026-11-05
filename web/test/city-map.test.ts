@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CityMapData } from '../../shared/map-schema';
-import { CityMap, hereFor, type WhoIsWhere } from '../src/ui/map/city-map';
+import { CityMap, hereFor, NEAR_SCALE, pinSize, tagSize, type WhoIsWhere } from '../src/ui/map/city-map';
 import type { Frame } from '../src/ui/map/camera';
 import { setHerPronoun } from '../src/room/her-copy';
 
@@ -41,7 +41,8 @@ const who = (here?: string, extra: Partial<WhoIsWhere> = {}): WhoIsWhere => ({
 
 let host: HTMLElement;
 let cm: CityMap;
-let frames: (Frame | null)[];
+let frames: Frame[];
+let focused: (string | null)[];
 let cues: string[];
 let travel = vi.fn<(placeId: string) => void>();
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = host) => root.querySelector<T>(sel);
@@ -50,12 +51,12 @@ const click = (el: Element | null) => el!.dispatchEvent(new MouseEvent('click', 
 const hover = (el: Element | null, on: boolean) => el!.dispatchEvent(new MouseEvent(on ? 'mouseenter' : 'mouseleave'));
 const label = (id: string) => host.querySelector<SVGTextElement>(`svg.city-names text.dname[data-id="${id}"]`);
 const pin = (id: string) => $(`.pin[data-place="${id}"]`);
-const bandTiles = () => $$('.map-band .map-bt.dist:not(.open) .nm').map((n) => n.textContent);
 
 beforeEach(() => {
   host = document.createElement('div');
   document.body.append(host);
   frames = [];
+  focused = [];
   cues = [];
   travel = vi.fn<(placeId: string) => void>();
 });
@@ -65,41 +66,29 @@ afterEach(() => {
 });
 
 function mount(here?: string, extra: Partial<WhoIsWhere> = {}, m = map(), opts: { reducedMotion?: boolean; overlay?: HTMLElement } = {}) {
-  cm = new CityMap(host, { onTravel: travel, onFrame: (f) => frames.push(f), onCue: (c) => cues.push(c), ...opts });
+  cm = new CityMap(host, { onTravel: travel, onZoomTo: (f) => frames.push(f), onFocus: (p) => focused.push(p?.id ?? null), onCue: (c) => cues.push(c), ...opts });
   cm.render(m, who(here, extra));
   return m;
 }
 
 describe('CityMap', () => {
-  it('opens where you are, with your place on file', () => {
+  it('opens with no card, every pin drawn, no band or heading (map pins spec §1)', () => {
     mount('b1');
-    expect(cm.openId).toBe('b');
-    expect(cm.openPlace).toBe('b1');
-    expect($('.map-heading .t')!.textContent).toBe('BEE');
-    expect($('.map-heading .s')!.textContent).toBe('Area B');
-    expect($('.map-strip .t')!.textContent).toBe('B ONE');
-    expect(frames.at(-1)).not.toBeNull();
-    expect($$('.pin.here')).toHaveLength(1);
-    expect(cues).toEqual([]);
-  });
-
-  it('opens at the city when you are not on the map: the band lists districts, no heading, no strip', () => {
-    mount(undefined);
-    expect(cm.openId).toBeNull();
-    expect(bandTiles()).toEqual(['AYE', 'BEE']);
-    expect($('.map-heading')).toBeNull();
+    expect(cm.focus).toBeNull();
+    expect($$('.pin').map((p) => p.dataset.place)).toEqual(['a1', 'a2', 'b1']);
+    expect(pin('b1')!.classList.contains('here')).toBe(true);
     expect($('.map-strip')).toBeNull();
-    expect(frames.at(-1)).toBeNull();
-    expect(cm.focus).toBe('a');
+    expect($('.map-band')).toBeNull();
+    expect($('.map-heading')).toBeNull();
   });
 
-  it('shows districts with places as openable, the rest as labels only', () => {
+  it('shows districts with places as clickable, the rest as labels only', () => {
     mount();
     expect(label('a')!.classList.contains('has')).toBe(true);
     expect(label('c')!.classList.contains('has')).toBe(false);
     expect($$('path.dpoly.has')).toHaveLength(2);
     click(label('c'));
-    expect(cm.openId).toBeNull();
+    expect(frames).toEqual([]);
   });
 
   it('prints each name along its path, with no area line or old label (district names spec §2)', () => {
@@ -116,228 +105,266 @@ describe('CityMap', () => {
   });
 
   it.each([
-    ['its band tile', () => $('.map-bt.dist[data-id="a"]')],
-    ['its border', () => $('path.dpoly.has[data-id="a"]')],
     ['its name', () => label('a')],
-  ])('%s opens a district: confirm cue, numbered pins, other pins at full strength', (_n, target) => {
+    ['its border', () => $('path.dpoly.has[data-id="a"]')],
+  ])('%s asks the camera to frame the district (map pins spec §3), with the confirm cue', (_n, target) => {
     mount();
     click(target());
-    expect(cm.openId).toBe('a');
-    expect(cm.openPlace).toBe('a1');
+    expect(frames).toHaveLength(1);
+    expect(frames[0]).toMatchObject({ x0: expect.any(Number), x1: expect.any(Number) });
+    expect(frames[0].x0).toBeLessThan(7);
+    expect(frames[0].x1).toBeGreaterThan(9);
     expect(cues).toEqual(['confirm']);
-    expect(frames.at(-1)).toMatchObject({ x0: expect.any(Number) });
-    expect($$('.pin .map-ntag .n').map((n) => n.textContent)).toEqual(['01', '02']);
-    expect($$('.pin.faded')).toHaveLength(0);
-    // The open district's name stays (district names spec §3).
-    expect(label('a')!.classList.contains('hide')).toBe(false);
-    expect($$('path.dpoly.dim').map((p) => p.dataset.id)).toEqual(['b']);
+    // Nothing else changes: no card, every pin as it was.
+    expect(cm.focus).toBeNull();
   });
 
-  it('a pin in another district shows its name on hover, without a number (spec 2026-10-28 §1)', () => {
+  it('GO rides on the picked pin\'s tag, not the card, and moves with the pick', () => {
     mount('a1');
-    hover(pin('b1'), true);
-    expect(pin('b1')!.classList.contains('on')).toBe(true);
-    expect(pin('b1')!.querySelector('.map-ntag.full .nm')!.textContent).toBe('B one');
-    expect(pin('b1')!.querySelector('.map-ntag .n')).toBeNull();
-    expect(cm.openId).toBe('a');
-    hover(pin('b1'), false);
-    expect(pin('b1')!.classList.contains('on')).toBe(false);
-    expect(pin('b1')!.querySelector('.map-ntag.full')).toBeNull();
+    click(pin('b1'));
+    expect($('.map-strip .go')).toBeNull();
+    expect($$('.map-go')).toHaveLength(1);
+    expect($('.map-go', pin('b1')!.querySelector('.map-ntag')!)!.textContent).toBe('GO');
+    click($('.map-go .go'));
+    expect(travel).toHaveBeenLastCalledWith('b1');
+    click(pin('a1'));
+    expect($$('.map-go')).toHaveLength(1);
+    expect($<HTMLButtonElement>('.map-go .go', pin('a1')!)!.disabled).toBe(true);
   });
 
-  it('at the city a pin shows its own name on hover and still lights its district', () => {
+  it("the card shows the place's readout as dossier lines; none without one", () => {
+    const m = map();
+    m.places[0] = { ...m.places[0], readout: [{ label: 'WHAT', text: 'A bar.' }, { label: 'WATCH FOR', text: 'The door.' }] };
+    mount('a1', {}, m);
+    click(pin('a1'));
+    expect($$('.map-strip .readout dt').map((d) => d.textContent)).toEqual(['WHAT', 'WATCH FOR']);
+    expect($$('.map-strip .readout dd').map((d) => d.textContent)).toEqual(['A bar.', 'The door.']);
+    click(pin('b1'));
+    expect($('.map-strip .readout')).toBeNull();
+  });
+
+  it('a pin click opens its card (name, district, who is there) and lights its tag', () => {
+    mount('a1');
+    click(pin('a1'));
+    expect(cm.focus).toBe('a1');
+    expect(focused).toEqual(['a1']);
+    expect($('.map-strip .t')!.textContent).toBe('A ONE');
+    expect($('.map-strip .s')!.textContent).toBe('AYE');
+    expect(pin('a1')!.classList.contains('focus')).toBe(true);
+    expect(pin('a1')!.classList.contains('on')).toBe(true);
+    click(pin('b1'));
+    expect(cm.focus).toBe('b1');
+    expect(pin('a1')!.classList.contains('focus')).toBe(false);
+    expect($$('.map-strip')).toHaveLength(1);
+  });
+
+  it('a place on the right half has its card on the left', () => {
+    const m = map();
+    m.places.push({ id: 'r1', name: 'R one', district: 'b', pin: [80, 50], scene: 'p/r1' });
+    mount(undefined, {}, m);
+    click(pin('r1'));
+    expect($('.map-strip')!.classList.contains('left')).toBe(true);
+    click(pin('a1'));
+    expect($('.map-strip')!.classList.contains('left')).toBe(false);
+  });
+
+  it('the card stands away from where the pin is on screen, not on the map (review I1)', () => {
+    const overlay = document.createElement('div');
+    document.body.append(overlay);
+    mount(undefined, {}, map(), { overlay });
+    overlay.querySelector<HTMLElement>('.map-overlay')!.getBoundingClientRect = () => ({ left: 0, top: 0, right: 1600, bottom: 900, width: 1600, height: 900, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    // a1 is at map x 7 %, but zoomed in it sits on the screen's right.
+    pin('a1')!.getBoundingClientRect = () => ({ left: 1200, top: 400, right: 1200, bottom: 400, width: 0, height: 0, x: 1200, y: 400, toJSON: () => ({}) }) as DOMRect;
+    click(pin('a1'));
+    expect(overlay.querySelector('.map-strip')!.classList.contains('left')).toBe(true);
+    pin('b1')!.getBoundingClientRect = () => ({ left: 300, top: 400, right: 300, bottom: 400, width: 0, height: 0, x: 300, y: 400, toJSON: () => ({}) }) as DOMRect;
+    click(pin('b1'));
+    expect(overlay.querySelector('.map-strip')!.classList.contains('left')).toBe(false);
+    cm.dispose();
+    overlay.remove();
+  });
+
+  it('every pin has a finger-sized target that does not shrink with the zoom (review I2)', () => {
+    mount();
+    expect($$('.pin > .hit')).toHaveLength(3);
+  });
+
+  it('every tag carries the full name, with faces (or a dot) of who is at the pin', () => {
+    mount('a1');
+    expect(pin('a1')!.querySelector('.map-ntag .nm')!.textContent).toBe('A one');
+    expect(pin('b1')!.querySelector('.map-ntag .nm')!.textContent).toBe('B one');
+    const faces = pin('a1')!.querySelector('.map-ntag .faces')!;
+    // Hicks has no face: a dot in his colour; Nix has one.
+    expect(faces.querySelector('b')).not.toBeNull();
+    expect(faces.querySelector('img.pface')!.getAttribute('src')).toBe('/nix.png');
+    expect(pin('a1')!.classList.contains('peopled')).toBe(true);
+    expect(pin('a2')!.classList.contains('peopled')).toBe(false);
+  });
+
+  it('far out a dot per person sits beside the pin (map pins spec §2)', () => {
+    mount('a1');
+    expect($$('.who b', pin('a1')!).map((b) => b.style.getPropertyValue('--c'))).toEqual(['#7fe9ff', '#ff4f8b']);
+    expect(pin('a2')!.querySelector('.who')).toBeNull();
+  });
+
+  it('setScale: far below NEAR_SCALE, near from it; pins and tags size with the zoom', () => {
+    mount('a1');
+    const root = $('.city-map')!;
+    cm.setScale(1);
+    expect(root.classList.contains('far')).toBe(true);
+    expect(Number(root.style.getPropertyValue('--pz'))).toBeCloseTo(pinSize(1));
+    cm.setScale(NEAR_SCALE);
+    expect(root.classList.contains('far')).toBe(false);
+    cm.setScale(3);
+    expect(Number(root.style.getPropertyValue('--pz'))).toBeGreaterThan(pinSize(1));
+    expect(Number(root.style.getPropertyValue('--tz'))).toBeGreaterThan(tagSize(NEAR_SCALE));
+  });
+
+  it('hover lights the pin (its name shows far out) and its district border', () => {
     mount();
     hover(pin('a1'), true);
     expect(pin('a1')!.classList.contains('on')).toBe(true);
-    expect(pin('a1')!.querySelector('.map-ntag.full .nm')!.textContent).toBe('A one');
     expect($('path.dpoly[data-id="a"]')!.classList.contains('open')).toBe(true);
-  });
-
-  it("a focus move leaves another district's hovered pin lit (Review Focus 5)", () => {
-    mount('a1');
-    hover(pin('b1'), true);
-    cm.move(1);
-    expect(pin('b1')!.classList.contains('on')).toBe(true);
+    hover(pin('a1'), false);
     expect(pin('a1')!.classList.contains('on')).toBe(false);
+    expect($('path.dpoly[data-id="a"]')!.classList.contains('open')).toBe(false);
   });
 
-  it('a pin click opens its district with that place on file', () => {
-    mount();
-    click(pin('a2'));
-    expect(cm.openId).toBe('a');
-    expect(cm.openPlace).toBe('a2');
-    expect($('.map-strip .t')!.textContent).toBe('A TWO');
+  describe('crowded tags (map pins spec §2)', () => {
+    // jsdom lays nothing out: each tag gets a box, a1's and a2's overlapping, b1's clear.
+    const boxes: Record<string, [number, number, number, number]> = { a1: [100, 100, 200, 120], a2: [150, 110, 250, 130], b1: [400, 100, 500, 120] };
+    const lay = () => {
+      for (const [id, [l, t, r, b]] of Object.entries(boxes)) {
+        const tag = pin(id)!.querySelector('.map-ntag')!;
+        tag.getBoundingClientRect = () => ({ left: l, top: t, right: r, bottom: b, width: r - l, height: b - t, x: l, y: t, toJSON: () => ({}) }) as DOMRect;
+      }
+      cm.layoutTags();
+    };
+    const crowded = () => $$('.pin.crowded').map((p) => p.dataset.place);
+
+    it('far out nothing is crowded (tags show on hover only)', () => {
+      mount();
+      cm.setScale(1);
+      lay();
+      expect(crowded()).toEqual([]);
+    });
+
+    it('near, the later of two overlapping tags hides; yours wins over map order', () => {
+      mount();
+      cm.setScale(2);
+      lay();
+      expect(crowded()).toEqual(['a2']);
+      cm.dispose();
+      host.replaceChildren();
+      mount('a2');
+      cm.setScale(2);
+      lay();
+      expect(crowded()).toEqual(['a1']);
+    });
+
+    it('zooming back out clears the crowding at once (review M4)', () => {
+      mount();
+      cm.setScale(2);
+      lay();
+      expect(crowded()).toEqual(['a2']);
+      cm.setScale(1);
+      expect(crowded()).toEqual([]);
+    });
+
+    it('hovering a pin lights it without reshuffling the other tags (review M6)', () => {
+      mount();
+      cm.setScale(2);
+      lay();
+      hover(pin('a2'), true);
+      expect(pin('a2')!.classList.contains('on')).toBe(true);
+      lay();
+      expect(crowded()).toEqual(['a2']);
+    });
+
+    it('a place with people wins over one without; the card wins over the rest', () => {
+      mount(undefined, { people: [{ place: 'a2', id: 'nix', name: 'Nix', role: 'contact', accent: '#ff4f8b', face: null }] });
+      cm.setScale(2);
+      lay();
+      expect(crowded()).toEqual(['a1']);
+      cm.dispose();
+      host.replaceChildren();
+      mount();
+      cm.setScale(2);
+      click(pin('a2'));
+      lay();
+      expect(crowded()).toEqual(['a1']);
+    });
   });
 
-  it('move() walks the places and wraps; only the focused pin shows its name', () => {
-    mount('a1');
+  it('move() walks every place district by district and wraps; from none it starts at yours', () => {
+    mount('a2');
     cm.move(1);
-    expect(cm.openPlace).toBe('a2');
-    expect($('.map-strip .t')!.textContent).toBe('A TWO');
-    expect($$('.pin .map-ntag.full').map((t) => t.closest<HTMLElement>('.pin')!.dataset.place)).toEqual(['a2']);
-    expect($$('.map-bt.place.focus').map((t) => t.dataset.place)).toEqual(['a2']);
+    expect(cm.focus).toBe('a2');
     cm.move(1);
-    expect(cm.openPlace).toBe('a1');
+    expect(cm.focus).toBe('b1');
+    cm.move(1);
+    expect(cm.focus).toBe('a1');
     cm.move(-1);
-    expect(cm.openPlace).toBe('a2');
-    expect(cues).toEqual(['move', 'move', 'move']);
+    expect(cm.focus).toBe('b1');
+    expect(cues).toEqual(['move', 'move', 'move', 'move']);
   });
 
-  it('move() at the city walks the district tiles', () => {
-    mount();
-    cm.move(1);
-    expect(cm.focus).toBe('b');
-    expect($$('.map-bt.dist.focus').map((t) => t.dataset.id)).toEqual(['b']);
-    cm.move(1);
-    expect(cm.focus).toBe('a');
-  });
-
-  it('a focus change keeps the band (its tiles do not print again)', () => {
+  it('enter() travels to the place whose card is open, once; nothing without a card', () => {
     mount('a1');
-    const band = $('.map-band');
-    cm.move(1);
-    expect($('.map-band')).toBe(band);
-  });
-
-  it('hovering a place tile shows its pin name; leaving hides it unless focused', () => {
-    mount('a1');
-    hover($('.map-bt.place[data-place="a2"]'), true);
-    expect(pin('a2')!.querySelector('.map-ntag')!.classList.contains('full')).toBe(true);
-    hover($('.map-bt.place[data-place="a2"]'), false);
-    expect(pin('a2')!.querySelector('.map-ntag')!.classList.contains('full')).toBe(false);
-    expect(pin('a1')!.querySelector('.map-ntag')!.classList.contains('full')).toBe(true);
-  });
-
-  it('hovering a place tile or pin leaves the file strip as it is (it prints only on a focus change)', () => {
-    mount('a1');
-    const strip = $('.map-strip');
-    hover($('.map-bt.place[data-place="a2"]'), true);
-    hover(pin('a2'), true);
-    hover(pin('a2'), false);
-    expect($('.map-strip')).toBe(strip);
-  });
-
-  it('at the city, hovering a pin lights its district border', () => {
-    mount();
-    hover(pin('b1'), true);
-    expect($('path.dpoly[data-id="b"]')!.classList.contains('open')).toBe(true);
-    hover(pin('b1'), false);
-    expect($('path.dpoly[data-id="b"]')!.classList.contains('open')).toBe(false);
-  });
-
-  it('at the city, hovering a district tile lights its border', () => {
-    mount();
-    hover($('.map-bt.dist[data-id="b"]'), true);
-    expect($('path.dpoly[data-id="b"]')!.classList.contains('open')).toBe(true);
-    hover($('.map-bt.dist[data-id="b"]'), false);
-    expect($('path.dpoly[data-id="b"]')!.classList.contains('open')).toBe(false);
-  });
-
-  it('enter() at the city opens the focused district', () => {
-    mount();
+    expect(cm.enter()).toBe(false);
+    click(pin('b1'));
     expect(cm.enter()).toBe(true);
-    expect(cm.openId).toBe('a');
-  });
-
-  it('enter() in a district travels to the focused place, once', () => {
-    mount('a1');
-    cm.openDistrict('b');
-    expect(cm.enter()).toBe(true);
-    expect(travel).toHaveBeenCalledTimes(1);
     expect(travel).toHaveBeenCalledWith('b1');
   });
 
-  it.each([
-    ['where you are', 'a1', {}, map()],
-    ['with no room', 'a2', {}, map()],
-    ['while she replies', 'b1', { busy: true }, map()],
-    ['at an invite-only place', 'b1', {}, (() => { const m = map(); m.places[2].inviteOnly = true; return m; })()],
-  ] as const)('enter() does not travel %s (Review Focus 4)', (_n, place, extra, m) => {
-    mount('a1', extra, m);
-    cm.openDistrict(m.places.find((p) => p.id === place)!.district, place);
-    expect(cm.enter()).toBe(false);
-    expect(travel).not.toHaveBeenCalled();
-  });
-
-  it('handleEscape() goes back to the city with that district focused, then reports nothing', () => {
-    mount('b1');
+  it('handleEscape() closes the card and says so; with none it reports nothing', () => {
+    mount('a1');
+    click(pin('a1'));
     expect(cm.handleEscape()).toBe(true);
-    expect(cm.openId).toBeNull();
-    expect(cm.focus).toBe('b');
-    expect(frames.at(-1)).toBeNull();
+    expect(cm.focus).toBeNull();
+    expect($('.map-strip')).toBeNull();
+    expect(focused.at(-1)).toBeNull();
     expect(cm.handleEscape()).toBe(false);
   });
 
-  it('puts the file strip on the left for a district in the map\'s right half, so the camera keeps it clear', () => {
-    const m = map();
-    m.places[2].pin = [80, 7];
-    mount('a1', {}, m);
-    expect($('.map-strip')!.classList.contains('left')).toBe(false);
-    cm.openDistrict('b');
-    expect($('.map-strip')!.classList.contains('left')).toBe(true);
-    cm.move(1);
-    expect($('.map-strip')!.classList.contains('left')).toBe(true);
+  it('select(null) closes the card (a click on the map)', () => {
+    mount();
+    click(pin('a1'));
+    cm.select(null);
+    expect($('.map-strip')).toBeNull();
   });
 
-  it('the ◂ LOWLIGHT tile goes back to the city', () => {
-    mount('a1');
-    click($('.map-back'));
-    expect(cm.openId).toBeNull();
-    expect(bandTiles()).toEqual(['AYE', 'BEE']);
-  });
-
-  it('update() keeps the open district and focus', () => {
-    mount('a1');
-    cm.move(1);
-    const m = map();
-    m.districts[0].name = 'Aye two';
+  it('update() keeps the card while its place exists, else closes it', () => {
+    const m = mount('a1');
+    click(pin('a2'));
     cm.update(m, who('a1'));
-    expect(cm.openId).toBe('a');
-    expect(cm.openPlace).toBe('a2');
-    expect($('.map-heading .t')!.textContent).toBe('AYE TWO');
+    expect(cm.focus).toBe('a2');
+    cm.update({ ...m, places: m.places.filter((p) => p.id !== 'a2') }, who('a1'));
+    expect(cm.focus).toBeNull();
+    expect($('.map-strip')).toBeNull();
   });
 
-  it('update() goes to the city when the open district is gone (Review Focus 5)', () => {
-    mount('b1');
-    const m = map();
-    m.districts.splice(1, 1);
-    m.places.splice(2, 1);
-    expect(() => cm.update(m, who())).not.toThrow();
-    expect(cm.openId).toBeNull();
-    expect(label('b')).toBeNull();
-    expect(frames.at(-1)).toBeNull();
-  });
-
-  it('update() refocuses the first place when the focused one is gone (Review Focus 5)', () => {
+  it('clear() empties the map and forgets the card', () => {
     mount('a1');
-    cm.move(1);
-    const m = map();
-    m.places.splice(1, 1);
-    expect(() => cm.update(m, who('a1'))).not.toThrow();
-    expect(cm.openPlace).toBe('a1');
-  });
-
-  it('clear() empties the map and forgets what was open', () => {
-    mount('a1');
+    click(pin('a1'));
     cm.clear();
-    expect(cm.openId).toBeNull();
+    expect(cm.focus).toBeNull();
     expect($('.pin')).toBeNull();
-    expect($('.map-band')).toBeNull();
+    expect($('.map-strip')).toBeNull();
   });
 
   it('marks itself still under reduced motion (no printing)', () => {
-    mount('a1', {}, map(), { reducedMotion: true });
-    expect($$('.city-map.map-still').length).toBeGreaterThan(0);
+    mount(undefined, {}, map(), { reducedMotion: true });
+    expect($('.city-map')!.classList.contains('map-still')).toBe(true);
   });
 
-  it('with an overlay host, the heading, band and strip go there and the pins stay in the world', () => {
+  it('with an overlay host the card goes there and the pins stay in the world', () => {
     const overlay = document.createElement('div');
     document.body.append(overlay);
     mount('a1', {}, map(), { overlay });
-    expect($('.map-band', overlay)).not.toBeNull();
-    expect($('.map-strip', overlay)).not.toBeNull();
-    expect($('.map-heading', overlay)).not.toBeNull();
-    expect($('.map-band')).toBeNull();
+    click(pin('a1'));
+    expect(overlay.querySelector('.map-strip')).not.toBeNull();
+    expect($('.map-strip')).toBeNull();
     expect($('.pin')).not.toBeNull();
     cm.dispose();
     expect(overlay.childElementCount).toBe(0);
@@ -388,10 +415,14 @@ describe('CityMap', () => {
     expect(hereFor(m, 'p/nowhere', exits, inside)).toBeUndefined();
   });
 
-  it('move() in a one-place district plays no cue (nothing moves)', () => {
-    mount('b1');
+  it('move() with one place plays no cue (nothing moves)', () => {
+    const m = map();
+    m.places = [m.places[0]];
+    mount('a1', {}, m);
     cm.move(1);
-    expect(cues).toEqual([]);
+    expect(cues).toEqual(['move']);
+    cm.move(1);
+    expect(cues).toEqual(['move']);
   });
 
   it('pins carry no browser tooltip (the name tag shows the name)', () => {
@@ -408,44 +439,16 @@ describe('CityMap', () => {
       expect(pin('a2')!.querySelector('.sub')).toBeNull();
     });
 
-    it('drops the list down under the tag while the pin is lit, nested by the way in', () => {
+    it('drops the list down under the tag while its card is open, nested by the way in', () => {
       mount('a1', { inside });
+      expect($$('.pin.focus .map-inside')).toHaveLength(0);
+      click(pin('a1'));
       expect($$('.pin.focus .map-inside')).toHaveLength(1);
       const rows = $$('.map-inside li', pin('a1')!);
       expect(rows.map((r) => r.querySelector('.nm')!.textContent)).toEqual(['Back Room', 'Cellar']);
       expect(rows.map((r) => r.dataset.depth)).toEqual(['1', '2']);
-      cm.move(1);
-      expect($$('.pin.focus .map-inside')).toHaveLength(0);
-    });
-
-    it('shows one list at a time: the focused pin\'s, not a hovered one\'s', () => {
-      mount('a1', { inside: { ...inside, a2: [{ room: 'p/attic', name: 'Attic', inside: [] }] } });
-      hover(pin('a2'), true);
-      expect(pin('a2')!.classList.contains('on')).toBe(true);
-      expect($$('.pin.focus .map-inside')).toHaveLength(1);
-      expect(pin('a1')!.classList.contains('focus')).toBe(true);
-      cm.move(1);
-      expect(pin('a2')!.classList.contains('focus')).toBe(true);
+      click(pin('a2'));
       expect(pin('a1')!.classList.contains('focus')).toBe(false);
-    });
-
-    it('opens a low pin\'s list upward, and one on the file strip\'s side away from the strip', () => {
-      // District A's frame runs y 7–9 and x 7–9; its strip stands on the right (the district is in the map's left half).
-      mount('a1', { inside: { ...inside, a2: [{ room: 'p/attic', name: 'Attic', inside: [] }] } });
-      expect(pin('a1')!.classList.contains('inside-up')).toBe(false);
-      expect(pin('a1')!.classList.contains('inside-left')).toBe(false);
-      expect(pin('a2')!.classList.contains('inside-up')).toBe(true);
-      expect(pin('a2')!.classList.contains('inside-left')).toBe(true);
-    });
-
-    it('a pin in a district on the right opens its list rightward, the strip being on the left', () => {
-      const m = map();
-      m.districts.push({ id: 'r', name: 'Arr', area: 'Area R', label: [80, 10], border: sq(75, 5) });
-      m.places.push({ id: 'r1', name: 'R one', district: 'r', pin: [78, 7], scene: 'p/r1' }, { id: 'r2', name: 'R two', district: 'r', pin: [82, 9], scene: 'p/r2' });
-      mount('r1', { inside: { r2: [{ room: 'p/attic', name: 'Attic', inside: [] }] } }, m);
-      expect($('.map-strip')!.classList.contains('left')).toBe(true);
-      expect(pin('r2')!.classList.contains('inside-up')).toBe(true);
-      expect(pin('r2')!.classList.contains('inside-left')).toBe(false);
     });
 
     it("shows people in a side room on that room's row, not the pin's", () => {
@@ -456,7 +459,7 @@ describe('CityMap', () => {
           { place: 'a1', room: 'p/a1', id: 'hae', name: 'Hae', role: 'fixed', accent: '#ffaa00', face: null },
         ],
       });
-      const tag = pin('a1')!.querySelector('.map-ntag > .in > .dots')!;
+      const tag = pin('a1')!.querySelector('.map-ntag > .in > .faces')!;
       expect(tag.children).toHaveLength(1);
       const back = $$('.map-inside li', pin('a1')!)[0];
       expect(back.querySelectorAll('.dots b')).toHaveLength(1);
@@ -464,6 +467,7 @@ describe('CityMap', () => {
 
     it('is information only: a row has no GO and clicking it travels nowhere', () => {
       mount('a1', { inside });
+      click(pin('a1'));
       const row = $('.map-inside li', pin('a1')!)!;
       expect(row.querySelector('button')).toBeNull();
       click(row);
@@ -475,7 +479,7 @@ describe('CityMap', () => {
 describe('CityMap raised pins (rendered map spec §5)', () => {
   it('a raised pin sits above its ground point with a stem down to it', async () => {
     const { liftPct } = await import('../../shared/map-projection');
-    cm = new CityMap(host, { onTravel: travel, onFrame: (f) => frames.push(f) });
+    cm = new CityMap(host, { onTravel: travel });
     cm.render(map(), who('a1'), { a1: 26.7 });
     expect(parseFloat(pin('a1')!.style.top)).toBeCloseTo(7 - liftPct(26.7), 6);
     const stem = $('.pin-stem[data-place="a1"]')!;
@@ -483,12 +487,12 @@ describe('CityMap raised pins (rendered map spec §5)', () => {
     expect(parseFloat(stem.style.height)).toBeCloseTo(liftPct(26.7), 6);
   });
   it('Level 4 stands above Level 2 at nearby places', () => {
-    cm = new CityMap(host, { onTravel: travel, onFrame: (f) => frames.push(f) });
+    cm = new CityMap(host, { onTravel: travel });
     cm.render(map(), who('a1'), { a1: 26.7, a2: 9.7 });
     expect(parseFloat(pin('a1')!.style.top) - 7).toBeLessThan(parseFloat(pin('a2')!.style.top) - 9);
   });
   it('painting mode: raised places stay on the ground', () => {
-    cm = new CityMap(host, { onTravel: travel, onFrame: (f) => frames.push(f) });
+    cm = new CityMap(host, { onTravel: travel });
     cm.render(map(), who('a1'));
     expect(pin('a1')!.style.top).toBe('7%');
     expect($('.pin-stem')).toBeNull();

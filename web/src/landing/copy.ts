@@ -80,7 +80,24 @@ export const COPY = {
     stripExtra: (p: Pronoun) => `▶ PICK ${forms(p).her.toUpperCase()} TO LINK A MIND`,
     titleLink: 'LINK A MIND',
     titleModel: (p: Pronoun) => `CHOOSE ${forms(p).hers.toUpperCase()} MIND`,
-    linkLine: (last4: string | null, credit: number | null) => `LINK …${last4 ?? '????'}${credit === null ? '' : ` · $${credit.toFixed(2)}`}`,
+    linkLine: (last4: string | null, credit: number | null, provider: 'openrouter' | 'anthropic' = 'openrouter') =>
+      `${provider === 'anthropic' ? 'ANTHROPIC' : 'OPENROUTER'} …${last4 ?? '????'}${credit === null ? '' : ` · $${credit.toFixed(2)}`}`,
+    /** The switch at the top of LINK A MIND, and an unlinked provider's button on the model list. */
+    providers: { openrouter: 'OPENROUTER', anthropic: 'ANTHROPIC' },
+    addLink: (provider: 'openrouter' | 'anthropic') => `+ LINK ${provider === 'anthropic' ? 'ANTHROPIC' : 'OPENROUTER'}`,
+    via: 'via your Anthropic key',
+    /** LINK A MIND on the Anthropic side (Anthropic backend spec §1): Claude models only. */
+    anthropic: {
+      why: 'Claude models only, through your own Anthropic key — Max plan API credits work here. It stays on this machine.',
+      fieldLabel: 'ANTHROPIC KEY',
+      getKey: 'get one → platform.claude.com/settings/keys ↗',
+      href: 'https://platform.claude.com/settings/keys',
+      errors: {
+        'key-rejected': "key rejected — Anthropic didn't accept that key. Check you copied all of it.",
+        unreachable: 'Anthropic unreachable — check your connection.',
+        'bad-key': "that doesn't look like a key — paste the whole thing.",
+      },
+    },
     changeKey: 'CHANGE KEY',
     unlinkFailed: (why: string) => `// COULDN'T UNLINK — ${why}`,
     unlink: 'UNLINK',

@@ -47,6 +47,7 @@ export const saveNow = (id: string, name: string, contactId?: string) =>
 /** Forks the save into a new playthrough, now active. */
 export const loadSave = (saveId: string) => call<PlaythroughInfo>('POST', `${save(saveId)}/load`);
 export const removeSave = (saveId: string) => call<void>('DELETE', save(saveId));
+export const renameSave = (saveId: string, name: string) => call<SaveInfo>('PATCH', save(saveId), { name });
 /** BRANCH HERE: the story from this line of `contactId`'s chat, as a new playthrough, now active. */
 export const branchFrom = (contactId: string, messageId: string) => call<PlaythroughInfo>('POST', '/api/branch', { contactId, messageId });
 /** The contacts the player knows in the active playthrough (§7). */

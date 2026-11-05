@@ -15,13 +15,23 @@ afterEach(() => {
 });
 
 describe('nextScreen', () => {
-  it('YOU → PEOPLE → CREW → MAP → YOU, and back the other way', () => {
+  it('YOU → PEOPLE → TEXTS → QUEST → CREW → MAP → YOU, and back the other way', () => {
     expect(nextScreen('you', 1)).toBe('people');
-    expect(nextScreen('people', 1)).toBe('crew');
+    expect(nextScreen('people', 1)).toBe('texts');
+    expect(nextScreen('texts', 1)).toBe('quest');
+    expect(nextScreen('quest', 1)).toBe('crew');
     expect(nextScreen('crew', 1)).toBe('map');
     expect(nextScreen('map', 1)).toBe('you');
     expect(nextScreen('you', -1)).toBe('map');
+    expect(nextScreen('crew', -1)).toBe('quest');
+    expect(nextScreen('quest', -1)).toBe('texts');
+    expect(nextScreen('texts', -1)).toBe('people');
     expect(nextScreen('people', -1)).toBe('you');
+  });
+  it('skips a screen that is not on the bar (QUEST with nothing to list)', () => {
+    const noQuest = (s: CycleScreen) => s !== 'quest';
+    expect(nextScreen('texts', 1, noQuest)).toBe('crew');
+    expect(nextScreen('crew', -1, noQuest)).toBe('texts');
   });
 });
 
@@ -44,12 +54,12 @@ describe('listenScreenCycle', () => {
     const { go, room, done } = listen({ current: 'people' });
     expect(tab().defaultPrevented).toBe(true);
     tab({ shiftKey: true });
-    expect(go.mock.calls).toEqual([['crew', 1], ['you', -1]]);
+    expect(go.mock.calls).toEqual([['texts', 1], ['you', -1]]);
     expect(room).not.toHaveBeenCalled();
     done();
   });
 
-  it("a screen's own page comes first (YOU: FILE → SHEET), then the next screen (spec 2026-10-28 §3)", () => {
+  it("a screen's own page comes first (YOU: FILE → STATS → STREET → KIT), then the next screen (spec 2026-10-28 §3)", () => {
     let turns = 1;
     const turnPage = vi.fn(() => turns-- > 0);
     const { go, room, done } = listen({ current: 'you', turnPage });

@@ -55,7 +55,7 @@ describe('TEXT SIZE (fixed stage §6)', () => {
     expect(style).toMatch(/\.feed-root\.feed-stage:not\(\.expanded\) \.msg \.text \{[^}]*font-size: calc\(17px \* var\(--text-scale, 1\)\)/);
     expect(style).toMatch(/\.input textarea \{[^}]*font-size: calc\(16px \* var\(--text-scale, 1\)\)/);
     expect(css('web/src/room/people-screen.css')).toMatch(/\.pe-where \{[^}]*calc\(15px \* var\(--text-scale, 1\)\)/);
-    expect(css('web/src/room/people-screen.css')).toMatch(/\.pe-lead-text \{[^}]*calc\(17px \* var\(--text-scale, 1\)\)/);
+    expect(css('web/src/room/quest-list.css')).toMatch(/\.ql-lead-text \{[^}]*calc\(17px \* var\(--text-scale, 1\)\)/);
     expect(style).toMatch(/\.ghost \{[^}]*font-size: 26px/);
     // The briefs a gig is played from (job cards, slip runs, Papers) follow it too.
     expect(css('web/src/ui/gig/gig.css')).toMatch(/\.gig-job-brief \{[^}]*font-size: calc\(12\.5px \* var\(--text-scale, 1\)\)/);

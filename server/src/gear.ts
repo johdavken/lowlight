@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseDecks, type Deck } from '../../shared/gear';
+import { parsePrograms, type Program } from '../../shared/programs';
 import { parseStock, type StockItem } from '../../shared/stock';
 import { parseWords } from '../../shared/crack';
 
@@ -18,6 +19,19 @@ export function loadDecks(dir: string, warn: (m: string) => void): Deck[] {
   const r = parseDecks(text);
   for (const p of r.problems) warn(`decks: ${p}; skipping it`);
   return r.decks;
+}
+
+/** The programs (spec 2026-11-02-programs §1.6) in `dir`/programs.md; each bad block warns and is skipped; a missing file has none. */
+export function loadPrograms(dir: string, warn: (m: string) => void): Program[] {
+  let text: string;
+  try {
+    text = fs.readFileSync(path.join(dir, 'programs.md'), 'utf8');
+  } catch {
+    return [];
+  }
+  const r = parsePrograms(text);
+  for (const p of r.problems) warn(`programs: ${p}; skipping it`);
+  return r.programs;
 }
 
 /** The fixers' stock (small jobs spec §5): world/gear/stock.md; each bad line warns and is skipped; a missing file has none. */

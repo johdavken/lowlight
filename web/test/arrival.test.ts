@@ -13,7 +13,8 @@ const key = (k: string, o: KeyboardEventInit = {}, target: EventTarget = window)
   target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true, ...o }));
 const barWidth = () => parseFloat($('.ar-bar i')!.style.width);
 
-type MakeOpts = { reducedMotion?: boolean; paused?: () => boolean; suggest?: (steer: string | null) => Promise<string>; travel?: ArrivalTravel; preload?: (id: string) => void };
+type Openings = NonNullable<Parameters<typeof createArrival>[1]['openings']>;
+type MakeOpts = { reducedMotion?: boolean; paused?: () => boolean; suggest?: (steer: string | null) => Promise<string>; openings?: Openings; travel?: ArrivalTravel; preload?: (id: string) => void };
 function make(info: DistrictInfo | null = KARASU, o: MakeOpts = {}) {
   const fetchDistrict = vi.fn(async () => info);
   const arrival = createArrival(host, {
@@ -21,6 +22,7 @@ function make(info: DistrictInfo | null = KARASU, o: MakeOpts = {}) {
     fetchDistrict,
     paused: o.paused,
     suggest: o.suggest,
+    ...(o.openings ? { openings: o.openings } : {}),
     ...(o.travel ? { travel: o.travel, moveLine: '*Jo and Nix head from the Tilt to the Low Roller.*' } : {}),
     preload: o.preload,
   });
@@ -632,6 +634,114 @@ describe('arrival screen: SUGGEST', () => {
     const { arrival } = make();
     await toReady(arrival, 'opening');
     expect($('.ar-suggest')).toBeNull();
+  });
+});
+
+describe("arrival screen: the opening's three openings", () => {
+  /** A stand-in for the cards panel: what the screen hands it, and the keys it hears. */
+  function fakeOpenings() {
+    const keys: string[] = [];
+    let destroyed = 0;
+    let h: Parameters<Openings>[2] | null = null;
+    const openings = vi.fn<Openings>((host, _steer, handlers) => {
+      h = handlers;
+      const node = document.createElement('div');
+      node.className = 'fake-cards';
+      host.append(node);
+      return {
+        key: (e) => {
+          keys.push(e.key);
+          return true;
+        },
+        destroy: () => {
+          destroyed++;
+          node.remove();
+        },
+      };
+    });
+    return { openings, keys, h: () => h!, destroyed: () => destroyed };
+  }
+
+  it('SUGGEST or Alt+G opens them over the screen with what is typed as the steer; they have every key', async () => {
+    const f = fakeOpenings();
+    const { arrival } = make(KARASU, { openings: f.openings });
+    await toReady(arrival, 'opening');
+    const sent = vi.fn();
+    arrival.onSend(sent);
+    box()!.value = 'the fence again';
+    key('g', { altKey: true }, box()!);
+    expect(f.openings).toHaveBeenCalledOnce();
+    expect(f.openings.mock.calls[0]![1]).toBe('the fence again');
+    expect($('.ar-stage .fake-cards')).not.toBeNull();
+    expect(document.activeElement).not.toBe(box());
+    // Enter and Esc go to the cards, not the screen: nothing is sent, the screen stays.
+    key('Enter');
+    key('Escape');
+    key('ArrowDown');
+    expect(f.keys).toEqual(['Enter', 'Escape', 'ArrowDown']);
+    expect(sent).not.toHaveBeenCalled();
+    expect(arrival.open).toBe(true);
+    // Browser shortcuts pass (a reload, the bug report's F8); a modified key is no card key (Ctrl+R isn't a paid redraw).
+    const ctrlR = new KeyboardEvent('keydown', { key: 'r', ctrlKey: true, bubbles: true, cancelable: true });
+    window.dispatchEvent(ctrlR);
+    expect(ctrlR.defaultPrevented).toBe(false);
+    const f8 = new KeyboardEvent('keydown', { key: 'F8', bubbles: true, cancelable: true });
+    window.dispatchEvent(f8);
+    expect(f8.defaultPrevented).toBe(false);
+    key('e', { altKey: true });
+    expect(f.keys).toEqual(['Enter', 'Escape', 'ArrowDown']);
+    // A second SUGGEST while they're up opens nothing more.
+    $('.ar-suggest')!.click();
+    expect(f.openings).toHaveBeenCalledOnce();
+  });
+
+  it('start plays a card as if typed and ENTER pressed; before the room is up it says so and nothing goes', async () => {
+    const f = fakeOpenings();
+    const { arrival } = make(KARASU, { openings: f.openings });
+    arrival.setScene('karasu', 'The Tilt');
+    await flush();
+    arrival.setMode('opening');
+    $('.ar-suggest')!.click();
+    expect(f.h().start('Rain on the stair.')).toBe('THE ROOM IS STILL LOADING');
+    expect(arrival.open).toBe(true);
+    arrival.ready();
+    await vi.advanceTimersByTimeAsync(1600);
+    const sent = vi.fn();
+    arrival.onSend(sent);
+    expect(f.h().start('Rain on the stair.')).toBeNull();
+    expect(sent).toHaveBeenCalledWith('Rain on the stair.');
+    expect(arrival.text()).toBe('Rain on the stair.');
+    expect(arrival.open).toBe(false);
+    expect(f.destroyed()).toBe(1);
+  });
+
+  it('edit puts a card in the box; close goes back with the box as it was; the keys are the screen\'s again', async () => {
+    const f = fakeOpenings();
+    const { arrival } = make(KARASU, { openings: f.openings });
+    await toReady(arrival, 'opening');
+    box()!.value = 'mine';
+    $('.ar-suggest')!.click();
+    f.h().close();
+    expect(box()!.value).toBe('mine');
+    expect($('.fake-cards')).toBeNull();
+    expect(document.activeElement).toBe(box());
+    $('.ar-suggest')!.click();
+    f.h().edit('Rain on the stair.');
+    expect(box()!.value).toBe('Rain on the stair.');
+    expect($('.fake-cards')).toBeNull();
+    const sent = vi.fn();
+    arrival.onSend(sent);
+    key('Enter', {}, box()!);
+    expect(sent).toHaveBeenCalledWith('Rain on the stair.');
+  });
+
+  it('the screen closing takes them with it', async () => {
+    const f = fakeOpenings();
+    const { arrival } = make(KARASU, { openings: f.openings });
+    await toReady(arrival, 'opening');
+    $('.ar-suggest')!.click();
+    arrival.close();
+    expect(f.destroyed()).toBe(1);
   });
 });
 

@@ -80,14 +80,14 @@ export function rememberMatch(m: Match): void {
   }
 }
 
-/** Esc with nothing else to close (feed collapsed, dev panel shut) goes back to the dial-in. */
-export function shouldReturnToDialIn(e: KeyboardEvent, s: { feedExpanded: boolean; devPanelOpen: boolean; journalOpen: boolean }): boolean {
-  return e.key === 'Escape' && !e.defaultPrevented && !s.feedExpanded && !s.devPanelOpen && !s.journalOpen;
+/** Esc with nothing else to close (feed collapsed, dev panel shut) opens the pause menu (spec 2026-10-30). */
+export function shouldPause(e: KeyboardEvent, s: { feedExpanded: boolean; devPanelOpen: boolean; journalOpen: boolean }): boolean {
+  return e.key === 'Escape' && !e.repeat && !e.defaultPrevented && !s.feedExpanded && !s.devPanelOpen && !s.journalOpen;
 }
 
-/** The room's chrome hotkeys: Alt+Y you (the sheet), Alt+S save, Alt+C contacts, Alt+L leads, Alt+T title, Alt+H hide the UI. */
-export type ChromeKey = 'you' | 'save' | 'people' | 'contacts' | 'leads' | 'journal' | 'loose' | 'quest' | 'crew' | 'title' | 'hide';
-const CHROME_KEYS: Record<string, ChromeKey> = { KeyY: 'you', KeyS: 'save', KeyP: 'people', KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal', KeyO: 'loose', KeyQ: 'quest', KeyK: 'crew', KeyT: 'title', KeyH: 'hide' };
+/** The room's chrome hotkeys: Alt+Y you (the sheet), Alt+S save, Alt+C contacts, Alt+J journal, Alt+L leads, Alt+O loose ends (those two on QUEST), Alt+X texts, Alt+T title, Alt+H hide the UI. */
+export type ChromeKey = 'you' | 'save' | 'people' | 'contacts' | 'leads' | 'journal' | 'loose' | 'quest' | 'crew' | 'texts' | 'title' | 'hide';
+const CHROME_KEYS: Record<string, ChromeKey> = { KeyY: 'you', KeyS: 'save', KeyP: 'people', KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal', KeyO: 'loose', KeyQ: 'quest', KeyK: 'crew', KeyX: 'texts', KeyT: 'title', KeyH: 'hide' };
 
 /**
  * The chrome action a key asks for: Alt+S, Alt+C or Alt+T (like the prompt's Alt+M), from anywhere,

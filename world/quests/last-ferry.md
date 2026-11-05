@@ -1,12 +1,13 @@
 ---
 title: Last Ferry
+art: last-ferry.webp
 kind: mission
 tier: 1
 with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A man has a seat on tonight's last ferry and a reason to be on it. There's a Sentinel on the Ferry Stairs checking faces.
-pay: 50-110
+pay: 90-110
 minutes: 20
 posts: 20:00-02:00
 trust: 1 / 1
@@ -14,6 +15,7 @@ trust: 1 / 1
 
 # upstairs
 stranger: Ilias — forties, a bag that's already packed, a ticket he keeps checking
+face: local-05
 
 *Ilias has the ticket in his hand and the bag between his feet. The ferry leaves at {time +90m}. He worked six years for a firm that owns his contract and his face, and tonight he means to be on the Isle before anyone counts heads in the morning.*
 
@@ -28,6 +30,7 @@ view nix-direct: He's been a client for a year. You helped him decide; you didn'
 
 # sentinel
 stranger: A Sentinel — rain cape, a face scanner on a lanyard, bored until he isn't
+face: sdg-10
 
 *The line moves a step at a time. The Sentinel holds the scanner up to each face, waits for the beep, then waves them on.*
 

@@ -259,6 +259,9 @@ describe('Hud fit order: the type tightens before a name is cut', () => {
     expect(lit()).toEqual(['hud-people']);
     hud.setOpen('map');
     expect(lit()).toEqual(['hud-map']);
+    hud.setTextsScreen(() => {});
+    hud.setOpen('texts');
+    expect(lit()).toEqual(['hud-tx']);
     hud.setOpen(null);
     expect(lit()).toEqual([]);
   });
@@ -282,49 +285,38 @@ describe('Hud Keys bar and SYS', () => {
     hud.setBackLink(() => {});
     hud.setYou(() => {});
     hud.setPeople(() => {});
+    hud.setTextsScreen(() => {});
     hud.setSave(() => {});
     hud.setMapLink(() => {});
     return { root, hud, sys: q(root, '.hud-sys') };
   }
 
-  it('SAVE is the first row of SYS: Enter or a click saves (SYS closes); Alt+S still saves', () => {
+  it('SAVE is no longer in SYS (it moved to the pause menu); pressSave opens it unless she is replying', () => {
     const { root, hud, sys } = setup2();
     sys.click();
-    const row = q(root, '.sys-row[data-row="save"]');
-    expect(row.hidden).toBe(false);
-    expect(row.textContent).toBe('SAVEALT+S');
-    expect(q(root, '.sys-row.on').dataset.row).toBe('save');
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
-    expect(onSave2).toHaveBeenCalledTimes(1);
-    expect(q(root, '.sys-menu').hidden).toBe(true);
-    sys.click();
-    row.click();
-    expect(onSave2).toHaveBeenCalledTimes(2);
+    expect(root.querySelector('.sys-row[data-row="save"]')).toBeNull();
     hud.pressSave();
-    expect(onSave2).toHaveBeenCalledTimes(3);
-  });
-
-  it('while she replies the SAVE row reads WAIT FOR <NAME> and does nothing', () => {
-    const { root, hud, sys } = setup2();
+    expect(onSave2).toHaveBeenCalledTimes(1);
     hud.setSaveBusy('Nix');
-    sys.click();
-    const row = q(root, '.sys-row[data-row="save"]');
-    expect(row.querySelector('.sys-value')!.textContent).toBe('WAIT FOR NIX');
-    row.click();
-    expect(onSave2).not.toHaveBeenCalled();
+    expect(hud.saveBlockedBy).toBe('Nix');
+    hud.pressSave();
+    expect(onSave2).toHaveBeenCalledTimes(1);
     hud.setSaveBusy(null);
-    expect(row.querySelector('.sys-value')!.textContent).toBe('ALT+S');
+    expect(hud.saveBlockedBy).toBeNull();
   });
 
-  it('without setSave there is no SAVE row', () => {
-    const { root } = setup();
-    expect(q(root, '.sys-row[data-row="save"]').hidden).toBe(true);
+  it('openSys opens SYS; where() is the bar\'s place and clock', () => {
+    const { root, hud } = setup2();
+    hud.openSys();
+    expect(q(root, '.sys-menu').hidden).toBe(false);
+    hud.setScene('The Noodle Stall');
+    expect(hud.where()).toContain('THE NOODLE STALL');
   });
 
-  it('the right side, in order: texts (promised texts spec §6), notice, YOU, PEOPLE, QUEST, CREW, MAP, SYS', () => {
+  it('the right side, in order: texts (promised texts spec §6), notice, YOU, PEOPLE, TEXTS, QUEST, CREW, MAP, SYS', () => {
     const { root } = full();
     expect([...q(root, '.hud-right').children].map((c) => c.className.split(' ')[0])).toEqual([
-      'hud-texts', 'notice', 'hud-you', 'hud-people', 'hud-quest', 'hud-crew', 'hud-map', 'hud-sys',
+      'hud-texts', 'notice', 'hud-you', 'hud-people', 'hud-tx', 'hud-quest', 'hud-crew', 'hud-map', 'hud-sys',
     ]);
     expect(root.querySelector('.hud-sound, .hud-speed, .hud-bar .hud-model')).toBeNull();
   });
@@ -340,6 +332,25 @@ describe('Hud Keys bar and SYS', () => {
     expect(q(root, '.hud-back').dataset.key).toBe('T');
     expect(q(root, '.hud-back').title).toBe('Title (Alt+T)');
     expect(q(root, '.hud-map').dataset.key).toBeUndefined();
+  });
+
+  it("CREW's key K isn't in its word: nothing underlined, the title names it (deferred minor)", () => {
+    const { root, hud } = full();
+    hud.setCrew(() => {});
+    const crew = q(root, '.hud-crew');
+    expect(crew.textContent).toBe('CREW');
+    expect(crew.querySelector('u')).toBeNull();
+    expect(crew.title).toBe('Crew (Alt+K)');
+  });
+
+  it('TEXTS underlines its X, not its first letter (in-game texts spec §2)', () => {
+    const { root } = full();
+    const tx = q(root, '.hud-tx');
+    expect(tx.dataset.key).toBe('X');
+    expect(tx.title).toBe('Texts (Alt+X)');
+    expect(tx.textContent).toBe('TEXTS');
+    expect(tx.querySelector('u')!.textContent).toBe('X');
+    expect(tx.firstChild!.textContent).toBe('TE');
   });
 
   it('holding Alt lights the keycaps; letting go or leaving the window puts them out', () => {
@@ -497,8 +508,8 @@ describe('Hud Keys bar and SYS', () => {
     q(root, 'i[data-speed="slow"]').click();
     expect(onPick).toHaveBeenCalledWith('slow');
     sys.click();
-    // SAVE, then SOUND, then TEXT.
-    for (let i = 0; i < 2; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
+    // SOUND, then TEXT.
+    for (let i = 0; i < 1; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
     expect(onStep).toHaveBeenCalledWith(1);
   });
@@ -516,8 +527,8 @@ describe('Hud Keys bar and SYS', () => {
     q(root, 'i[data-keys="labels"]').click();
     expect(onPick).toHaveBeenLastCalledWith('labels');
     sys.click();
-    // SAVE is the first row now: one more step down to CHAT KEYS.
-    for (let i = 0; i < 5; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
+    // SOUND, TEXT, TEXT SIZE, FONT, CHAT KEYS.
+    for (let i = 0; i < 4; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
     expect(row.classList.contains('on')).toBe(true);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
     expect(onPick).toHaveBeenLastCalledWith('labels');
@@ -546,12 +557,25 @@ describe('the texts signal (promised texts spec §6)', () => {
     hud.setTexts([]);
     expect(el().hidden).toBe(true);
   });
-  it('Enter on it opens the deck too (final review M1)', () => {
+  it('a click or Enter on it opens TEXTS on the first sender, never a window (in-game texts spec §4)', () => {
     const { root, hud } = setup();
     const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    hud.setTexts([{ id: 'nix', name: 'Nix' }]);
+    const onOpen = vi.fn();
+    hud.setTextsNotice(onOpen);
+    hud.setTexts([{ id: 'nix', name: 'Nix' }, { id: 'cass', name: 'Cass' }]);
+    root.querySelector<HTMLElement>('.hud-texts')!.click();
     root.querySelector<HTMLElement>('.hud-texts')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
-    expect(open).toHaveBeenCalledWith('/deck', '_blank');
+    expect(onOpen.mock.calls).toEqual([['nix'], ['nix']]);
+    expect(open).not.toHaveBeenCalled();
+  });
+  it('the TEXTS word carries a dot while anyone has texted unseen', () => {
+    const { root, hud } = setup();
+    hud.setTextsScreen(() => {});
+    const tx = root.querySelector<HTMLElement>('.hud-tx')!;
+    hud.setTexts([{ id: 'nix', name: 'Nix' }]);
+    expect(tx.classList.contains('texts-new')).toBe(true);
+    hud.setTexts([]);
+    expect(tx.classList.contains('texts-new')).toBe(false);
   });
   it('the bar refits when it appears (final review M2)', () => {
     const { hud } = setup();
@@ -559,14 +583,6 @@ describe('the texts signal (promised texts spec §6)', () => {
     hud.setTexts([{ id: 'nix', name: 'Nix' }, { id: 'hicks', name: 'Hicks' }]);
     expect(fit).toHaveBeenCalled();
   });
-  it('a click opens the deck in a new tab', () => {
-    const { root, hud } = setup();
-    const open = vi.spyOn(window, 'open').mockImplementation(() => null);
-    hud.setTexts([{ id: 'nix', name: 'Nix' }]);
-    root.querySelector<HTMLElement>('.hud-texts')!.click();
-    expect(open).toHaveBeenCalledWith('/deck', '_blank');
-  });
-
   it("shows KARASU · POWER OUT while your room's district is dark (blackouts phase 3 §4)", () => {
     const { root, hud } = setup();
     const line = () => root.querySelector<HTMLElement>('.hud-power')!;

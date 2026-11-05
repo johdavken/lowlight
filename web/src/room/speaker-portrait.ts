@@ -14,7 +14,18 @@ export interface SpeakerPortrait {
   show(s: { name: string; url: string; accent?: string } | null): void;
 }
 
-export function mountSpeakerPortrait(root: HTMLElement): SpeakerPortrait {
+/**
+ * `root` is the feed's root (`has-portrait` goes on it, so the line moves over). With `layerHost` (the game
+ * stage), the busts go in their own `.sp-layer` there instead of inside the feed, so they stand over the job
+ * table (z 24) as well as the subtitles; speaker-portrait.css hides that layer whenever the feed would.
+ */
+export function mountSpeakerPortrait(root: HTMLElement, layerHost?: HTMLElement): SpeakerPortrait {
+  let into = root;
+  if (layerHost) {
+    into = document.createElement('div');
+    into.className = 'sp-layer';
+    layerHost.append(into);
+  }
   let current: { el: HTMLElement; name: string; url: string } | null = null;
 
   const leave = (el: HTMLElement) => {
@@ -57,7 +68,7 @@ export function mountSpeakerPortrait(root: HTMLElement): SpeakerPortrait {
       root.classList.toggle('has-portrait', s !== null);
       if (!s) return;
       const el = build(s);
-      root.append(el);
+      into.append(el);
       current = { el, name: s.name, url: s.url };
     },
   };

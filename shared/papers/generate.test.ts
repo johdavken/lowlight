@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import type { Tier } from '../gig/rules';
+import type { Tier } from '../gig/brief';
 import { DEFAULT_ORIGINS, DEFAULT_REASONS, type Face, type PapersData } from './data';
 import { FIRST_NIGHT_NOTES } from './first-night';
 import { PAPERS_TIERS, papersBoard } from './generate';

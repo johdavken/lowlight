@@ -1,9 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { ContactEntry } from '../shared/types';
 import { DIRECT, awaitGreeting, send, skipSplash } from './fixtures';
 
 // Her plans (spec 2026-10-21 §5): a line about her going home makes the fake residual record a going plan; the card
 // comes up. LET HER GO: her goodbye, then /solo with her row showing where she went. GO WITH HER: the card goes and
-// the scene stays. Each in a playthrough of its own; the one it found is put back.
+// you walk to her place together. Each in a playthrough of its own; the one it found is put back.
 test.describe.configure({ mode: 'serial' });
 
 let before: string | null = null;
@@ -14,6 +15,12 @@ test.beforeEach(async ({ request }) => {
 test.afterEach(async ({ request }) => {
   if (before) expect((await request.post(`/api/playthroughs/${before}/activate`)).status()).toBe(200);
 });
+
+/** Her room as the active playthrough's databases have it. */
+async function herScene(page: Page): Promise<string | undefined> {
+  const list = (await (await page.request.get('/api/playthroughs/active/contacts')).json()) as ContactEntry[];
+  return list.find((c) => c.id === DIRECT.id)?.sceneId;
+}
 
 async function cardUp(page: Page) {
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -41,10 +48,12 @@ test('LET HER GO: her goodbye, then on your own, her row says where she went', a
   expect(errors).toEqual([]);
 });
 
-test('GO WITH HER: the card goes and the scene stays', async ({ page }) => {
+test('GO WITH HER: the card goes and you walk to her place together', async ({ page }) => {
   const card = await cardUp(page);
+  const from = await herScene(page);
   await card.locator('.pcd-stay').click();
   await expect(card).toHaveCount(0);
+  await expect.poll(() => herScene(page), { timeout: 15_000 }).not.toBe(from);
   await page.reload();
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   await expect(page.locator('.plan-card')).toHaveCount(0);

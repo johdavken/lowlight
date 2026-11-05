@@ -58,8 +58,9 @@ test('splash: once per session, the theme plays on the splash, a room and back s
 
   await dialIn(page, SECOND.id);
   await page.waitForFunction(() => window.__nixRoom !== undefined);
+  // Esc pauses; TITLE goes back from a room: no splash, straight to the title.
   await page.keyboard.press('Escape');
-  // Back from a room: no splash, straight to the title.
+  await page.locator('.pause-row[data-row="title"]').click();
   await page.waitForURL((u) => u.pathname === '/');
   await toTitle(page);
   await expect(page.locator('.splash')).toHaveCount(0);
@@ -105,6 +106,8 @@ test('splash: opening a room directly, then going back, skips it', async ({ page
   await page.goto(`/room/${SECOND.id}`);
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
   await expect(phase(page)).toBeVisible();
   await expect(page.locator('.splash')).toHaveCount(0);
 });
@@ -264,6 +267,14 @@ test('sound: locked until a click, then follows the room (indoor rain, neon, roo
   const roof = await audio();
   expect(roof.mix!.wind.level).toBeGreaterThanOrEqual(0.15);
   expect(roof.mix!.neon.map((n) => n.id).sort()).toEqual(['sign_below']); // the re-art's one neon (fa7d7d79)
+  expect(roof.mix!.space).toBe(0);
+  expect(indoor.mix!.space).toBe(0);
+  expect(indoor.voices).not.toContain('space');
+
+  // The Back Alley's walls answer the rain: a subtle reverb send, built only for a room that asks for one.
+  await send(page, { type: 'dev_action', tool: 'go_to', args: { id: 'intake-back-alley', transition: 'fade' } });
+  await expect.poll(async () => (await audio()).mix?.space).toBe(0.3);
+  expect((await audio()).voices).toContain('space');
 
   expect(errors).toEqual([]);
 });
@@ -288,10 +299,16 @@ test('stage: both figures on stage, the speaker is marked, PgUp shows history, a
   await expect(left).toBeVisible();
   await expect(right).toBeVisible();
 
+  const herBox = page.locator('#feed .msg.agent:visible');
+  const herLine = herBox.locator('.text');
+  const greeting = (await herBox.getAttribute('data-id'))!;
   await send(page, { type: 'user_message', text: 'stage check' });
   const reply = DIRECT.reply;
+  // Her greeting is a `GLM reply #n` too, and the server may hold this line a moment (a quest's pick
+  // check): wait for the box to move past the greeting to her finished answer.
+  await expect(herBox).not.toHaveAttribute('data-id', greeting, { timeout: 10_000 });
+  await expect(herBox).toHaveClass(/\bs-ok\b/, { timeout: 10_000 });
   // Earlier tests leave her pinned note, so the stub's reply may carry a "(heard: …)" suffix.
-  const herLine = page.locator('#feed .msg.agent:visible .text');
   await expect(herLine).toContainText(reply, { timeout: 10_000 });
   // The stage marks the speaker but draws nobody differently (no lit/dimmed looks, spec 2026-10-15).
   await expect(right).toHaveClass(/\bspeaking\b/);
@@ -364,10 +381,17 @@ test('expressions: the dev panel picks her face for one reply', async ({ page })
   await page.goto(`/room/${DIRECT.id}`);
   await page.waitForFunction(() => window.__nixRoom !== undefined);
 
-  // She needs a reply on screen before a pick (with no turn running) has anywhere to land.
+  // She needs a reply on screen before a pick (with no turn running) has anywhere to land. Once the
+  // history is in (and any greeting landed), an earlier `GLM reply #n` may be in the box: wait for the
+  // box to move on to her finished answer to this line.
+  await awaitGreeting(page);
+  const herBox = page.locator('#feed .msg.agent:visible');
+  const before = (await herBox.count()) > 0 ? await herBox.getAttribute('data-id') : null;
   await send(page, { type: 'user_message', text: 'expression check' });
   const reply = DIRECT.reply;
-  await expect(page.locator('#feed .msg.agent:visible .text')).toContainText(reply, { timeout: 10_000 });
+  if (before) await expect(herBox).not.toHaveAttribute('data-id', before, { timeout: 10_000 });
+  await expect(herBox).toHaveClass(/\bs-ok\b/, { timeout: 10_000 });
+  await expect(herBox.locator('.text')).toContainText(reply, { timeout: 10_000 });
 
   // Backtick, with the chat input empty and unfocused, opens the dev drawer.
   await page.keyboard.press('`');
@@ -508,6 +532,8 @@ test('paging fit: a reply that fits never pages, and a long one keeps one page s
   await expect(page.locator('.line-keys button.key')).toHaveCount(5);
   await resize();
   await expect(page.locator('button.continue')).toHaveCount(0);
+  // The box eases to its new height (the s-ok refresh can still be growing it): measure it settled.
+  await short.evaluate((n) => Promise.all(n.closest<HTMLElement>('.feed')!.getAnimations().map((a) => a.finished)));
   // It may borrow its bottom padding (the box then scrolls by as much), but no content is cut off.
   expect((await fit(short)).contentTopClip).toBeLessThanOrEqual(0.5);
 
@@ -746,7 +772,7 @@ test('songs: a room shuffles its songs with a pause; a shared song carries on', 
 });
 
 // Nix's room is shared by every test that drives her, so the map's test lives here, where tests run one at a time.
-test('map: opens on the whole city with the district you are in open (no auto zoom), switches districts, Esc goes to the city and then closes', async ({ page }) => {
+test('map: opens on the whole city with your pin lit and no card; a pin opens its card; a district name zooms; Esc steps back out, then closes', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -757,12 +783,14 @@ test('map: opens on the whole city with the district you are in open (no auto zo
   await page.waitForTimeout(1_500);
 
   await page.locator('.hud-map').click();
-  const heading = page.locator('.map-heading');
-  await expect(heading.locator('.t')).toHaveText('KARASU');
-  await expect(heading.locator('.s')).toHaveText('Old Town / The Ribbon');
-  const intake = page.locator('.map-bt.place.focus');
-  await expect(intake.locator('.nm')).toHaveText('Lowlight Intake');
-  await expect(intake.locator('.n')).toHaveText('04');
+  // No band, no heading, no card (map pins spec §1): a click on your pin opens its card.
+  await expect(page.locator('.map-band, .map-heading')).toHaveCount(0);
+  await expect(page.locator('.map-strip')).toHaveCount(0);
+  await expect(page.locator('.city-map .pin.here')).toHaveAttribute('data-place', 'lowlight-intake');
+  await page.locator('.city-map .pin.here').dispatchEvent('click');
+  await expect(page.locator('.map-strip .t')).toHaveText('LOWLIGHT INTAKE');
+  // Far out the pins are dots: their names hidden until hovered.
+  await expect(page.locator('.city-map.far')).toHaveCount(1);
   // The ambience canvas lies in the camera layer, sized to the screen.
   const amb = page.locator('.map-world > canvas.map-amb');
   await expect(amb).toHaveCount(1);
@@ -771,14 +799,14 @@ test('map: opens on the whole city with the district you are in open (no auto zo
   await expect(page.locator('.map-world')).toHaveAttribute('style', /scale\(1\)/);
   await expect(page.locator('.city-map .pin.here')).toHaveCount(1);
   await expect(page.locator('.map-notice')).toBeHidden();
-  // The CRT (scanlines, fuzz, roll, vignette) is drawn over the map, band and strip, as on a real screen.
+  // The CRT (scanlines, fuzz, roll, vignette) is drawn over the map and the card, as on a real screen.
   const z = await page.evaluate(() => {
     const zi = (sel: string) => Number(getComputedStyle(document.querySelector(sel)!).zIndex) || 0;
     return { city: Math.max(zi('.map-world'), zi('.map-overlay-host')), crt: Math.min(zi('.map-scan'), zi('.map-fuzz'), zi('.map-roll'), zi('.map-vignette')) };
   });
   expect(z.crt).toBeGreaterThan(z.city);
 
-  // Every place's pin shows at full strength with Karasu open; another district's pin names itself on hover (spec 2026-10-28 §1).
+  // Every place's pin shows at full strength; a pin names itself on hover far out (map pins spec §2).
   const places = await page.evaluate(async () => {
     const r = (await (await fetch('/api/map')).json()) as { map?: unknown };
     const m = (r.map ?? r) as { places: { id: string; name: string; district: string; side?: boolean }[] };
@@ -804,6 +832,11 @@ test('map: opens on the whole city with the district you are in open (no auto zo
   // parts of the screen from the pointer while it plays.
   await page.locator('.map-screen').evaluate((s) =>
     Promise.all(s.getAnimations().filter((a) => (a as CSSAnimation).animationName === 'map-glitch-in').map((a) => a.finished)));
+  // A real pointer reaches your pin far out (its target is bigger than the dot): Esc closes the card, a click opens it again.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.map-strip')).toHaveCount(0);
+  await page.locator('.city-map .pin.here .hit').click();
+  await expect(page.locator('.map-strip .t')).toHaveText('LOWLIGHT INTAKE');
   const view = () => page.locator('.map-world').evaluate((w) => /translate\(([-\d.e]+)px, ([-\d.e]+)px\) scale\(([\d.e]+)\)/.exec((w as HTMLElement).style.transform)!.slice(1).map(Number));
   await page.mouse.move(1000, 600);
   await page.mouse.down();
@@ -823,14 +856,23 @@ test('map: opens on the whole city with the district you are in open (no auto zo
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
   expect((await view())[2]).toBeGreaterThan(1);
 
-  await page.keyboard.press('Escape');
-  await expect(heading).toHaveCount(0);
-  await page.locator('.map-bt.dist[data-id="velvet"]').click();
-  await expect(heading.locator('.t')).toHaveText('VELVET');
-  await expect(page.locator('.map-band')).toHaveCount(1);
+  // Zoomed in, the pins carry their names (map pins spec §2).
+  await expect(page.locator('.city-map.far')).toHaveCount(0);
+  await expect(page.locator('.city-map .pin.here .map-ntag')).toBeVisible();
 
+  // Esc: the card goes, then the camera eases back out to the city, then the map closes.
   await page.keyboard.press('Escape');
-  await expect(heading).toHaveCount(0);
+  await expect(page.locator('.map-strip')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await view())[2]).toBeCloseTo(1, 2);
+  // A district's name eases the camera to it (map pins spec §3).
+  // A real click where the Marsh's name is printed (mid-screen, clear of the HUD): on the painting its border lies
+  // over the name and frames the same district.
+  const marsh = (await page.locator('svg.city-names text.dname[data-id="marsh"]').boundingBox())!;
+  await page.mouse.click(marsh.x + marsh.width / 2, marsh.y + marsh.height / 2);
+  await expect.poll(async () => (await view())[2]).toBeGreaterThan(1.5);
+  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await view())[2]).toBeCloseTo(1, 2);
   await expect(page.locator('#map')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#map')).toBeHidden();
@@ -889,13 +931,14 @@ test('map travel: GO walks you both to the stall and she answers; her walk-up is
   await page.waitForTimeout(1_500);
 
   await page.locator('.hud-map').click();
-  const strip = page.locator('.map-strip');
-  await page.locator('.map-bt.place', { hasText: "Nix's walk-up" }).click();
+  // GO (or the invite lock) rides on the picked pin's name tag.
+  const strip = page.locator('.pin.focus .map-go');
+  await page.locator('.city-map .pin[data-place="nix-walk-up"]').dispatchEvent('click');
   // The pin is the landing outside her door: anyone can go; her apartment past it is hers to invite you into.
   await expect(strip.locator('.invite')).toHaveCount(0);
   await expect(strip.locator('.go')).toHaveCount(1);
 
-  await page.locator('.map-bt.place', { hasText: "Hae's Noodles" }).click();
+  await page.locator('.city-map .pin[data-place="haes-noodles"]').dispatchEvent('click');
   await strip.locator('.go').click();
   await expect(page.locator('#map')).toBeHidden();
   await arriveGo(page);
@@ -992,6 +1035,101 @@ test('persona: play Nix as Vee — the room names you Vee and her turn says who 
   expect(said).toContain("[who's here: Vee (she)]");
 });
 
+test('the YOU panel: QUEST’s box, Hicks whole on the left, every page fits at 1600×900', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await skipSplash(page);
+  await newGame(page);
+  await showTile(page, 'hicks');
+  await lockPlayer(page, 'hicks');
+  await showTile(page, SECOND.id);
+  await page.locator(`.tile[data-id="${SECOND.id}"]`).click();
+  await expect(phase(page)).toHaveAttribute('data-phase', /model|ready/);
+  if ((await phase(page).getAttribute('data-phase')) === 'model') {
+    await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+    await page.keyboard.press('Enter');
+  }
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
+  // A reply still streaming from an earlier test refuses a new game: Enter again until it starts.
+  await expect(async () => {
+    await page.keyboard.press('Enter');
+    await page.waitForURL(`**/room/${SECOND.id}*`, { timeout: 2_000 });
+  }).toPass({ timeout: 45_000 });
+  await page.waitForFunction(() => window.__nixRoom !== undefined);
+  await page.locator('.hud-quest').click();
+  await expect(page.locator('.ql-pane')).toBeVisible();
+  const quest = await page.locator('.ql-pane').boundingBox();
+  await page.keyboard.press('Escape');
+  await page.locator('.hud-you').click();
+  const frame = page.locator('.character-sheet .scr-frame');
+  await expect(frame).toBeVisible();
+  expect(await frame.boundingBox()).toEqual(quest);
+  // The banner is the room you're in, and the figure stands inside its column.
+  await expect(page.locator('.cs-art')).toHaveAttribute('style', /\/scenes\//);
+  const img = page.locator('.cs-img');
+  await expect.poll(() => img.evaluate((n: HTMLImageElement) => n.naturalWidth)).toBeGreaterThan(0);
+  const [fig, col] = [await img.boundingBox(), await page.locator('.cs-figure').boundingBox()];
+  expect(fig!.y).toBeGreaterThanOrEqual(col!.y);
+  expect(fig!.y + fig!.height).toBeLessThanOrEqual(col!.y + col!.height);
+  for (const p of ['file', 'stats', 'street', 'kit']) {
+    await page.locator(`.cs-page-tab[data-page="${p}"]`).click();
+    await expect(page.locator('.cs-page-tab.on')).toHaveAttribute('data-page', p);
+    expect(await page.locator('.cs-page').evaluate((n) => n.scrollHeight <= n.clientHeight)).toBe(true);
+    await page.waitForTimeout(p === 'file' ? 500 : 0); // past the flicker, for the screenshot
+    await page.screenshot({ path: `test-results/you-${p}.png` });
+  }
+});
+
+test('the PEOPLE panel: QUEST’s box, the roster beside the file, JOURNAL for the one you are with, off for another', async ({ page }) => {
+  await page.setViewportSize({ width: 1600, height: 900 });
+  await skipSplash(page);
+  await newGame(page);
+  await showTile(page, 'hicks');
+  await lockPlayer(page, 'hicks');
+  await showTile(page, SECOND.id);
+  await page.locator(`.tile[data-id="${SECOND.id}"]`).click();
+  await expect(phase(page)).toHaveAttribute('data-phase', /model|ready/);
+  if ((await phase(page).getAttribute('data-phase')) === 'model') {
+    await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+    await page.keyboard.press('Enter');
+  }
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
+  // A reply still streaming from an earlier test refuses a new game: Enter again until it starts.
+  await expect(async () => {
+    await page.keyboard.press('Enter');
+    await page.waitForURL(`**/room/${SECOND.id}*`, { timeout: 2_000 });
+  }).toPass({ timeout: 45_000 });
+  await page.waitForFunction(() => window.__nixRoom !== undefined);
+  await page.locator('.hud-quest').click();
+  await expect(page.locator('.ql-pane')).toBeVisible();
+  const quest = await page.locator('.ql-pane').boundingBox();
+  await page.keyboard.press('Escape');
+  await page.locator('.hud-people').click();
+  const frame = page.locator('.people-screen .scr-frame');
+  await expect(frame).toBeVisible();
+  expect(await frame.boundingBox()).toEqual(quest);
+  const you = page.locator('.pe-tile.on');
+  await expect(you.locator('.pe-here')).toHaveText('● HERE');
+  await expect(page.locator('.pe-file .pe-fig')).toBeVisible();
+  await page.waitForTimeout(500); // past the flicker, for the screenshot
+  await page.screenshot({ path: 'test-results/people-file.png' });
+  await page.locator('.pe-tab[data-tab="journal"]').click();
+  await expect(page.locator('.pe-right .jd-root')).toBeVisible();
+  await page.screenshot({ path: 'test-results/people-journal.png' });
+  await page.locator('.pe-tile:not(.on)').first().click();
+  await expect(page.locator('.pe-tab.on')).toHaveText('FILE');
+  await expect(page.locator('.pe-tab[data-tab="journal"]')).toBeDisabled();
+  await page.screenshot({ path: 'test-results/people-other.png' });
+  // Alt+L goes on to QUEST.
+  const lead = { title: 'SDG at the Tilt', details: 'A man in plain clothes asked after you. He stayed two hours.', place: 'The Tilt', portrait: null };
+  await page.route(/\/api\/.*leads/, (r) => r.fulfill({ json: [{ ...lead, id: 'a', to: 'nix', toName: 'Nix', met: false, followed: false }, { ...lead, id: 'b', to: 'nix', toName: 'Nix', met: true, followed: true, title: 'The Orchid owes' }] }));
+  await page.keyboard.press('Alt+KeyL');
+  await expect(page.locator('.people-screen')).toHaveCount(0);
+  await expect(page.locator('.ql-pane')).toHaveAttribute('data-tab', 'leads');
+  await expect(page.locator('.ql-file .ql-lead-text')).toContainText('plain clothes');
+  await page.waitForTimeout(500); // past the flicker, for the screenshot
+  await page.screenshot({ path: 'test-results/quest-leads.png' });
+});
+
 test('YOU sheet wardrobe: ← dresses Hicks in another outfit, in the room too, and a reload keeps it', async ({ page }) => {
   await skipSplash(page);
   await newGame(page);
@@ -1023,12 +1161,18 @@ test('YOU sheet wardrobe: ← dresses Hicks in another outfit, in the room too, 
   await page.keyboard.press('Tab');
   await expect(page.locator('.character-sheet [data-section="stats"]')).toBeVisible();
   await expect(page.locator('.character-sheet .cs-filepage')).toBeHidden();
-  // The next Tab goes on round the cycle, to PEOPLE; Shift+Tab comes back into YOU at SHEET, then FILE.
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'street');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'kit');
+  // The next Tab goes on round the cycle, to PEOPLE; Shift+Tab comes back into YOU at KIT, then back to FILE.
   await page.keyboard.press('Tab');
   await expect(page.locator('.people-screen')).toBeVisible();
   await expect(page.locator('.character-sheet')).toHaveCount(0);
   await page.keyboard.press('Shift+Tab');
-  await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'sheet');
+  await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'kit');
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Shift+Tab');
   await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'file');
   await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('OUTDOORS');
@@ -1088,12 +1232,13 @@ test('map on rendered tiles: zoom into Karasu past 4x, an 8x tile loads, the Int
   await expect(page.locator('img.map-img')).toBeHidden();
   const pin = page.locator('.city-map .pin[data-place="lowlight-intake"]');
   await expect(pin).toHaveCount(1);
-  // Every pin is on top of the tiles, not hidden under the sharper levels' images (the focused pin has its own z-index,
-  // so check one that isn't focused).
+  // Every pin is on top of the tiles, not hidden under the sharper levels' images. Far out a name shows on hover:
+  // hover one (not yours, which has its own z-index) so its tag is there to test.
+  await page.locator('.city-map .pin[data-place="second-socket"]').dispatchEvent('mouseenter');
   await expect
     .poll(() => page.locator('.city-map .pin[data-place="second-socket"]').evaluate((el) => {
       // The pin's name tag (the pin itself has no size): whatever is on top there must be part of the city layer.
-      const tag = el.firstElementChild as HTMLElement;
+      const tag = el.querySelector('.map-ntag') as HTMLElement;
       const r = tag.getBoundingClientRect();
       const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return !!top && !!top.closest('.city-map');
@@ -1152,7 +1297,7 @@ test('map blackouts: a district goes dark over the rendered tiles and comes back
   await page.locator('.hud-map').click();
   await expect(page.locator('img.map-img')).toBeHidden();
   // The map data comes through the route above (a fetch of the live map first): give it time under a full run.
-  await expect(page.locator('.map-strip')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.city-map .pin').first()).toBeAttached({ timeout: 15_000 });
   // Only Karasu's sign is on the grid here (no windows in the fixture).
   await expect.poll(() => page.evaluate(() => window.__nixRoom!.mapGridLights!()), { timeout: 3_000 }).toBe(1);
   const before = 1;

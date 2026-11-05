@@ -1,99 +1,66 @@
-/* PEOPLE (2026-10-18 spec §2): its tab band in the select screen's slanted-tile language, on the shared frame's
-   amber. Every class is pe- (global names collide). */
-.people-screen .scr-scroll { display: flex; flex-direction: column; }
-.pe-tabs { display: flex; align-items: center; gap: 10px; padding: 16px 28px 0; }
-.pe-tab {
-  padding: 4px 22px;
-  font: 22px/1 var(--pixel);
-  letter-spacing: 0.2em;
-  color: var(--screen-accent);
-  background: rgba(8, 3, 16, 0.85);
-  border: 1px solid color-mix(in srgb, var(--screen-accent) 40%, transparent);
-  transform: skewX(-12deg);
-  cursor: pointer;
+/* PEOPLE (2026-10-18 spec §2; panel 2026-11-04): the shared holo pane in amber, a roster beside the selected one's FILE
+   or JOURNAL, in QUEST's layout. Each contact's own accent is --c. Every class is pe- (global names collide). */
+.people-screen {
+  --pe-ink: #fbeee0;
+  --pe-dim: #c9b49a;
+  --pe-rule: color-mix(in srgb, var(--screen-accent) 28%, transparent);
 }
-.pe-tab > span { display: inline-block; transform: skewX(12deg); }
-.pe-tab:hover, .pe-tab:focus-visible { outline: none; border-color: var(--screen-accent); }
-.pe-tab.on { color: #000; background: var(--screen-accent); border-color: #fff; box-shadow: 0 0 14px -2px var(--screen-accent); }
-.pe-as { margin-left: auto; font: 13px var(--mono); letter-spacing: 0.3em; color: rgba(255, 217, 230, 0.45); }
-.pe-pane { flex: 1; min-height: 0; }
-.pe-loading, .pe-error, .pe-empty { padding: 40px 28px; font: 18px var(--pixel); letter-spacing: 0.2em; color: rgba(255, 217, 230, 0.5); }
+/* .scr-root's own colour is as specific as a single class. */
+.scr-root.people-screen { color: var(--pe-ink); }
+.pe-as { margin-left: auto; font-size: 18px; letter-spacing: 0.2em; color: var(--pe-dim); }
+.pe-esc { margin-left: 1em; font-size: 18px; letter-spacing: 0.2em; color: var(--pe-dim); }
+
+.pe-tabs { flex: none; display: flex; gap: 4px; padding: 11px 25px 0; }
+.pe-tab { padding: 4px 18px; font: 19px var(--pixel); letter-spacing: 0.2em; color: var(--pe-dim); background: none; border: 1px solid var(--pe-rule); border-bottom: 0; cursor: pointer; }
+.pe-tab:hover:not(:disabled), .pe-tab:focus-visible { outline: none; color: var(--pe-ink); }
+.pe-tab.on { color: #180d02; background: var(--screen-accent); }
+.pe-tab:disabled { cursor: default; opacity: 0.4; }
+.pe-pane { flex: 1; min-height: 0; overflow-y: auto; border-top: 1px solid color-mix(in srgb, var(--screen-accent) 30%, transparent); }
+.pe-loading, .pe-error, .pe-empty { padding: 24px 29px; font: 18px var(--pixel); letter-spacing: 0.2em; color: var(--pe-dim); }
 .pe-error { color: #ffb36b; }
 
-/* CONTACTS: a roster of slanted tiles on the left, her file on the right. */
-.pe-contacts, .pe-leads-tab { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 34px; padding: 22px 28px; }
-.pe-roster, .pe-leadlist { display: flex; flex-direction: column; gap: 8px; }
-.pe-tile, .pe-lead {
-  --c: var(--screen-accent);
-  display: block;
-  width: 100%;
-  padding: 7px 14px;
-  text-align: left;
-  color: #e8dcef;
-  background: rgba(8, 3, 16, 0.85);
-  border: 1px solid #3a2560;
-  transform: skewX(-12deg);
-  cursor: pointer;
-}
-.pe-tile-in, .pe-lead-in { display: flex; align-items: center; gap: 12px; transform: skewX(12deg); }
-.pe-tile:hover, .pe-lead:hover { border-color: color-mix(in srgb, var(--screen-accent) 60%, transparent); }
-.pe-tile.on, .pe-lead.on { border-color: var(--screen-accent); background: color-mix(in srgb, var(--screen-accent) 14%, rgba(8, 3, 16, 0.9)); box-shadow: 0 0 14px -4px var(--screen-accent); }
-.pe-face { width: 38px; height: 38px; flex: none; border-radius: 50%; border: 1.5px solid var(--c); box-shadow: 0 0 6px var(--c); object-fit: cover; object-position: top; }
-.pe-mono { display: grid; place-items: center; font: 18px var(--pixel); color: var(--c); background: rgba(12, 3, 20, 0.85); }
-.pe-tile-text { display: flex; flex-direction: column; gap: 2px; }
-.pe-tile-name { font: 19px/1 var(--pixel); letter-spacing: 0.12em; color: var(--c); font-weight: normal; }
-.pe-tile-standing { font-size: 12px; letter-spacing: 0.1em; color: rgba(255, 217, 230, 0.6); }
-.pe-here { font-size: 11px; letter-spacing: 0.2em; color: var(--map-cyan, #7fe9ff); }
-.pe-file { --c: var(--screen-accent); display: grid; grid-template-columns: minmax(200px, 38%) minmax(0, 1fr); gap: 28px; align-items: start; }
-.pe-fig { display: flex; justify-content: center; align-items: flex-end; height: 520px; }
-.pe-figure { max-height: 100%; max-width: 100%; image-rendering: pixelated; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 35%, transparent)); }
-.pe-big { width: 200px; height: 200px; font-size: 90px; border-radius: 50%; border: 2px solid var(--c); }
-.pe-info { display: flex; flex-direction: column; gap: 10px; padding-top: 20px; }
-.pe-name { font: 64px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: var(--c); text-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent); }
-.pe-standing { font: 18px var(--pixel); letter-spacing: 0.2em; color: #ffe1ea; }
-.pe-where { font-size: calc(15px * var(--text-scale, 1)); line-height: 1.5; color: rgba(255, 217, 230, 0.75); }
-.pe-sub { margin-top: 10px; font: 13px var(--pixel); letter-spacing: 0.3em; color: rgba(255, 217, 230, 0.45); }
-/* Her file (spec 2026-10-28 §4): the select screen's bio and facts; the screen scrolls when it runs long. */
-.pe-bio { max-width: 760px; }
-.pe-bio p { margin: 0 0 8px; font-size: calc(15px * var(--text-scale, 1)); line-height: 1.55; color: rgba(255, 217, 230, 0.85); }
-.pe-facts { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 5px 14px; max-width: 760px; margin: 0; align-items: baseline; }
-.pe-facts dt { font: 15px var(--pixel); letter-spacing: 0.14em; color: var(--c); opacity: 0.8; }
-.pe-facts dd { margin: 0; font-size: 12.5px; line-height: 1.4; text-transform: uppercase; letter-spacing: 0.04em; color: rgba(255, 217, 230, 0.85); }
-.pe-leads { margin: 0; padding: 0; list-style: none; }
-.pe-leads li { padding: 3px 0; color: var(--screen-accent); }
+/* The roster, as QUEST's list. */
+.pe-contacts { display: grid; grid-template-columns: 36% minmax(0, 1fr); height: 100%; min-height: 0; }
+.pe-roster { min-height: 0; overflow-y: auto; padding: 11px 11px 13px 18px; border-right: 1px solid var(--pe-rule); scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--screen-accent) 45%, transparent) transparent; }
+.pe-tile { --c: var(--screen-accent); display: block; width: 100%; margin-top: 2px; padding: 8px 9px; text-align: left; color: var(--pe-ink); background: none; border: 0; border-left: 3px solid transparent; cursor: pointer; }
+.pe-tile:hover, .pe-tile.on { background: color-mix(in srgb, var(--screen-accent) 10%, transparent); border-left-color: var(--screen-accent); }
+.pe-tile:focus-visible { outline: none; }
+.pe-tile-in { display: flex; align-items: center; gap: 11px; }
+.pe-face { flex: none; width: 34px; height: 45px; object-fit: cover; object-position: top; image-rendering: pixelated; background: #0b0618; }
+.pe-mono { display: grid; place-items: center; font: 20px var(--pixel); color: var(--c); background: #0b0618; }
+.pe-tile-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pe-tile-name { font: 22px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; font-weight: normal; color: var(--c); }
+.pe-tile-standing { font: 16px var(--pixel); letter-spacing: 0.14em; color: var(--pe-dim); }
+.pe-here { font: 15px var(--pixel); letter-spacing: 0.16em; color: #7fe9ff; }
+
+/* The right side: the file, or the journal. */
+.pe-right { min-height: 0; min-width: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--screen-accent) 45%, transparent) transparent; }
+.pe-file { --c: var(--screen-accent); display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 16px 27px 14px; box-sizing: border-box; }
+.pe-top { flex: none; display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; }
+/* The top of her sprite, from the head down. */
+.pe-fig { position: relative; height: 200px; overflow: hidden; background: #0b0618; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); }
+.pe-figure { position: absolute; left: 50%; top: 4px; height: 250%; max-width: none; transform: translateX(-50%); image-rendering: pixelated; }
+.pe-figure.pe-flat { inset: 0; width: 100%; height: 100%; transform: none; object-fit: cover; object-position: top; }
+.pe-big { height: 100%; font-size: 90px; }
+.pe-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pe-name { font: 49px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.03em; color: var(--c); }
+.pe-standing { font: 18px var(--pixel); letter-spacing: 0.2em; color: #ffc56b; }
+.pe-arrangement { font: 16px var(--pixel); letter-spacing: 0.14em; color: #ffb3a6; }
+.pe-where { font-size: calc(15px * var(--text-scale, 1)); line-height: 1.45; color: var(--pe-dim); }
+.pe-body { flex: 1; min-height: 0; margin-top: 8px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--screen-accent) 45%, transparent) transparent; }
+.pe-sub { margin: 8px 0 6px; padding-bottom: 2px; font: 17px var(--pixel); letter-spacing: 0.3em; color: var(--screen-accent); border-bottom: 1px solid var(--pe-rule); }
+/* Her file (spec 2026-10-28 §4): the select screen's bio and facts. */
+.pe-bio p { margin: 0 0 9px; font: 15px/1.45 var(--chat-font, var(--mono)); color: var(--pe-ink); }
+.pe-facts { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 5px 14px; margin: 0; }
+.pe-facts dt { font: 15px/1.35 var(--pixel); letter-spacing: 0.16em; color: #ffc56b; }
+.pe-facts dd { margin: 0; font: 14px/1.35 var(--chat-font, var(--mono)); color: var(--pe-ink); }
+.pe-leads { margin: 0; padding: 0; list-style: none; font: 18px var(--pixel); letter-spacing: 0.08em; }
+.pe-leads li { padding: 2px 0; color: var(--screen-accent); }
 .pe-leads li::before { content: '→ '; opacity: 0.6; }
 .pe-leads li.followed { opacity: 0.45; }
-.pe-go {
-  align-self: flex-start;
-  margin-top: 14px;
-  padding: 6px 30px;
-  font: 22px/1 var(--pixel);
-  letter-spacing: 0.24em;
-  color: #000;
-  background: var(--screen-accent);
-  border: 1px solid #fff;
-  transform: skewX(-12deg);
-  cursor: pointer;
-}
-.pe-go:disabled { color: rgba(255, 217, 230, 0.4); background: none; border-color: rgba(255, 217, 230, 0.2); cursor: default; }
+.pe-foot { flex: none; display: flex; justify-content: flex-end; padding-top: 10px; }
+.pe-go { padding: 4px 20px; font: 20px var(--pixel); letter-spacing: 0.2em; color: #180d02; background: var(--screen-accent); border: 0; cursor: pointer; }
+.pe-go:disabled { color: rgba(251, 238, 224, 0.4); background: color-mix(in srgb, var(--screen-accent) 16%, transparent); cursor: default; }
 
-/* LEADS: cards on the left, the selected lead in full on the right. */
-.pe-lead.followed { opacity: 0.5; }
-.pe-lead-name { font: 17px/1.2 var(--pixel); letter-spacing: 0.08em; color: #ffe1ea; white-space: normal; }
-.pe-unknown { --c: rgba(255, 217, 230, 0.4); }
-.pe-leadlist .pe-sub { margin: 12px 0 2px; }
-.pe-lead-detail { display: flex; flex-direction: column; gap: 14px; padding-top: 18px; max-width: 760px; }
-.pe-lead-detail.followed { opacity: 0.6; }
-.pe-lead-title { font: 44px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: var(--screen-accent); }
-.pe-lead-text { font-size: calc(17px * var(--text-scale, 1)); line-height: 1.6; color: #ffe1ea; white-space: pre-wrap; }
-.pe-lead-to { font: 20px var(--pixel); letter-spacing: 0.16em; color: var(--screen-accent); }
-
-/* LOOSE ENDS (cipher spec §2.8): unlabelled clusters of what you noticed, then what you solved. */
-.pe-loose-tab { display: flex; flex-direction: column; gap: 18px; padding: 22px 28px; max-width: 900px; overflow-y: auto; }
-.pe-loose-group { display: flex; flex-direction: column; gap: 8px; padding: 0 0 18px; border-bottom: 1px solid rgba(255, 197, 107, 0.18); }
-.pe-loose-line { display: flex; flex-direction: column; gap: 2px; }
-.pe-loose-text { font-size: calc(17px * var(--text-scale, 1)); line-height: 1.5; color: #ffe1ea; }
-.pe-loose-where { font: 12px var(--pixel); letter-spacing: 0.2em; color: rgba(255, 217, 230, 0.45); text-transform: uppercase; }
-.pe-loose-solved { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; border-left: 2px solid var(--screen-accent); background: rgba(255, 197, 107, 0.05); }
-.pe-loose-truth { font: 28px/1.1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.03em; color: var(--screen-accent); }
-.pe-loose-label { margin-top: 4px; font: 12px var(--pixel); letter-spacing: 0.3em; color: rgba(255, 217, 230, 0.45); }
+/* The journal, inside the right side. */
+.people-screen .jd-root { min-height: 0; padding: 14px 22px 16px; }

@@ -1,12 +1,13 @@
 /** POST /api/encounter/options (encounter cards spec §2): three events for this moment in her room, written by her model. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { parseEncounterOptions, type Encounter } from '../../shared/encounter';
+import { parseEncounterOptions, type Encounter, type Stranger } from '../../shared/encounter';
 import type { NarratorKind } from '../../shared/narrator';
 import type { CompletionMessage } from './turn';
 import { NarratorError } from './scenario';
 import type { ScenarioDeps } from './scenario-routes';
 
-type Prompt = { messages: CompletionMessage[]; reserved: string[]; dark?: boolean };
+/** `face`: a face for a stranger card, picked for this room (an extra's id; null: none). */
+type Prompt = { messages: CompletionMessage[]; reserved: string[]; dark?: boolean; face?: (s: Stranger) => string | null };
 
 export interface EncounterDeps extends Pick<ScenarioDeps, 'originAllowed' | 'busy' | 'target'> {
   /** The narrator's request for `ai`'s room as it stands, and the names a stranger can't take; null when there's no such room. */
@@ -41,7 +42,14 @@ export function registerEncounterRoutes(app: FastifyInstance, deps: EncounterDep
       kind = 'bad-answer';
       try {
         const options: Encounter[] | null = parseEncounterOptions(await target.narrate(prompt.messages), prompt.reserved, { dark: prompt.dark === true });
-        if (options) return { options };
+        if (options) {
+          // The stranger card shows who walks in: a face for them now, kept when the card is played.
+          const faced = options.map((e) => {
+            const face = e.stranger && !e.stranger.face ? prompt.face?.(e.stranger) : null;
+            return face && e.stranger ? { ...e, stranger: { ...e.stranger, face } } : e;
+          });
+          return { options: faced };
+        }
       } catch (err) {
         const status = (err as { status?: unknown }).status;
         if (status === 401 || status === 403) return reply.code(409).send({ error: 'key-rejected' });

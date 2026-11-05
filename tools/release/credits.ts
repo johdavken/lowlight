@@ -27,11 +27,12 @@ const backticked = (s: string) => [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1].
  * - a list item `- <scene>: <path> ←` (Studio's picks) credits that path in that scene, in any pack;
  *   a list item with a backticked full path credits that path.
  * Nothing in the `## Patrons` section credits anything: those lines are names.
- * Returns the full paths credited and the (scene, path) pairs of the picks.
+ * Returns the full paths credited and the (scene, path) pairs of the picks (ElevenLabs takes apart, in freePicks).
  */
-function credits(text: string, restrictedOnly = false): { full: Set<string>; picks: Set<string>; free: Set<string> } {
+function credits(text: string, restrictedOnly = false): { full: Set<string>; picks: Set<string>; freePicks: Set<string>; free: Set<string> } {
   const full = new Set<string>();
   const picks = new Set<string>();
+  const freePicks = new Set<string>();
   // The full paths that may go public: a row in the Suno music section, or a CC0 Glitch Noises or generated ElevenLabs row with nothing restricted mixed in.
   const free = new Set<string>();
   let shared = false;
@@ -67,22 +68,23 @@ function credits(text: string, restrictedOnly = false): { full: Set<string>; pic
       continue;
     }
     if (line.startsWith('- ')) {
-      const pick = /^- ([\w-]+): (\S.*?) ←/.exec(line);
-      if (pick) picks.add(`${pick[1]}/${pick[2]}`);
+      const pick = /^- ([\w-]+): (\S.*?) ←(.*)$/.exec(line);
+      // A generated ElevenLabs take picked in Studio may go public; any other pick (a Sonniss bundle's) may not.
+      if (pick) (/ElevenLabs/.test(pick[3]) && !RESTRICTED_SOURCE.test(pick[3]) ? freePicks : picks).add(`${pick[1]}/${pick[2]}`);
       for (const f of backticked(line)) if (FULL.test(f)) full.add(f);
     }
   }
-  return { full, picks, free };
+  return { full, picks, freePicks, free };
 }
 
 /** The uncredited files among scene audio (by pack folder), shared sounds, splash images and theme songs, and district art. */
 function scan(packDirs: { pack: string; dir: string }[], soundDir: string, splashDir: string, districtsDir: string, creditsText: string): string[] {
-  const { full, picks } = credits(creditsText);
+  const { full, picks, freePicks } = credits(creditsText);
   const missing: string[] = [];
   for (const { pack, dir } of packDirs) {
     for (const rel of files(dir, AUDIO)) {
       // <scene>/<rest>: a Studio pick names it so; the full path is scenes/<pack>/<scene>/<rest>.
-      if (!full.has(`scenes/${pack}/${rel}`) && !picks.has(rel)) missing.push(`scenes/${pack}/${rel}`);
+      if (!full.has(`scenes/${pack}/${rel}`) && !picks.has(rel) && !freePicks.has(rel)) missing.push(`scenes/${pack}/${rel}`);
     }
   }
   for (const rel of files(soundDir, AUDIO)) {
@@ -115,17 +117,17 @@ export type AudioStatus = 'public' | 'restricted' | 'unlisted';
 
 /**
  * What CREDITS.md says an audio file may do: `public` (Suno songs, CC0 Glitch Noises cues, generated ElevenLabs sounds), `restricted`
- * (Sonniss, Bleeoop, JDSherbert, a mix with any of them, every Studio library pick), or `unlisted`.
+ * (Sonniss, Bleeoop, JDSherbert, a mix with any of them, a Studio pick from the Sonniss bundles), or `unlisted`; an ElevenLabs pick is public.
  * `repoPath` is forward-slash and repo-relative. A pick names a scene, so it matches that scene in any pack.
  */
 export function audioStatus(creditsText: string): (repoPath: string) => AudioStatus {
-  const { full, picks, free } = credits(creditsText);
+  const { full, picks, freePicks, free } = credits(creditsText);
   // Restricted wins: a file credited both ways (a free row and a restricted row or pick) stays private.
   const { full: restrictedRows } = credits(creditsText, true);
   return (repoPath) => {
     const scene = /^scenes\/[^/]+\/(.+)$/.exec(repoPath);
     if (restrictedRows.has(repoPath) || (scene && picks.has(scene[1]))) return 'restricted';
-    if (free.has(repoPath)) return 'public';
+    if (free.has(repoPath) || (scene && freePicks.has(scene[1]))) return 'public';
     return full.has(repoPath) ? 'restricted' : 'unlisted';
   };
 }

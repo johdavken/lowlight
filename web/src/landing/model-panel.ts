@@ -5,13 +5,13 @@
  */
 import type { Pronoun } from '../../../shared/pronoun';
 import type { ModelChoice, ModelEvent } from '../../../shared/types';
-import type { LinkInfo, ModelLists } from '../net/link';
+import { PROVIDERS, type LinkInfo, type ModelLists, type Provider } from '../net/link';
 import { COPY } from './copy';
 
 const SEARCH_MIN = 2;
 const DEBOUNCE_MS = 150;
 
-export type Row = { kind: 'current' | 'reset' | 'pick' | 'recent' | 'result'; id: string | null; label: string; price: string; why?: string };
+export type Row = { kind: 'current' | 'reset' | 'pick' | 'recent' | 'result'; id: string | null; label: string; price: string; why?: string; via?: boolean };
 
 const price = (n: number | null) => (n === null ? '—' : `$${n.toFixed(2)}`);
 /** "$in / $out" per million tokens; "—" when neither is known. */
@@ -19,7 +19,7 @@ export function priceText(c: ModelChoice): string {
   return c.priceIn === null && c.priceOut === null ? '—' : `${price(c.priceIn)} / ${price(c.priceOut)}`;
 }
 
-const row = (kind: Row['kind'], c: ModelChoice): Row => ({ kind, id: c.id, label: c.label, price: priceText(c), ...(c.why ? { why: c.why } : {}) });
+const row = (kind: Row['kind'], c: ModelChoice): Row => ({ kind, id: c.id, label: c.label, price: priceText(c), ...(c.why ? { why: c.why } : {}), ...(c.via ? { via: true } : {}) });
 
 /** The rows in order: current, reset (when she's off her default), picks, recent, results; current, picks and recent list each model once. */
 export function modelRows(d: { current: ModelChoice; def: ModelChoice; picks: ModelChoice[]; recent: ModelChoice[]; results: ModelChoice[]; pronoun?: Pronoun }): Row[] {
@@ -42,7 +42,10 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
 }
 
 export interface ModelPanelOptions {
+  /** The OpenRouter link. */
   link: LinkInfo;
+  /** The Anthropic link (absent: not linked). */
+  anthropic?: LinkInfo;
   /** Hers, for "reset to her default" (absent: they). */
   pronoun?: Pronoun;
   agentModels: ModelEvent;
@@ -50,8 +53,10 @@ export interface ModelPanelOptions {
   /** A model id, or null for "back to her default". */
   onPick: (id: string | null) => void;
   onBack: () => void;
-  onChangeKey: () => void;
-  onUnlink: () => void;
+  onChangeKey: (provider: Provider) => void;
+  onUnlink: (provider: Provider) => void;
+  /** An unlinked provider's + LINK (absent: no button). */
+  onLink?: (provider: Provider) => void;
   debounceMs?: number;
 }
 
@@ -77,29 +82,46 @@ export class ModelPanel {
     this.def = choice(e.default ?? e.model);
 
     this.el = el('div', 'model-panel');
-    const head = el('div', 'mp-link');
-    const dot = el('span', 'mp-dot', '●');
-    if (o.link.state !== 'ok') dot.dataset.state = o.link.state;
-    const change = el('button', 'mp-change', L.changeKey);
-    change.type = 'button';
-    change.onclick = () => o.onChangeKey();
-    const unlink = el('button', 'mp-unlink', L.unlink);
-    unlink.type = 'button';
-    let armed = false;
-    unlink.onclick = () => {
-      if (armed) return o.onUnlink();
-      armed = true;
-      unlink.textContent = L.unlinkConfirm;
-    };
-    head.append(dot, el('span', 'mp-line', L.linkLine(o.link.last4, o.link.credit)), el('span', 'mp-sp'), change, unlink);
+    const unlinked: LinkInfo = { linked: false, last4: null, credit: null, state: 'no-link' };
+    const links: Record<Provider, LinkInfo> = { openrouter: o.link, anthropic: o.anthropic ?? unlinked };
+    // One line per key: linked, with CHANGE KEY and UNLINK; else a + LINK button.
+    const heads = PROVIDERS.flatMap((p) => {
+      const info = links[p];
+      const head = el('div', 'mp-link');
+      head.dataset.provider = p;
+      if (!info.linked) {
+        if (!o.onLink) return [];
+        head.classList.add('mp-off');
+        const add = el('button', 'mp-add', L.addLink(p));
+        add.type = 'button';
+        add.onclick = () => o.onLink!(p);
+        head.append(add);
+        return [head];
+      }
+      const dot = el('span', 'mp-dot', '●');
+      if (info.state !== 'ok') dot.dataset.state = info.state;
+      const change = el('button', 'mp-change', L.changeKey);
+      change.type = 'button';
+      change.onclick = () => o.onChangeKey(p);
+      const unlink = el('button', 'mp-unlink', L.unlink);
+      unlink.type = 'button';
+      let armed = false;
+      unlink.onclick = () => {
+        if (armed) return o.onUnlink(p);
+        armed = true;
+        unlink.textContent = L.unlinkConfirm;
+      };
+      head.append(dot, el('span', 'mp-line', L.linkLine(info.last4, info.credit, p)), el('span', 'mp-sp'), change, unlink);
+      return [head];
+    });
     this.list = el('div', 'mp-list');
     const search = el('label', 'mp-search');
     this.field = el('input', '');
     this.field.readOnly = true; // typed through key(): the select screen owns the keyboard
     this.field.setAttribute('aria-label', L.search);
     search.append(el('span', 'mp-ic', L.search), this.field);
-    this.el.append(head, this.list, search);
-    if (o.link.state === 'no-credit') this.el.insertBefore(el('div', 'mp-warn', L.noCredit), this.list);
+    this.el.append(...heads, this.list, search);
+    if (o.link.state === 'no-credit' || links.anthropic.state === 'no-credit') this.el.insertBefore(el('div', 'mp-warn', L.noCredit), this.list);
     host.append(this.el);
     this.render();
     void o.search('').then((r) => {
@@ -179,6 +201,7 @@ export class ModelPanel {
       const n = el('div', `mp-row mp-${r.kind}${i === this.index ? ' on' : ''}`);
       n.append(el('span', 'mp-label', r.label), el('span', 'mp-price', r.price));
       if (r.why) n.append(el('span', 'mp-why', r.why));
+      if (r.via) n.append(el('span', 'mp-via', COPY.link.via));
       n.onclick = () => this.o.onPick(r.id);
       this.list.append(n);
     });

@@ -92,6 +92,14 @@ describe('soundMix: neon', () => {
   });
 });
 
+describe('soundMix: space', () => {
+  it("the street's reverb send is the scene's sound.reverb, dry when unset", () => {
+    expect(mix(scene()).space).toBe(0);
+    expect(mix(scene({ sound: { reverb: 0.3 } })).space).toBe(0.3);
+    expect(SILENT.space).toBe(0);
+  });
+});
+
 describe('SILENT', () => {
   it('is all quiet', () => {
     expect(SILENT.rain.level + SILENT.wind.level + SILENT.hum.level).toBe(0);

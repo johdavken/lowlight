@@ -46,7 +46,7 @@ function setup(o: { card?: PlanCard | null; state?: QuestState | (() => QuestSta
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   const journal = new Journal(db);
   const room = new Room(registry);
-  const calls = { plans: [] as string[], send: [] as { text: string; mode: string }[], start: [] as string[], choose: [] as unknown[], due: [] as unknown[], walk: [] as string[] };
+  const calls = { plans: [] as string[], send: [] as { text: string; mode: string }[], start: [] as string[], setups: [] as unknown[], choose: [] as unknown[], due: [] as unknown[], walk: [] as string[] };
   const relay = {
     activeMessageId: null,
     busy: false,
@@ -67,8 +67,9 @@ function setup(o: { card?: PlanCard | null; state?: QuestState | (() => QuestSta
       calls.send.push({ text, mode });
       return { ok: true };
     },
-    startQuest: async (_p: string, id: string) => {
+    startQuest: async (_p: string, id: string, setup?: unknown) => {
       calls.start.push(id);
+      if (setup) calls.setups.push(setup);
       return o.start ?? { ok: true };
     },
     playDueQuest: async (_p: string, o: unknown) => {
@@ -299,23 +300,53 @@ describe('quest events', () => {
     expect(validateClientEvent({ type: 'quest_start', id: 'paper-trail' })).toEqual({ type: 'quest_start', id: 'paper-trail' });
     expect(typeof validateClientEvent({ type: 'quest_start' })).toBe('string');
     expect(validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c' })).toEqual({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c' });
+  });
+
+  it('quest_choose rejects malformed programs (programs spec §2.2)', () => {
+    const base = { type: 'quest_choose', id: 'a', beat: 'b', choice: 'c' };
+    expect(validateClientEvent({ ...base, programs: { load: ['solvent'], run: [] } })).toEqual({ ...base, programs: { load: ['solvent'], run: [] } });
+    for (const bad of [{ load: 'solvent', run: [] }, { load: [], run: [3] }, { load: ['a', 'b', 'c', 'd'], run: [] }, { load: ['x'.repeat(41)], run: [] }, { load: [] }, 'solvent'])
+      expect(validateClientEvent({ ...base, programs: bad })).toContain('programs');
     expect(typeof validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', said: 'x'.repeat(5000) })).toBe('string');
   });
 
-  it('big jobs: quest_choose carries a read or a gig result; quest_walk reaches the relay', async () => {
-    expect(validateClientEvent({ type: 'quest_choose', id: 'a', beat: '!read', choice: '!read', read: ['x', 'y', 'z'] })).toEqual({ type: 'quest_choose', id: 'a', beat: '!read', choice: '!read', read: ['x', 'y', 'z'] });
-    expect(typeof validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', read: ['x', 'y'] })).toBe('string');
-    expect(typeof validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', read: ['x', 'y', 'z'.repeat(50)] })).toBe('string');
-    expect(validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', gig: { result: 'close', seed: 42 } })).toEqual({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', gig: { result: 'close', seed: 42 } });
-    expect(typeof validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', gig: { result: 'won', seed: 42 } })).toBe('string');
-    expect(typeof validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', gig: { result: 'clean', seed: 1.5 } })).toBe('string');
-    expect(validateClientEvent({ type: 'quest_walk', id: 'north-gate' })).toEqual({ type: 'quest_walk', id: 'north-gate' });
+  it('the hand: quest_start carries a setup, quest_choose a card', async () => {
+    const setup0 = { approach: 'quiet', people: ['dez'], favour: true };
+    expect(validateClientEvent({ type: 'quest_start', id: 'a', setup: setup0 })).toEqual({ type: 'quest_start', id: 'a', setup: setup0 });
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, approach: 'loud' } })).toBe('string');
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, people: ['a', 'b', 'c', 'd'] } })).toBe('string');
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, favour: 'yes' } })).toBe('string');
+    // Programs loaded at SETUP (programs spec §1.2a): at most 3 ids.
+    expect(validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: ['solvent'] } })).toEqual({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: ['solvent'] } });
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: ['a', 'b', 'c', 'd'] } })).toBe('string');
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: [''] } })).toBe('string');
+    expect(validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', card: 'dez' })).toEqual({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', card: 'dez' });
+    expect(typeof validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', card: '' })).toBe('string');
     const { tab, calls } = setup();
-    tab.client({ type: 'quest_choose', id: 'north-gate', beat: 'gate', choice: 'wire', gig: { result: 'clean', seed: 7 } });
-    tab.client({ type: 'quest_walk', id: 'north-gate' });
+    tab.client({ type: 'quest_start', id: 'marked-cards', setup: setup0 } as never);
+    tab.client({ type: 'quest_choose', id: 'marked-cards', beat: 'b', choice: 'c', card: 'dez' } as never);
     await flush();
-    expect(calls.choose.at(-1)).toEqual({ id: 'north-gate', beat: 'gate', choice: 'wire', gig: { result: 'clean', seed: 7 } });
-    expect(calls.walk).toEqual(['north-gate']);
+    expect(calls.setups).toEqual([setup0]);
+    expect(calls.choose.at(-1)).toEqual({ id: 'marked-cards', beat: 'b', choice: 'c', card: 'dez' });
+  });
+
+  it('contact cards: quest_start setup carries contacts as ids', () => {
+    const setup0 = { approach: 'quiet', people: [], favour: false };
+    expect(validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, contacts: ['cass'] } })).toEqual({ type: 'quest_start', id: 'a', setup: { ...setup0, contacts: ['cass'] } });
+    const bad = validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, contacts: [3] } });
+    expect(typeof bad).toBe('string');
+    expect(bad).toContain('contacts');
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, contacts: ['a', 'b', 'c'] } })).toBe('string');
+  });
+
+  it('quest_walk reaches the relay', async () => {
+    expect(validateClientEvent({ type: 'quest_walk', id: 'the-contract' })).toEqual({ type: 'quest_walk', id: 'the-contract' });
+    const { tab, calls } = setup();
+    tab.client({ type: 'quest_choose', id: 'the-contract', beat: 'gate', choice: 'wire' });
+    tab.client({ type: 'quest_walk', id: 'the-contract' });
+    await flush();
+    expect(calls.choose.at(-1)).toEqual({ id: 'the-contract', beat: 'gate', choice: 'wire' });
+    expect(calls.walk).toEqual(['the-contract']);
     expect(tab.events.at(-1)).toEqual({ type: 'notice', text: "you can't walk away now", for: 'quest' });
   });
 });

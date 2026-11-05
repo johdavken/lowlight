@@ -1,30 +1,15 @@
+import { nerveMax } from './stats';
 import { describe, expect, it } from 'vitest';
-import { crackTries, foldKit, heatIn, hottest, oddsOf, outcomeTier, repDelta, repTier, TIER_NAMES, type Check, type KitEvent } from './mission';
+import { crackTries, foldKit, heatIn, hottest, outcomeTier, repDelta, repTier, TIER_NAMES, type Check, type KitEvent } from './mission';
 import type { Deck } from './gear';
 import { DAY } from './clock';
 import { DEFAULT_STATS } from './stats';
 import type { CondCtx } from './quests';
 
 const HICKS = { body: 4, reflex: 6, tech: 7, cool: 7, wits: 6, edge: 4 };
-const STALL: Deck = { id: 'stall-build', name: 'Stall build', bonus: 15, heat: 0, traits: ['fragile'] };
+const STALL: Deck = { id: 'stall-build', name: 'Stall build', quality: 2, heat: 0, traits: ['fragile'] };
 const at = (day: number, hh: number, mm = 0) => (day - 1) * DAY + hh * 60 + mm;
 const ctx = (o: Partial<CondCtx> = {}): CondCtx => ({ flags: {}, trust: 'mid', warmth: 'mid', with: 'ember', stats: HICKS, ...o });
-
-describe('oddsOf with modifiers', () => {
-  it('why order and deltas', () => {
-    const check: Check = { stat: 'tech', base: 45, grid: true, red: false, crew: [{ contact: 'ember', bonus: 15 }], mods: [{ when: [{ kind: 'set', name: 'cased' }], delta: 15, label: 'you cased the door' }] };
-    const o = oddsOf(check, { stats: HICKS, deck: STALL, with: 'ember', alarm: 1, ctx: ctx({ flags: { cased: 'yes' } }), temper: 'easy' });
-    expect(o.why).toEqual(['GRID', 'STALL BUILD +15', 'EMBER +15', '+15 YOU CASED THE DOOR', 'EASY MARK +10', 'ALARM 1 −10']);
-    expect(o.chance).toBe(95);
-    const bare = oddsOf({ ...check, crew: [], mods: [] }, { stats: HICKS, deck: null, with: 'nix', alarm: 2, ctx: ctx(), temper: 'hard' });
-    expect(bare.why).toEqual(['GRID', 'NO DECK −25', 'HARD MARK −10', 'ALARM 2 −20']);
-    expect(bare.chance).toBe(Math.max(5, 45 + 14 - 25 - 10 - 20));
-  });
-  it('a modifier whose condition fails is left out', () => {
-    const check: Check = { stat: 'cool', base: 50, grid: false, red: false, crew: [], mods: [{ when: [{ kind: 'set', name: 'cased' }], delta: 15, label: 'cased' }] };
-    expect(oddsOf(check, { stats: DEFAULT_STATS, deck: null, with: 'x', ctx: ctx() }).why).toEqual([]);
-  });
-});
 
 describe('outcome tier and rep', () => {
   it('outcomeTier', () => {
@@ -45,7 +30,7 @@ describe('outcome tier and rep', () => {
 });
 
 describe('the kit per district', () => {
-  const start = { deck: 'stall-build', edgeMax: 2, from: at(1, 20) };
+  const start = { deck: 'stall-build', nerveMax: 2, from: at(1, 20) };
   it('rep per district, clamped', () => {
     const k = foldKit(start, [
       { at: at(1, 21), rep: { district: 'karasu', delta: 60 } },
@@ -91,11 +76,27 @@ describe('crackTries', () => {
   });
 });
 
-describe('oddsOf extra (crew spec §2)', () => {
-  it('adds each extra after the modifiers, named in why', () => {
-    const check: Check = { stat: 'cool', base: 50, grid: false, crew: [], red: false, mods: [] };
-    const o = oddsOf(check, { stats: { body: 5, reflex: 5, tech: 5, cool: 5, wits: 5, edge: 5 }, deck: null, with: 'nix', extra: [{ delta: 10, label: 'CASED' }] });
-    expect(o.chance).toBe(60);
-    expect(o.why).toEqual(['CASED +10']);
+describe('NERVE (the table spec §3)', () => {
+  const start = { deck: null, nerveMax: 5, from: at(1, 20) };
+  it('nerveMax: edge 4 → 5, edge 5 → 6, edge 1 → 4', () => {
+    expect([4, 5, 1].map((edge) => nerveMax({ ...HICKS, edge }))).toEqual([5, 6, 4]);
+  });
+  it('foldKit spends nerve events and refills at 06:00', () => {
+    expect(foldKit(start, [{ at: at(1, 21), nerve: -2 }], at(1, 22))).toMatchObject({ nerveLeft: 3, nerveMax: 5, nerveGone: false });
+    expect(foldKit(start, [{ at: at(1, 21), nerve: -2 }], at(2, 7)).nerveLeft).toBe(5);
+  });
+  it('a lift ends NERVE GONE; NERVE alone leaves it on; a later 0 brings it back', () => {
+    const ev = [{ at: at(1, 21), nerve: -5 }, { at: at(1, 22), nerve: 2, lift: true as const }];
+    expect(foldKit(start, ev, at(1, 23))).toMatchObject({ nerveLeft: 2, nerveGone: false });
+    expect(foldKit(start, [ev[0], { at: at(1, 22), nerve: 2 }], at(1, 23))).toMatchObject({ nerveLeft: 2, nerveGone: true });
+    expect(foldKit(start, [...ev, { at: at(1, 22), nerve: -2 }], at(1, 23))).toMatchObject({ nerveLeft: 0, nerveGone: true });
+  });
+  it('nerveGone turns on at 0 and off at the next 06:00', () => {
+    const ev = [{ at: at(1, 21), nerve: -2 }, { at: at(1, 22), nerve: -3 }];
+    expect(foldKit(start, ev, at(1, 23))).toMatchObject({ nerveLeft: 0, nerveGone: true });
+    expect(foldKit(start, ev, at(2, 7))).toMatchObject({ nerveLeft: 5, nerveGone: false });
+  });
+  it('a legacy edge: -1 event spends 1 nerve', () => {
+    expect(foldKit(start, [{ at: at(1, 21), edge: -1 }], at(1, 22)).nerveLeft).toBe(4);
   });
 });

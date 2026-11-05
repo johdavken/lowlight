@@ -162,6 +162,9 @@ export function standingControl(o: {
   };
 }
 
+/** The reason an unpaid nightly retainer moved her trust (arrangement spec 2026-10-20 §2); only old deals made these. */
+export const UNPAID_REASON = 'Unpaid retainer';
+
 /** A job's trust stake (Intake board spec §2): her word before and after a move, and the move itself. */
 export interface TrustControl {
   /** Her word on `player` now and after `delta` (nothing written); null when standing doesn't apply. */
@@ -170,6 +173,8 @@ export interface TrustControl {
   move(player: string, delta: number, reason: string, messageId: string): void;
   /** Her trust on `player` now (stored, else the start); null when standing doesn't apply. */
   now(player: string): number | null;
+  /** Whether `player` ever left her unpaid (Tier 2 spec §1): a stored move with UNPAID_REASON. */
+  unpaid?(player: string): boolean;
 }
 
 export function trustControl(o: {
@@ -191,6 +196,9 @@ export function trustControl(o: {
     now(player) {
       const start = o.start(player);
       return start === null ? null : currentStanding(o.db, player, start, o.config(), o.shared()).values.trust;
+    },
+    unpaid(player) {
+      return (parseStored(o.db.getMeta(standingKey(player)))?.moves ?? []).some((m) => m.reason === UNPAID_REASON);
     },
     move(player, delta, reason, messageId) {
       const start = o.start(player);

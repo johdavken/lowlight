@@ -41,10 +41,10 @@ export interface LandingApi {
   models(id: string): Promise<ModelEvent>;
   /** Saves a direct character's model (null: back to her default); rejects with the server's `error` string. */
   setModel(id: string, model: string | null): Promise<void>;
-  /** The in-game link: is a key linked, its last 4 and credit. */
-  link(): Promise<link.LinkInfo>;
-  putLink(apiKey: string): Promise<link.LinkInfo | { error: link.LinkError }>;
-  deleteLink(): Promise<void>;
+  /** The in-game link: each key (OpenRouter's, Anthropic's), linked or not, its last 4 and credit. */
+  link(): Promise<link.LinkStatus>;
+  putLink(apiKey: string, provider: link.Provider): Promise<link.LinkInfo | { error: link.LinkError }>;
+  deleteLink(provider: link.Provider): Promise<void>;
   /** The shipped picks, recent models and (with q) the catalog's matches. */
   searchModels(q: string): Promise<link.ModelLists>;
   /** Every map district's name (the select screen's group labels). */
@@ -81,6 +81,8 @@ export interface LandingOptions {
     reducedMotion: boolean;
     /** The browser blocked the theme until a gesture: the first key or click starts it, the next goes on. */
     needsSound?: boolean;
+    /** The opening card's end, when one is up over the splash. */
+    noticeAfter?: Promise<void>;
   };
   /** Where Esc on the title brings the splash back. Defaults to `splash.host`; without either, Esc on the title does nothing. */
   splashHost?: HTMLElement;
@@ -127,6 +129,15 @@ const TITLES: Record<Exclude<Phase, 'model'>, string> = { p1: COPY.titleP1, you:
 
 /** A direct contact with no key linked yet: pickable, and her model step opens on LINK A MIND. */
 const isNoLink = (a: LandingAgent): boolean => a.backend === 'direct' && a.connected && a.link === 'no-link';
+
+const UNLINKED: link.LinkInfo = { linked: false, last4: null, credit: null, state: 'no-link' };
+/** `status` with one provider's link replaced, and the combined state again: ok when either key works. */
+function withLink(status: link.LinkStatus | undefined, p: link.Provider, info: link.LinkInfo): link.LinkStatus {
+  const next = { openrouter: status?.openrouter ?? UNLINKED, anthropic: status?.anthropic ?? UNLINKED, [p]: info };
+  const [a, b] = [next.openrouter, next.anthropic];
+  const state = a.state === 'ok' || b.state === 'ok' ? 'ok' : a.linked ? a.state : b.linked ? b.state : 'no-link';
+  return { ...next, state };
+}
 
 function toTile(id: string, a: LandingAgent | undefined): GridTile {
   if (!a) return { id, name: COPY.random, accent: '', thumb: null, avatar: null, avatarKind: 'monogram', offline: false, noLink: false };
@@ -282,22 +293,23 @@ export function mountLanding(
     // Her own link decides (a contact on a local endpoint needs no OpenRouter key); the OpenRouter
     // link only fills the model list's header.
     const needsKey = isNoLink(byId.get(ai)!);
-    const fallback: link.LinkInfo = { linked: !needsKey, last4: null, credit: null, state: byId.get(ai)!.link };
+    const fallback: link.LinkStatus = { state: byId.get(ai)!.link, openrouter: { linked: !needsKey, last4: null, credit: null, state: byId.get(ai)!.link }, anthropic: UNLINKED };
     void api.link().then(
       (info) => seq === panelSeq && !disposed && (needsKey ? openLinkPanel(ai, false) : openModelPanel(ai, info)),
       () => seq === panelSeq && !disposed && (needsKey ? openLinkPanel(ai, false) : openModelPanel(ai, fallback)),
     );
   };
 
-  function openLinkPanel(ai: string, changing: boolean, previous?: link.LinkInfo): void {
+  function openLinkPanel(ai: string, changing: boolean, previous?: link.LinkStatus, provider?: link.Provider): void {
     closePanel();
     const host = el('div', 'panel-host');
     const obj = new LinkPanel(host, {
-      put: (k) => api.putLink(k),
+      put: (k, p) => api.putLink(k, p),
       changing,
-      onLinked: (info) => {
+      ...(provider ? { provider } : {}),
+      onLinked: (info, p) => {
         refreshRoster();
-        openModelPanel(ai, info);
+        openModelPanel(ai, withLink(previous, p, info));
       },
       onBack: () => {
         if (changing && previous) openModelPanel(ai, previous);
@@ -313,7 +325,7 @@ export function mountLanding(
     obj.el.querySelector('input')?.focus();
   }
 
-  function openModelPanel(ai: string, info: link.LinkInfo): void {
+  function openModelPanel(ai: string, info: link.LinkStatus): void {
     closePanel();
     render();
     const seq = panelSeq;
@@ -326,7 +338,8 @@ export function mountLanding(
     ).then((agentModels) => {
       if (seq !== panelSeq || disposed) return;
       const obj = new ModelPanel(el('div', 'panel-host'), {
-        link: info,
+        link: info.openrouter,
+        anthropic: info.anthropic,
         pronoun: a.pronoun,
         agentModels,
         search: (q) => api.searchModels(q),
@@ -336,14 +349,19 @@ export function mountLanding(
           flow!.back();
           act();
         },
-        onChangeKey: () => openLinkPanel(ai, true, info),
-        onUnlink: () => {
+        onChangeKey: (p) => openLinkPanel(ai, true, info, p),
+        onLink: (p) => openLinkPanel(ai, true, info, p),
+        onUnlink: (p) => {
           const at = panelSeq;
           const still = () => at === panelSeq && !disposed && flow?.state.phase === 'model' && flow.state.ai === ai;
-          void api.deleteLink().then(
+          void api.deleteLink(p).then(
             () => {
               refreshRoster();
-              if (still()) openLinkPanel(ai, false);
+              if (!still()) return;
+              // The other key still linked: her list stays; none left: LINK A MIND.
+              const rest = withLink(info, p, UNLINKED);
+              if (rest.state === 'no-link') openLinkPanel(ai, false);
+              else openModelPanel(ai, rest);
             },
             (err: unknown) => {
               if (!still()) return;
@@ -614,6 +632,11 @@ export function mountLanding(
     if (awaitingSound) soundStarted();
     else void dismissSplash();
   };
+  /** A press on the splash: on the notice it stays (though it may still start the theme). */
+  const splashPress = (e: PointerEvent) => {
+    if (splash?.inNotice(e.target)) soundStarted();
+    else splashGesture();
+  };
   /** The intro: the logo glitches out with the backdrop and the burst; the screen glitches in ~0.4 s later. */
   const dismissSplash = async () => {
     if (!splash || dismissing) return;
@@ -654,8 +677,8 @@ export function mountLanding(
   const raiseSplash = (host: HTMLElement, intro = true) => {
     splashing = true;
     root.classList.add('splashing');
-    splash = mountSplash(host, { reducedMotion, needsSound: awaitingSound, art: opts.splashArt, intro });
-    splash.el.addEventListener('pointerdown', splashGesture);
+    splash = mountSplash(host, { reducedMotion, needsSound: awaitingSound, art: opts.splashArt, intro, noticeAfter: opts.splash?.noticeAfter });
+    splash.el.addEventListener('pointerdown', splashPress);
   };
   let titleMenu: ReturnType<typeof mountTitle> | null = null;
   /**
@@ -761,20 +784,21 @@ export function mountLanding(
     raiseSplash(splashHost, false);
     splash!.setSceneOk(skylineOk);
     // The art, the logo and the prompt (the logo and prompt sit on the splash's own stage).
-    glitchIn([...splash!.el.querySelectorAll<HTMLElement>('.splash-art, .splash-logo, .splash-wordmark, .splash-prompt')], { reducedMotion });
+    glitchIn([...splash!.el.querySelectorAll<HTMLElement>('.splash-art, .splash-logo, .splash-wordmark, .splash-prompt, .sn-wrap')], { reducedMotion });
     if (!reducedMotion) void preview.glitch().catch(() => {});
     opts.onSplashReturn?.();
   };
 
   const onKey = (e: KeyboardEvent) => {
     if (splashing) {
-      // Any key dismisses the splash; it (and any key during the glitch) never reaches the grid.
+      // Any key but the notice's scrolling ones dismisses the splash; it (and any key during the glitch) never reaches the grid.
       // Browser keys pass through untouched: Ctrl+R / F5 still reload, Escape doesn't count.
       if (isBrowserKey(e)) return;
       e.preventDefault();
       // The title menu mounts mid-glitch: it must not hear the key either.
       e.stopImmediatePropagation();
-      splashGesture();
+      if (splash?.noticeKey(e.key)) soundStarted();
+      else splashGesture();
       return;
     }
     // The load screen reads its own keys (Esc included).
@@ -952,10 +976,12 @@ export async function startLanding(): Promise<void> {
   }
   // The opening card over everything while the splash mounts underneath, the theme under its text. With sound
   // blocked it opens on the sound prompt: that first key starts the theme and the typing together.
+  let noticeAfter: Promise<void> | undefined;
   if (shouldShowOpeningCard(splash)) {
     markOpeningCardSeen();
     const card = mountOpeningCard(gameRoot(), { reducedMotion, waitForSound: needsSound, onGesture: () => audio.gesture() });
     if (needsSound) engine.onStateChange(() => engine.state().context === 'running' && card.soundStarted());
+    noticeAfter = card.done;
   }
 
   const preview = createPreview(host, (pack) => fetch(`/api/packs/${encodeURIComponent(pack)}/scenes`).then((r) => r.json()), { audio });
@@ -977,8 +1003,8 @@ export async function startLanding(): Promise<void> {
         return res.json() as Promise<ModelEvent>;
       },
       link: () => link.getLink(),
-      putLink: (k) => link.putLink(k),
-      deleteLink: () => link.deleteLink(),
+      putLink: (k, p) => link.putLink(k, p),
+      deleteLink: (p) => link.deleteLink(p),
       searchModels: (q) => link.searchModels(q),
       districts: async () => {
         const res = await fetch('/api/district-list', { signal: AbortSignal.timeout(2000) });
@@ -1000,7 +1026,7 @@ export async function startLanding(): Promise<void> {
     (p) => location.assign(p),
     preview,
     {
-      splash: splash ? { host: gameRoot(), reducedMotion, needsSound } : undefined,
+      splash: splash ? { host: gameRoot(), reducedMotion, needsSound, noticeAfter } : undefined,
       splashHost: gameRoot(),
       splashArt: art,
       reducedMotion,

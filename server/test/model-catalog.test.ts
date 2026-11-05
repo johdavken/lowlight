@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { createModelCatalog, createModelPicker } from '../src/model-catalog';
+import { createAnthropicCatalog, createModelCatalog, createModelPicker, createRoutedCatalog } from '../src/model-catalog';
 import { startStubOpenRouter, type StubOpenRouter } from './fixtures/stub-openrouter';
 
 let stub: StubOpenRouter | null = null;
@@ -142,5 +142,69 @@ describe('createModelPicker', () => {
     expect(current()).toBe('deepseek/deepseek-v3.2');
     expect(await picker.choose('nope/nope')).toBe('unknown-model');
     expect(current()).toBe('deepseek/deepseek-v3.2');
+  });
+});
+
+describe('createAnthropicCatalog / createRoutedCatalog', () => {
+  const anthropicFetch = (async () =>
+    new Response(JSON.stringify({ data: [{ type: 'model', id: 'claude-sonnet-5-5', display_name: 'Claude Sonnet 5.5', created_at: '2026-09-01T00:00:00Z' }], has_more: false, first_id: null, last_id: null }), {
+      headers: { 'content-type': 'application/json' },
+    })) as unknown as typeof fetch;
+  const anthropic = () => createAnthropicCatalog({ apiKey: () => 'sk-ant-cat', baseUrl: 'http://fake', fetchImpl: anthropicFetch });
+
+  it("Anthropic's list in the stored id form, labelled, no prices", async () => {
+    const c = anthropic();
+    expect(await c.get('anthropic/claude-sonnet-5.5')).toEqual({ id: 'anthropic/claude-sonnet-5.5', label: 'Claude Sonnet 5.5', priceIn: null, priceOut: null });
+    expect((await c.search('sonnet', 5))?.map((m) => m.id)).toEqual(['anthropic/claude-sonnet-5.5']);
+  });
+
+  it('no Anthropic key: no list', async () => {
+    expect(await createAnthropicCatalog({ apiKey: () => null, baseUrl: 'http://fake', fetchImpl: anthropicFetch }).list()).toBeNull();
+  });
+
+  it('routed: Anthropic only with just that key, else OpenRouter', async () => {
+    const or = await catalogWith();
+    const keys = { openrouter: null as string | null, anthropic: 'sk-ant-cat' as string | null };
+    const routed = createRoutedCatalog({ openrouter: or, anthropic: anthropic(), keys: () => keys });
+    expect((await routed.list())?.map((m) => m.id)).toEqual(['anthropic/claude-sonnet-5.5']);
+    keys.openrouter = 'sk-or-cat';
+    expect((await routed.list())?.map((m) => m.id)).toEqual(['z-ai/glm-5.2', 'deepseek/deepseek-v3.2']);
+  });
+});
+
+describe('createModelPicker: via', () => {
+  it('marks the choices that run through the Anthropic key', async () => {
+    const catalog = await catalogWith();
+    const picker = createModelPicker({
+      catalog,
+      defaultModel: 'z-ai/glm-5.2',
+      provider: 'openrouter',
+      curated: () => ['anthropic/claude-sonnet-5.5'],
+      store: { get: () => 'z-ai/glm-5.2', set: () => {} },
+      credit: async () => 4.12,
+      via: (id) => id === 'anthropic/claude-sonnet-5.5',
+    });
+    const e = await picker.event();
+    expect(e.choices?.map((c) => [c.id, c.via])).toEqual([['z-ai/glm-5.2', undefined], ['anthropic/claude-sonnet-5.5', 'anthropic']]);
+  });
+});
+
+describe('createModelPicker: the model her route runs', () => {
+  it('shows what she actually runs (an Anthropic-only player on a GLM character: Sonnet), the stored pick untouched', async () => {
+    const catalog = await catalogWith();
+    let stored = 'z-ai/glm-5.2';
+    const picker = createModelPicker({
+      catalog,
+      defaultModel: 'z-ai/glm-5.2',
+      provider: 'openrouter',
+      curated: () => [],
+      store: { get: () => stored, set: (id) => (stored = id ?? 'z-ai/glm-5.2') },
+      credit: async () => null,
+      shown: (id) => (id.startsWith('anthropic/') ? id : 'anthropic/claude-sonnet-5.5'),
+    });
+    const e = await picker.event();
+    expect(e.model).toBe('anthropic/claude-sonnet-5.5');
+    expect(e.choices?.map((c) => c.id)).toContain('anthropic/claude-sonnet-5.5');
+    expect(stored).toBe('z-ai/glm-5.2');
   });
 });

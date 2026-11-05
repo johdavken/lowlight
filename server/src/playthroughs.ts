@@ -8,7 +8,7 @@ import { currentSceneId } from '../../shared/scene-aliases';
 import { copyIdentityOverrides } from './playthrough-identity';
 
 /** Checkpoints kept per playthrough; manual saves are never pruned. */
-export const CHECKPOINT_CAP = 20;
+export const CHECKPOINT_CAP = 10;
 
 export type SaveRequest = Omit<SaveInfo, 'id' | 'playthrough' | 'at' | 'fingerprint'>;
 /** The open contact databases, by contact id. Contacts that aren't open aren't snapshotted. */
@@ -56,6 +56,8 @@ export interface Playthroughs {
    */
   copyLive(id: string, dbs: LiveDbs, info: Omit<PlaythroughInfo, 'id' | 'createdAt' | 'updatedAt'>): PlaythroughInfo;
   removeSave(saveId: string): void;
+  /** Names a save in whichever playthrough holds it; null when there's no such save. */
+  renameSave(saveId: string, name: string): SaveInfo | null;
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -404,6 +406,16 @@ export function createPlaythroughs(
     removeSave(saveId) {
       const found = locate(saveId);
       if (found) fs.rmSync(found.dir, { recursive: true, force: true });
+    },
+
+    renameSave(saveId, name) {
+      const found = locate(saveId);
+      if (!found) return null;
+      const info = asSave(readJson(path.join(found.dir, 'save.json')), saveId);
+      if (!info) return null;
+      const next = { ...info, name };
+      writeJsonAtomic(path.join(found.dir, 'save.json'), next);
+      return next;
     },
   };
 }

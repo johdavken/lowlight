@@ -1,34 +1,36 @@
 /**
- * LOAD (spec 2026-10-09 front-end restyle §4), in the select screen's language: the playthroughs
- * in the 1P file (↑↓), the selected one's timeline as the tile band (←→: NOW, then its saves
- * newest first), and the save's speaker as the CPU fighter with her line. Over the skyline.
+ * LOAD (spec 2026-10-09 front-end restyle §4; save strips, pause menu mockup 2026-10-30): the playthroughs
+ * on the left (←→), and the selected one's saves on the right as wide strips (↑↓): NOW, then your saves
+ * newest first, then the automatic ones. Each strip is the room with your face and theirs and the save's
+ * name. RENAME and DELETE (or R and Del) act on the playthrough at NOW, else on the save. Over the skyline.
  */
 import type { PlaythroughInfo, SaveInfo } from '../../../shared/types';
 import { ApiError, type PlaythroughApi, type PlaythroughListing } from '../net/playthroughs';
-import { FighterStrip, type FileRow } from './fighter-strip';
 import type { LandingAgent } from './landing';
 import { topRowFor } from './roster-grid';
-import { TileBand, type BandTile } from './tile-band';
 import { playPath } from './route';
 import { formatClock } from '../../../shared/clock';
-import { ago, JACK_MS, spoken, type TitleCue } from './title';
+import { ago, JACK_MS, type TitleCue } from './title';
+import { saveStrip } from '../ui/save-strip';
 import './load.css';
 
 export interface LoadDeps {
   api: PlaythroughApi;
   nav(path: string): void;
-  /** Esc: back to the title. */
+  /** Esc: back to the title (or the pause menu). */
   back(): void;
   sound(cue: TitleCue): void;
-  /** The roster, by id (the select's): fighters' art and names. */
+  /** The roster, by id (the select's): faces and names. */
   agents(): ReadonlyMap<string, LandingAgent>;
   reducedMotion: boolean;
+  /** Over a room (the pause menu): its keys go first and no further, so none reach the chat prompt behind it. */
+  exclusive?: boolean;
 }
 
-const HINTS = '[↑↓] PLAYTHROUGH · [←→] SAVE · [ENTER] LOAD · [R] RENAME · [DEL] DELETE · [ESC] BACK';
+const HINTS = '[↑↓] SAVE · [←→] PLAYTHROUGH · [ENTER] LOAD · [R] RENAME · [DEL] DELETE · [ESC] BACK';
 const CONFIRM = 'DELETE? Y/N';
 const ICONS: Record<SaveInfo['trigger'], string> = { manual: '★', travel: '⇢', end: '◼', rewind: '↺' };
-/** How many playthrough rows the 1P file shows at once (a window that follows the selection). */
+/** How many playthrough rows the left list shows at once (a window that follows the selection). */
 const LIST_ROWS = 12;
 const KINDS: Record<SaveInfo['trigger'], string> = { manual: 'SAVE', travel: 'TRIP', end: 'END', rewind: 'REWIND' };
 
@@ -43,7 +45,6 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const why = (err: unknown) => (err instanceof ApiError ? err.error : err instanceof Error ? err.message : String(err));
 /** A scene the map doesn't name: its folder, dashes as spaces. */
 const folderName = (sceneId: string) => (sceneId.split('/').pop() ?? sceneId).replace(/-/g, ' ');
-const thumbUrl = (sceneId: string) => `/scenes/${sceneId.split('/').map(encodeURIComponent).join('/')}/room.png`;
 
 /** The city map's place names by scene id; empty when the map can't load. */
 async function placeNames(): Promise<Map<string, string>> {
@@ -67,37 +68,24 @@ function history(pt: PlaythroughInfo): string | null {
     : `forked from "${from.name}" · ${ago(pt.createdAt)}`;
 }
 
-/** At most one wheel step this often (a trackpad sends dozens of events per swipe). */
-const WHEEL_GAP_MS = 120;
-
-/** A wheel handler that steps `go` by ±1, down or right being +1, at most once per WHEEL_GAP_MS. */
-function onWheel(go: (d: number) => void): (e: WheelEvent) => void {
-  let last = -Infinity;
-  return (e) => {
-    e.preventDefault();
-    const d = Math.sign(e.deltaY || e.deltaX);
-    const now = performance.now();
-    if (d === 0 || now - last < WHEEL_GAP_MS) return;
-    last = now;
-    go(d);
-  };
-}
+/** What R, Del and the buttons act on: the playthrough, or one save. */
+type Target = { kind: 'pt'; pt: PlaythroughListing } | { kind: 'save'; pt: PlaythroughListing; save: SaveInfo };
 
 export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void; refresh(): void } {
   const box = el('div', 'load-screen');
   const title = el('div', 'load-title', 'LOAD');
-  const p1 = new FighterStrip(box, 'p1', { reducedMotion: deps.reducedMotion });
-  const p2 = new FighterStrip(box, 'p2', { reducedMotion: deps.reducedMotion });
-  const band = new TileBand(box, { reducedMotion: deps.reducedMotion, visible: 8, tileW: 112, tileH: 124, onPick: (i) => pick(i), onHover: (i) => focusRow(i) });
+  const left = el('div', 'ld-pts');
+  const right = el('div', 'ld-saves');
   const under = el('div', 'load-under');
   const error = el('div', 'load-error');
   const jack = el('div', 'jack-in', 'JACK IN');
   const hints = el('div', 'load-hints', HINTS);
-  box.append(title, under, error, jack, hints);
+  box.append(title, left, right, under, error, jack, hints);
   root.append(box);
 
   let list: PlaythroughListing[] = [];
   let activeId: string | null = null;
+  /** Each playthrough's saves, newest first (fetched once). */
   const savesBy = new Map<string, SaveInfo[]>();
   let places = new Map<string, string>();
   let ptIndex = 0;
@@ -105,137 +93,206 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
   let loaded = false;
   /** The first playthrough row shown. */
   let ptTop = 0;
-  /** 0 is NOW; 1.. are the saves. */
+  /** 0 is NOW; 1.. are the saves in shown order (yours, then automatic). */
   let row = 0;
-  let confirming = false;
-  let renaming = false;
+  /** DELETE? Y/N is up, for this. */
+  let confirming: Target | null = null;
+  /** A name field is open, for this; its input survives redraws. */
+  let renaming: { target: Target; input: HTMLInputElement } | null = null;
   /** An api call (or its JACK IN) is in flight: keys wait. */
   let busy = false;
   let destroyed = false;
   let jackTimer: ReturnType<typeof setTimeout> | null = null;
 
   const selected = (): PlaythroughListing | undefined => list[ptIndex];
-  const savesOf = (pt: PlaythroughInfo | undefined) => (pt ? (savesBy.get(pt.id) ?? []) : []);
+  const byTime = (pt: PlaythroughInfo | undefined) => (pt ? (savesBy.get(pt.id) ?? []) : []);
+  /** The saves as shown: yours newest first, then the automatic ones newest first. */
+  const savesOf = (pt: PlaythroughInfo | undefined) => {
+    const all = byTime(pt);
+    return [...all.filter((s) => s.kind === 'manual'), ...all.filter((s) => s.kind !== 'manual')];
+  };
   const placeOf = (sceneId: string) => places.get(sceneId) ?? folderName(sceneId);
+  const saveAt = (pt: PlaythroughInfo, i: number): SaveInfo | undefined => (i === 0 ? undefined : savesOf(pt)[i - 1]);
+  const targetAt = (pt: PlaythroughListing, i: number): Target => {
+    const save = saveAt(pt, i);
+    return save ? { kind: 'save', pt, save } : { kind: 'pt', pt };
+  };
 
   function setHint(text: string | null): void {
     hints.textContent = text ?? HINTS;
   }
 
-  /** The agent a save's line belongs to: its speaker by name, else the contact it was saved with. */
-  function speakerOf(pt: PlaythroughInfo, s: SaveInfo | undefined): LandingAgent | undefined {
+  /** A face thumbnail for an agent id, or null. */
+  const faceOf = (id: string | undefined | null) => (id ? (deps.agents().get(id)?.thumb ?? null) : null);
+
+  /** Who a save was with: its speaker by name, else the contact it was saved with; never you; none solo. */
+  function withWhom(pt: PlaythroughInfo, s: SaveInfo | undefined): string | null {
+    if (s?.solo || (!s && pt.solo)) return null;
     const roster = deps.agents();
+    let id: string | undefined;
     if (s?.lastLine) {
       const name = s.lastLine.speaker.toLowerCase();
-      const byName = [...roster.values()].find((a) => a.name.toLowerCase() === name);
-      if (byName) return byName;
+      id = [...roster.values()].find((a) => a.name.toLowerCase() === name)?.id;
     }
-    const id = s ? s.location?.contactId : (pt.location?.contactId ?? pt.startContact);
-    return id ? roster.get(id) : undefined;
+    id ??= s ? s.location?.contactId : (pt.location?.contactId ?? pt.startContact);
+    return id && id !== pt.player ? id : null;
   }
 
   /** A save's place; a trip reads FROM → TO when the next older save was somewhere else. */
-  function whereOf(pt: PlaythroughInfo, i: number): string {
-    if (i === 0) return pt.location ? placeOf(pt.location.sceneId) : '';
-    const saves = savesOf(pt);
-    const s = saves[i - 1]!;
+  function whereOf(pt: PlaythroughInfo, s: SaveInfo | undefined): string {
+    if (!s) return pt.location ? placeOf(pt.location.sceneId) : '';
     const to = s.location ? placeOf(s.location.sceneId) : '';
     if (s.trigger !== 'travel') return to;
-    const older = saves[i]?.location;
+    const all = byTime(pt);
+    const older = all[all.indexOf(s) + 1]?.location;
     const from = older ? placeOf(older.sceneId) : null;
     return from && from !== to ? `${from} → ${to}` : to;
   }
 
-  function tiles(pt: PlaythroughInfo): BandTile[] {
-    const art = (sceneId: string | null | undefined): BandTile['art'] => (sceneId ? { kind: 'room', src: thumbUrl(sceneId) } : { kind: 'mark', text: '?' });
-    return [
-      { id: 'now', name: ago(pt.updatedAt), art: art(pt.location?.sceneId), tag: { text: '▶ NOW', now: true } },
-      ...savesOf(pt).map((s) => ({ id: s.id, name: ago(s.at), art: art(s.location?.sceneId), tag: { text: ICONS[s.trigger] } })),
-    ];
+  /** RENAME and DELETE for `t`. */
+  function actions(t: Target): HTMLElement {
+    const acts = el('div', 'ld-acts');
+    const btn = (text: string, cls: string, go: () => void) => {
+      const b = el('button', `ld-btn ${cls}`, text);
+      b.type = 'button';
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (busy || renaming) return;
+        go();
+      });
+      return b;
+    };
+    acts.append(btn('✎ RENAME', 'ld-rename', () => startRename(t)), btn('✕ DELETE', 'ld-delete', () => askDelete(t)));
+    return acts;
   }
 
-  /** The 1P side: the selected playthrough's player, and every playthrough as a row. */
-  function renderPlayer(pt: PlaythroughListing): void {
-    p1.show(deps.agents().get(pt.player) ?? null, { locked: false });
-    // The list is something to read: lit even when the player isn't in the roster.
-    p1.el.classList.remove('waiting');
-    if (pt.persona) p1.showYou(pt.persona);
-    p1.setTag(`1P · ${ptIndex + 1}/${list.length}`);
+  /** The left side: every playthrough as a row (a window round the selection), the selected one's buttons, its file. */
+  function renderLeft(pt: PlaythroughListing): void {
     ptTop = topRowFor(ptIndex, ptTop, list.length, LIST_ROWS);
-    const rows: FileRow[] = list.slice(ptTop, ptTop + LIST_ROWS).map((p) => ({
-      row: { id: p.id, text: p.name, on: p.id === pt.id, aside: ago(p.updatedAt), ...(p.id === activeId ? { chip: 'ACTIVE' } : {}) },
-    }));
+    const rows: HTMLElement[] = [el('div', 'ld-head', 'PLAYTHROUGHS')];
+    for (const p of list.slice(ptTop, ptTop + LIST_ROWS)) {
+      const on = p.id === pt.id;
+      const editing = renaming?.target.kind === 'pt' && renaming.target.pt.id === p.id;
+      const r = el('div', `pt${on ? ' on' : ''}${editing ? ' editing' : ''}`);
+      r.dataset.id = p.id;
+      if (editing) {
+        r.append(renaming!.input, el('small', 'ld-edit-hint', '[ENTER] RENAME · [ESC] KEEP'));
+      } else {
+        const name = el('span', 'pt-name', p.name);
+        if (p.id === activeId) name.append(el('span', 'chip', 'ACTIVE'));
+        r.append(name, el('small', 'pt-ago', ago(p.updatedAt)));
+      }
+      rows.push(r);
+      if (on && !editing) rows.push(actions({ kind: 'pt', pt: p }));
+    }
+    const saves = byTime(pt);
+    const mine = saves.filter((s) => s.kind === 'manual').length;
     const from = history(pt);
-    p1.setFile({
-      name: pt.name,
-      tagline: [pt.id === activeId ? 'Active' : null, pt.persona?.name ?? cap(pt.player), ago(pt.updatedAt)].filter(Boolean).join(' · '),
-      head: '// PLAYTHROUGHS',
-      rows: from ? [...rows, { p: from }] : rows,
-    });
+    const file = el('div', 'ld-file');
+    file.append(
+      el('div', '', [pt.persona?.name ?? cap(pt.player), pt.id === activeId ? 'Active' : null].filter(Boolean).join(' · ')),
+      el('div', '', `${mine} ${mine === 1 ? 'save' : 'saves'} · ${saves.length - mine} auto`),
+      ...(from ? [el('div', 'ld-from', from)] : []),
+    );
+    rows.push(file);
+    left.replaceChildren(...rows);
   }
 
-  /** The CPU side and the under line: the focused stop on the timeline. */
-  function renderStop(pt: PlaythroughListing): void {
-    const s = row === 0 ? undefined : savesOf(pt)[row - 1];
-    const her = speakerOf(pt, s);
-    p2.show(her ?? null, { locked: false });
-    p2.setTag(`CPU · ${s ? KINDS[s.trigger] : 'NOW'}`);
-    const where = whereOf(pt, row);
-    const at = s ? s.at : pt.updatedAt;
-    const when = [s?.timeOfDay, ago(at)].filter((x): x is string => !!x).join(' · ');
-    p2.setFile({
-      ...(her ? {} : { name: s?.lastLine?.speaker ?? '???' }),
-      tagline: where,
-      head: s ? '// AT THIS SAVE' : '// WHERE YOU LEFT IT',
-      rows: [
-        ...(s?.lastLine ? [{ quote: spoken(s.lastLine.text) }] : []),
-        {
-          facts: [
-            { label: 'WHEN', value: when },
-            ...(her?.modelLabel ? [{ label: 'MODEL', value: her.modelLabel }] : []),
-            { label: 'LOAD', value: s ? 'starts a new one here' : 'continues this playthrough' },
-          ],
-        },
-      ],
-    });
+  /** One stop on the right: NOW (i 0) or a save, as a strip. */
+  function stripFor(pt: PlaythroughListing, i: number): HTMLElement {
+    const s = saveAt(pt, i);
+    const editing = !!s && renaming?.target.kind === 'save' && renaming.target.save.id === s.id;
+    const where = whereOf(pt, s);
     const storyTime = s?.clock !== undefined ? formatClock(s.clock) : null;
-    if (!renaming) under.textContent = confirming ? CONFIRM : [where, s?.timeOfDay, storyTime, ago(at)].filter((x): x is string => !!x).join(' · ').toUpperCase();
+    const meta = [where, s ? (storyTime ?? s.timeOfDay) : null, ago(s ? s.at : pt.updatedAt)].filter((x): x is string => !!x).join(' · ');
+    const strip = saveStrip({
+      scene: (s ? s.location?.sceneId : pt.location?.sceneId) ?? null,
+      you: faceOf(pt.player),
+      them: faceOf(withWhom(pt, s)),
+      name: s ? s.name : '▶ NOW',
+      meta,
+      ...(s ? { kind: `${ICONS[s.trigger]} ${KINDS[s.trigger]}` } : {}),
+      size: s && s.kind !== 'manual' ? 'small' : 'big',
+    });
+    strip.dataset.row = String(i);
+    strip.dataset.id = s ? s.id : 'now';
+    if (!s) strip.classList.add('ss-now');
+    if (i === row) strip.classList.add('on');
+    if (editing) {
+      const name = strip.querySelector('.ss-name')!;
+      name.replaceChildren(renaming!.input);
+      strip.classList.add('editing');
+    } else if (s && i === row) strip.append(actions({ kind: 'save', pt, save: s }));
+    return strip;
   }
 
-  /** Everything for the selected playthrough; `band` rebuilds the timeline (glitching it in on a new playthrough). */
-  function render(o: { band?: 'glitch' | 'quiet' } = {}): void {
+  /** The right side: NOW, then SAVES (yours), then AUTO, each group headed. */
+  function renderRight(pt: PlaythroughListing): void {
+    const shown = savesOf(pt);
+    const mine = shown.filter((s) => s.kind === 'manual').length;
+    const out: HTMLElement[] = [stripFor(pt, 0)];
+    const group = (text: string, small: string) => {
+      const g = el('div', 'ld-group', text);
+      g.append(el('small', '', small));
+      return g;
+    };
+    if (mine > 0) out.push(group('SAVES', 'YOURS · NEVER PRUNED'));
+    shown.forEach((s, k) => {
+      if (k === mine) out.push(group('AUTO', 'LAST 10'));
+      out.push(stripFor(pt, k + 1));
+    });
+    right.replaceChildren(...out);
+    right.querySelector<HTMLElement>('.ss.on')?.scrollIntoView?.({ block: 'nearest' });
+  }
+
+  function render(): void {
     if (destroyed) return;
     const pt = selected();
     if (!pt) {
-      p1.show(null, { locked: false });
-      p2.show(null, { locked: false });
-      band.setTiles([], 0);
+      left.replaceChildren(el('div', 'ld-head', 'PLAYTHROUGHS'));
+      right.replaceChildren();
       under.textContent = loaded ? 'NO PLAYTHROUGHS' : '';
       return;
     }
-    if (o.band) band.setTiles(tiles(pt), row, { glitch: o.band === 'glitch' });
-    else band.move(row);
-    renderPlayer(pt);
-    renderStop(pt);
+    renderLeft(pt);
+    renderRight(pt);
+    under.textContent = confirming ? (confirming.kind === 'pt' ? `DELETE "${confirming.pt.name}"? Y/N` : `DELETE "${confirming.save.name}"? Y/N`) : '';
+    // YES and NO for a pointer (review I2), as Y and N.
+    if (confirming) {
+      const answer = (text: string, cls: string, yes: boolean) => {
+        const b = el('button', `ld-btn ${cls}`, text);
+        b.type = 'button';
+        b.addEventListener('click', () => {
+          const t = confirming;
+          if (!t) return;
+          confirming = null;
+          render();
+          if (yes) remove(t);
+        });
+        return b;
+      };
+      under.append(answer('YES', 'ld-yes ld-delete', true), answer('NO', 'ld-no', false));
+    }
+    // Focus stays in an open name field through a redraw.
+    if (renaming && document.activeElement !== renaming.input) renaming.input.focus();
   }
 
-  /** The selected playthrough's saves, newest first (fetched once). */
+  /** The selected playthrough's saves (fetched once). */
   async function fetchSaves(pt: PlaythroughInfo): Promise<void> {
     if (savesBy.has(pt.id)) return;
-    // Arriving the first time, the timeline glitches in (the NOW tile alone just did).
     try {
       const saves = await deps.api.listSaves(pt.id);
       savesBy.set(pt.id, [...saves].sort((a, b) => b.at - a.at));
     } catch (err) {
       error.textContent = `// COULDN'T LIST SAVES — ${why(err)}`;
     }
-    if (selected()?.id === pt.id) render({ band: renaming ? 'quiet' : 'glitch' });
+    if (selected()?.id === pt.id) render();
   }
 
   function selectPlaythrough(i: number): void {
     ptIndex = i;
     row = 0;
-    render({ band: 'glitch' });
+    render();
     const pt = selected();
     if (pt) void fetchSaves(pt);
   }
@@ -243,7 +300,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
   /** Keys work again: the lock and JACK IN come off. */
   function unlock(): void {
     busy = false;
-    band.setLive(true);
+    box.classList.remove('locked');
     jack.classList.remove('on');
     render();
   }
@@ -266,19 +323,15 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     }
   }
 
-  /** Lock flash and shake, then JACK IN (NOW) or FORK HERE (a save) types out; the call goes after JACK_MS. */
+  /** JACK IN (NOW) or FORK HERE (a save) types out; the call goes after JACK_MS. */
   function enter(): void {
     const pt = selected();
     if (!pt || busy) return;
-    const s = row === 0 ? undefined : savesOf(pt)[row - 1];
+    const s = saveAt(pt, row);
     if (row !== 0 && !s) return;
     deps.sound('confirm');
     busy = true;
-    band.setLive(false);
-    p1.lock();
-    p2.lock();
-    p1.shake();
-    p2.shake();
+    box.classList.add('locked');
     jack.textContent = s ? 'FORK HERE' : 'JACK IN';
     jack.classList.add('on');
     jackTimer = setTimeout(() => {
@@ -297,11 +350,15 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     }, JACK_MS);
   }
 
-  /** Del then Y: on NOW the playthrough (the active one refuses), on a save that save. */
-  function remove(): void {
-    const pt = selected();
-    if (!pt) return;
-    if (row === 0) {
+  function askDelete(t: Target): void {
+    confirming = t;
+    render();
+  }
+
+  /** Y on DELETE?: the playthrough (the active one refuses), or that save. */
+  function remove(t: Target): void {
+    const pt = t.pt;
+    if (t.kind === 'pt') {
       void attempt('DELETE', async () => {
         await deps.api.removePlaythrough(pt.id);
         list = list.filter((p) => p.id !== pt.id);
@@ -310,31 +367,29 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
       });
       return;
     }
-    const s = savesOf(pt)[row - 1];
-    if (!s) return;
     void attempt('DELETE', async () => {
-      await deps.api.removeSave(s.id);
-      const rest = savesOf(pt).filter((x) => x.id !== s.id);
+      await deps.api.removeSave(t.save.id);
+      const rest = byTime(pt).filter((x) => x.id !== t.save.id);
       savesBy.set(pt.id, rest);
       row = Math.min(row, rest.length);
-      render({ band: 'quiet' });
     });
   }
 
-  /** R: the under line becomes the selected playthrough's name field; Enter renames, Esc keeps it. */
-  function startRename(): void {
-    const pt = selected();
-    if (!pt) return;
-    renaming = true;
+  /** A name field in place of the playthrough's row or the save's name: Enter renames, Esc (or leaving it) keeps. */
+  function startRename(t: Target): void {
+    if (busy || renaming) return;
+    confirming = null;
     const input = el('input', 'pn-input');
-    input.value = pt.name;
+    const old = t.kind === 'pt' ? t.pt.name : t.save.name;
+    input.value = old;
     input.maxLength = 80;
-    under.replaceChildren(input);
+    renaming = { target: t, input };
+    render();
     input.focus();
     input.select();
     const done = () => {
-      if (!renaming) return;
-      renaming = false;
+      if (renaming?.input !== input) return;
+      renaming = null;
       render();
     };
     input.addEventListener('keydown', (e) => {
@@ -347,25 +402,24 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
         e.preventDefault();
         const next = input.value.trim();
         if (busy) return;
-        if (!next || next === pt.name) return done();
-        // Off before the call: its render puts the under line back.
-        renaming = false;
+        if (!next || next === old) return done();
+        // Off before the call: its redraw puts the row or strip back.
+        renaming = null;
         void attempt('RENAME', async () => {
-          const updated = await deps.api.rename(pt.id, next);
-          list = list.map((p) => (p.id === pt.id ? { ...updated, contacts: p.contacts } : p));
+          if (t.kind === 'pt') {
+            const updated = await deps.api.rename(t.pt.id, next);
+            list = list.map((p) => (p.id === t.pt.id ? { ...updated, contacts: p.contacts } : p));
+          } else {
+            const updated = await deps.api.renameSave(t.save.id, next);
+            savesBy.set(t.pt.id, byTime(t.pt).map((x) => (x.id === updated.id ? updated : x)));
+          }
         });
       }
     });
     input.addEventListener('blur', done);
   }
 
-  function pick(i: number): void {
-    if (busy || renaming) return;
-    if (i === row) return enter();
-    focusRow(i);
-  }
-
-  /** Focuses stop `i` on the timeline (keys, the mouse over a tile, the wheel). */
+  /** Focuses stop `i` (keys, a click on a strip). */
   function focusRow(i: number): void {
     if (busy || renaming || confirming || i === row) return;
     row = i;
@@ -373,7 +427,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     render();
   }
 
-  /** The next or previous stop on the timeline, clamped to NOW and the oldest save. */
+  /** The next or previous stop, clamped to NOW and the last save. */
   function stepRow(d: number): void {
     const pt = selected();
     if (pt) focusRow(Math.min(savesOf(pt).length, Math.max(0, row + d)));
@@ -388,12 +442,9 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     selectPlaythrough(i);
   }
 
-  band.el.addEventListener('wheel', onWheel(stepRow), { passive: false });
-  p1.el.addEventListener('wheel', onWheel(stepPlaythrough), { passive: false });
-
-  p1.el.addEventListener('click', (e) => {
+  left.addEventListener('click', (e) => {
     const r = (e.target as HTMLElement).closest<HTMLElement>('.pt');
-    if (!r || busy || renaming) return;
+    if (!r || busy || renaming || confirming) return;
     const i = list.findIndex((p) => p.id === r.dataset.id);
     if (i >= 0 && i !== ptIndex) {
       deps.sound('move');
@@ -401,15 +452,28 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     }
   });
 
+  // A click on a strip focuses it; on the focused one, it loads.
+  right.addEventListener('click', (e) => {
+    const s = (e.target as HTMLElement).closest<HTMLElement>('.ss');
+    if (!s || busy || renaming || confirming) return;
+    const i = Number(s.dataset.row);
+    if (i === row) enter();
+    else focusRow(i);
+  });
+
   const onKey = (e: KeyboardEvent) => {
-    if (isModified(e) || renaming) return;
+    // A name field takes its own keys (and stops them there).
+    if (renaming) return;
+    if (deps.exclusive) e.stopImmediatePropagation();
+    if (isModified(e)) return;
     if (confirming) {
       const k = e.key.toLowerCase();
       if (k !== 'y' && k !== 'n' && e.key !== 'Escape') return;
       e.preventDefault();
-      confirming = false;
+      const t = confirming;
+      confirming = null;
       render();
-      if (k === 'y') remove();
+      if (k === 'y') remove(t);
       return;
     }
     if (e.key === 'Escape') {
@@ -428,23 +492,22 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     setHint(null);
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
-      stepPlaythrough(e.key === 'ArrowUp' ? -1 : 1);
+      stepRow(e.key === 'ArrowUp' ? -1 : 1);
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
-      stepRow(e.key === 'ArrowLeft' ? -1 : 1);
+      stepPlaythrough(e.key === 'ArrowLeft' ? -1 : 1);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       enter();
     } else if (e.key === 'r' || e.key === 'R') {
       e.preventDefault();
-      startRename();
+      startRename(targetAt(pt, row));
     } else if (e.key === 'Delete') {
       e.preventDefault();
-      confirming = true;
-      render();
+      askDelete(targetAt(pt, row));
     }
   };
-  window.addEventListener('keydown', onKey);
+  window.addEventListener('keydown', onKey, deps.exclusive === true);
 
   void (async () => {
     const [res, names] = await Promise.all([deps.api.listPlaythroughs().catch((err: unknown) => (error.textContent = `// COULDN'T LIST PLAYTHROUGHS — ${why(err)}`, null)), placeNames()]);
@@ -468,7 +531,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     destroy() {
       destroyed = true;
       if (jackTimer !== null) clearTimeout(jackTimer);
-      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keydown', onKey, deps.exclusive === true);
       box.remove();
     },
   };

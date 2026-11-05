@@ -1,12 +1,13 @@
 ---
 title: Cut Short
+art: cut-short.webp
 kind: mission
 tier: 1
 with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's hands won't stop shaking. Her script came from the Open Hand, and it wasn't what the label said.
-pay: 50-150
+pay: 90-110
 minutes: 20
 posts: 20:00-02:00
 trust: 1 / 1
@@ -14,6 +15,7 @@ trust: 1 / 1
 
 # client
 stranger: Sun — a line cook, chrome in both hands, holding a cup of tea in both of them so it won't spill
+face: local-06
 
 *Sun's chrome hands won't keep still. She bought this month's script at the Open Hand because it was cheaper than MiraGen, and the ampoule in her pocket is cloudy where it should be clear.*
 
@@ -28,6 +30,7 @@ view nix-direct: Cut script. You've seen this twice this year, and both times th
 
 # ripper
 stranger: The night ripper — gloves on, mask down, a cigarette she isn't allowed to smoke
+face: local-01
 
 *She looks at the cloudy ampoule and then at you, and her face doesn't change at all.*
 

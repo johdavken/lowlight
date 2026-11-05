@@ -42,6 +42,7 @@
     }
   ],
   "standing": {
+    "vouches": "face",
     "start": {
       "trust": -3,
       "warmth": 4
@@ -60,7 +61,41 @@
     {
       "from": "10:00",
       "to": "02:00",
-      "room": "marsh/counting-house"
+      "room": "marsh/counting-house",
+      "days": [
+        "mon",
+        "wed",
+        "thu",
+        "sat",
+        "sun"
+      ]
+    },
+    {
+      "from": "10:00",
+      "to": "14:00",
+      "room": "marsh/counting-house",
+      "days": [
+        "tue",
+        "fri"
+      ]
+    },
+    {
+      "from": "14:00",
+      "to": "16:00",
+      "room": "strand/low-roller",
+      "days": [
+        "tue",
+        "fri"
+      ]
+    },
+    {
+      "from": "16:00",
+      "to": "02:00",
+      "room": "marsh/counting-house",
+      "days": [
+        "tue",
+        "fri"
+      ]
     }
   ],
   "stats": { "body": 5, "reflex": 3, "tech": 6, "cool": 7, "wits": 8, "edge": 4 },

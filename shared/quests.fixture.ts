@@ -223,121 +223,7 @@ take: part
 → end
 `;
 
-/**
- * A big job (big jobs spec): legwork scenes at places, clues, a three-blank read, routes into gigs.
- * The ask marks the ferry and the Intake; the Intake's log reveals the Tilt.
- */
-export const BIG = `---
-title: North Gate
-kind: big
-tier: 3
-with: [hicks, ember, nix-direct]
-starts: haes-noodles
-pitch: A courier keeps getting through the north gate. Someone wants to know how, and wants in.
-pay: 1500-3000
-go: 03:00
-stake: 15 / 25
----
-
-# ask
-*The fixer slides a photo across the counter: a courier at the north gate, waved through.*
-
-- take: Take the job. → taken
-- think: Say you'll think about it, and take it anyway. → taken
-
-## taken
-*You have until three.*
-marks: ferry-stairs "the courier came through here", lowlight-intake "the gate's paperwork"
-→ back
-
-# ferry at ferry-stairs
-*The last ferry noses in under the floodlights.*
-
-- look: Check the railing. → strap / nothing [check wits 50]
-- lean: Lean on the deckhand. → leaned [alarm +1]
-
-## strap
-*A strap snagged on the railing.*
-clue: strap
-→ back
-
-## nothing
-*Nothing on the railing but rust.*
-→ back
-
-## leaned
-*He talks to make you go away.*
-heat: +1
-clue: rumour
-→ back
-
-# intake at lowlight-intake if time>=02:00
-*The night clerk is asleep over the log.*
-
-- log: Read the log over his shoulder. → logged
-- wait: Wait for him to wake. → logged [clock +30m]
-
-# intake at lowlight-intake
-*The night clerk watches you over the log.*
-
-- log: Ask to see the log. → logged
-- leave: Leave him be. → nothing
-
-## logged
-*The gate's shift change is written in the margin.*
-clue: schedule
-reveals: the-tilt "the guard drinks here"
-→ back
-
-# bar at the-tilt
-*The guard's off shift, at the end of the bar.*
-
-- buy: Buy him a drink. → paid-off
-- watch: Watch who pays his tab. → paid-off [clock +30m]
-
-## paid-off
-*Someone else is paying his tab, and has been for weeks.*
-clue: paid
-→ back
-
-# clues
-- strap: A courier's strap snagged on the ferry railing. · words: the courier, the ferry
-- schedule: The north gate's guard changes at 04:00. · words: the north gate
-- rumour: The deckhand swears the guard's on SDG pay. · words: SDG pay · false
-- paid: Someone pays the guard's bar tab. · words: the guard is paid
-
-# read
-read: [the courier] gets through [the north gate] because [the guard is paid].
-wrong: the dock, the river, the night shift
-→ gate
-
-# gate
-*The north gate, a little before three.*
-
-- wire: Loop the gate's cameras from the substation. → in-clean / in-close / burned [gig hack medium · if read.2=right -1 "you know the gate" · hicks -1]
-- walk: Walk in with the shift change. → in-clean / in-close / burned [gig slip hard · if read=full -1 "you know the timing"]
-- paper: Hand the gate a courier's papers. → in-clean / in-close / burned [gig papers medium, needs read.1=right]
-
-## in-clean
-*In and out, and nobody the wiser.*
-pay: full
-take: full
-→ end
-
-## in-close
-*In and out, with a close call at the gate.*
-pay: half
-take: part
-→ end
-
-## burned
-*The gate goes up in alarms. You get out with nothing.*
-heat: +2
-take: none
-→ end
-`;
-
-/** The arrangement's Chair (spec 2026-10-20), cut down: Nix names her price; the deal strikes 150 a night, one job. */
+/** The arrangement's Chair (spec 2026-10-20), cut down: Nix names her price; the deal strikes a 25% cut, one job a night. */
 export const CHAIR = `---
 title: The Chair
 with: [nix-direct]
@@ -354,7 +240,7 @@ view any: You know what you're worth.
 
 ## struck
 *She writes it in the ledger.*
-arrangement: chair 150 / 1
+arrangement: chair-cut 25 / 1
 → end
 
 ## passed

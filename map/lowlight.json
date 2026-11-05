@@ -1082,7 +1082,6 @@
         31.5
       ],
       "scene": "karasu/public-landing",
-      "gigs": true,
       "on": "ribbon",
       "level": 6
     },
@@ -1108,7 +1107,6 @@
       ],
       "scene": "karasu/second-socket",
       "hires": [
-        "wire",
         "runner"
       ],
       "on": "ribbon",
@@ -1268,8 +1266,7 @@
         83.6,
         26
       ],
-      "scene": "velvet/under-the-cat",
-      "gigs": true
+      "scene": "velvet/under-the-cat"
     },
     {
       "id": "the-open-hand",
@@ -1350,6 +1347,10 @@
         35.6
       ],
       "scene": "spine/long-haul",
+      "hires": [
+        "runner",
+        "muscle"
+      ],
       "on": "spine",
       "level": "roof"
     },

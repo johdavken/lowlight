@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { rng } from '../gig/generate';
+import { rng } from '../rng';
 import { chance, chooseMove, DEFAULT_SETTINGS, simulate, strongestFace, TUNE, type DiceSettings } from './opponent';
 import { bid, callLiar, countFace, isLegal, lastBid, newGame, totalDice, type DiceState } from './rules';
 

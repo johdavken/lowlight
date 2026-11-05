@@ -4,6 +4,8 @@
  * story meta key in her database and the tool moves it.
  */
 
+import { HIREABLE, normalSpec, type Specialty } from './crew-book';
+
 /** Every number Standing uses, in one place for the hand-check to tune. */
 export const STANDING = {
   min: -10,
@@ -60,6 +62,8 @@ export interface StandingConfig {
   secret: string | null;
   hint: string | null;
   words: Partial<Record<Cell, string>>;
+  /** Crew spec §5: the specialty her vouched hire has; absent: drawn. */
+  vouches?: Specialty;
 }
 
 /** `world/standing.json`: the shared words and the band lines. */
@@ -96,6 +100,9 @@ export const DEFAULT_SHARED_STANDING: SharedStanding = {
 export function bandOf(v: number): Band {
   return v <= STANDING.lowMax ? 'low' : v >= STANDING.highMin ? 'high' : 'mid';
 }
+
+/** Crew spec §5: a contact vouches for a hire with trust in the top band and warmth not in the bottom one. */
+export const VOUCH_CELLS: readonly Cell[] = ['high-mid', 'high-high'];
 
 export function cellOf(v: StandingValues): Cell {
   return `${bandOf(v.trust)}-${bandOf(v.warmth)}`;
@@ -156,7 +163,13 @@ export function parseStandingConfig(raw: unknown, warn: (m: string) => void): St
         if (w !== null) words[k] = w;
       }
   }
-  return { start, want, secret, hint: secret === null ? null : hintText, words };
+  let vouches: Specialty | undefined;
+  if (raw.vouches !== undefined) {
+    const vouch = normalSpec(raw.vouches);
+    if (typeof vouch === 'string' && (HIREABLE as string[]).includes(vouch)) vouches = vouch as Specialty;
+    else warn(`standing.vouches: not a specialty you can hire (${HIREABLE.join(', ')}); dropped`);
+  }
+  return { start, want, secret, hint: secret === null ? null : hintText, words, ...(vouches ? { vouches } : {}) };
 }
 
 /** `world/standing.json`, each entry checked on its own: a missing or bad one falls back to the default with a warning. */

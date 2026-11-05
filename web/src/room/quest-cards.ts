@@ -3,11 +3,11 @@
  * A card click chooses it. A line the pick check held lights its card with THAT'S MY CHOICE (choose it with
  * that line) and JUST TALKING (send the line on as ordinary chat).
  */
+import { ALARM_MAX, deckNotes, EFFECT_NAMES, POSITION_NAMES, type Pool } from '../../../shared/dice';
 import type { ChatMessage, Debrief, QuestState } from '../../../shared/types';
 import { debriefEl } from './debrief';
 import { hhmmOf, minuteOfDay } from '../../../shared/clock';
 import { passiveLabels } from '../ui/passive';
-import { mountReadBoard } from './read-board';
 import { markLore } from '../ui/lore-hover';
 
 type Active = NonNullable<QuestState['active']>;
@@ -69,58 +69,53 @@ function storyEl(text: string): HTMLElement {
   return box;
 }
 
-/** A job's strip under its title (small jobs spec §6): ALARM in 3 segments, EDGE, HEAT, the pay range. */
+/** A clock as lit segments (the table spec §4): its name, then `size` pips with `filled` lit. */
+function clockEl(cls: string, name: string, filled: number, size: number): HTMLElement {
+  const c = el('span', cls);
+  c.append(el('b', '', name));
+  for (let i = 0; i < size; i++) c.append(el('i', i < filled ? 'on' : ''));
+  return c;
+}
+
+/** A job's strip under its title (the table spec §4): TAKE and ALARM as clocks, NERVE, HEAT, the pay range. */
 function stripEl(a: Active): HTMLElement | null {
   if (a.alarm === undefined) return null;
   const strip = el('div', 'qc-strip');
-  const alarm = el('span', 'qc-alarm');
-  alarm.append(el('b', '', 'ALARM'));
-  for (let i = 0; i < 3; i++) alarm.append(el('i', i < a.alarm ? 'on' : ''));
-  strip.append(alarm, el('span', 'qc-edge', `EDGE ${a.edge ?? 0}`), el('span', 'qc-heat', `HEAT ${a.heat ?? 0}`));
+  if (a.take) strip.append(clockEl('qc-take', 'TAKE', a.take.filled, a.take.size));
+  strip.append(clockEl('qc-alarm', 'ALARM', a.alarm, ALARM_MAX), el('span', 'qc-nerve', `NERVE ${a.nerve?.left ?? 0}/${a.nerve?.max ?? 0}`), el('span', 'qc-heat', `HEAT ${a.heat ?? 0}`));
   if (a.pay && a.pay[1] > 0) strip.append(el('span', 'qc-pay', `PAY ${a.pay[0] === a.pay[1] ? a.pay[0] : `${a.pay[0]}–${a.pay[1]}`} SOL`));
-  // A big job (big jobs spec §5): its section first, and during legwork the go hour and the time left.
-  if (a.big) {
-    strip.prepend(el('span', 'qc-section', SECTION_WORD[a.big.section]));
-    if (a.big.section === 'legwork') strip.append(el('span', 'qc-go', `GO ${a.big.go}${a.big.left !== null ? ` · IN ${span(a.big.left).toUpperCase()}` : ''}`));
-  }
+  if (a.push && a.push.pot > 0) strip.append(el('span', 'qc-pot', `POT +${a.push.pot} SOL`));
   return strip;
 }
 
-const SECTION_WORD = { legwork: 'LEGWORK', read: 'THE READ', approach: 'THE APPROACH', out: 'OUT' } as const;
-
-/** A big job's clues held, folded (big jobs spec §5). */
-function cluesEl(big: NonNullable<Active['big']>): HTMLElement | null {
-  if (!big.clues.length) return null;
-  const d = el('details', 'qc-clues');
-  d.append(el('summary', '', `CLUES · ${big.clues.length}`));
-  const ul = el('ul', '');
-  for (const c of big.clues) ul.append(el('li', '', c.text));
-  d.append(ul);
-  return d;
+/** A card's dice (the table spec §4): `· TECH ●●● +RUE ● −NO DECK ○ · IN THE OPEN`, the position in its colour. */
+function oddsEl(pool: Pool): HTMLElement {
+  // The stat's own dice (older states without it: the pool less its parts).
+  const base = pool.base ?? Math.max(0, pool.dice - pool.parts.reduce((n, p) => n + p.dice, 0));
+  const parts = pool.parts.map((p) => (p.dice > 0 ? ` +${p.label} ●` : ` −${p.label} ○`)).join('');
+  const odds = el('span', 'qc-odds', `· ${pool.stat} ${'●'.repeat(base)}${parts} · `);
+  odds.append(el('span', `qc-pos qc-pos-${pool.position}`, POSITION_NAMES[pool.position]));
+  // How much a pass fills TAKE (effect and NERVE spec §3): none on a check that fills none.
+  if (pool.effect) odds.append(' · ', el('span', `qc-eff qc-eff-${pool.effect}`, EFFECT_NAMES[pool.effect]));
+  // What the deck does here (deck effects spec §3): `· DECK HOLDS · HIDDEN · NO HEAT`.
+  for (const n of deckNotes(pool)) odds.append(` · ${n}`);
+  return odds;
 }
 
-/** Legwork's marked places still to visit (big jobs spec §2). */
-function marksEl(big: NonNullable<Active['big']>): HTMLElement | null {
-  if (big.section !== 'legwork' || !big.marks.length) return null;
-  const ul = el('ul', 'qc-marks');
-  for (const m of big.marks) ul.append(el('li', '', `${m.name} · ${m.line}`));
-  return ul;
-}
-
-export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string, said?: string): void; onTalk(text: string): void; onContinue?(id: string): void; onShown?(shown: boolean): void;
+export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string, said?: string, push?: boolean): void; onTalk(text: string): void; onContinue?(id: string): void; onShown?(shown: boolean): void;
   /** WAIT UNTIL in the waiting panel: let the clock run on this many minutes. */
   onWait?(minutes: number): void;
   /** A line under the cards for a new player (null: none). */
   hint?(): string | null;
   /** The pointer came onto a job's card (its hover cue). */
   onHover?(): void;
-  /** READ IT on a big job's read (big jobs spec §3). */
-  onRead?(picks: [string, string, string]): void;
 }): QuestCards {
   host.classList.add('qc-host');
   host.hidden = true;
   let active: Active | null = null;
   let story: string | null = null;
+  /** PUSH is on for the next checked card (the table spec §3). */
+  let pushOn = false;
   let ended: string | null = null;
   /** The ended job's debrief card, built once (its stamp cue and count-up play once). */
   let debrief: HTMLElement | null = null;
@@ -196,6 +191,23 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
     // A blown job waiting on its cover cards (small jobs spec §5).
     const cover = active.choices.some((c) => c.id === '!burner' || c.id === '!fall-guy');
     if (cover) head.append(el('span', 'qc-blown', 'BLOWN'));
+    // A job on its WALK / PRESS ON card (pressing on spec §4).
+    if (active.push) head.append(el('span', 'qc-push', 'PRESS ON?'));
+    // A full ALARM (the table spec §2).
+    if (active.getaway) head.append(el('span', 'qc-getaway', 'GET OUT'));
+    // PUSH (the table spec §3): one toggle, with 2 NERVE to spare and a checked card that isn't red.
+    const canPush = (active.nerve?.left ?? 0) >= 2 && active.choices.some((c) => c.pool && !c.red);
+    if (!canPush) pushOn = false;
+    const toggle = canPush ? el('button', `qc-push-toggle${pushOn ? ' on' : ''}`, 'PUSH +1d (2 NERVE)') : null;
+    if (toggle) {
+      toggle.setAttribute('type', 'button');
+      toggle.setAttribute('aria-pressed', String(pushOn));
+      toggle.onclick = (e) => {
+        e.stopPropagation();
+        pushOn = !pushOn;
+        render();
+      };
+    }
     const cards = el('div', 'qc-cards');
     for (const c of active.choices) {
       const card = el('div', c.id === '!burner' || c.id === '!fall-guy' ? 'qc-card qc-cover' : 'qc-card');
@@ -204,25 +216,18 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
       card.setAttribute('role', 'button');
       card.append(el('span', 'qc-line', c.line));
       if (active.alarm !== undefined) card.addEventListener('mouseenter', () => o.onHover?.());
-      // A mission's checked choice: its odds for you (missions spec §3).
-      if (c.odds) card.append(el('span', 'qc-odds', `· ${c.odds.stat} ${c.odds.chance}%${c.odds.noDeck ? ' · NO DECK' : ''}`));
-      // A job's card (small jobs spec §6): ONE SHOT, the terminal's size, the odds as a bar and what moved them.
+      // A job's checked choice: its dice and position for you (the table spec §4).
+      if (c.pool) card.append(oddsEl(c.pool));
+      // A job's card (small jobs spec §6): ONE SHOT, the terminal's size.
       if (c.red) card.append(el('span', 'qc-red', 'ONE SHOT'));
       if (c.crack) card.append(el('span', 'qc-crack', `CRACK · ${c.crack.length} LETTERS · ${c.crack.tries} TRIES`));
-      // A big job's route (big jobs spec §3): its gig and difficulty, and what moved it.
-      const route = active.big?.routes?.[c.id];
-      if (route) {
-        card.append(el('span', 'qc-gig', `${route.kind.toUpperCase()} · ${route.tier.toUpperCase()}`));
-        if (route.why.length) card.append(el('div', 'qc-why', route.why.join(' · ')));
-      }
-      if (c.odds && active.alarm !== undefined) {
-        const bar = el('div', 'qc-bar');
-        bar.style.setProperty('--odds', `${c.odds.chance}%`);
-        card.append(bar);
-        if (c.odds.why.length) card.append(el('div', 'qc-why', c.odds.why.join(' · ')));
-      }
       const said = lit?.choice === c.id ? lit.text : null;
-      const choose = () => o.onChoose(c.id, said ?? undefined);
+      const push = pushOn && Boolean(c.pool) && !c.red;
+      const choose = () => {
+        pushOn = false;
+        if (push) o.onChoose(c.id, said ?? undefined, true);
+        else o.onChoose(c.id, said ?? undefined);
+      };
       card.onclick = choose;
       card.onkeydown = (e) => {
         // Only the card itself: Enter on either button is that button's own.
@@ -240,7 +245,9 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
         confirm.type = 'button';
         confirm.onclick = (e) => {
           e.stopPropagation();
-          o.onChoose(c.id, said);
+          pushOn = false;
+          if (push) o.onChoose(c.id, said, true);
+          else o.onChoose(c.id, said);
         };
         const talk = el('button', 'qc-talk', 'JUST TALKING');
         talk.type = 'button';
@@ -271,16 +278,7 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
     const strip = stripEl(active);
     if (strip) host.append(strip);
     if (story) host.append(storyEl(story));
-    if (active.big) {
-      const clues = cluesEl(active.big);
-      if (clues) host.append(clues);
-      const marks = marksEl(active.big);
-      if (marks) host.append(marks);
-    }
-    // The read (big jobs spec §3): the board takes the cards' place.
-    const read = active.big?.read;
-    if (read) mountReadBoard(host, { parts: read.parts, bank: read.bank, onRead: (picks) => o.onRead?.(picks) });
-    else host.append(cards);
+    host.append(...(toggle ? [toggle] : []), cards);
     // The debrief as it stands, under the cover cards (spec §5–§6): the totals update after the choice.
     if (active.blown) host.append(debriefEl(active.blown.debrief, { cue: () => {}, reduced: true }));
     const hint = o.hint?.() ?? null;

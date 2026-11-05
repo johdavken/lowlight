@@ -26,7 +26,8 @@ function walk(dir: string, pre = ''): string[] {
     .flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name), `${pre}${e.name}/`) : e.name.endsWith('.json') ? [`${pre}${e.name}`] : []));
 }
 
-const kindOf = (rel: string): CityFileKind | null =>
+/** A map/city/ file's kind by where it sits (relative to map/city/); null for anything else. */
+export const kindOf = (rel: string): CityFileKind | null =>
   rel.startsWith('districts/') ? 'district' : rel.startsWith('structures/') ? 'structure' : (['landmarks.json', 'terrain.json', 'render.json'].includes(rel) ? (rel.slice(0, -5) as CityFileKind) : null);
 
 /** Throws an Error naming each bad file (`file: path: message`). */

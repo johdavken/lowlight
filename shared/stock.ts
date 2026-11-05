@@ -4,10 +4,6 @@ import { z } from 'zod';
 import type { CoverId, KitEvent } from './mission';
 
 export const COVER_IDS: readonly CoverId[] = ['burner', 'fall-guy'];
-/** What a deck the fixer doesn't stock trades in against (a quarter of it). */
-export const UNSTOCKED_DECK = 300;
-export const TRADE_IN = 0.25;
-
 export interface StockItem {
   id: string;
   kind: 'deck' | 'cover';
@@ -43,14 +39,15 @@ export function parseStock(text: string, deckIds: ReadonlySet<string>): { byPlac
   return { byPlace, problems };
 }
 
-/** The kit event a purchase makes: a deck replaces yours (a quarter of its price here back, else of 300); cover adds one. */
-export function buyEvent(o: { item: StockItem; at: number; current: string | null; placeStock: StockItem[] }): KitEvent {
+/** The kit event a purchase makes: a deck is carried and the old one kept (`keep`: no trade-in); cover adds one. */
+export function buyEvent(o: { item: StockItem; at: number }): KitEvent {
   if (o.item.kind === 'cover') return { at: o.at, sol: -o.item.price, cover: { id: o.item.id as CoverId, delta: 1 } };
-  const old = o.current ? (o.placeStock.find((s) => s.kind === 'deck' && s.id === o.current)?.price ?? UNSTOCKED_DECK) : 0;
-  return { at: o.at, sol: -o.item.price + Math.round(old * TRADE_IN), deck: o.item.id };
+  return { at: o.at, sol: -o.item.price, deck: o.item.id, keep: true };
 }
 
-export function canBuy(o: { item: StockItem; sol: number; tier: number }): 'ok' | 'locked' | 'short' {
+/** `owned`: a deck you already have isn't sold to you again. */
+export function canBuy(o: { item: StockItem; sol: number; tier: number; owned?: readonly string[] }): 'ok' | 'locked' | 'short' | 'owned' {
+  if (o.item.kind === 'deck' && o.owned?.includes(o.item.id)) return 'owned';
   if (o.tier < o.item.tier) return 'locked';
   return o.sol < o.item.price ? 'short' : 'ok';
 }
@@ -63,16 +60,21 @@ const fixerSchema = z.array(
     at: z.number(),
     sol: z.number().optional(),
     deck: z.string().nullable().optional(),
+    carry: z.literal(true).optional(),
+    keep: z.literal(true).optional(),
     cover: z.object({ id: z.enum(['burner', 'fall-guy']), delta: z.number() }).optional(),
   }),
 );
 
-/** A `fixer.<player>` value's purchases; none when absent or unreadable. */
+/**
+ * A `fixer.<player>` value's purchases; none when absent or unreadable. A deck bought before decks were kept (no
+ * `keep`, not a swap) traded the old one in for its sol: it's a `trade`, so the old deck doesn't come back.
+ */
 export function parseFixer(v: string | null): KitEvent[] {
   if (v === null) return [];
   try {
     const r = fixerSchema.safeParse(JSON.parse(v));
-    return r.success ? (r.data as KitEvent[]) : [];
+    return r.success ? (r.data as KitEvent[]).map((e) => (typeof e.deck === 'string' && !e.keep && !e.carry ? { ...e, trade: true as const } : e)) : [];
   } catch {
     return [];
   }

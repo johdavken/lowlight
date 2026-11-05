@@ -1,5 +1,6 @@
+import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { BUILT_IN_THEME, checkSplash, readSplashTheme, songTitle, clampLogo, PROMPT_GAP_MAX, PROMPT_GAP_MIN, DEFAULT_LOGO_EFFECTS, logoEffects, defaultLogo, logoAspect, logoFits, readSplashEntry, readSplashLogo, splashId, splashLibrarySchema, splashLogoEntries, splashLogoId, SPLASH_LOGO_ASPECT, type SplashEntry } from './splash';
+import { BUILT_IN_THEME, checkSplash, clampPanel, defaultPanel, parseNotice, readSplashNotice, readSplashTheme, songTitle, clampLogo, PROMPT_GAP_MAX, PROMPT_GAP_MIN, DEFAULT_LOGO_EFFECTS, logoEffects, defaultLogo, logoAspect, logoFits, readSplashEntry, readSplashLogo, splashId, splashLibrarySchema, splashLogoEntries, splashLogoId, SPLASH_LOGO_ASPECT, type SplashEntry } from './splash';
 
 const seed: SplashEntry = { id: 'nix-wall', name: 'Nix against the wall', file: 'nix-wall.webp', width: 1531, height: 1027, on: true, logo: { x: 67, y: 117, width: 727 } };
 
@@ -147,5 +148,47 @@ describe('menu theme', () => {
   it('the built-in theme is the game’s own file, and a song’s title is its file name', () => {
     expect(BUILT_IN_THEME).toEqual({ title: 'Lost in Lowlight', url: '/sound/music/Lost%20in%20Lowlight.ogg' });
     expect(songTitle('Neon Rain (2).ogg')).toBe('Neon Rain (2)');
+  });
+});
+
+describe('the notice', () => {
+  it('reads paragraphs as entries, first sentence the head, under section lines', () => {
+    expect(parseNotice('Features\n\nTexts. Text your contacts.\nFrom the deck.\n\nSUGGEST (Alt+G). Stuck? It drafts.\n\nFixes\n\nBanners clear.')).toEqual([
+      { title: 'Features', entries: [{ head: 'Texts', body: 'Text your contacts. From the deck.' }, { head: 'SUGGEST (Alt+G)', body: 'Stuck? It drafts.' }] },
+      { title: 'Fixes', entries: [{ head: 'Banners clear' }] },
+    ]);
+  });
+  it("drops a heading with nothing under it, so a pasted What's new doesn't show twice", () => {
+    expect(parseNotice("What's new\n\nFixes\n\nBanners clear.").map((s) => s.title)).toEqual(['Fixes']);
+  });
+  it('reads a plain message as it is: no section needed, a long lone sentence is body', () => {
+    const long = 'The servers are down for the weekend while the relay moves to a new home on the Strand.';
+    expect(parseNotice(long)).toEqual([{ title: null, entries: [{ body: long }] }]);
+    expect(parseNotice('')).toEqual([]);
+  });
+  it('keeps a short message, and a short closing line, as entries', () => {
+    expect(parseNotice('Back on Monday')).toEqual([{ title: null, entries: [{ head: 'Back on Monday' }] }]);
+    expect(parseNotice('Fixes\n\nBanners clear.\n\nSee you out there')).toEqual([{ title: 'Fixes', entries: [{ head: 'Banners clear' }, { head: 'See you out there' }] }]);
+    expect(parseNotice('Fixes\n\nSee you out there')).toEqual([{ title: 'Fixes', entries: [{ head: 'See you out there' }] }]);
+  });
+  it('reads the shipped notes: 39 features, 11 fixes', () => {
+    const lib = JSON.parse(fs.readFileSync('world/splash/splashes.json', 'utf8')) as { notice: { text: string }; splashes: { panel?: unknown }[] };
+    const sections = parseNotice(lib.notice.text);
+    expect(sections.map((s) => [s.title, s.entries.length])).toEqual([['Features', 39], ['Fixes', 11]]);
+    expect(lib.splashes.every((s) => s.panel)).toBe(true);
+  });
+  it('a panel stays inside the image at a size it allows', () => {
+    expect(clampPanel({ x: 5000, y: -10, width: 900, height: 100 }, 1531, 1027)).toEqual({ x: 971, y: 0, width: 560, height: 260 });
+    expect(clampPanel({ x: 62, y: 556, width: 440, height: 340 }, 1531, 1027)).toEqual({ x: 62, y: 556, width: 440, height: 340 });
+    expect(clampPanel({ x: 0, y: 0, width: 440, height: 900 }, 300, 200)).toEqual({ x: 0, y: 0, width: 300, height: 200 });
+  });
+  it('a splash with no panel gets the bottom-left spot, scaled to the image', () => {
+    expect(defaultPanel(1531, 1027)).toEqual({ x: 61, y: 555, width: 439, height: 318 });
+  });
+  it('reads the manifest: none, good, or what is wrong', () => {
+    expect(readSplashNotice({})).toEqual({ notice: null, problem: null });
+    const n = { on: true, title: 'New', tag: '', text: 'Hi.' };
+    expect(readSplashNotice({ notice: n })).toEqual({ notice: n, problem: null });
+    expect(readSplashNotice({ notice: { on: 1 } }).problem).toMatch(/^notice: /);
   });
 });

@@ -132,6 +132,18 @@ describe('the relay with a direct backend', () => {
     expect(db.recentMessages('hicks', 5).find((m) => m.role === 'user')!.status).toBe('failed');
   });
 
+  it('an Anthropic failure names Anthropic, not OpenRouter (final review I1)', async () => {
+    const credit = relayWith(fakeBackend(() => new TurnError('credit', 'out', 402, undefined, 'anthropic')), { identity: () => 'I' });
+    expect(await credit.relay.send('hicks', 'hello')).toEqual({ ok: false, error: 'credit' });
+    expect(notices(credit.events)).toEqual(['// ANTHROPIC CREDIT IS OUT']);
+    const rejected = relayWith(fakeBackend(() => new TurnError('http', 'bad', 400, undefined, 'anthropic')), { identity: () => 'I' });
+    await rejected.relay.send('hicks', 'hello');
+    expect(notices(rejected.events)).toEqual(['// ANTHROPIC REJECTED THIS TURN']);
+    const down = relayWith(fakeBackend(() => new TurnError('unreachable', 'fetch failed', undefined, undefined, 'anthropic')), { identity: () => 'I' });
+    await down.relay.send('hicks', 'hello');
+    expect(notices(down.events)).toEqual(["// CAN'T REACH ANTHROPIC — CHECK YOUR CONNECTION"]);
+  });
+
   it('refused → "// THE PROVIDER REFUSED THIS TURN — TRY ANOTHER MODEL"', async () => {
     const { relay, events } = relayWith(fakeBackend(() => new TurnError('refused', 'no', 403)), { identity: () => 'I' });
     expect(await relay.send('hicks', 'hello')).toEqual({ ok: false, error: 'refused' });

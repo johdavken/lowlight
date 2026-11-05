@@ -1,5 +1,5 @@
 import { WRITTEN_SCENE_TITLE } from '../../shared/scenario';
-import { describe, expect, it, beforeAll, afterAll, afterEach } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll, afterEach, vi } from 'vitest';
 import { diceActionLine, diceText } from '../../shared/dice/text';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +19,7 @@ type Persona = Parameters<typeof personaLine>[0];
 import { LORE_HEADER, loreBlock, selectLore, type LoreEntry, type LoreSelection } from '../../shared/lore';
 import { herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, othersBlock, type OtherVoice, ENCOUNTER_INSTRUCTIONS, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, strangerBlock, beatLine, RP_HEADING } from '../src/instructions';
 import { gigActionLine, gigText } from '../../shared/gig/brief';
-import type { ChatMessage } from '../../shared/types';
+import { EMPTY_QUEST_STATE, type ChatMessage } from '../../shared/types';
 import { parsePlan, planKey, planSeenKey } from '../../shared/plan';
 import type { LeadEntry as LeadEntry_ } from '../../shared/leads';
 
@@ -943,6 +943,22 @@ describe('ChatRelay end scene mode', () => {
       expect(db.getMeta(planKey('hicks'))).not.toBeNull();
     });
 
+    it("a quest's panel holds her card back, and LET HER GO / GO WITH HER are refused under it; it comes back after", async () => {
+      const { relay, db, cards } = await setup();
+      store(db);
+      const active = { id: 'q', title: 'Marked Cards', beat: 'b1', choices: [] };
+      const state = vi.spyOn(relay, 'questState').mockReturnValue({ ...EMPTY_QUEST_STATE, active });
+      expect(relay.planCardFor('hicks')).toBeNull();
+      relay.emitPlanCard('hicks');
+      expect(cards().at(-1) ?? null).toBeNull();
+      expect(await relay.letHerGo('hicks')).toMatchObject({ ok: false, error: 'no-plan' });
+      expect(relay.dropPlan('hicks')).toMatchObject({ ok: false, error: 'no-plan' });
+      expect(db.getMeta(planKey('hicks'))).not.toBeNull();
+      state.mockReturnValue({ ...EMPTY_QUEST_STATE });
+      relay.emitPlanCard('hicks');
+      expect(cards().at(-1)).toMatchObject({ going: "Nix's flat" });
+    });
+
     it('LET HER GO with no plan going is refused', async () => {
       const { relay, db } = await setup();
       expect(await relay.letHerGo('hicks')).toEqual({ ok: false, error: 'no-plan' });
@@ -953,7 +969,8 @@ describe('ChatRelay end scene mode', () => {
       const { relay, db, cards } = await setup();
       store(db);
       relay.emitPlanCard('hicks');
-      expect(relay.dropPlan('hicks')).toMatchObject({ ok: true });
+      // It says where she was heading, so the hub can walk you there together.
+      expect(relay.dropPlan('hicks')).toMatchObject({ ok: true, going: 'x/home' });
       expect(db.getMeta(planKey('hicks'))).toBeNull();
       // The drop folds into the set under the same reply: a rewind past it undoes both, a swipe of it too.
       expect(db.writes().filter((w) => w.key === planKey('hicks')).map((w) => [w.messageId, w.value])).toEqual([['r1', null]]);
@@ -1900,6 +1917,30 @@ describe('ChatRelay encounter', () => {
     expect(turn.instructions.endsWith(RP_SYSTEM)).toBe(true);
     expect(body(turn.message).startsWith(`${ENCOUNTER_INSTRUCTIONS}\n\n${strangerBlock(courier)}\n\n`)).toBe(true);
     expect(turn.message.endsWith(`[event: "Wrong package": A courier drops a box on the counter.]`)).toBe(true);
+  });
+
+  it("keeps a DRAW stranger's face only when it's one of the extras; never their gender or age on the row", async () => {
+    const stub = await makeStub([reply(), reply()]);
+    const db = makeDb();
+    const quests = { contact: 'nix-direct', book: () => [], extras: () => [{ id: 'local-karasu-03', file: 'local-karasu-03.png', tags: ['local'] }], status: () => [], ctx: () => null, placeId: () => null, contactName: (id: string) => id, placeName: (id: string) => id };
+    const relay = new ChatRelay({ players: fakePlayers('hicks', { hicks: { name: 'Hicks' } }), backend: wireBackend(stub.url), db, room: makeRoom(), emit: () => {}, quests });
+    await relay.encounter('hicks', { ...event, stranger: { ...courier, face: 'local-karasu-03', gender: 'man', age: 'old' } });
+    expect(db.recentMessages('hicks')[0]!.encounter!.stranger).toEqual({ ...courier, face: 'local-karasu-03' });
+    await relay.encounter('hicks', { ...event, stranger: { ...courier, face: 'not-a-face' } });
+    expect(db.recentMessages('hicks').filter((m) => m.role === 'user' && m.mode === 'encounter')[1]!.encounter!.stranger).toEqual(courier);
+  });
+
+  it('UNDO of an event row keeps a face only if it is one of the extras', async () => {
+    const stub = await makeStub([]);
+    const db = makeDb();
+    const quests = { contact: 'nix-direct', book: () => [], extras: () => [{ id: 'local-05', file: 'local-05.png', tags: ['local'] }], status: () => [], ctx: () => null, placeId: () => null, contactName: (id: string) => id, placeName: (id: string) => id };
+    const relay = new ChatRelay({ players: fakePlayers('hicks', { hicks: { name: 'Hicks' } }), backend: wireBackend(stub.url), db, room: makeRoom(), emit: () => {}, quests });
+    const row = (id: string, face: string): ChatMessage => ({ id, role: 'user', text: 'A man at the stair.', toolLines: [], ts: 1, status: 'ok', mode: 'encounter', encounter: { title: 'T', stranger: { name: 'Colm', voice: 'flat', face } } });
+    await relay.restore('hicks', row('r1', 'local-05'));
+    await relay.restore('hicks', row('r2', 'local-99'));
+    const [a, b] = db.recentMessages('hicks');
+    expect(a!.encounter!.stranger).toEqual({ name: 'Colm', voice: 'flat', face: 'local-05' });
+    expect(b!.encounter!.stranger).toEqual({ name: 'Colm', voice: 'flat' });
   });
 
   it('a power cut card keeps power on its row and cuts the power once, after the row (blackouts phase 3 §2)', async () => {

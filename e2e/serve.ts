@@ -7,11 +7,13 @@ import path from 'node:path';
 import { buildApp } from '../server/src/app';
 import type { Config } from '../server/src/config';
 import { buildWeb } from './build-once';
-import { DIRECT, GOOD_KEY, SECOND } from './fixtures';
+import { DIRECT, GOOD_KEY, SECOND, ANT_KEY, ANT_REPLY } from './fixtures';
 import { BUG_RELAY_PORT, STUB_OR_LOG_PORT, gamePort } from './ports';
 import { startFakeOpenRouter } from './fake-openrouter';
+import { startStubAnthropic } from '../server/test/fixtures/stub-anthropic';
 import { PNG } from 'pngjs';
-import { BIG, CHAIR, JOB, MISSION, READY, WAITS } from '../shared/quests.fixture';
+import { CHAIR, JOB, MISSION, READY, WAITS } from '../shared/quests.fixture';
+import { CONTRACT } from '../shared/quests.contract.fixture';
 
 /**
  * Two test rooms in Nix's pack, independent of which of her real rooms are flat: `zz-flat-test`
@@ -86,11 +88,9 @@ function writeTestRooms(packDir: string): void {
 const PORT = gamePort();
 const TOKEN = 'e2e-smoke-test-token-0000';
 
-export { E2E_ENCOUNTERS, E2E_OPENING, E2E_SUGGESTION } from './fake-openrouter';
-/** The one gig brief e2e/direct's gig test runs. */
-export const E2E_GIG = { title: 'E2E Line', text: 'Make the line go away before the audit.' };
-/** The slip e2e/direct's slip test runs: medium, at The Tilt beside the hack (Glass Orchid is in another district's panel). */
-export const E2E_SLIP = { title: 'E2E Floor', text: 'In, lift, out.' };
+export { E2E_ENCOUNTERS, E2E_OPENINGS, E2E_SUGGESTION, E2E_SUGGESTION_PUSH, E2E_SUGGESTION_TURN } from './fake-openrouter';
+/** The one gig brief e2e/direct's gig test runs: a papers job (hack and slip went 2026-11-01). */
+export const E2E_GIG = { title: 'E2E Line', text: 'A courier needs papers before the audit.' };
 
 async function main(): Promise<void> {
   // In this process, not `npm run build && ...` through a shell, so the server stays one process
@@ -156,6 +156,8 @@ async function main(): Promise<void> {
     JSON.stringify({ version: 1, keys: { openrouter: GOOD_KEY }, recentModels: DIRECT.models.map((m) => m.id), characterModels: {} }),
   );
   const openrouterBaseUrl = await startFakeOpenRouter({ logPort: STUB_OR_LOG_PORT });
+  // Anthropic (link.spec): a stand-in that takes only ANT_KEY and answers every turn with ANT_REPLY.
+  const anthropic = await startStubAnthropic({ keys: [ANT_KEY], reply: ANT_REPLY, completion: '{}' });
 
   // No persona.json: the default player stays 'you' (who you are is chosen per playthrough at NEW GAME).
   const personaDir = path.join(tmpDir, 'persona');
@@ -185,16 +187,12 @@ async function main(): Promise<void> {
   fs.writeFileSync(path.join(loreDir, 'e2e-steel-doors.md'), '---\ntitle: Steel Doors\nkeys: [steel door]\n---\nInsider: the doors are SDG surplus.\n');
   fs.writeFileSync(path.join(loreDir, 'e2e-steel-doors-on-the-street.md'), '---\ntitle: Steel doors on the street\nkeys: [back door]\n---\nEvery stall on the Ribbon has one. Nobody asks where they came from.\n');
 
-  // Gig briefs (e2e/direct "gig:"): one easy job at The Tilt, so the hack window deals a single card.
+  // Gig briefs (e2e/direct "gig:"): one easy papers job at The Tilt, so the gig window deals a single card.
   const gigsDir = path.join(tmpDir, 'gigs');
   fs.mkdirSync(gigsDir, { recursive: true });
   fs.writeFileSync(
     path.join(gigsDir, 'e2e-line.md'),
-    `---\ntitle: ${E2E_GIG.title}\ntier: easy\nplace: the-tilt\nclient: A courier\ntarget: Voltaic · depot ledger\ntake: one line of debt\n---\n${E2E_GIG.text}\n`,
-  );
-  fs.writeFileSync(
-    path.join(gigsDir, 'e2e-floor.md'),
-    `---\ntitle: ${E2E_SLIP.title}\ntier: medium\nkind: slip\nplace: the-tilt\nclient: A dancer\ntarget: Glass Orchid · back office\ntake: a ledger page\n---\n${E2E_SLIP.text}\n`,
+    `---\ntitle: ${E2E_GIG.title}\ntier: easy\nkind: papers\nplace: the-tilt\nclient: A courier\ntarget: Tidal Isle · customs, booth nine\ntake: one crossing\n---\n${E2E_GIG.text}\n`,
   );
 
   // The splash library: the Nix image on, a second copy off (e2e/splash-library.spec.ts flips them).
@@ -227,14 +225,24 @@ async function main(): Promise<void> {
   const extrasDir = path.join(tmpDir, 'extras');
   fs.mkdirSync(extrasDir, { recursive: true });
   for (const id of ['sdg-01', 'sdg-02']) fs.copyFileSync(`./world/extras/${id === 'sdg-01' ? 'sdg-07' : 'sdg-02'}.png`, path.join(extrasDir, `${id}.png`));
-  fs.writeFileSync(path.join(extrasDir, 'extras.json'), JSON.stringify(['sdg-01', 'sdg-02'].map((id) => ({ id, file: `${id}.png`, tags: ['sdg'] }))));
+  // One local, for DRAW's stranger card (the courier is a young man).
+  fs.copyFileSync('./world/extras/local-karasu-02.png', path.join(extrasDir, 'local-01.png'));
+  fs.writeFileSync(
+    path.join(extrasDir, 'extras.json'),
+    JSON.stringify([...['sdg-01', 'sdg-02'].map((id) => ({ id, file: `${id}.png`, tags: ['sdg'] })), { id: 'local-01', file: 'local-01.png', tags: ['local', 'man', 'young'] }]),
+  );
   fs.writeFileSync(path.join(questsDir, 'ready-test.md'), READY);
-  // A mission at the Intake (e2e/missions.spec.ts), with its checks rolling 80 (a fail), then 3 (passes) from then on.
+  // A stranger with a face at the Ferry Stairs (e2e/comms.spec.ts): met on comms, for the speaker slot.
+  fs.writeFileSync(
+    path.join(questsDir, 'dock-clerk.md'),
+    '---\ntitle: Dock Clerk\nwith: [nix-direct]\nstarts: ferry-stairs\n---\n\n# stairs\nstranger: Dock Clerk — bored, by the book\nface: sdg-01\n\n*A clerk at the foot of the stairs, a tablet in his hand.*\n\nview any: He wants papers.\n\n- wait: Let him come to you. → wait\n- go: Go up to him. → wait\n\n## wait\n*He looks up.*\n→ talk\n\n# talk\n*He holds out a hand for papers.*\n\nview any: Papers, then.\n\n- give: Hand them over. → done\n- back: Turn back. → done\n\n## done\n*He waves you up.*\n→ end\n',
+  );
+  // A mission at the Intake (e2e/missions.spec.ts), with its checks rolling a miss (2), then 6s from then on (the table: each entry is a roll's kept face).
   fs.writeFileSync(path.join(questsDir, 'night-shift.md'), MISSION.replace('starts: haes-noodles', 'starts: lowlight-intake').replace('pay: 400\n---', 'pay: 400\nart: night-shift.png\n---'));
   // Its picture (quest art): any wide room picture stands in.
   fs.mkdirSync(path.join(questsDir, 'art'), { recursive: true });
   fs.copyFileSync('./scenes/tidal/ferry-stairs/room.png', path.join(questsDir, 'art', 'night-shift.png'));
-  process.env.NIX_TEST_ROLLS = '80,3';
+  process.env.NIX_TEST_ROLLS = '2,6';
   // A small job at the Intake (e2e/jobs.spec.ts): tier 1 so a Nobody sees it; its door's talk is the red check, a kick
   // blows it without a roll, and the ledger cracks. With Night Shift it makes a pool of two, so both post every night.
   fs.writeFileSync(
@@ -245,17 +253,12 @@ async function main(): Promise<void> {
       .replace(/(- wait: Wait for the shift change\. → inside \[clock \+1h\]\n)/g, '$1- kick: Kick the door in. → turned [alarm +1]\n')
       .replace('- grab: Take it all. → paid / part [check reflex 50]', '- grab: Crack the ledger terminal. → paid / part [crack 6 corp]'),
   );
-  // A big job at the Intake (e2e/big-jobs.spec.ts), played by Cass with Trusted rep in Karasu (a playthrough of its own),
-  // so the other specs' player keeps a Nobody's boards. The take marks the ferry and the Tilt; every route's gig resolves clean without its window.
-  fs.writeFileSync(
-    path.join(questsDir, 'north-gate.md'),
-    BIG.replace('starts: haes-noodles', 'starts: lowlight-intake')
-      .replace('go: 03:00', 'go: 05:30')
-      .replace('marks: ferry-stairs "the courier came through here", lowlight-intake "the gate\'s paperwork"', 'marks: ferry-stairs "the courier came through here", the-tilt "the guard drinks here"')
-      .replace('reveals: the-tilt "the guard drinks here"\n', ''),
-  );
+  // A tier 2 job at the Intake (e2e/tier-cut.spec.ts): only Cass's Trusted rep sees it, so Nobody's boards keep their count.
+  fs.writeFileSync(path.join(questsDir, 'two-step.md'), JOB.replace('title: Back Door', 'title: Two Step').replace('starts: haes-noodles', 'starts: lowlight-intake'));
+  // A contract at the Intake (e2e/contracts.spec.ts): the same rep, with her.
+  fs.writeFileSync(path.join(questsDir, 'test-contract.md'), CONTRACT.replace('with: [mother-rot]', `with: [${DIRECT.id}]`).replace('starts: haes-noodles', 'starts: lowlight-intake'));
   process.env.NIX_TEST_REP = 'cass@karasu:50';
-  process.env.NIX_TEST_GIG = 'clean';
+  process.env.NIX_TEST_SOL = 'cass:1000';
   // One of Nix's own clients' jobs (e2e/intake.spec.ts), at Hae's so the Intake's pool stays as jobs.spec counts it:
   // trust is its stake, it posts all day, and its skim ends CLEAN without a roll (the roll list belongs to missions.spec).
   fs.writeFileSync(
@@ -264,39 +267,156 @@ async function main(): Promise<void> {
       .replace('tier: 2', 'tier: 1')
       .replace('with: [hicks, ember, nix-direct]', 'with: [nix-direct]')
       .replace('minutes: 30\n', 'minutes: 30\nposts: 00:00-23:59\ntrust: 1 / 1\npitch: A client needs a hand.\n')
-      .replace('- skim: Take what fits in a pocket. → part', '- skim: Take what fits in a pocket. → paid'),
+      .replace('- skim: Take what fits in a pocket. → part', '- skim: Take what fits in a pocket. → paid')
+      // The table: a quiet beat on the stairs, so its no-roll clean path fills TAKE (tier 1: 3).
+      .replace("## inside\n*You're in.*\n→ desk", "## inside\n*You're in.*\n→ step\n\n# step\n*The stairs.*\n\n- go: Go up the stairs. → up\n- climb: Climb the back stairs. → up\n\n## up\n*The landing.*\n→ desk"),
+  );
+  // Pressing on (e2e/jobs.spec.ts): a job alone on Second Socket's board, so it posts every night; no checks, so no
+  // dice. The take, then PRESS ON wins one push and loses the next.
+  fs.writeFileSync(
+    path.join(questsDir, 'push-test.md'),
+    [
+      '---',
+      'title: Push Test',
+      'kind: mission',
+      'starts: second-socket',
+      'after: null',
+      'pay: 400',
+      '---',
+      '',
+      '# street',
+      '*The shutter is half up.*',
+      '',
+      '- duck: Duck under the shutter. → inside-1',
+      '- wait: Wait for the street to clear. → inside-1',
+      '',
+      '## inside-1',
+      '*Nobody inside.*',
+      '→ counter',
+      '',
+      '# counter',
+      '*The counter, and the stairs behind it.*',
+      '',
+      '- listen: Listen at the stairs. → quiet-1',
+      '- look: Look round the counter. → quiet-1',
+      '',
+      '## quiet-1',
+      '*Still quiet.*',
+      '→ till',
+      '',
+      '# till',
+      '*A cashbox on the counter, and nobody watching it.*',
+      '',
+      '- take: Take the cashbox. → paid',
+      '- half: Take half and leave the rest. → half',
+      '',
+      '## paid',
+      '*It is heavy.*',
+      'pay: full',
+      '→ end',
+      '',
+      '## half',
+      '*Half of it.*',
+      'pay: half',
+      'take: part',
+      '→ end',
+      '',
+      '# push-1',
+      '*A second box under the counter.*',
+      '',
+      '- lift: Lift the second box. → won-1',
+      '- peek: Look inside it first. → won-1',
+      '',
+      '## won-1',
+      '*Notes, rolled tight.*',
+      'pay: +100',
+      '→ end',
+      '',
+      '# push-2',
+      '*The owner is coming back down the stairs.*',
+      '',
+      '- grab: Grab the till as well. → lost-2',
+      '- stay: Stay for the change jar. → lost-2',
+      '',
+      '## lost-2',
+      '*He sees you with your hands in it.*',
+      'lost',
+      '→ end',
+      '',
+    ].join('\n'),
+  );
+  // GET OUT (e2e/jobs.spec.ts): four loud beats with no dice fill ALARM, and the stock getaway comes up.
+  const loud = (id: string, next: string) => [`# ${id}`, `*The ${id}.*`, '', `- bang: Bang through the ${id}. → ${id}-done [alarm +1]`, `- kick: Kick through the ${id}. → ${id}-done [alarm +1]`, '', `## ${id}-done`, '*Somebody heard that.*', ...(next === 'end' ? ['pay: full'] : []), `→ ${next}`, ''];
+  fs.writeFileSync(
+    path.join(questsDir, 'getaway-test.md'),
+    [
+      '---',
+      'title: Getaway Test',
+      'kind: mission',
+      'starts: second-socket',
+      'after: null',
+      'pay: 400',
+      '---',
+      '',
+      ...loud('door', 'hall'),
+      ...loud('hall', 'stairs'),
+      ...loud('stairs', 'office'),
+      ...loud('office', 'end'),
+    ].join('\n'),
   );
   // The arrangement (e2e/arrangement.spec.ts): a cut-down Chair and two jobs with Nix in their crew, all at the Tilt (no other
   // board there, so both jobs post every night); Cass starts with Nix at trust 6 (high), in a playthrough of its own.
   fs.writeFileSync(path.join(questsDir, 'chair-test.md'), CHAIR.replace('title: The Chair', 'title: Chair Test').replace('starts: lowlight-intake', 'starts: the-tilt'));
+  // The Chair, again (Tier 2 spec §1): listed locked with its checklist once Chair Test is struck.
+  fs.writeFileSync(
+    path.join(questsDir, 'chair-again-test.md'),
+    CHAIR.replace('title: The Chair', 'title: Chair Again Test')
+      .replace('starts: lowlight-intake', 'starts: the-tilt\nafter: deal2=ready and trust=high and chair=yes and chair2!=yes')
+      .replace('[set chair=yes]', '[set chair2=yes]')
+      .replace('arrangement: chair-cut 25 / 1', 'arrangement: chair-cut 20 / 3'),
+  );
   for (const [id, title] of [['chair-job', 'Chair Job'], ['chair-job-2', 'Chair Job Two']]) {
     fs.writeFileSync(
       path.join(questsDir, `${id}.md`),
       JOB.replace('title: Back Door', `title: ${title}`)
         .replace('tier: 2', 'tier: 1')
         .replace('starts: haes-noodles', 'starts: the-tilt')
-        .replace('- skim: Take what fits in a pocket. → part', '- skim: Take what fits in a pocket. → paid'),
+        .replace('- skim: Take what fits in a pocket. → part', '- skim: Take what fits in a pocket. → paid')
+        .replace("## inside\n*You're in.*\n→ desk", "## inside\n*You're in.*\n→ step\n\n# step\n*The stairs.*\n\n- go: Go up the stairs. → up\n- climb: Climb the back stairs. → up\n\n## up\n*The landing.*\n→ desk"),
     );
   }
   process.env.NIX_TEST_TRUST = 'cass@nix-direct:6';
+  // Contact cards (spec 2026-10-31-contact-cards): the player holds a lead from Ember (a runner), so her card is at SETUP.
+  process.env.NIX_TEST_GIVERS = 'you@ember';
   // The fixer's stock (small jobs spec §5): a free burner at the Intake, so the cover spec needn't earn sol first.
   const gearDir = path.join(tmpDir, 'gear');
   fs.mkdirSync(gearDir, { recursive: true });
-  for (const f of ['decks.md', 'words.md']) fs.copyFileSync(`./world/gear/${f}`, path.join(gearDir, f));
-  fs.writeFileSync(path.join(gearDir, 'stock.md'), '---\nplace: lowlight-intake\nitems:\n  - burner · 0 · 1\n---\n');
+  for (const f of ['decks.md', 'words.md', 'programs.md']) fs.copyFileSync(`./world/gear/${f}`, path.join(gearDir, f));
+  // A free Cortex Meridian too (programs spec §5, e2e/missions.spec.ts): two program slots for the programs spec.
+  fs.writeFileSync(path.join(gearDir, 'stock.md'), '---\nplace: lowlight-intake\nitems:\n  - burner · 0 · 1\n  - meridian · 0 · 1\n  - pocket-deck · 0 · 1\n---\n');
+  // SPRING THEM (e2e/crew.spec.ts, crew spec §5): a rescue with one sure way out, posted where the recruit was hired.
+  fs.writeFileSync(
+    path.join(questsDir, 'spring-test.md'),
+    '---\ntitle: Get {recruit} Out\nkind: mission\nspring: true\nafter: null\npitch: SDG has {recruit}.\n---\n\n# floor\n\n*{recruit} is on the holding floor.*\n\n- walk: Walk {recruit} out on a transfer order. → out\n- wait: Wait for the shift change. → out [clock +30m]\n\n## out\n*{recruit} is out.*\ntake: full\n→ end\n',
+  );
   // Crew (e2e/crew.spec.ts): the Intake hires runners and ears; a sure-thing trait keeps rolls clean, and the seed is pinned.
   const crewDir = path.join(tmpDir, 'crew');
   fs.mkdirSync(crewDir, { recursive: true });
   fs.writeFileSync(path.join(crewDir, 'names.md'), '## karasu\n- Juno Sato\n- Pell Okoro\n- Ren Takagi\n- Mika Arai\n');
   fs.writeFileSync(path.join(crewDir, 'traits.md'), 'sure · Sure Thing · + · odds any +90 · any · Never misses.\n');
+  // Crew abilities (e2e/crew.spec.ts): one ON A ROLL ability any GREEN can hold, so every hire carries the same card.
+  fs.writeFileSync(path.join(crewDir, 'abilities.md'), 'e2e-steady · Steady Hand · any · GREEN · die · Doesn’t shake.\n');
   fs.writeFileSync(path.join(crewDir, 'pitches.md'), '## runner GREEN\n- "Fast."\n## ears GREEN\n- "Quiet."\n');
   fs.writeFileSync(
     path.join(crewDir, 'errands.md'),
     [
       '---\nkind: run\nlabel: Run a package\ntag: SOL\nsuits: runner, ears\nhours: 2\nrisk: low\nblurb: Across the city and back.\nclean:\n  - effect: sol 200\n  - "{name} ran it."\nmessy:\n  - effect: sol 200\n  - "{name} ran it, late."\nblown:\n  - "{name} lost it."\n',
+      '---\nkind: groundwork\nlabel: Groundwork for {job}\ntag: PREP\nsuits: runner, ears, muscle, face\nhours: 8\nrisk: med\nneeds: run\nblurb: Part of a contract.\nclean:\n  - "{name} did it."\nmessy:\n  - "{name} did it, loud."\nblown:\n  - "{name} lost it."\n',
+      '---\nkind: sell\nlabel: Hustle in {district}\ntag: SOL\ngroup: hustle\nsuits: runner, ears\nhours: 2\nrisk: low\nneeds: lot\nblurb: Find a buyer.\nclean:\n  - "{name} moved it."\n  - "{name} sold it."\nmessy:\n  - "{name} sold half."\n  - "{name} got some of it."\nblown:\n  - "{name} lost it."\n  - "{name} got caught."\n',
       '---\nkind: case\nlabel: Case {job}\ntag: PREP\nsuits: runner, ears\nhours: 2\nrisk: low\nneeds: job\nclean:\n  - effect: prep cased=clean\n  - "{name} cased it."\nmessy:\n  - effect: prep cased=messy\n  - "{name} was seen."\nblown:\n  - "{name} was made."\n---\n',
     ].join(''),
   );
+  fs.writeFileSync(path.join(crewDir, 'goods.md'), '---\nkind: data\nlabel: Data\nroute: runner\nvalue: 380\nart: data.webp\n---\n');
   const crewMap = JSON.parse(fs.readFileSync('./map/lowlight.json', 'utf8')) as { places: { id: string; hires?: string[] }[] };
   for (const p of crewMap.places) if (p.id === 'lowlight-intake') p.hires = ['runner', 'ears'];
   const mapFile = path.join(tmpDir, 'map.json');
@@ -321,6 +441,7 @@ async function main(): Promise<void> {
     mapFile,
     webDist: 'dist/web',
     openrouterBaseUrl,
+    anthropicBaseUrl: anthropic.url,
     playthroughsDir: path.join(dataDir, 'playthroughs'),
     autoPlaythrough: true,
     bugRelayUrl: `http://127.0.0.1:${BUG_RELAY_PORT}/`,

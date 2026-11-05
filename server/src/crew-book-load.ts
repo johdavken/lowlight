@@ -1,4 +1,4 @@
-/** The crew tables (crew spec §1–§2): world/crew/{names,traits,pitches,errands}.md, read once at startup (restart after editing). */
+/** The crew tables (crew spec §1–§2): world/crew/{names,traits,pitches,errands,abilities}.md, read once at startup (restart after editing). */
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseCrewBook, type CrewBook } from '../../shared/crew-book';
@@ -15,7 +15,7 @@ const read = (dir: string, name: string): string => {
 
 /** The book in `dir`; a missing file is an empty part; each problem warns and its line or block is skipped. */
 export function loadCrewBook(dir: string, warn: (m: string) => void): CrewBook {
-  const r = parseCrewBook({ names: read(dir, 'names'), traits: read(dir, 'traits'), pitches: read(dir, 'pitches'), errands: read(dir, 'errands') });
+  const r = parseCrewBook({ names: read(dir, 'names'), traits: read(dir, 'traits'), pitches: read(dir, 'pitches'), errands: read(dir, 'errands'), abilities: read(dir, 'abilities'), goods: read(dir, 'goods') });
   for (const p of r.problems) warn(`crew ${p}; skipping it`);
   return r.book;
 }

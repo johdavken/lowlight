@@ -72,4 +72,21 @@ describe('the speaker portrait (stranger faces, by the subtitles)', () => {
     p.show({ ...VENN, accent: '#a9c4d6' });
     expect(shown()[0]!.style.getPropertyValue('--sp-c')).toBe('#a9c4d6');
   });
+
+  it('with a layer host, the busts go in their own layer there (over the job table), and has-portrait stays on the feed', () => {
+    document.body.innerHTML = '<div id="game"><div id="table" class="tb"></div><div id="feed"></div></div>';
+    const game = document.getElementById('game')!;
+    const feed = document.getElementById('feed')!;
+    const p = mountSpeakerPortrait(feed, game);
+    const layer = game.querySelector<HTMLElement>(':scope > .sp-layer')!;
+    expect(layer).not.toBeNull();
+    // Mounted after the table, so at the same z-index it stands on top.
+    expect(game.lastElementChild).toBe(layer);
+    p.show(VENN);
+    expect(layer.querySelectorAll('.sp-portrait')).toHaveLength(1);
+    expect(feed.querySelector('.sp-portrait')).toBeNull();
+    expect(feed.classList.contains('has-portrait')).toBe(true);
+    p.show(null);
+    expect(feed.classList.contains('has-portrait')).toBe(false);
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MISSION, TRAIL, WAITS } from './quests.fixture';
-import { holds, parseCondition, parseQuestFile, type CondCtx, type Condition, type QuestEntry } from './quests';
+import { fillRecruit, holds, parseCondition, parseQuestFile, parseRun, type CondCtx, type Condition, type QuestEntry } from './quests';
 import type { Deck } from './gear';
 import { DEFAULT_STATS } from './stats';
 
@@ -23,7 +23,7 @@ const conds = (s: string): Condition[] => {
   if (!Array.isArray(c)) throw new Error(c.message);
   return c;
 };
-const POCKET: Deck = { id: 'pocket-deck', name: 'Pocket deck', bonus: 5, heat: 0, traits: ['hidden'] };
+const POCKET: Deck = { id: 'pocket-deck', name: 'Pocket deck', quality: 1, heat: 0, traits: ['hidden'] };
 const ctx = (o: Partial<CondCtx> = {}): CondCtx => ({ flags: {}, trust: 'mid', warmth: 'mid', with: 'hicks', heat: 0, deck: null, stats: DEFAULT_STATS, ...o });
 
 describe('mission files', () => {
@@ -116,4 +116,44 @@ describe('a quest picture (art:)', () => {
   it('a name with a path or another kind of file is a problem', () => {
     for (const bad of ['../x.png', 'art/x.png', 'x.gif', 'X Y.png']) expect(messages(MISSION.replace('pay: 400\n---', `pay: 400\nart: ${bad}\n---`)).join(' '), bad).toMatch(/art/);
   });
+});
+
+describe('crew phase 2 lines (crew spec §5)', () => {
+  const withEffect = (line: string) => MISSION.replace('*Clean.*\npay: 400\n', `*Clean.*\npay: 400\n${line}\n`);
+  const SPRING = MISSION.replace('starts: haes-noodles\n', 'spring: true\n').replace('*The office is two floors up', '*Get {recruit} out. The office is two floors up');
+  it('reads gives: recruit muscle hand', () => expect(ok(withEffect('gives: recruit muscle hand')).outcomes.get('paid')!.effects.recruit).toEqual({ spec: 'muscle', grade: 1 }));
+  it('reads the grade in any case', () => expect(ok(withEffect('gives: recruit runner VET')).outcomes.get('paid')!.effects.recruit).toEqual({ spec: 'runner', grade: 3 }));
+  it('rejects an unknown specialty or grade', () => {
+    expect(messages(withEffect('gives: recruit chef boss')).some((m) => m.includes("can't read the effect line 'gives: recruit chef boss'"))).toBe(true);
+    expect(messages(withEffect('gives: recruit wheel green')).some((m) => m.includes("can't read the effect line"))).toBe(true);
+  });
+  it('gives: recruit only in a mission', () => {
+    expect(messages(withEffect('gives: recruit muscle hand').replace('kind: mission\n', '')).some((m) => m.includes('go only in a mission'))).toBe(true);
+  });
+  it('the effect-line hint names gives: recruit', () => expect(messages(withEffect('gives: recruit')).some((m) => m.includes('gives: recruit <specialty> <grade>'))).toBe(true));
+  it('a spring file parses without starts', () => expect(ok(SPRING)).toMatchObject({ spring: true, starts: '', kind: 'mission' }));
+  it('a plain mission without starts is still an error', () => expect(messages(MISSION.replace('starts: haes-noodles\n', '')).some((m) => m.startsWith('starts:'))).toBe(true));
+  it('a spring file is a mission', () => expect(messages(SPRING.replace('kind: mission\n', '')).some((m) => m.includes('spring: true goes only in a job (kind: mission)'))).toBe(true));
+  it('a spring file has no starts', () => expect(messages(SPRING.replace('spring: true\n', 'spring: true\nstarts: haes-noodles\n')).some((m) => m.includes("a spring file has no starts: (it posts where the recruit was hired)"))).toBe(true));
+  it('{recruit} outside a spring file is a problem', () => {
+    expect(messages(MISSION.replace('*The office is two floors up', '*{recruit} waits. The office is two floors up'))).toContain('file: {recruit} goes only in a spring file (spring: true)');
+  });
+  it('fillRecruit fills and leaves alone', () => {
+    expect(fillRecruit('Get {recruit} out.', 'Juno')).toBe('Get Juno out.');
+    expect(fillRecruit('Get {recruit} out.', null)).toBe('Get {recruit} out.');
+  });
+});
+
+describe('a stored run from before RUNNER (crew cleanup spec §4)', () => {
+  it('reads a contact of wire as a runner', () => {
+    const contact = { id: 'hicks', name: 'Hicks', accent: '#7fe9ff', portrait: null, spec: 'wire' };
+    const run = { beat: 'a', picks: [], flags: {}, done: false, at: 1, setup: { approach: 'quiet', people: [], favour: false, at: 1, contacts: [contact] } };
+    expect(parseRun(JSON.stringify(run))?.setup?.contacts?.[0].spec).toBe('runner');
+  });
+});
+
+describe('drops: (crew goods spec §6)', () => {
+  const file = (line: string) => MISSION.replace(/^title:/m, `${line}\ntitle:`);
+  it('reads a kind of goods', () => expect(ok(file('drops: data')).drops).toBe('data'));
+  it('refuses an unknown kind', () => expect(messages(file('drops: gold')).join()).toContain('drops'));
 });

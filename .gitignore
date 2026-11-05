@@ -29,7 +29,7 @@ persona/*
 /build/
 /release/
 tools/map3d/out/
-web/public/map/tiles/
+web/public/map/tiles
 web/public/map/tiles-dark/
 web/public/map/tiles-mask/
 web/public/map/tiles.json

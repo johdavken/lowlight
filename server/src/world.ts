@@ -5,15 +5,15 @@ import { markSeen, MEET_WAIT, parsePlan, planKey, planOver, planPlaceAt, planSee
 import type { Pronoun } from '../../shared/pronoun';
 import { emptyCrewBook, type CrewBook } from '../../shared/crew-book';
 import { parseInstance } from '../../shared/crew';
-import { foldWithCrew, type CrewEvent, type CrewState } from '../../shared/crew-fold';
+import { foldWithCrew, type CrewEvent, type CrewState, type FoldJob } from '../../shared/crew-fold';
 import { parseCrewEvents } from './crew-view';
 import type { LeadEntry } from '../../shared/leads';
-import { parseRun, type QuestEntry, type QuestStatus } from '../../shared/quests';
-import type { Kit, KitEvent } from '../../shared/mission';
+import { fillRecruit, parseRun, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { outcomeTier, type Kit, type KitEvent } from '../../shared/mission';
 import { fixerKey, parseFixer } from '../../shared/stock';
-import { bookId, repFromEnv, trustFromEnv } from './mission-run';
-import { DEFAULT_STATS, edgeMax, type Stats } from '../../shared/stats';
-import { DEFAULT_SHARED_STANDING, startValues, wordFor, type SharedStanding, type StoredStanding, type StandingConfig, type StandingValues } from '../../shared/standing';
+import { bookId, repFromEnv, solFromEnv, trustFromEnv } from './mission-run';
+import { DEFAULT_STATS, nerveMax, type Stats } from '../../shared/stats';
+import { DEFAULT_SHARED_STANDING, parseStored, standingKey, startValues, wordFor, type SharedStanding, type StoredStanding, type StandingConfig, type StandingValues } from '../../shared/standing';
 import { readHeldLeads } from './leads-held';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -33,7 +33,8 @@ import type { AgentRuntime } from './runtime';
 import { addNarrated, darkNow, dropUndone, powerOf, type PowerPlace } from './power';
 import type { Outage } from '../../shared/outage';
 import { cipherKey, foldCipher, looseEnds, parseCipherEvents, type CipherState } from '../../shared/cipher';
-import type { LooseEndsView } from '../../shared/types';
+import type { ContactCard, LooseEndsView } from '../../shared/types';
+import { contactCardsFrom, giversFromEnv } from './contact-cards';
 
 type Players = ReturnType<typeof createPlayers>;
 
@@ -137,6 +138,10 @@ export interface CheckpointPort {
   tieFor(contactId: string, player: string): string | null;
   /** Where her standing on `player` starts (Standing spec §3): the tie's start, else her Studio start, else 0/0; null when standing doesn't apply (no playthrough, or anyone but its player). */
   standingStart(contactId: string, player: string): StandingValues | null;
+  /** Every contact's standing on the active playthrough's `player` now (stored, else where it starts); [] for anyone else (crew spec §5's vouches). */
+  standingAll(player: string): { contact: string; values: StandingValues }[];
+  /** The latest story minute any room's `[crew]` line told up to, for the active playthrough's `player`; null: none yet (crew spec §5). */
+  crewToldUntil(player: string): number | null;
   /** Her `standing` block (want, secret, words); null without one. */
   standingConfig(contactId: string): StandingConfig | null;
   /** The shared words and band lines (world/standing.json). */
@@ -145,6 +150,8 @@ export interface CheckpointPort {
   heldLeads(player: string): HeldLead[] | null;
   /** Every quest run `player` has in the active playthrough, in whose room (Quest lines spec §4); null when quests don't apply (no playthrough, or anyone but its player). Read fresh, as held leads are. */
   questStatus(player: string): QuestStatus[] | null;
+  /** Does any contact's room in the playthrough hold `key`? */
+  metaAnywhere?(key: string): boolean;
   /** `player`'s kit now (missions spec §1): their character's stats and starting deck, with every mission run's events folded in, from every contact's room; null when it doesn't apply (no playthrough, or anyone but its player). */
   /** The kit now, or at story-clock minute `at` (events after it left out). */
   /** The kit and the crew folded on one timeline (crew spec §3). */
@@ -155,6 +162,8 @@ export interface CheckpointPort {
   cipherCast(player: string): { id: string; name: string; pronoun: string; about: string; secret: string | null }[];
   /** LEADS: the leads the active playthrough's player holds, open ones first, oldest first within each. Throws 'no-playthrough'. */
   leads(): LeadView[];
+  /** Contact cards (contact cards spec §1): who gave `player` a lead and has a trade; [] when it doesn't apply. */
+  contactCards(player: string): ContactCard[];
   /** LOOSE ENDS (cipher spec §2.8): the clues the player saw and the truths they learned; never an open truth. Throws 'no-playthrough'. */
   looseEnds(): LooseEndsView;
   /** The map's name for a scene, else the scene's own name. */
@@ -855,6 +864,17 @@ export function createWorld(deps: {
       });
       return [...rows.filter((r) => !r.followed), ...rows.filter((r) => r.followed)];
     },
+    contactCards(player) {
+      const pt = playthroughs.active();
+      const held = pt ? this.heldLeads(player) : null;
+      if (!pt || !held) return [];
+      const met = new Map(known(pt).map((c) => [c.id, c]));
+      // Test-only (e2e): givers seeded by NIX_TEST_GIVERS, read off the roster when not met.
+      const seeded = giversFromEnv(player).map((givenBy): HeldLead => ({ id: `test-${givenBy}`, givenBy, details: '', at: 0, followed: false }));
+      const roster = (id: string) => deps.roster().find((r) => r.id === id);
+      const info = (id: string) => met.get(id) ?? (roster(id) ? { name: roster(id)!.name, accent: roster(id)!.accent, portrait: null } : null);
+      return contactCardsFrom([...seeded, ...held], info, (id) => deps.standingConfig?.(id)?.vouches);
+    },
     looseEnds() {
       const pt = playthroughs.active();
       if (!pt) throw new Error('no-playthrough');
@@ -878,6 +898,10 @@ export function createWorld(deps: {
         ),
       );
     },
+    metaAnywhere(key) {
+      const pt = playthroughs.active();
+      return pt ? withDbs(pt, (dbs) => [...dbs].some(([, db]) => db.getMeta(key) !== null)) : false;
+    },
     kitOf(player, at) {
       const pt = playthroughs.active();
       if (!pt || pt.player !== player) return null;
@@ -887,6 +911,8 @@ export function createWorld(deps: {
       // Each run's events, with the district its mission starts in (old heat events carry none); then the fixer's
       // purchases; and each recruit's crew events, merged across room dbs by recruit id.
       const home = new Map<KitEvent, string | null>();
+      // Jobs played with the hand (spec 2026-10-29-the-hand): who went, the calls, the end; cut at `at` like the rest.
+      const jobs: FoldJob[] = [];
       const crewLists = new Map<string, CrewEvent[]>();
       const prints: string[] = [];
       const events = withDbs(pt, (dbs) =>
@@ -898,9 +924,27 @@ export function createWorld(deps: {
           }
           return [
             ...db.metaWithPrefix(prefix).flatMap(({ k, v }) => {
-              const starts = book.find((q) => q.id === bookId(k.slice(prefix.length)))?.starts;
+              const q = book.find((x) => x.id === bookId(k.slice(prefix.length)));
+              const run = parseRun(v);
+              // A rescue (crew spec §5) plays where its recruit was hired: its heat lands there.
+              const starts = run?.spring?.place ?? q?.starts;
               const district = starts ? (deps.districtOf?.(starts) ?? null) : null;
-              const evs = (parseRun(v)?.kit ?? []) as KitEvent[];
+              const evs = (run?.kit ?? []) as KitEvent[];
+              const s = run?.setup;
+              if (run && s && (at === undefined || s.at <= at)) {
+                // A contract's job is over at its debrief, though the run waits on for its fallout.
+                const ended = (run.done || run.contract?.stage === 'fallout') && s.endAt !== undefined && (at === undefined || s.endAt <= at);
+                jobs.push({
+                  key: k,
+                  title: q?.title ?? k,
+                  district,
+                  setup: s,
+                  calls: (run.calls ?? []).filter((c) => at === undefined || c.at <= at),
+                  end: ended ? { at: s.endAt!, tier: outcomeTier({ take: run.take ?? 'full', blown: run.blown === true, alarm: run.alarm ?? 0, paidOff: run.setup?.paidOff === true }), getOut: run.getaway === true } : null,
+                  ...(run.spring ? { spring: run.spring.recruit } : {}),
+                  ...(q?.drops ? { drops: q.drops } : {}),
+                });
+              }
               for (const e of evs) home.set(e, district);
               return evs;
             }),
@@ -908,16 +952,23 @@ export function createWorld(deps: {
           ];
         }),
       );
+      // A rescue's title names its recruit (crew spec §5), as the crew lists have them.
+      for (const j of jobs) {
+        if (!j.spring) continue;
+        const h = crewLists.get(j.spring)?.find((e): e is Extract<CrewEvent, { type: 'hire' }> => e.type === 'hire');
+        j.title = fillRecruit(j.title, h ? h.recruit.name.split(' ')[0] : null);
+      }
       const now = at ?? clockOf(pt);
       const key = `${pt.id}|${player}|${at ?? '-'}|${now}|${prints.join(';')}`;
       if (kitMemo?.key === key) return kitMemo.value;
       const start = deps.kitStart?.(player) ?? { stats: DEFAULT_STATS, deck: null };
-      const seeded = repFromEnv(player).map((rep): KitEvent => ({ at: START, rep }));
+      const sol = solFromEnv(player);
+      const seeded = [...repFromEnv(player).map((rep): KitEvent => ({ at: START, rep })), ...(sol ? [{ at: START, sol }] : [])];
       const kept = [...seeded, ...(at === undefined ? events : events.filter((e) => e.at <= at))];
       const crewBook = deps.crewBook?.() ?? emptyCrewBook();
       const job = (id: string) => book.find((q) => q.id === id);
       const r = foldWithCrew({
-        start: { deck: start.deck, edgeMax: edgeMax(start.stats), from: START },
+        start: { deck: start.deck, nerveMax: nerveMax(start.stats), from: START },
         kitEvents: kept,
         crew: [...crewLists.values()].map((l) => (at === undefined ? l : l.filter((e) => e.at <= at))),
         now,
@@ -933,7 +984,9 @@ export function createWorld(deps: {
             placeOfJob: (j) => job(j)?.starts ?? null,
           }),
         districtOf: (e) => home.get(e) ?? null,
+        placeDistrict: (place) => deps.districtOf?.(place) ?? null,
         names: { place: deps.crewPlaceName, district: deps.districtName, job: (id) => job(id)?.title ?? id },
+        jobs,
       });
       const value = { kit: r.kit, stats: start.stats, crew: r.crew };
       kitMemo = { key, value };
@@ -975,6 +1028,30 @@ export function createWorld(deps: {
       const pt = playthroughs.active();
       if (!pt || pt.player !== player) return null;
       return standingStartOf(pt, contactId);
+    },
+    standingAll(player) {
+      const pt = playthroughs.active();
+      if (!pt || pt.player !== player) return [];
+      return withDbs(pt, (dbs) =>
+        [...dbs.entries()].map(([contact, db]) => {
+          const stored = parseStored(db.getMeta(standingKey(player)));
+          return { contact, values: stored ? { trust: stored.trust, warmth: stored.warmth } : standingStartOf(pt, contact) };
+        }),
+      );
+    },
+    crewToldUntil(player) {
+      const pt = playthroughs.active();
+      if (!pt || pt.player !== player) return null;
+      return withDbs(pt, (dbs) =>
+        [...dbs.values()].reduce<number | null>((max, db) => {
+          try {
+            const u = (JSON.parse(db.getMeta(`crewTold.${player}`) ?? 'null') as { until?: number } | null)?.until;
+            return typeof u === 'number' && (max === null || u > max) ? u : max;
+          } catch {
+            return max;
+          }
+        }, null),
+      );
     },
     standingConfig(contactId) {
       return deps.standingConfig?.(contactId) ?? null;

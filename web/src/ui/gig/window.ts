@@ -1,22 +1,16 @@
 /**
- * The hack window (gig runs spec §4): over the open MAP, a CRT terminal with the place's jobs, then
- * a run on its board, then the result, which is sent once and answered by her in the room. Esc is
- * the map's: it asks `handleEscape` first. Other keys are taken here while the window is up.
+ * The gig window (gig runs spec §4): over the open MAP, a CRT terminal with the place's jobs, then
+ * a papers run at the desk, then the result, which is sent once and answered by her in the room. Esc
+ * is the map's: it asks `handleEscape` first. Other keys are taken here while the window is up. Hack
+ * and slip are gone (2026-11-01): their briefs are never dealt.
  */
 import { bugReportOpen } from '../bug-report';
-import { dealJobs, gigKind, RESULTS_FOR, type Brief, type GigKind, type GigResult } from '../../../../shared/gig/brief';
-import { generate as generateBoard } from '../../../../shared/gig/generate';
-import { DECK, type Board, type Tier } from '../../../../shared/gig/rules';
-import { KIT } from '../../../../shared/slip/rules';
-import { HackRun, button, type Deck } from './hack-run';
-import { slipBoards, type SlipBoards, type SlipGen } from '../slip/boards';
-import { SlipRun, type Kit } from '../slip/run';
+import { dealJobs, gigKind, type Brief, type GigKind, type GigResult } from '../../../../shared/gig/brief';
 import { PapersRun } from '../papers/run';
 import { papersBoard, type PapersBoard } from '../../../../shared/papers/generate';
 import type { PapersData } from '../../../../shared/papers/data';
-import type { SlipBoard } from '../../../../shared/slip/rules';
 import { jobCard } from './job-card';
-import type { RunEnd, RunHost, RunScreen } from './run-screen';
+import { button, type RunEnd, type RunHost, type RunScreen } from './run-screen';
 import './gig.css';
 
 export interface GigSend {
@@ -39,32 +33,20 @@ export interface GigWindowOpts {
   load: () => Promise<Brief[]>;
   onSend: (run: GigSend) => void;
   onClose: () => void;
-  /** A sound cue by name: the hack's (gig/sound.ts) and the slip's (slip/sound.ts). */
+  /** A sound cue by name: the window's (gig/sound.ts) and the desk's (`papers:`…). */
   cue?: (name: string) => void;
   reducedMotion: boolean;
-  /** The dev strip: seed, solver, REVEAL, NEW BOARD, DECK RAM, RERUN. */
+  /** The dev strip: the run's seed and result. */
   dev?: boolean;
   /** Default: `?gigSeed=` when present (e2e), else random. */
   seed?: () => number;
-  /** The deck's RAM for this window's runs. Default DECK.ram. */
-  ram?: number;
-  generate?: (tier: Tier, seed: number) => Board;
-  /** The window's music: 'slip' while a slip runs, null for the gig track (spec §7). */
+  /** The window's music: 'papers' at the desk, null for the gig track (spec §7). */
   music?: (kind: GigKind | null) => void;
-  /** Slip boards; default a web worker (slipBoards). */
-  generateSlip?: SlipGen;
   /** GET /api/papers: the data papers boards are dealt from, and whether the first night is still to come. */
   loadPapers?: () => Promise<(PapersData & { firstNight: boolean }) | null>;
-  /**
-   * A big job's route (big jobs spec §3): straight onto this brief's run with this seed, no jobs list. Its
-   * result goes out once, with this seed, and the window closes; walking away is a failure of its kind.
-   */
-  direct?: { brief: Brief; seed: number };
 }
 
 const RESULT_LABEL: Record<GigResult, string> = { clean: 'CLEAN', close: 'CLOSE CALL', traced: 'TRACED', caught: 'CAUGHT', back: 'TURNED BACK' };
-/** How many seeds a job tries before saying the board won't resolve. */
-const SEED_TRIES = 6;
 /** How long a sent result waits for her turn to start before the window offers SEND AGAIN. */
 const ANSWER_MS = 10_000;
 
@@ -104,20 +86,12 @@ export class GigWindow {
   private picked = 0;
   private run: Run | null = null;
   private runScreen: RunScreen | null = null;
-  private readonly deck: Deck;
-  private readonly kit: Kit = { charges: KIT.charges };
-  /** Slip boards asked for as the jobs are dealt (by job index), so SLIP IN rarely waits. */
-  private readonly warm = new Map<number, { seed: number; board: Promise<SlipBoard | null> }>();
-  private slipGen: SlipGen | null = null;
-  /** The worker this window made (none when the opts gave a generator). */
-  private ownBoards: SlipBoards | null = null;
   private playing: GigKind | null = null;
   /** Papers: the data boards are dealt from (null when it wouldn't load), and each papers job's dealt board. */
   private papersData: (PapersData & { firstNight: boolean }) | null = null;
   private readonly papers = new Map<number, PapersBoard>();
   /** Papers: the WALK AWAY / STAY confirm, while it's up. */
   private confirm: HTMLElement | null = null;
-  private escArmed = false;
   /** Set when the result goes out; only a refusal clears it. */
   private sent = false;
   private refusal: string | null = null;
@@ -130,7 +104,6 @@ export class GigWindow {
     host: HTMLElement,
     private readonly opts: GigWindowOpts,
   ) {
-    this.deck = { ram: opts.ram ?? DECK.ram };
     this.root = el('div', 'gig-window');
     this.root.setAttribute('role', 'dialog');
     this.root.setAttribute('aria-label', 'Gig window');
@@ -141,7 +114,7 @@ export class GigWindow {
     this.prompt.hidden = true;
     const close = (this.jackout = el('button', 'gig-jackout', '[ESC] JACK OUT'));
     close.type = 'button';
-    // The button is SLIP OUT / JACK OUT itself, not Esc: it never just cancels an aim.
+    // The button is WALK AWAY / JACK OUT itself, not Esc.
     close.addEventListener('click', () => this.handleEscape(true));
     bar.append(this.where, this.prompt, close);
     this.view = el('div', 'gig-view');
@@ -156,19 +129,13 @@ export class GigWindow {
     window.addEventListener('keydown', this.onKey, true);
     this.paint();
     this.cue('jack-in');
-    if (opts.direct) {
-      void this.startDirect(opts.direct);
-      return;
-    }
     opts
       .load()
       .then(async (briefs) => {
         if (this.closed) return;
-        this.jobs = dealJobs(briefs);
-        this.jobs.forEach((b, i) => {
-          if (gigKind(b) === 'slip') this.warm.set(i, this.slipBoard(b.tier, this.freshSeed()));
-        });
-        if (this.jobs.some((b) => gigKind(b) === 'papers')) await this.dealPapers();
+        // Hack and slip are gone: an old brief of theirs is never dealt.
+        this.jobs = dealJobs(briefs.filter((b) => gigKind(b) === 'papers'));
+        if (this.jobs.length) await this.dealPapers();
         if (this.closed) return;
         this.screen = this.jobs.length ? 'jobs' : 'empty';
         this.paint();
@@ -193,11 +160,6 @@ export class GigWindow {
       if (this.runScreen.handingOver) return true;
       if (this.confirm) this.dropConfirm();
       else this.askWalkAway();
-      return true;
-    }
-    if (this.screen === 'run' && !this.escArmed) {
-      this.escArmed = true;
-      this.prompt.hidden = false;
       return true;
     }
     this.close();
@@ -243,7 +205,6 @@ export class GigWindow {
     this.closed = true;
     window.removeEventListener('keydown', this.onKey, true);
     this.dropRun();
-    this.ownBoards?.dispose();
     this.root.remove();
   }
 
@@ -258,30 +219,12 @@ export class GigWindow {
 
   private close(): void {
     if (this.closed) return;
-    // Direct mode: leaving before a result is walking away, a failure of the route's kind.
-    if (this.opts.direct && !this.sent) {
-      const kind = gigKind(this.opts.direct.brief);
-      this.sent = true;
-      this.opts.onSend({ kind, place: this.opts.place.id, brief: this.opts.direct.brief.id, result: RESULTS_FOR[kind][2], trace: 0, max: 0, seed: this.opts.direct.seed });
-    }
     this.opts.onClose();
-  }
-
-  private kind(): GigKind {
-    const brief = this.run?.brief ?? this.jobs[this.picked];
-    return brief ? gigKind(brief) : 'hack';
   }
 
   // ── keys ──
 
   private key(e: KeyboardEvent): void {
-    // Direct mode (a big job's route): no map above to hand Esc down, so the window takes it.
-    if (this.opts.direct && e.key === 'Escape' && !this.closed) {
-      e.preventDefault();
-      e.stopPropagation();
-      this.handleEscape();
-      return;
-    }
     if (this.closed || e.key === 'Escape' || e.key === '`' || e.altKey || e.ctrlKey || e.metaKey) return;
     // Typing in a field outside the window (the dev panel) is that field's.
     const t = e.target;
@@ -337,7 +280,6 @@ export class GigWindow {
   }
 
   private disarm(): void {
-    this.escArmed = false;
     this.prompt.hidden = true;
   }
 
@@ -389,14 +331,6 @@ export class GigWindow {
     return this.opts.seed?.() ?? urlSeed() ?? (Math.random() * 2 ** 32) >>> 0;
   }
 
-  private slipBoard(tier: Tier, seed: number): { seed: number; board: Promise<SlipBoard | null> } {
-    if (!this.slipGen) {
-      if (this.opts.generateSlip) this.slipGen = this.opts.generateSlip;
-      else this.slipGen = this.ownBoards = slipBoards();
-    }
-    return { seed, board: this.slipGen(tier, seed) };
-  }
-
   /** Papers (spec §3.1): one board per papers job, dealt now so its card shows the cap. The first night, while it's pending, is every card's. */
   private async dealPapers(): Promise<void> {
     try {
@@ -419,82 +353,24 @@ export class GigWindow {
     this.disarm();
     this.sent = false;
     this.refusal = null;
-    if (gigKind(brief) === 'papers') {
-      const data = this.papersData;
-      const board = data ? (seed === undefined ? (this.papers.get(i) ?? papersBoard(brief.tier, this.freshSeed() || 1, data)) : papersBoard(brief.tier, seed, data)) : null;
-      if (!board) {
-        this.screen = 'error';
-        this.run = { brief, seed: 0, end: null, detail: '' };
-        this.paint();
-        this.run = null;
-        return;
-      }
-      this.run = { brief, seed: board.seed, end: null, detail: '' };
-      this.screen = 'run';
-      this.setMusic('papers');
-      this.runScreen = new PapersRun(this.host(), { brief, board }, { name: this.opts.place.name }, !!this.opts.dev);
-      this.paint();
-      this.scroll.scrollTop = 0;
-      return;
-    }
-    if (gigKind(brief) === 'slip') {
-      // The dealt board, unless the dev strip asked for a seed; a later SLIP IN deals a fresh one.
-      const job = seed === undefined ? (this.warm.get(i) ?? this.slipBoard(brief.tier, this.freshSeed())) : this.slipBoard(brief.tier, seed);
-      this.warm.delete(i);
-      this.run = { brief, seed: job.seed, end: null, detail: '' };
-      this.screen = 'run';
-      this.setMusic('slip');
-      this.runScreen = new SlipRun(this.host(), { brief, seed: job.seed, board: job.board }, { name: this.opts.place.name, district: this.opts.place.district }, this.kit, urlSeed() !== null);
-      this.paint();
-      return;
-    }
-    const gen = this.opts.generate ?? generateBoard;
-    const base = seed ?? this.opts.seed?.() ?? urlSeed() ?? (Math.random() * 2 ** 32) >>> 0;
-    let board: Board | null = null;
-    let used = base;
-    for (let k = 0; k < SEED_TRIES && !board; k++) {
-      try {
-        used = (base + k) >>> 0;
-        board = gen(brief.tier, used);
-      } catch {
-        board = null;
-      }
-    }
-    this.sent = false;
-    this.refusal = null;
+    const data = gigKind(brief) === 'papers' ? this.papersData : null;
+    const board = data ? (seed === undefined ? (this.papers.get(i) ?? papersBoard(brief.tier, this.freshSeed() || 1, data)) : papersBoard(brief.tier, seed, data)) : null;
     if (!board) {
       this.screen = 'error';
       this.run = null;
       this.paint();
       return;
     }
-    this.setMusic(null);
-    this.run = { brief, seed: used, end: null, detail: '' };
+    this.run = { brief, seed: board.seed, end: null, detail: '' };
     this.screen = 'run';
-    this.runScreen = new HackRun(this.host(), { brief, seed: used, board }, this.deck, urlSeed() !== null);
+    this.setMusic('papers');
+    this.runScreen = new PapersRun(this.host(), { brief, board }, { name: this.opts.place.name }, !!this.opts.dev);
     this.paint();
-  }
-
-  /** A big job's route: its one brief, its seed, its board (papers data loaded first). */
-  private async startDirect(d: { brief: Brief; seed: number }): Promise<void> {
-    this.jobs = [d.brief];
-    if (gigKind(d.brief) === 'papers') await this.dealPapers();
-    if (this.closed) return;
-    this.start(0, d.seed);
-  }
-
-  /** Direct mode: the result once, with the route's seed, then close (no row of its own to wait for). */
-  private sendDirect(result: GigResult, meter = 0, max = 0): void {
-    const d = this.opts.direct!;
-    if (this.sent) return;
-    this.sent = true;
-    this.opts.onSend({ kind: gigKind(d.brief), place: this.opts.place.id, brief: d.brief.id, result, trace: meter, max, seed: d.seed });
-    this.close();
+    this.scroll.scrollTop = 0;
   }
 
   private send(): void {
     const run = this.run;
-    if (this.opts.direct && run?.end) return this.sendDirect(run.end.result, run.end.meter, run.end.max);
     if (this.sent || !run?.end) return;
     this.sent = true;
     this.refusal = null;
@@ -529,16 +405,13 @@ export class GigWindow {
               : this.screen === 'error'
                 ? 'ERROR'
                 : 'CONNECTING';
-    const kind = this.kind();
-    const slip = kind === 'slip';
     this.jackout.hidden = this.screen === 'result' && !this.refusal;
-    this.jackout.textContent = this.screen === 'run' && kind !== 'hack' ? (slip ? '[ESC] SLIP OUT' : '[ESC] WALK AWAY') : '[ESC] JACK OUT';
-    this.prompt.textContent = slip ? '[ESC] again to slip out' : '[ESC] again to jack out';
+    this.jackout.textContent = this.screen === 'run' ? '[ESC] WALK AWAY' : '[ESC] JACK OUT';
     // Papers names the job, not the district (spec §3.3): you sit at one desk for one client.
     this.where.textContent =
-      kind === 'papers' && this.screen === 'run' && this.run
+      this.screen === 'run' && this.run
         ? `◢ DESK // ${this.opts.place.name.toUpperCase()} · ${this.run.brief.title}`
-        : `◢ ${slip ? 'FLOOR' : kind === 'papers' ? 'DESK' : 'GRID'} // ${this.opts.place.name.toUpperCase()} · ${this.opts.place.district.toUpperCase()} · ${step}`;
+        : `◢ DESK // ${this.opts.place.name.toUpperCase()} · ${this.opts.place.district.toUpperCase()} · ${step}`;
   }
 
   private paint(): void {
@@ -553,7 +426,7 @@ export class GigWindow {
     this.view.replaceChildren();
     if (this.screen === 'loading') this.view.append(el('p', 'gig-boot', '> dialing in…'));
     else if (this.screen === 'empty') this.view.append(el('p', 'gig-empty', 'no jobs posted here tonight'), el('p', 'gig-empty-close', '[ESC] CLOSE'));
-    else if (this.screen === 'error') this.view.append(el('p', 'gig-error', `the ${{ slip: 'floor', papers: 'desk', hack: 'board' }[this.kind()]} won't resolve — try again`), el('p', 'gig-empty-close', '[ESC] CLOSE'));
+    else if (this.screen === 'error') this.view.append(el('p', 'gig-error', "the desk won't resolve — try again"), el('p', 'gig-empty-close', '[ESC] CLOSE'));
     else if (this.screen === 'jobs') this.paintJobs();
     else if (this.screen === 'result') this.paintResult();
     this.paintDev();
@@ -562,7 +435,7 @@ export class GigWindow {
   private paintJobs(): void {
     const boot = el('p', 'gig-boot');
     boot.append(
-      `> ${DECK.name.toLowerCase()} · ${this.deck.ram} RAM · ${KIT.name.toLowerCase()} · ${this.kit.charges} charges · forger's kit · ${this.opts.you} · ${this.opts.contact} on comms`,
+      `> forger's kit · ${this.opts.you} · ${this.opts.contact} on comms`,
       el('br', ''),
       `> ${this.jobs.length} job${this.jobs.length === 1 ? '' : 's'} posted for ${this.opts.place.name}. pick one.`,
     );
@@ -590,8 +463,7 @@ export class GigWindow {
     const wrap = el('div', 'gig-result');
     wrap.append(el('div', `gig-result-big gig-${end.result}`, RESULT_LABEL[end.result]), el('div', 'gig-result-detail', run.detail));
     if (this.refusal) wrap.append(el('div', 'gig-refusal', this.refusal));
-    const leave = { slip: '[ENTER] WALK AWAY', papers: '[ENTER] LEAVE THE DESK', hack: '[ENTER] JACK OUT' }[gigKind(run.brief)];
-    const send = button(this.refusal ? '[ENTER] SEND AGAIN' : leave, 'gig-send', () => this.send());
+    const send = button(this.refusal ? '[ENTER] SEND AGAIN' : '[ENTER] LEAVE THE DESK', 'gig-send', () => this.send());
     send.disabled = this.sent;
     wrap.append(send);
     this.view.append(wrap);
@@ -603,11 +475,5 @@ export class GigWindow {
     strip.replaceChildren();
     const run = this.run;
     strip.append(el('span', '', run?.end ? (run.end.devLine ?? `DEV · seed ${run.end.seed} · ${run.end.result} ${run.end.meter}/${run.end.max}`) : 'DEV'));
-    strip.append(el('span', 'gig-sp'));
-    strip.append(
-      el('span', '', `DECK RAM ${this.deck.ram}`),
-      button('−', '', () => ((this.deck.ram = Math.max(0, this.deck.ram - 1)), this.paint())),
-      button('+', '', () => ((this.deck.ram = Math.min(8, this.deck.ram + 1)), this.paint())),
-    );
   }
 }

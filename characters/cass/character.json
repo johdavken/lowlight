@@ -55,11 +55,17 @@
     },
     {
       "from": "04:00",
-      "to": "20:00",
+      "to": "19:00",
       "room": "karasu/cass-apartment"
+    },
+    {
+      "from": "19:00",
+      "to": "20:00",
+      "room": "karasu/noodle-stall"
     }
   ],
   "standing": {
+    "vouches": "fence",
     "start": {
       "trust": 0,
       "warmth": 2

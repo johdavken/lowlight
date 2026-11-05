@@ -15,15 +15,26 @@ export const ENCOUNTER_LINE_MAX = 400;
 export const STRANGER_NAME_MAX = 24;
 export const STRANGER_VOICE_MAX = 120;
 
+/** DRAW's three kinds, one card each, in this order: someone walks in, the place acts, it touches the two of them. */
+export const ENCOUNTER_KINDS = ['stranger', 'city', 'personal'] as const;
+export type EncounterKind = (typeof ENCOUNTER_KINDS)[number];
+export const STRANGER_GENDERS = ['man', 'woman'] as const;
+export const STRANGER_AGES = ['young', 'middle', 'old'] as const;
+
 export interface Stranger {
   name: string;
   /** A few words on how they speak. */
   voice: string;
-  /** Their face, an extra's id (quest strangers only; stranger faces spec §5). */
+  /** Their face, an extra's id (a quest's `face:`, or picked for a DRAW stranger; stranger faces spec §5). */
   face?: string;
+  /** What the narrator said they look like, for the face pick (DRAW strangers). */
+  gender?: (typeof STRANGER_GENDERS)[number];
+  age?: (typeof STRANGER_AGES)[number];
 }
 
 export interface Encounter {
+  /** Which of DRAW's kinds (sets dealt before kinds have none). */
+  kind?: EncounterKind;
   title: string;
   text: string;
   stranger?: Stranger;
@@ -37,7 +48,7 @@ const title = z
   .min(1)
   .max(SCENE_TITLE_MAX)
   .refine((s) => !/[\r\n]/.test(s));
-const eventSchema = z.object({ title, text: z.string().trim().min(1).max(SCENE_OPTION_TEXT_MAX), stranger: z.unknown().optional(), power: z.unknown().optional() });
+const eventSchema = z.object({ kind: z.unknown().optional(), title, text: z.string().trim().min(1).max(SCENE_OPTION_TEXT_MAX), stranger: z.unknown().optional(), power: z.unknown().optional() });
 const strangerSchema = z.object({
   name: z
     .string()
@@ -46,7 +57,18 @@ const strangerSchema = z.object({
     .max(STRANGER_NAME_MAX)
     .regex(/^[\p{L}][\p{L} '-]*$/u),
   voice: z.string().trim().min(1).max(STRANGER_VOICE_MAX),
+  gender: z.unknown().optional(),
+  age: z.unknown().optional(),
+  face: z.unknown().optional(),
 });
+const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined => (typeof v === 'string' && (list as readonly string[]).includes(v.toLowerCase()) ? (v.toLowerCase() as T) : undefined);
+
+export interface EncounterParseOptions {
+  /** The power's already out here: no event cuts it again. */
+  dark?: boolean;
+  /** A stranger's face is kept only when this knows the id (the extras library); without it, never. */
+  faceOk?: (id: string) => boolean;
+}
 
 /** Words that say the power goes: a power cut card whose text has none is a mistag. */
 const POWER_WORDS = /\b(power|grid|black ?out|outage|breaker|fuse|current|juice|electric\w*|darkness|(goes|went|go|going|gone) dark|dark(ness)? (falls|rolls|spreads)|(lights?|lamps?|bulbs?|neon|screens?)(\s+\w+){0,3}\s+(die|dies|died|dying|go|goes|went|cut|cuts|fail|fails|failed|drop|drops|gutter\w*|out))\b/i;
@@ -55,24 +77,35 @@ const POWER_WORDS = /\b(power|grid|black ?out|outage|breaker|fuse|current|juice|
 const bare = (s: string) => s.replace(/^[\s*]+|[\s*]+$/g, '').toLowerCase();
 
 /**
- * An event, trimmed; null when it isn't one. Its stranger is dropped (the event kept) when it
- * isn't one, or when its name is already taken (`reserved`: you, her, the place's resident). Its
+ * An event, trimmed; null when it isn't one. Its kind is kept when it's one of DRAW's. Its stranger
+ * is dropped (the event kept) when it isn't one, or when its name is already taken (`reserved`: you,
+ * her, the place's resident); their gender and age are kept when they're the narrator's words, their
+ * face only when `faceOk` knows it (a played event comes back from the browser). Its
  * `power: 'out'` is kept only as exactly that, and dropped where the power's already out (`dark`).
  */
-export function parseEncounter(raw: unknown, reserved: string[], o: { dark?: boolean } = {}): Encounter | null {
+export function parseEncounter(raw: unknown, reserved: string[], o: EncounterParseOptions = {}): Encounter | null {
   const r = eventSchema.safeParse(raw);
   if (!r.success) return null;
-  const out: Encounter = { title: r.data.title, text: r.data.text };
+  const kind = oneOf(ENCOUNTER_KINDS, r.data.kind);
+  const out: Encounter = { ...(kind ? { kind } : {}), title: r.data.title, text: r.data.text };
   const s = strangerSchema.safeParse(r.data.stranger);
   const taken = new Set(reserved.map(bare));
-  if (s.success && !taken.has(bare(s.data.name))) out.stranger = { name: s.data.name, voice: s.data.voice };
+  if (s.success && !taken.has(bare(s.data.name))) {
+    const gender = oneOf(STRANGER_GENDERS, s.data.gender);
+    const age = oneOf(STRANGER_AGES, s.data.age);
+    const face = typeof s.data.face === 'string' && o.faceOk?.(s.data.face) ? s.data.face : undefined;
+    out.stranger = { name: s.data.name, voice: s.data.voice, ...(gender ? { gender } : {}), ...(age ? { age } : {}), ...(face ? { face } : {}) };
+  }
   // A power cut only where the power is on, and only when the event says the power goes (blackouts phase 3 §2; the narrator once tagged an envelope).
   if (r.data.power === 'out' && !o.dark && POWER_WORDS.test(`${out.title} ${out.text}`)) out.power = 'out';
   return out;
 }
 
-/** The narrator's answer: exactly three events (from inside a code fence if there is one); null otherwise. */
-export function parseEncounterOptions(text: string, reserved: string[], o: { dark?: boolean } = {}): Encounter[] | null {
+/**
+ * The narrator's answer: exactly three events (from inside a code fence if there is one), each
+ * taking the kind of its place (stranger, city, personal) whatever it said; null otherwise.
+ */
+export function parseEncounterOptions(text: string, reserved: string[], o: EncounterParseOptions = {}): Encounter[] | null {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(text);
   const body = fenced ? fenced[1] : text;
   const start = body.indexOf('[');
@@ -86,10 +119,13 @@ export function parseEncounterOptions(text: string, reserved: string[], o: { dar
   }
   if (!Array.isArray(raw) || raw.length !== ENCOUNTER_OPTIONS) return null;
   const out: Encounter[] = [];
-  for (const item of raw) {
+  for (const [i, item] of raw.entries()) {
     const e = parseEncounter(item, reserved, o);
     if (!e) return null;
-    out.push(e);
+    const kind = ENCOUNTER_KINDS[i]!;
+    // Only THE CITY cuts the power: a power cut on another card goes, the card kept.
+    const { power: _power, ...rest } = e;
+    out.push({ ...(kind === 'city' ? e : rest), kind });
   }
   return out;
 }

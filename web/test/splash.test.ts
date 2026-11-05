@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BUILT_IN, coverBox, groupHeight, SPLASH_GROUP_H, markScale, markSplashSeen, mountSplash, PROMPT_TUCK, promptTop, sessionSplashArt, shouldShowSplash, SPLASH_KEY, type SplashArt } from '../src/landing/splash';
+import { BUILT_IN, coverBox, groupHeight, SPLASH_GROUP_H, markScale, markSplashSeen, mountSplash, PROMPT_TUCK, promptTop, sessionSplashArt, shouldShowSplash, splashArt, SPLASH_KEY, type SplashArt } from '../src/landing/splash';
 import { SPLASH_LOGO_ASPECT } from '../../shared/splash';
 
 beforeEach(() => {
@@ -429,5 +429,103 @@ describe('splash: prompt gap (2026-10-11)', () => {
     const b = coverBox(1600, 900, a);
     const k = markScale(1600, 900, a);
     expect(b.top + (a.logo.y + groupHeight(3, 200) * k) * b.scale).toBeLessThanOrEqual(900 - 24 + 0.0001);
+  });
+});
+
+describe('splash: the notice', () => {
+  const notice = { title: "What's new", tag: 'PREVIEW 5', text: 'Features\n\nTexts. Text your contacts.\n\nFixes\n\nBanners clear.' };
+  const art = { ...BUILT_IN, panel: { x: 62, y: 556, width: 440, height: 340 }, notice };
+
+  it('shows none without a message', () => {
+    const s = mountSplash(document.body, { reducedMotion: false });
+    expect(document.querySelector('.sn-wrap')).toBeNull();
+    expect(s.noticeKey('ArrowDown')).toBe(false);
+  });
+
+  it('draws the message at its panel, above the scanlines on the art transform', () => {
+    mountSplash(document.body, { reducedMotion: false, art });
+    const wrap = document.querySelector<HTMLElement>('.sn-wrap')!;
+    expect([wrap.style.left, wrap.style.top, wrap.style.width, wrap.style.height]).toEqual(['62px', '556px', '440px', '340px']);
+    expect(document.querySelector('.sn-title')!.textContent).toBe("What's new");
+    expect(document.querySelector('.sn-tag')!.textContent).toBe('PREVIEW 5');
+    expect([...document.querySelectorAll('.sn-sec')].map((n) => n.textContent)).toEqual(['Features', 'Fixes']);
+    expect(document.querySelector('.sn-entry h4')!.textContent).toBe('Texts');
+    expect(document.querySelector<HTMLElement>('.sn-layer')!.style.transform).toBe(document.querySelector<HTMLElement>('.splash-stage')!.style.transform);
+    expect(document.querySelectorAll('.sn-rail i')).toHaveLength(2);
+    expect(document.querySelectorAll('.sn-rail i.alt')).toHaveLength(1);
+  });
+
+  it('a splash with no panel of its own takes the default spot', () => {
+    mountSplash(document.body, { reducedMotion: false, art: { ...BUILT_IN, notice } });
+    expect(document.querySelector<HTMLElement>('.sn-wrap')!.style.left).toBe('61px');
+  });
+
+  it('prints on the first showing, not on Esc back', () => {
+    mountSplash(document.body, { reducedMotion: false, art });
+    expect(document.querySelector('.sn-wrap')!.classList.contains('print')).toBe(true);
+    document.body.innerHTML = '';
+    mountSplash(document.body, { reducedMotion: false, art, intro: false });
+    expect(document.querySelector('.sn-wrap')!.classList.contains('print')).toBe(false);
+  });
+
+  it('held under the opening card: prints when the card has gone', async () => {
+    let done = () => {};
+    mountSplash(document.body, { reducedMotion: false, art, noticeAfter: new Promise<void>((r) => (done = r)) });
+    const wrap = document.querySelector('.sn-wrap')!;
+    expect([wrap.classList.contains('held'), wrap.classList.contains('print')]).toEqual([true, false]);
+    done();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect([wrap.classList.contains('held'), wrap.classList.contains('print')]).toEqual([false, true]);
+  });
+
+  it('scrolling keys scroll it; others are not its own', () => {
+    const s = mountSplash(document.body, { reducedMotion: false, art });
+    const box = document.querySelector<HTMLElement>('.sn-scroll')!;
+    expect(s.noticeKey('ArrowDown')).toBe(true);
+    expect(box.scrollTop).toBe(64);
+    expect(s.noticeKey('ArrowUp')).toBe(true);
+    expect(box.scrollTop).toBe(0);
+    for (const k of ['PageDown', 'PageUp', 'Home', 'End']) expect(s.noticeKey(k)).toBe(true);
+    for (const k of ['Enter', ' ', 'a', 'Tab']) expect(s.noticeKey(k)).toBe(false);
+  });
+
+  it('knows a press on the notice from one on the art', () => {
+    const s = mountSplash(document.body, { reducedMotion: false, art });
+    expect(s.inNotice(document.querySelector('.sn-entry h4'))).toBe(true);
+    expect(s.inNotice(document.querySelector('.splash-art'))).toBe(false);
+  });
+
+  it('the wheel off the panel scrolls it too', () => {
+    mountSplash(document.body, { reducedMotion: false, art });
+    document.querySelector('.splash-art')!.dispatchEvent(new WheelEvent('wheel', { deltaY: 120, bubbles: true }));
+    expect(document.querySelector<HTMLElement>('.sn-scroll')!.scrollTop).toBe(120);
+  });
+
+  it('keeps the message when the art falls back to the built-in', () => {
+    mountSplash(document.body, { reducedMotion: false, art: { ...art, id: 'gone', src: '/gone.png' } });
+    document.querySelector('img.splash-art')!.dispatchEvent(new Event('error'));
+    expect(document.querySelector('.sn-title')!.textContent).toBe("What's new");
+  });
+
+  it('Studio moves it and swaps the words', () => {
+    const s = mountSplash(document.body, { reducedMotion: false, art });
+    s.placePanel({ x: 1, y: 2, width: 400, height: 300 });
+    expect(document.querySelector<HTMLElement>('.sn-wrap')!.style.left).toBe('1px');
+    s.setNotice({ title: 'Down', tag: '', text: 'Back Monday.' });
+    expect(document.querySelector('.sn-title')!.textContent).toBe('Down');
+    s.setNotice(undefined);
+    expect(document.querySelector('.sn-wrap')).toBeNull();
+  });
+
+  it('splashArt carries the panel and message, and the built-in carries it with no splash on', async () => {
+    const reply = (body: unknown) => (async () => new Response(JSON.stringify(body))) as unknown as typeof fetch;
+    const store = { getItem: () => null, setItem: () => {} };
+    const n = { title: 'New', tag: '', text: 'Hi.' };
+    const panel = { x: 1, y: 2, width: 400, height: 300 };
+    const a = await splashArt({ local: store, session: store, fetchImpl: reply({ splashes: [{ id: 'a', url: '/a.png', width: 1000, height: 800, logo: { x: 0, y: 0, width: 400 }, panel }], notice: n }) });
+    expect([a.panel, a.notice]).toEqual([panel, n]);
+    const b = await splashArt({ local: store, session: store, fetchImpl: reply({ splashes: [], notice: n }) });
+    expect([b.id, b.notice]).toEqual(['built-in', n]);
   });
 });

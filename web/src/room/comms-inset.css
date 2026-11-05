@@ -53,20 +53,35 @@
   letter-spacing: 0.16em;
   text-shadow: 0 0 6px #7fe9ff;
 }
+.ci.ci-leaving { animation: ci-out 220ms ease-in forwards; }
 @keyframes ci-in { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes ci-out { to { opacity: 0; transform: translateX(-14px); } }
 @keyframes ci-rec { 50% { opacity: 0.25; } }
 @media (prefers-reduced-motion: reduce) {
-  .ci, .ci-rec { animation: none; }
+  .ci, .ci.ci-leaving, .ci-rec { animation: none; }
 }
 .feed-root:not(.feed-stage) .ci,
 .feed-root.expanded .ci { display: none; }
 /* The line moves over for the monitor while she's on the line (as it does for a stranger's bust). */
-.feed-root.feed-stage.has-comms:not(.has-portrait):not(.expanded) .feed {
+.feed-root.feed-stage.has-comms:not(.has-portrait):not(.comms-bust):not(.expanded) .feed {
   left: calc(var(--sub-x) + 190px + 24px);
   transition: left 220ms ease, height 150ms ease;
 }
-/* With a stranger's bust up too, the monitor sits above it. */
-.feed-root.feed-stage.has-portrait .ci { bottom: calc(var(--feed-bottom, 64px) + var(--sp-h) + 12px); }
+/* In the speaker slot (comms-slot.ts, a stranger present): the bust's size and place, her head and shoulders. */
+.ci.ci-bust {
+  /* The bust's top, but the frame stops on the line's floor: the bust fades out below it, a monitor can't. */
+  bottom: calc(var(--feed-bottom, 64px) + 8px);
+  width: var(--sp-w);
+  height: calc(var(--sp-h) - 32px);
+}
+.ci.ci-bust .ci-face {
+  background-size: 340% auto;
+  background-position: 50% 6%;
+}
+.feed-root.feed-stage.comms-bust:not(.expanded) .feed {
+  left: calc(var(--sub-x) + var(--sp-w) + 24px);
+  transition: left 220ms ease, height 150ms ease;
+}
 /* Her pages while she's on the line: tagged COMMS, like a stranger's are tagged STRANGER. */
 .feed-root.comms .msg.agent:not(.other-page):not(.stranger-page) .meta .name::after {
   content: 'COMMS';

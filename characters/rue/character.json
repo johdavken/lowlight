@@ -40,13 +40,17 @@
     "concerned": "rue-concerned.png"
   },
   "outfits": {
-    "work": "rue-outfit-work.png"
+    "work": "rue-outfit-work.png",
+    "home": "rue-outfit-home.png",
+    "morning": "rue-outfit-morning.png"
   },
   "outfitByScene": {
-    "spine/rue-hab": "work"
+    "spine/rue-hab": "home"
   },
   "outfitWears": {
-    "work": "her dead father's oversized olive hauler's jacket with a reflective stripe, sleeves rolled, grey hoodie, patched black cargo trousers, boots a size too big, fingerless gloves, a pocket deck on a strap"
+    "work": "her dead father's oversized olive hauler's jacket with a reflective stripe, sleeves rolled, grey hoodie, patched black cargo trousers, boots a size too big, fingerless gloves, a pocket deck on a strap",
+    "home": "a worn grey zip hoodie hanging open, sleeves shoved up her forearms, a black tank under it, patched black cargo trousers rolled at the ankle, barefoot on the grating",
+    "morning": "her father's faded oversized black hauler-depot T-shirt over a grey thermal pulled over her knuckles, black thermal leggings, mismatched wool socks"
   },
   "face": {
     "x": 0.52,
@@ -66,14 +70,76 @@
   ],
   "schedule": [
     {
+      "from": "11:00",
+      "to": "16:00",
+      "room": "spine/rue-hab"
+    },
+    {
+      "from": "16:00",
+      "to": "18:00",
+      "room": "spine/deck-market"
+    },
+    {
       "from": "18:00",
       "to": "19:00",
       "room": "spine/oksanas-counter"
     },
     {
       "from": "19:00",
-      "to": "18:00",
+      "to": "23:00",
       "room": "spine/rue-hab"
+    },
+    {
+      "from": "23:00",
+      "to": "01:00",
+      "room": "karasu/second-socket",
+      "days": [
+        "fri",
+        "sat"
+      ]
+    },
+    {
+      "from": "23:00",
+      "to": "01:00",
+      "room": "spine/rue-hab",
+      "days": [
+        "sun",
+        "mon",
+        "tue",
+        "wed",
+        "thu"
+      ]
+    },
+    {
+      "from": "01:00",
+      "to": "02:00",
+      "room": "spine/catwalk",
+      "days": [
+        "mon",
+        "wed",
+        "sat"
+      ]
+    },
+    {
+      "from": "02:00",
+      "to": "11:00",
+      "room": "spine/rue-hab",
+      "days": [
+        "mon",
+        "wed",
+        "sat"
+      ]
+    },
+    {
+      "from": "01:00",
+      "to": "11:00",
+      "room": "spine/rue-hab",
+      "days": [
+        "tue",
+        "thu",
+        "fri",
+        "sun"
+      ]
     }
   ],
   "standing": {

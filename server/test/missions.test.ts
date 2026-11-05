@@ -1,3 +1,5 @@
+import { dealAs, settleLikeOld } from './settle';
+import { facesFor } from '../../shared/dice';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -13,11 +15,11 @@ import { Journal } from '../src/journal';
 import { Room } from '../src/room-state';
 import { SceneRegistry } from '../src/scenes';
 import { generateScenes } from '../../tools/gen-placeholders';
-import { flagsOf, parseQuestFile, parseRun, questKey, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { flagsOf, parseQuestFile, parseRun, type DicePending, questKey, type QuestEntry, type QuestStatus } from '../../shared/quests';
 import { MISSION, TRAIL } from '../../shared/quests.fixture';
 import { foldKit, heatIn, type KitEvent } from '../../shared/mission';
 import type { Deck } from '../../shared/gear';
-import { edgeMax, type Stats } from '../../shared/stats';
+import { nerveMax, type Stats } from '../../shared/stats';
 
 let tmpDir: string;
 let registry: SceneRegistry;
@@ -33,9 +35,9 @@ afterEach(() => {
 });
 
 const DECKS: Deck[] = [
-  { id: 'stall-build', name: 'Stall build', bonus: 15, heat: 0, traits: ['fragile'] },
-  { id: 'meridian', name: 'Cortex Meridian', bonus: 20, heat: 2, traits: [] },
-  { id: 'deaf-meridian', name: 'Deaf Meridian', bonus: 18, heat: 1, traits: [] },
+  { id: 'stall-build', name: 'Stall build', quality: 2, heat: 0, traits: ['fragile'] },
+  { id: 'meridian', name: 'Cortex Meridian', quality: 3, heat: 2, traits: [] },
+  { id: 'deaf-meridian', name: 'Deaf Meridian', quality: 3, heat: 1, traits: [] },
 ];
 const HICKS: Stats = { body: 4, reflex: 6, tech: 7, cool: 7, wits: 6, edge: 4 };
 const known = { roster: null, places: null, decks: new Set(DECKS.map((d) => d.id)) };
@@ -48,7 +50,7 @@ if (!trail.ok) throw new Error('fixture');
 const KEY = questKey('hicks', 'night-shift@0');
 
 /** Hicks (TECH 7, stall build, EDGE 4 → 2 rerolls) on a mission with Nix at Hae's: Ember's bonus never applies. */
-function relayWith(o: { rolls?: number[]; book?: QuestEntry[]; deck?: string | null; stats?: Stats; clock?: () => number } = {}) {
+function relayWith(o: { rolls?: number[]; nerve?: number; book?: QuestEntry[]; deck?: string | null; stats?: Stats; clock?: () => number } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const events: ServerEvent[] = [];
@@ -62,7 +64,7 @@ function relayWith(o: { rolls?: number[]; book?: QuestEntry[]; deck?: string | n
       return run ? [{ id: k.slice(`quest.${p}.`.length), contact, run }] : [];
     });
   const kit = (p: string) =>
-    foldKit({ deck: o.deck === undefined ? 'stall-build' : o.deck, edgeMax: edgeMax(stats), from: 1200 }, status(p).flatMap((s) => (s.run.kit ?? []) as KitEvent[]), 1200, { districtOf: () => 'karasu' });
+    foldKit({ deck: o.deck === undefined ? 'stall-build' : o.deck, nerveMax: nerveMax(stats), from: 1200 }, [...(o.nerve !== undefined ? [{ at: 1199, nerve: o.nerve - nerveMax(stats) }] : []), ...status(p).flatMap((s) => (s.run.kit ?? []) as KitEvent[])], 1200, { districtOf: () => 'karasu' });
   const quests: NonNullable<ChatRelayDeps['quests']> = {
     contact,
     book: () => o.book ?? [NIGHT],
@@ -86,7 +88,7 @@ function relayWith(o: { rolls?: number[]; book?: QuestEntry[]; deck?: string | n
     emit: (e) => events.push(e),
     instructions: 'ROOM NOTE',
     quests,
-    roll: () => rolls.shift() ?? 50,
+    rollDice: (n: number, keep: 'high' | 'low') => facesFor(rolls.shift() ?? 6, n, keep),
     ...(o.clock ? { clockNow: o.clock } : {}),
   });
   return { relay, db, events, backend: backend as ReturnType<typeof fakeBackend>, kit: () => kit('hicks') };
@@ -95,12 +97,17 @@ const lastUser = (r: TurnRequest) => r.messages.at(-1)!.content;
 const run = (db: Db) => parseRun(db.getMeta(KEY));
 const states = (events: ServerEvent[]) => events.filter((e): e is { type: 'quest_state'; state: QuestState } => e.type === 'quest_state').map((e) => e.state);
 const questRows = (db: Db) => db.recentMessages('hicks', 50).filter((m) => m.mode === 'quest' && m.role === 'user');
-const pick = (relay: ChatRelay, beat: string, choice: string) => relay.chooseQuest('hicks', { id: 'night-shift', beat, choice });
+/** A pick; a costly roll's dealt costs (roll lifecycle spec §1) are then taken as dealt, as a bare TAKE IT does. */
+const raw = (relay: ChatRelay, beat: string, choice: string, card?: string) => relay.chooseQuest('hicks', { id: 'night-shift', beat, choice, ...(card ? { card } : {}) });
+const pick = async (relay: ChatRelay, beat: string, choice: string) => {
+  const r = await relay.chooseQuest('hicks', { id: 'night-shift', beat, choice });
+  return (await settleLikeOld(relay, "night-shift", beat)) ?? r;
+};
 
 describe('missions: setting out', () => {
   it('open rows mark missions', () => {
     const { relay } = relayWith();
-    expect(relay.questState('hicks').open).toEqual([{ id: 'night-shift', title: 'Night Shift', pitch: NIGHT.pitch, timed: false, mission: { pay: 400, tier: 1, range: [400, 400] } }]);
+    expect(relay.questState('hicks').open).toEqual([{ id: 'night-shift', title: 'Night Shift', pitch: NIGHT.pitch, timed: false, mission: { pay: 400, tier: 1, range: [400, 400] }, setup: { district: 'unknown', tier: 'NOBODY', heat: 0, favour: 'ON HOLD', crew: [], contacts: [], deck: { name: 'Stall build', quality: 2, slots: 2 }, programs: [], leans: ['tech', 'cool'] } }]);
   });
 
   it('start runs one reply with MISSION_OPEN', async () => {
@@ -114,89 +121,81 @@ describe('missions: setting out', () => {
     expect(sent).toContain('stall build');
   });
 
-  it('cards carry odds', async () => {
+  it('cards carry their pool: dice and position (the table spec §1)', async () => {
     const { relay } = relayWith();
     await relay.startQuest('hicks', 'night-shift');
     const active = relay.questState('hicks').active!;
-    expect(active.choices[0]).toEqual({ id: 'roof', line: 'Loop the cameras from the roof.', odds: { stat: 'TECH', chance: 74, noDeck: false, why: ['GRID', 'STALL BUILD +15'] } });
-    expect(active.choices[1]).toEqual({ id: 'walk', line: 'Walk in with a forged work order.', odds: { stat: 'COOL', chance: 64, noDeck: false, why: [] } });
+    expect(active.choices[0]).toMatchObject({ id: 'roof', line: 'Loop the cameras from the roof.', pool: { stat: 'TECH', base: 3, dice: 4, parts: [{ label: 'STALL BUILD', dice: 1, kind: 'pocket' }], position: 'open', noDeck: false, deck: { match: 'holds', broke: false, hidden: false, chrome: false }, effect: 'fair', effectRaw: 1, effectParts: [] }, trade: { safe: null, bold: null }, pushEffect: null });
+    expect(active.choices[1]).toMatchObject({ id: 'walk', line: 'Walk in with a forged work order.', pool: { stat: 'COOL', base: 3, dice: 3, parts: [], position: 'open', noDeck: false, effect: 'fair', effectRaw: 1, effectParts: [] }, trade: { safe: null, bold: null }, pushEffect: null });
   });
 
   it('with no deck a grid card says so', async () => {
     const { relay } = relayWith({ deck: null });
     await relay.startQuest('hicks', 'night-shift');
-    expect(relay.questState('hicks').active!.choices[0].odds).toEqual({ stat: 'TECH', chance: 34, noDeck: true, why: ['GRID', 'NO DECK −25'] });
+    expect(relay.questState('hicks').active!.choices[0].pool).toMatchObject({ stat: 'TECH', base: 3, dice: 2, parts: [{ label: 'NO DECK', dice: -1, kind: 'pocket' }], position: 'open', noDeck: true, effect: 'fair', effectRaw: 1, effectParts: [] });
   });
 });
 
 describe('missions: checks', () => {
   it('a pass posts the result line and the next beat, no reply', async () => {
-    const { relay, db, backend } = relayWith({ rolls: [30] });
+    const { relay, db, backend } = relayWith({ rolls: [6] });
     await relay.startQuest('hicks', 'night-shift');
     await pick(relay, 'door', 'roof');
     expect(backend.reqs).toHaveLength(1);
     const row = questRows(db).at(-1)!;
-    expect(row.text).toBe('You loop the cameras from the roof.\n\n*TECH 74% — clean.*\n\n*You\'re in.*\n\n*The manifest is on the screen.*');
-    expect(row.quest!.pick).toEqual({ choice: 'roof', line: 'You loop the cameras from the roof.', roll: { stat: 'TECH', chance: 74, rolls: [30], pass: true } });
-    expect(run(db)!.picks.at(-1)).toEqual({ beat: 'door', choice: 'roof', roll: { stat: 'TECH', chance: 74, rolls: [30], pass: true } });
+    expect(row.text).toBe('You loop the cameras from the roof.\n\n*TECH 4d · IN THE OPEN — 6, clean.*\n\n*You\'re in.*\n\n*The manifest is on the screen.*');
+    expect(row.quest!.pick).toMatchObject({ choice: 'roof', line: 'You loop the cameras from the roof.', roll: { stat: 'TECH', dice: 4, position: 'open', faces: [6, 1, 1, 1], keep: 'high', kind: 'clean', pass: true } });
+    expect(run(db)!.picks.at(-1)).toMatchObject({ beat: 'door', choice: 'roof', roll: { stat: 'TECH', dice: 4, position: 'open', faces: [6, 1, 1, 1], keep: 'high', kind: 'clean', pass: true } });
   });
 
-  it('a fail with edge shows reroll cards and writes no row', async () => {
-    const { relay, db, events } = relayWith({ rolls: [80] });
+  it('a miss deals its costs and writes no row', async () => {
+    const { relay, db, events } = relayWith({ rolls: [2] });
     await relay.startQuest('hicks', 'night-shift');
     const before = questRows(db).length;
-    await pick(relay, 'door', 'roof');
+    await raw(relay, 'door', 'roof');
     expect(questRows(db)).toHaveLength(before);
-    expect(states(events).at(-1)!.active!.choices).toEqual([
-      { id: '!reroll', line: 'REROLL (EDGE 2 LEFT)' },
-      { id: '!take', line: 'TAKE IT' },
-    ]);
-    expect(run(db)!.pending).toEqual({ beat: 'door', choice: 'roof', stat: 'TECH', chance: 74, rolls: [80] });
+    expect(states(events).at(-1)!.active!.choices).toEqual([]);
+    expect(states(events).at(-1)!.active!.costs).toMatchObject({ pick: 2 });
+    expect(run(db)!.pending).toMatchObject({ beat: 'door', choice: 'roof', roll: { stat: 'TECH', dice: 4, position: 'open', faces: [2, 1, 1, 1], keep: 'high', kind: 'miss', pass: false }, cost: { alarm: 0, heat: 0 }, died: 'Stall build', pick: 2 });
+    // The death names its deck (review I2), and the save keeps the name.
+    expect(run(db)!.kit).toContainEqual(expect.objectContaining({ deck: null, lose: ['stall-build'] }));
   });
-
-  it('reroll spends edge and resolves', async () => {
-    const { relay, db, kit } = relayWith({ rolls: [80, 30] });
+  it('RESIST spends NERVE by its dice and drops the costs; the fail outcome still plays', async () => {
+    const { relay, db, kit } = relayWith({ rolls: [2, 5, 5] });
     await relay.startQuest('hicks', 'night-shift');
-    await pick(relay, 'door', 'roof');
-    await pick(relay, 'door', '!reroll');
-    expect(run(db)!.picks.at(-1)!.roll).toEqual({ stat: 'TECH', chance: 74, rolls: [80, 30], pass: true });
-    expect(run(db)!.kit).toContainEqual(expect.objectContaining({ edge: -1 }));
+    await raw(relay, 'door', 'roof');
+    dealAs(db, KEY, ['alarm', 'heat']);
+    for (const c of ['alarm', 'heat']) await raw(relay, 'door', '!cost', c);
+    for (const c of ['alarm', 'heat']) await raw(relay, 'door', '!resist', c);
+    expect(run(db)!.picks.at(-1)!.roll).toMatchObject({ kind: 'miss', costs: [{ cost: 'alarm', how: 'resisted' }, { cost: 'heat', how: 'resisted' }] });
     expect(run(db)!.pending ?? null).toBeNull();
-    expect(kit().edgeLeft).toBe(1);
-    expect(questRows(db).at(-1)!.text).toContain('*TECH 74% — clean.*');
+    expect(run(db)!.alarm ?? 0).toBe(0);
+    expect(kit().nerveLeft).toBe(3);
+    expect(heatIn(kit(), 'karasu')).toBe(0); // resisted, and a job's outcome adds none
+    expect(questRows(db).at(-1)!.text).toContain('*TECH 4d · IN THE OPEN — 2, no · ALARM +1 RESISTED · HEAT +1 RESISTED.*\n\n*The Stall build dies.*\n\n*The camera turns.*');
   });
-
-  it('take it posts the fail outcome and adds heat 1', async () => {
-    const { relay, db, kit } = relayWith({ rolls: [80] });
+  it('TAKE IT posts the fail outcome and lands the heat it took', async () => {
+    const { relay, db, kit } = relayWith({ rolls: [2] });
     await relay.startQuest('hicks', 'night-shift');
-    await pick(relay, 'door', 'roof');
-    await pick(relay, 'door', '!take');
+    await raw(relay, 'door', 'roof');
+    dealAs(db, KEY, ['heat', 'alarm']);
+    await raw(relay, 'door', '!take');
     const row = questRows(db).at(-1)!;
-    expect(row.text).toContain('*TECH 74% — no.*\n\n*The camera turns.*');
-    expect(row.quest!.pick!.roll).toEqual({ stat: 'TECH', chance: 74, rolls: [80], pass: false });
-    expect(heatIn(kit(), 'karasu')).toBe(3); // the outcome's +2, the fail's +1
+    expect(row.text).toContain('*TECH 4d · IN THE OPEN — 2, no · HEAT +1 TAKEN · ALARM +1 TAKEN.*\n\n*HEAT +1*\n\n*ALARM +1*\n\n*The Stall build dies.*\n\n*The camera turns.*');
+    expect(row.quest!.pick!.roll).toMatchObject({ kind: 'miss', pass: false });
+    expect(heatIn(kit(), 'karasu')).toBe(1); // a roll from before: the heat taken
   });
-
-  it('a fail with no edge left goes straight to the fail outcome', async () => {
-    const { relay, db } = relayWith({ rolls: [80], stats: { ...HICKS, edge: 0 } });
-    await relay.startQuest('hicks', 'night-shift');
-    await pick(relay, 'door', 'roof');
-    expect(questRows(db).at(-1)!.text).toContain('*TECH 74% — no.*');
+  it('a grid check keeps the deck heat for the job’s end, on pass and on fail', async () => {
+    for (const rolls of [[6], [2]]) {
+      const t = relayWith({ rolls, deck: 'meridian', nerve: 1 });
+      await t.relay.startQuest('hicks', 'night-shift');
+      await raw(t.relay, 'door', 'roof');
+      expect(heatIn(t.kit(), 'karasu')).toBe(0);
+      expect((run(t.db)!.pending as DicePending | undefined)?.roll ?? run(t.db)!.picks.at(-1)!.roll).toMatchObject({ deckHeat: 2 });
+    }
   });
-
-  it('grid check adds the deck heat on pass and on fail', async () => {
-    const pass = relayWith({ rolls: [30], deck: 'meridian' });
-    await pass.relay.startQuest('hicks', 'night-shift');
-    await pick(pass.relay, 'door', 'roof');
-    expect(heatIn(pass.kit(), 'karasu')).toBe(2);
-    const fail = relayWith({ rolls: [99], deck: 'meridian', stats: { ...HICKS, edge: 0 } });
-    await fail.relay.startQuest('hicks', 'night-shift');
-    await pick(fail.relay, 'door', 'roof');
-    expect(heatIn(fail.kit(), 'karasu')).toBe(2 + 2 + 1); // the deck, the outcome, the fail
-  });
-
-  it('fragile deck dies on 96+', async () => {
-    const { relay, db, kit } = relayWith({ rolls: [97], stats: { ...HICKS, edge: 0 } });
+  it('a fragile deck dies on a miss that shows a 1', async () => {
+    const { relay, db, kit } = relayWith({ rolls: [2], nerve: 1 });
     await relay.startQuest('hicks', 'night-shift');
     await pick(relay, 'door', 'roof');
     expect(kit().deck).toBeNull();
@@ -204,7 +203,7 @@ describe('missions: checks', () => {
   });
 
   it('a stale card during a reroll has passed', async () => {
-    const { relay } = relayWith({ rolls: [80] });
+    const { relay } = relayWith({ rolls: [2] });
     await relay.startQuest('hicks', 'night-shift');
     await pick(relay, 'door', 'roof');
     expect(await pick(relay, 'door', 'walk')).toBe('that choice has passed');
@@ -212,16 +211,16 @@ describe('missions: checks', () => {
   });
 
   it('pick-checked choice rolls (a typed line confirmed onto a checked card)', async () => {
-    const { relay, db } = relayWith({ rolls: [30] });
+    const { relay, db } = relayWith({ rolls: [6] });
     await relay.startQuest('hicks', 'night-shift');
     await relay.chooseQuest('hicks', { id: 'night-shift', beat: 'door', choice: 'roof', said: 'I take the roof.' });
-    expect(questRows(db).at(-1)!.quest!.pick!.roll).toEqual({ stat: 'TECH', chance: 74, rolls: [30], pass: true });
+    expect(questRows(db).at(-1)!.quest!.pick!.roll).toMatchObject({ stat: 'TECH', dice: 4, kind: 'clean', pass: true });
   });
 });
 
 describe('missions: the end', () => {
   it('effects append one event; end runs one reply with MISSION_CLOSE and the summary', async () => {
-    const { relay, db, backend, kit } = relayWith({ rolls: [30, 20] });
+    const { relay, db, backend, kit } = relayWith({ rolls: [6, 6] });
     await relay.startQuest('hicks', 'night-shift');
     await pick(relay, 'door', 'roof');
     await pick(relay, 'desk', 'wipe');
@@ -238,17 +237,18 @@ describe('missions: the end', () => {
 });
 
 describe('missions: rewind', () => {
-  it('rewind restores a pending reroll and refunds edge', async () => {
-    const { relay, db, events, kit } = relayWith({ rolls: [80, 30] });
+  it('rewind restores a waiting roll with its deal, still to settle', async () => {
+    const { relay, db, events, kit } = relayWith({ rolls: [2] });
     await relay.startQuest('hicks', 'night-shift');
     const opening = db.recentMessages('hicks', 50).filter((m) => m.role === 'agent').at(-1)!;
-    await pick(relay, 'door', 'roof');
-    await pick(relay, 'door', '!reroll');
-    expect(kit().edgeLeft).toBe(1);
+    await raw(relay, 'door', 'roof');
+    const dealt = (run(db)!.pending as DicePending).dealt;
+    await raw(relay, 'door', '!take');
+    expect(run(db)!.pending ?? null).toBeNull();
     await relay.rewind('hicks', opening.id);
-    expect(run(db)!.pending).toMatchObject({ choice: 'roof', rolls: [80] });
-    expect(states(events).at(-1)!.active!.choices.map((c) => c.id)).toEqual(['!reroll', '!take']);
-    expect(kit().edgeLeft).toBe(2);
+    expect(run(db)!.pending).toMatchObject({ choice: 'roof', roll: { kind: 'miss' }, dealt });
+    expect(states(events).at(-1)!.active!.costs).toBeTruthy();
+    expect(kit().nerveLeft).toBe(5);
   });
 });
 
@@ -266,11 +266,12 @@ describe('quests are unchanged', () => {
 
 describe('rollsFromEnv', async () => {
   const { rollsFromEnv } = await import('../src/mission-run');
-  it('rolls the list in order, then the last again; unset is undefined', () => {
-    const r = rollsFromEnv({ NIX_TEST_ROLLS: '80, 30' })!;
-    expect([r(), r(), r()]).toEqual([80, 30, 30]);
+  it("gives each roll's kept face in order, then the last again; 66 is two sixes; unset or unreadable is undefined", () => {
+    const r = rollsFromEnv({ NIX_TEST_ROLLS: '2, 66, 5' })!;
+    expect([r(), r(), r(), r()]).toEqual([2, 66, 5, 5]);
     expect(rollsFromEnv({})).toBeUndefined();
-    expect(rollsFromEnv({ NIX_TEST_ROLLS: 'x,0,101' })).toBeUndefined();
+    expect(rollsFromEnv({ NIX_TEST_ROLLS: 'x,0,7' })).toBeUndefined();
+    expect(rollsFromEnv({ NIX_TEST_ROLLS: '80' })).toBeUndefined();
   });
 });
 
@@ -289,20 +290,20 @@ const variant = (text: string) => {
 };
 
 describe('review fixes (Task 5)', () => {
-  it('I1: a reroll still resolves when its own roll hid the choice', async () => {
-    const book = [variant(MISSION.replace('[check tech 45 grid · ember +15]', '[check tech 45 grid · ember +15, needs heat<=1]'))];
-    const { relay, db } = relayWith({ book, deck: 'meridian', rolls: [99, 10] });
+  it('I1: a parked roll still resolves when its own roll hid the choice', async () => {
+    const book = [variant(MISSION.replace('[check tech 45 grid · ember +15]', '[check tech 40 grid · ember +15, needs heat<=1]'))];
+    const { relay, db } = relayWith({ book, deck: 'meridian', rolls: [5] });
     await relay.startQuest('hicks', 'night-shift');
-    await pick(relay, 'door', 'roof');
+    await raw(relay, 'door', 'roof');
     expect(run(db)!.pending).toBeTruthy();
-    expect(await pick(relay, 'door', '!reroll')).toEqual({ ok: true, text: 'ok' });
+    dealAs(db, KEY, ['heat', 'alarm']);
+    expect(await raw(relay, 'door', '!take')).toEqual({ ok: true, text: 'ok' });
     expect(run(db)!.picks.at(-1)!.roll!.pass).toBe(true);
   });
-
   it('I2: a mission that ends on a wait-resumed row gets the closing note', async () => {
     let clock = 1200;
     const text = MISSION.replace("## inside\n*You're in.*\n→ desk", "## inside\n*You're in.*\n→ desk\nwait: after +1h · by +2h else gone").concat('\n## gone\n*Too late.*\n→ end\n');
-    const { relay, backend } = relayWith({ book: [variant(text)], rolls: [10], clock: () => clock });
+    const { relay, backend } = relayWith({ book: [variant(text)], rolls: [6], clock: () => clock });
     await relay.startQuest('hicks', 'night-shift');
     await pick(relay, 'door', 'roof');
     clock += 600;
@@ -313,7 +314,7 @@ describe('review fixes (Task 5)', () => {
   });
 
   it('I3: REGENERATE and RETRY refuse a mission beat in between', async () => {
-    const { relay, db, backend } = relayWith({ rolls: [10] });
+    const { relay, db, backend } = relayWith({ rolls: [6] });
     await relay.startQuest('hicks', 'night-shift');
     await pick(relay, 'door', 'roof');
     const mid = questRows(db).at(-1)!;
@@ -327,12 +328,12 @@ describe('final review fixes', () => {
   it('I1: an outcome reached by a wait applies its effects', async () => {
     let clock = 1200;
     const text = MISSION.replace("## inside\n*You're in.*\n→ desk", "## inside\n*You're in.*\n→ desk\nwait: after +1h · by +2h else missed").concat('\n## missed\n*Too late.*\nheat: +2\n→ end\n');
-    const { relay, kit } = relayWith({ book: [variant(text)], rolls: [10], clock: () => clock });
+    const { relay, kit } = relayWith({ book: [variant(text)], rolls: [6], clock: () => clock });
     await relay.startQuest('hicks', 'night-shift');
     await pick(relay, 'door', 'roof');
     clock += 600;
     await relay.playDueQuest('hicks');
-    expect(heatIn(kit(), 'karasu')).toBe(2);
+    expect(heatIn(kit(), 'karasu')).toBe(0); // a job's outcome adds no heat (tier template spec §2)
   });
 });
 
@@ -347,3 +348,4 @@ describe('the quest picture', () => {
     expect('art' in plain.relay.questState('hicks').active!).toBe(false);
   });
 });
+

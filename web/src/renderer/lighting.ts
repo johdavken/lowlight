@@ -128,7 +128,9 @@ export class LightingFilter extends Filter {
 
   constructor() {
     super({
-      glProgram: GlProgram.from({ vertex, fragment, name: 'nix-lighting' }),
+      // highp: at Pixi's default mediump, distance() overflows past ~256 px on some GPUs (Chromium here),
+      // so a big light (the Low Roller's wheel, radius 800) lit only a hard-edged disc around itself.
+      glProgram: GlProgram.from({ vertex, fragment, name: 'nix-lighting', preferredFragmentPrecision: 'highp' }),
       resources: {
         lightUniforms: {
           uAmbient: { value: new Float32Array(3), type: 'vec3<f32>' },

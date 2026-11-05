@@ -51,6 +51,8 @@ export class FakeNode {
   type = '';
   loop = false;
   buffer: unknown = null;
+  /** A buffer source's speed (unused on other nodes). */
+  readonly playbackRate = new FakeParam(1);
   onended: (() => void) | null = null;
   constructor(
     readonly kind: string,
@@ -128,6 +130,12 @@ export class FakeAudioContext {
   }
   createDynamicsCompressor(): CompressorNode {
     return new CompressorNode('compressor', this);
+  }
+  createConvolver(): FakeNode {
+    return new FakeNode('convolver', this);
+  }
+  createDelay(): FakeNode & { delayTime: FakeParam } {
+    return Object.assign(new FakeNode('delay', this), { delayTime: new FakeParam(0) });
   }
   createBufferSource(): FakeNode {
     return new FakeNode('buffer-source', this);

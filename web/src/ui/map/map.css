@@ -1,10 +1,13 @@
-/* The city map's contents (CityMap): survey district names, borders, pins with number tags, the rail band and the file strip. */
+/* The city map's contents (CityMap): survey district names, borders, pins that grow with the zoom, and the place's card. */
 .city-map {
   --map-pink: #ff4f8b;
   --map-cyan: #7fe9ff;
   --map-cyan-dim: rgba(127, 233, 255, 0.45);
   --map-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --map-pixel: 'VT323', ui-monospace, monospace;
+  --map-tile: #120a22;
+  --map-green: #3dff7a;
+  --map-amber: #ffc56b;
   position: absolute;
   inset: 0;
   z-index: 2;
@@ -28,17 +31,18 @@
 .city-names .dname.has { pointer-events: auto; cursor: pointer; }
 .city-names .dname.has:hover { fill: #fff; }
 
-/* ── pins: small diamonds, every one at full strength whatever district is open (spec 2026-10-28 §1); in the open district
-   a number tag that grows to the name when focused or hovered, any other pin's name only while hovered.
-   --inv undoes the camera's zoom (MapPanel sets it), so pins and names stay one size on screen. ── */
+/* ── pins (map pins spec, 2026-10-30): far out (.far) small diamonds with a dot per person you know beside them, the
+   name only on hover; near, a tag with the full name and the faces of who's there, a tag that would cover a more
+   important one hiding to its pin (.crowded) until hovered. --inv undoes the camera's zoom (MapPanel sets it); --pz
+   and --tz size the pin and the tag for the zoom (CityMap.setScale). ── */
 .city-map .pin { position: absolute; width: 0; height: 0; cursor: pointer; pointer-events: auto; transform: scale(var(--inv, 1)); transition: opacity 0.3s; }
 .city-map .pin::before {
   content: '';
   position: absolute;
-  width: 10px;
-  height: 10px;
-  left: -5px;
-  top: -5px;
+  width: calc(10px * var(--pz, 1));
+  height: calc(10px * var(--pz, 1));
+  left: calc(-5px * var(--pz, 1));
+  top: calc(-5px * var(--pz, 1));
   transform: rotate(45deg);
   background: var(--map-pink);
   border: 1px solid #fff;
@@ -48,10 +52,10 @@
 .city-map .pin.here::after {
   content: '';
   position: absolute;
-  width: 26px;
-  height: 26px;
-  left: -13px;
-  top: -13px;
+  width: calc(26px * var(--pz, 1));
+  height: calc(26px * var(--pz, 1));
+  left: calc(-13px * var(--pz, 1));
+  top: calc(-13px * var(--pz, 1));
   border-radius: 50%;
   border: 1.5px solid var(--map-cyan);
   box-shadow: 0 0 8px var(--map-cyan);
@@ -59,41 +63,60 @@
   animation: map-here 2.2s ease-in-out infinite;
 }
 @keyframes map-here { 50% { transform: scale(1.25); opacity: 0.4; } }
-.city-map .pin.on { z-index: 5; }
+/* The pin's target round the diamond at any zoom: 14 px for a mouse, 30 px for a finger (far out on a phone). */
+.city-map .pin .hit { position: absolute; width: 14px; height: 14px; left: -7px; top: -7px; border-radius: 50%; }
+@media (pointer: coarse) {
+  .city-map .pin .hit { width: 30px; height: 30px; left: -15px; top: -15px; }
+}
+.city-map .pin.on,
+.city-map .pin.here { z-index: 5; }
+.city-map .pin.focus { z-index: 6; }
+/* Far out: who's here as dots in their colours beside the pin. */
+.city-map .pin .who { position: absolute; left: calc(8px * var(--pz, 1)); top: -3px; display: flex; gap: 2px; pointer-events: none; }
+.city-map .pin .who b { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px #000, 0 0 4px var(--c); }
+.city-map:not(.far) .pin .who { display: none; }
 .city-map .map-ntag {
   position: absolute;
-  left: 12px;
-  top: -12px;
-  height: 24px;
+  left: calc(10px * var(--pz, 1));
+  top: calc(-14px * var(--tz, 1));
+  height: calc(28px * var(--tz, 1));
   display: flex;
   align-items: center;
-  padding: 0 6px;
-  background: var(--map-tile);
-  border: 1px solid #3a2560;
-  transform: skewX(-12deg);
+  padding: 0 calc(8px * var(--tz, 1)) 0 calc(5px * var(--tz, 1));
+  background: rgba(8, 4, 20, 0.88);
+  border: 1px solid rgba(255, 79, 139, 0.6);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
 }
-.city-map .map-ntag > .in { display: flex; align-items: center; gap: 7px; transform: skewX(12deg); white-space: nowrap; }
-.city-map .map-ntag .n { font: 10px var(--map-mono); color: var(--map-pink); }
-.city-map .map-ntag .nm { font: 17px/1 var(--map-pixel); letter-spacing: 0.1em; color: #000; }
-.city-map .map-ntag .dots { display: flex; gap: 3px; }
-.city-map .map-ntag .dots b { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 4px var(--c); }
-.city-map .pin:not(.open) .map-ntag:not(.full) { display: none; }
-.city-map .map-ntag:not(.full) .nm,
-.city-map .map-ntag:not(.full) .dots { display: none; }
-.city-map .map-ntag.full { padding: 0 9px; background: var(--map-pink); border-color: #fff; }
-.city-map .map-ntag.full .n { color: #000; }
+.city-map .map-ntag > .in { display: flex; align-items: center; gap: calc(6px * var(--tz, 1)); white-space: nowrap; }
+.city-map .map-ntag .nm { font: calc(21px * var(--tz, 1)) / 1 var(--map-pixel); letter-spacing: 0.06em; color: #f2ecff; }
+.city-map .map-ntag .faces { display: flex; gap: 3px; align-items: center; }
+.city-map .map-ntag .faces:empty { display: none; }
+.city-map .map-ntag .pface { width: calc(22px * var(--tz, 1)); height: calc(22px * var(--tz, 1)); object-fit: cover; object-position: center 20%; border: 1px solid var(--c); }
+.city-map .map-ntag .faces b { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 4px var(--c); }
 .city-map .pin.here .map-ntag { border-color: var(--map-cyan); }
-.city-map .pin.here .map-ntag:not(.full) .n { color: var(--map-cyan); }
-.city-map .pin:hover .map-ntag { box-shadow: 0 0 0 1px var(--map-green), 0 2px 8px rgba(0, 0, 0, 0.6); }
-
-/* ── zoomed into a district: the others dim ── */
-.city-map .dpoly.dim { fill: rgba(0, 0, 0, 0.45); stroke-opacity: 0.15; pointer-events: none; }
-
-/* ── the district heading, top-left over the zoomed map ── */
-.city-map .map-heading { position: absolute; left: 18px; top: 14px; pointer-events: none; animation: map-print 0.35s steps(8) backwards; }
-.city-map .map-heading .t { font: 40px/1 var(--map-pixel); letter-spacing: 0.12em; color: #fff; text-shadow: 3px 0 #ff2bd6, -3px 0 var(--map-cyan); }
-.city-map .map-heading .s { margin-top: 4px; font: 11px var(--map-mono); letter-spacing: 0.3em; color: var(--map-cyan); text-transform: uppercase; }
+.city-map .pin.on .map-ntag { box-shadow: 0 0 0 1px var(--map-green), 0 2px 8px rgba(0, 0, 0, 0.6); }
+.city-map .pin.focus .map-ntag { border-color: var(--map-green); box-shadow: 0 0 0 1px var(--map-green), 0 0 14px rgba(61, 255, 122, 0.5); }
+/* Names slant like GO (mockup 2026-11-02, 3); what's inside stands upright. The picked one fills green, dark type, like a lit key. */
+.city-map .map-ntag { transform: skewX(-12deg); }
+.city-map .map-ntag > .in,
+.city-map .map-ntag > .map-go { transform: skewX(12deg); }
+.city-map .pin.focus .map-ntag { background: var(--map-green); }
+.city-map .pin.focus .map-ntag .nm { color: #05020c; }
+.city-map .pin.focus .map-ntag .sub { color: #05020c; opacity: 0.7; }
+/* GO (or WITH HER / ON COMMS, or the invite lock) as slanted chips just past the picked name. */
+.city-map .map-go { position: absolute; left: calc(100% + 8px); top: 50%; translate: 0 -50%; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+.city-map .map-go .go-pair { display: inline-flex; gap: 8px; }
+.city-map .map-go :is(.go, .go-comms) { margin: 0; padding: 1px calc(14px * var(--tz, 1)); font: calc(18px * var(--tz, 1)) var(--map-pixel); letter-spacing: 0.3em; color: #000; background: var(--map-cyan); border: 0; transform: skewX(-12deg); cursor: pointer; }
+.city-map .map-go .go-comms { background: var(--map-pink); }
+.city-map .map-go :is(.go, .go-comms):disabled { background: #2a2140; color: #6e5a90; opacity: 1; cursor: not-allowed; }
+.city-map .map-go .invite { padding: 1px 8px; font: calc(15px * var(--tz, 1)) var(--map-pixel); letter-spacing: 0.15em; color: var(--map-amber); background: rgba(8, 4, 20, 0.88); }
+/* Near the screen's right edge the picked tag turns to the pin's left, GO before the name (fitFocus). */
+.city-map .pin.flip .map-ntag { left: auto; right: calc(10px * var(--pz, 1)); }
+.city-map .pin.flip .map-go { left: auto; right: calc(100% + 8px); }
+.city-map .pin.flip .map-inside { left: auto; right: 14px; }
+/* Far out the name shows only while hovered (or its card is open); near, a crowded tag hides to its pin until hovered. */
+.city-map.far .pin:not(.on) .map-ntag,
+.city-map:not(.far) .pin.crowded:not(.on) .map-ntag { display: none; }
 
 /* ── who's here (the file strip) ── */
 .city-map .chip { display: flex; align-items: center; gap: 6px; font: 17px var(--map-pixel); letter-spacing: 0.1em; color: var(--c); }
@@ -112,68 +135,13 @@
 
 /* ── the overlay: fixed over the camera, clicks only on its own pieces ── */
 .city-map.map-overlay { z-index: 3; pointer-events: none; }
-.city-map.map-still .map-bt,
 .city-map.map-still .map-strip .body,
-.city-map.map-still .map-heading,
 .city-map.map-still .pin.here::after { animation: none; }
 @media (prefers-reduced-motion: reduce) {
-  .city-map .pin.here::after,
-  .city-map .map-heading { animation: none; }
+  .city-map .pin.here::after { animation: none; }
 }
 
-/* ── the rail band: the select screen's skewed tiles along the bottom (districts, then a district's places) ── */
-.city-map {
-  --map-tile: #120a22;
-  --map-green: #3dff7a;
-  --map-amber: #ffc56b;
-}
-.city-map .map-band {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px 4px;
-  padding: 26px 18px 12px;
-  background: linear-gradient(0deg, rgba(5, 2, 10, 0.96) 65%, rgba(5, 2, 10, 0));
-  pointer-events: auto;
-}
-.city-map .map-bt {
-  display: flex;
-  align-items: center;
-  height: 32px;
-  padding: 0 12px;
-  background: var(--map-tile);
-  border: 1px solid #2a1a48;
-  transform: skewX(-12deg);
-  cursor: pointer;
-  animation: map-print 0.28s steps(6) backwards;
-  animation-delay: calc(var(--i, 0) * 30ms);
-}
-.city-map .map-bt > .in { display: flex; align-items: center; gap: 10px; transform: skewX(12deg); white-space: nowrap; }
-.city-map .map-bt .nm { font: 20px var(--map-pixel); letter-spacing: 0.12em; color: #d9cdee; }
-.city-map .map-bt.place .nm { font-size: 18px; }
-.city-map .map-bt .ct { font: 11px var(--map-mono); color: var(--map-cyan); }
-.city-map .map-bt .n { font: 11px var(--map-mono); color: var(--map-pink); }
-.city-map .map-bt .gt { font: 10px var(--map-mono); letter-spacing: 0.15em; color: var(--map-amber); }
-.city-map .map-bt .dots { display: flex; gap: 3px; }
-.city-map .map-bt .dots b { width: 7px; height: 7px; border-radius: 50%; background: var(--c); box-shadow: 0 0 4px var(--c); }
-.city-map .map-bt.here { border-color: var(--map-cyan); }
-.city-map .map-bt.here .n { color: var(--map-cyan); }
-.city-map .map-bt:not(.map-back):not(.open):hover { box-shadow: 0 0 0 1px var(--map-green); }
-.city-map .map-bt.focus { box-shadow: 0 0 0 2px var(--map-green), 0 0 14px var(--map-green); }
-.city-map .map-bt.place.focus { background: #2b1340; }
-.city-map .map-bt.dist.open { margin-right: 10px; background: var(--map-pink); border-color: #fff; cursor: default; }
-.city-map .map-bt.dist.open .nm,
-.city-map .map-bt.dist.open .ct { color: #000; }
-.city-map .map-bt.map-back { background: var(--map-cyan); border-color: #fff; }
-.city-map .map-bt.map-back .nm { color: #000; }
-.city-map .map-bt.map-back .k { font: 10px var(--map-mono); color: #05303a; }
-.city-map .map-bt.map-back:hover { box-shadow: 0 0 12px var(--map-cyan); }
-
-/* ── the file strip: the focused place, slanted at the right edge ── */
+/* ── the place's card (the file strip): a clicked pin's place, slanted at the right edge (left for a place on the right) ── */
 .city-map .map-strip {
   position: absolute;
   right: 0;
@@ -189,27 +157,21 @@
 .city-map .map-strip .body { animation: map-print 0.35s steps(8) backwards; }
 .city-map .map-strip .t { font: 28px/1 var(--map-pixel); letter-spacing: 0.1em; color: #fff; }
 .city-map .map-strip .s { margin: 4px 0 12px; font: 10px var(--map-mono); letter-spacing: 0.25em; color: #ff2bd6; }
+.city-map .map-strip .readout { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; margin: 0 0 14px; }
+.city-map .map-strip .readout dt { padding-top: 2px; font: 9px/1.3 var(--map-mono); letter-spacing: 0.22em; color: #ff2bd6; white-space: nowrap; }
+.city-map .map-strip .readout dd { margin: 0; font: 12px/1.35 var(--map-mono); color: #e9def9; }
 .city-map .map-strip .who { display: flex; flex-wrap: wrap; gap: 6px 12px; }
 .city-map .map-strip .none { font: 11px var(--map-mono); color: rgba(233, 222, 250, 0.4); }
 .city-map .map-strip .acts { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
-.city-map .map-strip .go { margin: 0; padding: 1px 16px; font: 18px var(--map-pixel); letter-spacing: 0.3em; color: #000; background: var(--map-cyan); border: 0; transform: skewX(-12deg); }
-.city-map .map-strip .go:disabled { background: #2a2140; color: #6e5a90; opacity: 1; }
-/* Comms (spec 2026-10-20 §1): WITH HER and ON COMMS side by side; ON COMMS in her pink, the line's colour. */
-.city-map .map-strip .go-pair { display: inline-flex; gap: 12px; margin: 0; }
-.city-map .map-strip .go-comms { margin: 0; padding: 1px 16px; font: 18px var(--map-pixel); letter-spacing: 0.3em; color: #000; background: var(--map-pink); border: 0; transform: skewX(-12deg); }
-.city-map .map-strip .go-comms:disabled { background: #2a2140; color: #6e5a90; opacity: 1; }
 .city-map .map-strip .gig-open { margin: 0; transform: skewX(-12deg); }
-.city-map .map-strip .invite { margin: 0; flex-basis: auto; font: 15px var(--map-pixel); letter-spacing: 0.15em; color: var(--map-amber); }
 .city-map .map-strip.left { right: auto; left: 0; padding: 14px 52px 16px 18px; clip-path: polygon(0 0, 100% 0, 84% 100%, 0 100%); }
 @keyframes map-print { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
 @media (prefers-reduced-motion: reduce) {
-  .city-map .map-bt,
   .city-map .map-strip .body { animation: none; }
 }
 
 /* A pin's side rooms: a count on its tag, and while it's focused, the rooms drop down under it (information only). */
-.city-map .map-ntag .sub { font: 10px var(--map-mono); color: var(--map-pink); }
-.city-map .map-ntag.full .sub { color: #000; }
+.city-map .map-ntag .sub { font: calc(12px * var(--tz, 1)) var(--map-mono); color: var(--map-pink); }
 .city-map .map-inside {
   position: absolute;
   left: 14px;
@@ -225,8 +187,9 @@
   pointer-events: none;
 }
 .city-map .pin:not(.focus) .map-inside { display: none; }
-.city-map .pin.inside-up .map-inside { top: auto; bottom: 12px; border-top: 1px solid #3a2560; border-bottom: 0; }
-.city-map .pin.inside-left .map-inside { left: auto; right: 0; }
+/* Slanted under the slanted tag; its lines stand upright. */
+.city-map .map-inside { transform: skewX(-12deg); }
+.city-map .map-inside li { transform: skewX(12deg); }
 .city-map .map-inside li { display: flex; align-items: center; gap: 6px; font: 14px/1.5 var(--map-pixel); letter-spacing: 0.08em; color: #d8c8f0; }
 .city-map .map-inside li::before { content: '└'; font: 10px var(--map-mono); color: var(--map-pink); opacity: 0.7; }
 .city-map .map-inside li[data-depth='2'] { padding-left: 14px; }

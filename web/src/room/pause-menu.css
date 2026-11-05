@@ -1,0 +1,40 @@
+/* PAUSED (pause menu mockup 2026-10-30): a framed panel centred over the dimmed room. Every class is pause-. */
+.pause-menu { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(4, 2, 10, 0.62); backdrop-filter: blur(1px); }
+.pause-panel {
+  width: 620px;
+  padding: 28px 40px 30px;
+  font-family: var(--pixel);
+  background: rgba(6, 3, 16, 0.92);
+  border: 1px solid rgba(70, 227, 252, 0.45);
+  box-shadow: 0 0 40px rgba(70, 227, 252, 0.18);
+  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+.pause-panel.pause-glitch-in { animation: map-glitch-in 0.5s steps(1, end) backwards; }
+.pause-head { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 20px; letter-spacing: 0.25em; color: #3dff7a; }
+.pause-hint { color: #8e86a3; }
+.pause-title { margin: 6px 0 22px; text-align: center; font-size: 64px; letter-spacing: 0.35em; color: var(--cyan, #46e3fc); text-shadow: 0 0 16px currentColor; }
+.pause-rows { display: flex; flex-direction: column; }
+.pause-row {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 10px 18px;
+  font: 34px var(--pixel);
+  letter-spacing: 0.25em;
+  text-align: left;
+  color: #c8bfdb;
+  background: none;
+  border: 0;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+.pause-row small { font-size: 17px; letter-spacing: 0.15em; color: #7f7896; }
+.pause-row.on { color: #fff; border-left-color: var(--cyan, #46e3fc); background: linear-gradient(90deg, rgba(70, 227, 252, 0.18), transparent); text-shadow: 0 0 10px rgba(70, 227, 252, 0.6); }
+.pause-row.on::before { content: '▸'; position: absolute; left: -22px; color: var(--cyan, #46e3fc); }
+.pause-row.blocked { cursor: default; opacity: 0.55; }
+.pause-row.blocked small { color: #ffb347; }
+.pause-where { margin-top: 18px; text-align: center; font-size: 18px; letter-spacing: 0.22em; color: #7f7896; }
+
+/* LOAD from PAUSED: the title's LOAD over the room, on the stage's dark. */
+.pause-load { position: absolute; inset: 0; z-index: 60; color: #e9defa; background: #07030f; }

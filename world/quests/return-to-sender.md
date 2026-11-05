@@ -1,12 +1,12 @@
 ---
 title: Return to Sender
+art: return-to-sender.webp
 kind: mission
 tier: 1
-with: [silas, ember, hicks, cass, nix-direct]
 starts: second-socket
 after: null
 pitch: A repaired deck, a client in the Spine, and a market between you that wants it more than he does.
-pay: 200-260
+pay: 90-110
 draw complication: none | tail | rain-closed-the-bridge
 draw client: easy | hard
 ---
@@ -45,7 +45,7 @@ take: part
 
 *The footbridge to the Spine is chained off, water sheeting over its rail. The only other way across is the cable gantry, forty metres up, slick as glass.*
 
-- gantry: Cross on the gantry. → across / slipped [check body 45 · hicks +10]
+- gantry: Cross on the gantry. → across / slipped [check body 45 · hicks +10 · ines +10]
 - around: Go the long way round by the Strand. → across [clock +1h]
 
 # crossing
@@ -67,23 +67,25 @@ take: part
 # handoff if alarm>=1
 
 stranger: The client — a courier with a ruined knee and a grudge against stairs
+face: local-08
 temper: client
 
 *He's waiting on the Spine's lower deck with his collar up. He's already heard there was trouble in the market.*
 
 *"Is it whole?" he says, before hello.*
 
-- show: Open the bag and let him test it. → paid / short [check cool 50 · if roofs +10 "you came over the roofs"]
+- show: Open the bag and let him test it. → paid / short [check cool 50 · mother-rot +10 · if roofs +10 "you came over the roofs"]
 - lie: Tell him it's fine and hand it over. → paid / short [check cool 40]
 
 # handoff
 
 stranger: The client — a courier with a ruined knee and a grudge against stairs
+face: local-08
 temper: client
 
 *He's waiting on the Spine's lower deck with his collar up. He takes the bag and weighs it in his hand before he looks inside.*
 
-- show: Let him test it there and then. → paid / short [check tech 45 · silas +10 · if shook +10 "nobody followed you here"]
+- show: Let him test it there and then. → paid / short [check tech 45 · silas +10 · rue +10 · if shook +10 "nobody followed you here"]
 - wait: Stand in the rain while he checks every port. → paid [clock +30m]
 
 ## paid

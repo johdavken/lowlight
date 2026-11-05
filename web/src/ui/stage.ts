@@ -1,6 +1,6 @@
 import type { Crop } from '../../../shared/types';
 import { figureBox } from './figure';
-import { lightFilter } from './stage-light';
+import { FLAT_LIGHT, lightFilter } from './stage-light';
 
 /** What a figure shows, in order of preference: a sprite, her portrait, a monogram, a silhouette. */
 export type FigureSource =
@@ -76,9 +76,10 @@ export class Stage {
 
   constructor(
     private readonly root: HTMLElement,
-    opts: { probe?: (url: string) => Promise<Probed | null> } = {},
+    opts: { probe?: (url: string) => Promise<Probed | null>; flatLight?: boolean } = {},
   ) {
     this.probe = opts.probe ?? probeImage;
+    const flat = opts.flatLight ?? FLAT_LIGHT;
     root.classList.add('stage');
     const make = (side: Side) => {
       const fig = document.createElement('div');
@@ -86,7 +87,13 @@ export class Stage {
       fig.setAttribute('role', 'img');
       const art = document.createElement('div');
       art.className = 'stage-art';
-      // The room's light on her (stage-light.ts): a filter on her art, read by style.css for sprites.
+      // The room's light on her (stage-light.ts): a filter on her art, read by style.css for sprites;
+      // in Firefox one brightness, since the filter crops her there (FLAT_LIGHT).
+      if (flat) {
+        fig.style.setProperty('--fig-filter', 'brightness(var(--fig-light, 1))');
+        fig.append(art);
+        return fig;
+      }
       const light = lightFilter(`stage-light-${side}`);
       fig.style.setProperty('--fig-filter', `url(#${light.id})`);
       fig.append(art, light.svg);
@@ -111,6 +118,11 @@ export class Stage {
    */
   setSpeaker(side: Side | null): void {
     for (const s of SIDES) this.figures[s].classList.toggle('speaking', s === side);
+  }
+
+  /** Flips `side`'s figure to face the other way (SYS → MIRROR); the room's light still falls from where it is. */
+  setMirror(side: Side, on: boolean): void {
+    this.figures[side].toggleAttribute('data-mirror', on);
   }
 
   /** Re-crops a sprite figure live (the dev panel's STAGE sliders). */

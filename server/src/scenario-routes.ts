@@ -1,6 +1,6 @@
-/** POST /api/scenario/draft (arrival screen spec §3): one opening for a new game's first scene, written by her model and steered by what's typed. */
+/** POST /api/scenario/draft (arrival screen spec §3): three openings for a new game's first scene (history, business, chance), written by her model for the pair and steered by what's typed. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { parseSceneDraft } from '../../shared/scenario';
+import { parseSceneOptions } from '../../shared/scenario';
 import type { NarratorKind } from '../../shared/narrator';
 import type { CompletionMessage } from './turn';
 import { NarratorError } from './scenario';
@@ -11,9 +11,12 @@ export interface ScenarioDeps {
   busy(): string | null;
   /** Who writes for `ai`: her model, or nobody (unknown, or a character with no mind). */
   target(ai: string): { kind: 'direct'; ready(): boolean; narrate(messages: CompletionMessage[]): Promise<string> } | null;
-  /** The narrator's request for the playthrough's player and `ai`'s room, with the steer; null when either is unknown. */
-  promptFor(ai: string, steer: string | null): Promise<CompletionMessage[] | null>;
+  /** The narrator's request for the playthrough's player and `ai`'s room, with the steer, and the pair for the panel's head; null when either is unknown. */
+  promptFor(ai: string, steer: string | null): Promise<{ messages: CompletionMessage[]; pair: OpeningPair } | null>;
 }
+
+/** Who the openings are for: the player (their id, for their face) and the tie line between them (null: they haven't met). */
+export type OpeningPair = { player: { id: string; name: string }; tie: string | null };
 
 const field = (body: unknown, k: string): unknown => (typeof body === 'object' && body !== null ? (body as Record<string, unknown>)[k] : undefined);
 
@@ -34,18 +37,18 @@ export function registerScenarioRoutes(app: FastifyInstance, deps: ScenarioDeps)
     if (!target.ready()) return reply.code(409).send({ error: 'no-link' });
     const busy = deps.busy();
     if (busy) return reply.code(409).send({ error: 'busy', contact: busy });
-    const messages = await deps.promptFor(ai, steer);
-    if (!messages) return reply.code(400).send({ error: 'bad-request' });
+    const prompt = await deps.promptFor(ai, steer);
+    if (!prompt) return reply.code(400).send({ error: 'bad-request' });
     // One retry: a bad answer (or a failed call) gets a second try; never a half-valid set. The
     // reason given is the last try's. A rejected key or no credit won't mend on a retry: said at once.
     let why = '';
     let kind: NarratorKind = 'bad-answer';
     for (let attempt = 0; attempt < 2; attempt++) {
-      why = 'the answer was not one opening';
+      why = 'the answer was not three openings';
       kind = 'bad-answer';
       try {
-        const draft = parseSceneDraft(await target.narrate(messages));
-        if (draft) return { text: draft.text };
+        const options = parseSceneOptions(await target.narrate(prompt.messages));
+        if (options) return { options, pair: prompt.pair };
       } catch (err) {
         const status = (err as { status?: unknown }).status;
         if (status === 401 || status === 403) return reply.code(409).send({ error: 'key-rejected' });

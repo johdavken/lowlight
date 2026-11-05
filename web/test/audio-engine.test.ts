@@ -40,6 +40,26 @@ describe('AudioEngine: unlock', () => {
 });
 
 describe('AudioEngine: voices and glides', () => {
+  it('a street with reverb sends the weather and lights channels (not the room bed) through one space, gliding its send', () => {
+    const { engine, ctx, p } = setup();
+    engine.unlock();
+    engine.apply(rainMix(0.5), 0);
+    expect(engine.state().voices).not.toContain('space');
+    expect(ctx.nodes.some((n) => n.kind === 'convolver')).toBe(false);
+    engine.apply(rainMix(0.5, { space: 0.3 }), 2);
+    const space = p(engine.debug().voice('space'));
+    expect(space.events.at(-1)).toEqual({ type: 'ramp', value: 0.3, time: 2 });
+    const delay = ctx.nodes.find((n) => n.kind === 'delay')!;
+    const input = ctx.nodes.find((n) => n.connections.includes(delay))!;
+    const feeds = ctx.nodes.filter((n) => n.connections.includes(input)).map((n) => (n as unknown as { gain: unknown }).gain);
+    const { weather, lights } = engine.debug().channel;
+    expect(feeds).toEqual(expect.arrayContaining([weather, lights]));
+    expect(feeds).toHaveLength(2);
+    engine.apply(rainMix(0.5), 1);
+    expect(space.last).toBe(0);
+    expect(ctx.nodes.filter((n) => n.kind === 'convolver')).toHaveLength(1);
+  });
+
   it('creates voices lazily, only for what the mix needs, and ramps silent ones down', () => {
     const { engine, p } = setup();
     engine.unlock();
@@ -372,6 +392,20 @@ describe('AudioEngine: oneShot', () => {
     expect(all).toHaveLength(2);
     expect(all[0].stopped).toBe(true); // stopped before (or as) the second started
     expect(all[1].stopped).toBe(false);
+  });
+
+  it('oneShot with overlap rings under its next play, at its own rate (dice taps)', async () => {
+    const fetchBuffer = vi.fn(() => Promise.resolve(sample));
+    const { engine, ctx } = setup({ fetchBuffer });
+    engine.unlock();
+    const sourcesBefore = ctx.of('buffer-source').length;
+    engine.oneShot('/tap.ogg', 0.5, undefined, { rate: 0.92, overlap: true });
+    await flush();
+    engine.oneShot('/tap.ogg', 0.5, undefined, { rate: 1.08, overlap: true });
+    await flush();
+    const all = ctx.of('buffer-source').slice(sourcesBefore) as any[];
+    expect(all.map((s) => s.stopped)).toEqual([false, false]);
+    expect(all.map((s) => s.playbackRate.value)).toEqual([0.92, 1.08]);
   });
 
   it('a source disconnects itself (and its gain) on ended', async () => {

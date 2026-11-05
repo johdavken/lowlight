@@ -1,5 +1,5 @@
 /** The city map's data (map/lowlight.json): districts, their borders and labels, and places. Pure zod, shared by the game, its server and Studio. */
-import { SPECIALTIES, type Specialty } from './crew-book';
+import { normalSpec, SPECIALTIES, type Specialty } from './crew-book';
 import { z } from 'zod';
 
 export type Pt = [number, number];
@@ -49,6 +49,22 @@ export interface Place {
   on?: string;
   /** Its level on that structure, counted from the bottom (1–12), or on its roof. */
   level?: number | 'roof';
+  /** The place card's dossier lines (`WHAT`, `WHO RUNS IT`…), from world/readouts/<id>.md; the server adds them to /api/map. */
+  readout?: ReadoutLine[];
+}
+export interface ReadoutLine {
+  label: string;
+  text: string;
+}
+
+/** A readout file: one `LABEL: text` per line; blank lines and lines without a label are skipped. */
+export function parseReadout(text: string): ReadoutLine[] {
+  const out: ReadoutLine[] = [];
+  for (const line of text.split('\n')) {
+    const m = /^([A-Z][A-Z' ]*[A-Z]):\s*(.+)$/.exec(line.trim());
+    if (m) out.push({ label: m[1], text: m[2].trim() });
+  }
+  return out;
 }
 export type SignMode = 'pulse' | 'blink' | 'flicker';
 /** A glow at a point on the map: a sign, a beacon. Sizes are a % of the map's width. */
@@ -170,9 +186,10 @@ const fileSchema = z
         inviteOnly: z.boolean().optional(),
         gigs: z.boolean().optional(),
         side: z.boolean().optional(),
-        hires: z.array(z.enum(SPECIALTIES)).optional(),
+        hires: z.array(z.preprocess(normalSpec, z.enum(SPECIALTIES))).optional(),
         on: z.string().regex(ID, 'lowercase letters, digits and dashes').optional(),
         level: z.union([z.number().int().min(1).max(12), z.literal('roof')]).optional(),
+        readout: z.array(z.object({ label: z.string(), text: z.string() })).optional(),
       }),
     ),
   })

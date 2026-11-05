@@ -4,7 +4,7 @@ import path from 'node:path';
 import Fastify from 'fastify';
 import { PNG } from 'pngjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { checkSplash, SPLASH_LOGO_ASPECT, type SplashEntry, type SplashLogoEntry } from '../../shared/splash';
+import { checkSplash, defaultPanel, SPLASH_LOGO_ASPECT, type SplashEntry, type SplashLogoEntry } from '../../shared/splash';
 import { registerSplashRoutes } from '../src/splash-routes';
 
 let dir: string;
@@ -33,11 +33,43 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
 describe('GET /api/splashes', () => {
+  const withNotice = (notice: unknown) => {
+    const file = path.join(dir, 'splashes.json');
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), notice }));
+  };
+  it('gives the notice when it is on and has text, without its switch', async () => {
+    library([entry({ id: 'nix-wall' })]);
+    withNotice({ on: true, title: 'New', tag: 'P5', text: 'Hello there.' });
+    const { a } = await app();
+    expect((await a.inject('/api/splashes')).json().notice).toEqual({ title: 'New', tag: 'P5', text: 'Hello there.' });
+  });
+  it('gives no notice when off or empty', async () => {
+    library([entry({ id: 'nix-wall' })]);
+    withNotice({ on: false, title: 'New', tag: '', text: 'Hello there.' });
+    const { a } = await app();
+    expect((await a.inject('/api/splashes')).json().notice).toBeUndefined();
+    withNotice({ on: true, title: 'New', tag: '', text: '  ' });
+    expect((await a.inject('/api/splashes')).json().notice).toBeUndefined();
+  });
+  it('warns about a broken notice and still lists the splashes', async () => {
+    library([entry({ id: 'nix-wall' })]);
+    withNotice({ on: 'yes' });
+    const { a, warn } = await app();
+    const body = (await a.inject('/api/splashes')).json();
+    expect(body.notice).toBeUndefined();
+    expect(body.splashes).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('notice'));
+  });
+  it('pulls a hand-edited panel back inside the image', async () => {
+    library([entry({ id: 'nix-wall', panel: { x: 5000, y: -10, width: 900, height: 100 } })]);
+    const { a } = await app();
+    expect((await a.inject('/api/splashes')).json().splashes[0].panel).toEqual({ x: 1040, y: 0, width: 560, height: 260 });
+  });
   it('lists only the entries that are on, with url /api/splash-art/<file>', async () => {
     library([entry({ id: 'nix-wall' }), entry({ id: 'roof', on: false })]);
     const { a } = await app();
     const res = await a.inject('/api/splashes');
-    expect(res.json()).toEqual({ splashes: [{ id: 'nix-wall', url: '/api/splash-art/nix-wall.png', width: 1600, height: 900, logo: { x: 70, y: 70, width: 760, ...BUILT_IN } }] });
+    expect(res.json()).toEqual({ splashes: [{ id: 'nix-wall', url: '/api/splash-art/nix-wall.png', width: 1600, height: 900, panel: defaultPanel(1600, 900), logo: { x: 70, y: 70, width: 760, ...BUILT_IN } }] });
   });
 
   it('skips (and warns about) an entry whose file is missing or whose placement is bad; the rest still list', async () => {

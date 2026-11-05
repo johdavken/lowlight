@@ -31,7 +31,7 @@ export function stageContent(root: string, resolved: ResolvedRelease, defaultPla
   // The district styles' blackout rates (blackouts phase 3); the rest of map/city is only the renderer's.
   const districts = path.join(root, 'map', 'city', 'districts');
   if (fs.existsSync(districts)) copyTree(districts, path.join(out, 'map', 'city', 'districts'));
-  for (const part of ['lore', 'gigs', 'papers', 'splash', 'districts', 'leads', 'extras', 'gear', 'crew']) copyTree(path.join(root, 'world', part), path.join(out, 'world', part));
+  for (const part of ['lore', 'readouts', 'gigs', 'papers', 'splash', 'districts', 'leads', 'extras', 'gear', 'crew']) copyTree(path.join(root, 'world', part), path.join(out, 'world', part));
   copyTree(path.join(root, 'world', 'quests'), path.join(out, 'world', 'quests'), resolved.holdQuests.map((id) => `${id}.md`));
   // Standing's shared words (STANDING_FILE); the game falls back to its defaults without it.
   const standing = path.join(root, 'world', 'standing.json');
@@ -49,12 +49,13 @@ export function stageContent(root: string, resolved: ResolvedRelease, defaultPla
 
 /** What the release says when the city map's render doesn't match the data being built (rendered map spec §4). */
 export const STALE_RENDER = 'the city map render is out of date — run npm run map-render';
+export const PARTIAL_RENDER = 'the city map render is 2× only — RENDER ALL first (Studio MAP, or npm run map-render)';
 
 /**
  * The rendered map in `renderRoot` (its web/public/map, gitignored) against the data in `dataRoot`: none when there's no
  * render (the build ships the painting), current when it was made from this data, stale otherwise.
  */
-export function renderCheck(renderRoot: string, dataRoot: string): 'none' | 'current' | 'stale' {
+export function renderCheck(renderRoot: string, dataRoot: string): 'none' | 'current' | 'partial' | 'stale' {
   let manifest = null;
   try {
     manifest = parseManifest(JSON.parse(fs.readFileSync(path.join(renderRoot, 'web', 'public', 'map', 'tiles.json'), 'utf8')));
@@ -63,7 +64,10 @@ export function renderCheck(renderRoot: string, dataRoot: string): 'none' | 'cur
   }
   if (!manifest) return 'none';
   try {
-    return manifest.dataHash === currentDataHash(dataRoot) ? 'current' : 'stale';
+    if (manifest.dataHash !== currentDataHash(dataRoot)) return 'stale';
+    // A RENDER 2× from Studio: current data, but not every level render.json wants (spec 2026-10-30 §3).
+    const want = (JSON.parse(fs.readFileSync(path.join(dataRoot, 'map', 'city', 'render.json'), 'utf8')) as { levels?: number[] }).levels ?? [];
+    return want.every((l) => manifest!.levels.some((m) => m.scale === l)) ? 'current' : 'partial';
   } catch {
     return 'stale';
   }
@@ -73,6 +77,7 @@ export function renderCheck(renderRoot: string, dataRoot: string): 'none' | 'cur
 export function copyMapRender(renderRoot: string, work: string): 'none' | 'current' {
   const state = renderCheck(renderRoot, work);
   if (state === 'stale') throw new Error(STALE_RENDER);
+  if (state === 'partial') throw new Error(PARTIAL_RENDER);
   if (state === 'none') return 'none';
   const from = path.join(renderRoot, 'web', 'public', 'map'), to = path.join(work, 'web', 'public', 'map');
   fs.mkdirSync(to, { recursive: true });

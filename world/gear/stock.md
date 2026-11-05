@@ -16,3 +16,11 @@ items:
   - burner · 600 · 1
   - fall-guy · 1000 · 3
 ---
+---
+place: deck-market
+items:
+  - dock-slate · 280 · 1
+  - burner · 550 · 1
+  - field-deck · 1300 · 2
+  - chrome-deck · 1700 · 3
+---

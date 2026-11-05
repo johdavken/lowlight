@@ -37,6 +37,7 @@ describe('stageContent', () => {
     expect(fs.readdirSync(path.join(out, 'art/scenes'))).toEqual(['one.md']);
     expect(fs.readdirSync(path.join(out, 'art'))).toEqual(['scenes']);
     expect(fs.readdirSync(path.join(out, 'world/lore'))).toEqual(['city.md']);
+    expect(fs.readdirSync(path.join(out, 'world/readouts'))).toEqual(['the-tilt.md']);
     expect(fs.readdirSync(path.join(out, 'world/gigs'))).toEqual(['job.md']);
     // Papers' data and faces ship with the game (final review, Important 1).
     expect(fs.readdirSync(path.join(out, 'world/papers')).sort()).toEqual(['faces', 'origins.json']);
@@ -100,7 +101,7 @@ describe('the city map render in a build (rendered map spec §4)', () => {
   afterEach(() => fs.rmSync(repo, { recursive: true, force: true }));
   const writeManifest = async () => {
     const { currentDataHash } = await import('../map3d/versions');
-    const m = { version: 1, size: [4608, 3072], tile: 512, levels: [{ scale: 1, cols: 9, rows: 6, tiles: 'all' }], deep: [], dataHash: currentDataHash(repo), blender: '5.2.2', pinHeights: {}, rendered: 'now' };
+    const m = { version: 1, size: [4608, 3072], tile: 512, levels: [1, 2, 4, 8].map((scale) => ({ scale, cols: 9 * scale, rows: 6 * scale, tiles: scale === 1 ? ('all' as const) : [] })), deep: [], dataHash: currentDataHash(repo), blender: '5.2.2', pinHeights: {}, rendered: 'now' };
     fs.writeFileSync(path.join(pub(), 'tiles.json'), JSON.stringify(m));
     fs.writeFileSync(path.join(pub(), 'windows.json'), '[]');
     fs.writeFileSync(path.join(pub(), 'tiles', '1', '0_0.webp'), Buffer.from([1]));
@@ -116,6 +117,18 @@ describe('the city map render in a build (rendered map spec §4)', () => {
     m.places[0].pin[0] += 1;
     fs.writeFileSync(file, JSON.stringify(m));
     expect(renderCheck(repo, repo)).toBe('stale');
+  });
+
+  it('renderCheck: partial when the data is current but a level render.json wants is missing (RENDER 2×), and the build refuses it', async () => {
+    const { renderCheck, copyMapRender } = await import('./stage');
+    await writeManifest();
+    const file = path.join(pub(), 'tiles.json');
+    const m = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...m, levels: m.levels.filter((l: { scale: number }) => l.scale === 2) }));
+    expect(renderCheck(repo, repo)).toBe('partial');
+    const work = awkwardTemp('partial work');
+    fs.cpSync(repo, work, { recursive: true });
+    expect(() => copyMapRender(repo, work)).toThrow(/2× only/);
   });
 
   it('copyMapRender copies a current render into the build, refuses a stale one, and does nothing without one', async () => {

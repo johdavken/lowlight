@@ -53,7 +53,7 @@ describe('resolveRelease', () => {
 });
 
 describe('the real release.json', () => {
-  it('parses and resolves with no errors, shipping nix as the base of nix-direct', () => {
+  it('parses and resolves with no errors, shipping Nix as nix-direct alone', () => {
     const repo = path.join(__dirname, '..', '..');
     const list = releaseListSchema.parse(JSON.parse(fs.readFileSync(path.join(repo, 'release.json'), 'utf8')));
     // The list itself is edited in Studio; what must hold is that it ships the splash, a
@@ -64,7 +64,8 @@ describe('the real release.json', () => {
     expect(list.bugRelay === null || /^https:\/\/[\w.-]+\.workers\.dev$/.test(list.bugRelay ?? '')).toBe(true);
     const r = resolveRelease(repo, list);
     expect(r.errors).toEqual([]);
-    expect(r.characters).toContain('nix');
+    expect(r.characters).toContain('nix-direct');
+    expect(r.characters).not.toContain('nix');
   });
 });
 

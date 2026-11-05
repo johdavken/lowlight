@@ -1,16 +1,21 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import Fastify from 'fastify';
 import { registerLinkRoutes } from '../src/link-routes';
-import { createModelCatalog } from '../src/model-catalog';
+import { createAnthropicCatalog, createModelCatalog, createRoutedCatalog } from '../src/model-catalog';
+import { startStubAnthropic, type StubAnthropic } from './fixtures/stub-anthropic';
 import { openSettings, type Settings } from '../src/settings';
 import { startStubOpenRouter, type StubOpenRouter } from './fixtures/stub-openrouter';
 import { tempDir } from './fixtures/temp-dir';
 
 let stub: StubOpenRouter | null = null;
+let an: StubAnthropic | null = null;
 afterEach(async () => {
   await stub?.close();
+  await an?.close();
   stub = null;
+  an = null;
 });
+const GOOD_ANT = 'sk-ant-api03-good-key-wxyz';
 
 const MODELS = {
   data: [
@@ -23,35 +28,42 @@ const MODELS = {
   ],
 };
 
-async function start(opts: { key?: string | null; fetchImpl?: typeof fetch; settings?: Settings } = {}) {
+async function start(opts: { key?: string | null; anthropicKey?: string; fetchImpl?: typeof fetch; settings?: Settings } = {}) {
   stub = await startStubOpenRouter([]);
+  an = await startStubAnthropic({ keys: [GOOD_ANT] });
   stub.models = { status: 200, json: MODELS };
   const settings = opts.settings ?? openSettings(tempDir('nix-link-'));
   if (opts.key) settings.setKey('openrouter', opts.key);
+  if (opts.anthropicKey) settings.setKey('anthropic', opts.anthropicKey);
   const resets: string[] = [];
   const runtimes = [{ id: 'a', resetProbe: async () => void resets.push('a') }, { id: 'b', resetProbe: async () => void resets.push('b') }];
   const app = Fastify();
-  const catalog = createModelCatalog({ baseUrl: stub.url, apiKey: () => settings.key('openrouter') });
+  const catalog = createRoutedCatalog({
+    openrouter: createModelCatalog({ baseUrl: stub.url, apiKey: () => settings.key('openrouter') }),
+    anthropic: createAnthropicCatalog({ apiKey: () => settings.key('anthropic'), baseUrl: an.url }),
+    keys: () => ({ openrouter: settings.key('openrouter'), anthropic: settings.key('anthropic') }),
+  });
   registerLinkRoutes(app, {
     settings,
     baseUrl: stub.url,
+    anthropicBaseUrl: an.url,
     ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
     catalog,
     runtimes: () => runtimes as never,
     originAllowed: (o) => o === undefined || o === 'http://localhost:5173',
   });
   await app.ready();
-  return { app, settings, resets, stub: stub! };
+  return { app, settings, resets, stub: stub!, an: an! };
 }
 
 const put = (app: Awaited<ReturnType<typeof start>>['app'], body: unknown, origin?: string) =>
-  app.inject({ method: 'PUT', url: '/api/link', payload: body as object, headers: origin ? { origin } : {} });
+  app.inject({ method: 'PUT', url: '/api/link/openrouter', payload: body as object, headers: origin ? { origin } : {} });
 
 describe('/api/link', () => {
   it('GET with no key → no-link', async () => {
     const { app } = await start();
     const res = await app.inject({ method: 'GET', url: '/api/link' });
-    expect(res.json()).toEqual({ linked: false, last4: null, credit: null, state: 'no-link' });
+    expect(res.json()).toEqual({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } });
   });
 
   it('PUT a good key saves it and returns last4 and credit, never the key', async () => {
@@ -126,7 +138,7 @@ describe('/api/link', () => {
   it('PUT and DELETE from a foreign Origin → 403 origin', async () => {
     const { app, settings } = await start({ key: 'sk-or-keep-me-1' });
     expect((await put(app, { apiKey: 'sk-or-v1-abcdef3f9a' }, 'https://evil.example')).statusCode).toBe(403);
-    const del = await app.inject({ method: 'DELETE', url: '/api/link', headers: { origin: 'https://evil.example' } });
+    const del = await app.inject({ method: 'DELETE', url: '/api/link/openrouter', headers: { origin: 'https://evil.example' } });
     expect(del.statusCode).toBe(403);
     expect(del.json()).toEqual({ error: 'origin' });
     expect(settings.key('openrouter')).toBe('sk-or-keep-me-1');
@@ -136,7 +148,7 @@ describe('/api/link', () => {
     const { app, resets } = await start();
     await put(app, { apiKey: 'sk-or-v1-abcdef3f9a' });
     expect(resets).toEqual(['a', 'b']);
-    await app.inject({ method: 'DELETE', url: '/api/link' });
+    await app.inject({ method: 'DELETE', url: '/api/link/openrouter' });
     expect(resets).toEqual(['a', 'b', 'a', 'b']);
   });
 
@@ -154,31 +166,107 @@ describe('/api/link', () => {
     await app2.ready();
     const res = await Promise.race([put(app2, { apiKey: 'sk-or-v1-abcdef3f9a' }), new Promise<'hung'>((r) => setTimeout(() => r('hung'), 1000))]);
     expect(res).not.toBe('hung');
-    const del = await Promise.race([app2.inject({ method: 'DELETE', url: '/api/link' }), new Promise<'hung'>((r) => setTimeout(() => r('hung'), 1000))]);
+    const del = await Promise.race([app2.inject({ method: 'DELETE', url: '/api/link/openrouter' }), new Promise<'hung'>((r) => setTimeout(() => r('hung'), 1000))]);
     expect(del).not.toBe('hung');
     void app;
   });
 
   it('DELETE removes the key → GET says no-link', async () => {
     const { app, settings } = await start({ key: 'sk-or-v1-abcdef3f9a' });
-    const del = await app.inject({ method: 'DELETE', url: '/api/link' });
+    const del = await app.inject({ method: 'DELETE', url: '/api/link/openrouter' });
     expect(del.statusCode).toBe(204);
     expect(settings.key('openrouter')).toBeNull();
-    expect((await app.inject({ method: 'GET', url: '/api/link' })).json()).toMatchObject({ linked: false, state: 'no-link' });
+    expect((await app.inject({ method: 'GET', url: '/api/link' })).json().openrouter).toMatchObject({ linked: false, state: 'no-link' });
   });
 
   it('GET with a key reports last4, credit and state', async () => {
     const { app } = await start({ key: 'sk-or-v1-abcdef3f9a' });
     const res = await app.inject({ method: 'GET', url: '/api/link' });
-    expect(res.json()).toEqual({ linked: true, last4: '3f9a', credit: 4.12, state: 'ok' });
+    expect(res.json().openrouter).toEqual({ linked: true, last4: '3f9a', credit: 4.12, state: 'ok' });
     expect(res.body).not.toContain('abcdef');
   });
 
   it('GET with a revoked key says key-rejected, and keeps the key', async () => {
     const { app, settings, stub } = await start({ key: 'sk-or-v1-abcdef3f9a' });
     stub.key = { status: 401, json: {} };
-    expect((await app.inject({ method: 'GET', url: '/api/link' })).json()).toMatchObject({ linked: true, state: 'key-rejected' });
+    expect((await app.inject({ method: 'GET', url: '/api/link' })).json().openrouter).toMatchObject({ linked: true, state: 'key-rejected' });
     expect(settings.key('openrouter')).toBe('sk-or-v1-abcdef3f9a');
+  });
+});
+
+describe('/api/link/anthropic', () => {
+  const putAnt = (app: Awaited<ReturnType<typeof start>>['app'], apiKey: string, origin?: string) =>
+    app.inject({ method: 'PUT', url: '/api/link/anthropic', payload: { apiKey }, headers: origin ? { origin } : {} });
+
+  it('PUT a good key saves it; last4, no credit figure; GET shows it beside OpenRouter', async () => {
+    const { app, settings } = await start();
+    const res = await putAnt(app, GOOD_ANT);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ linked: true, last4: 'wxyz', credit: null, state: 'ok' });
+    expect(settings.key('anthropic')).toBe(GOOD_ANT);
+    expect(settings.key('openrouter')).toBeNull();
+    const all = (await app.inject({ method: 'GET', url: '/api/link' })).json();
+    expect(all.state).toBe('ok');
+    expect(all.anthropic).toMatchObject({ linked: true, last4: 'wxyz', state: 'ok' });
+    expect(all.openrouter).toMatchObject({ linked: false, state: 'no-link' });
+    expect(JSON.stringify(all)).not.toContain('good-key');
+  });
+
+  it('PUT a rejected key → 400 key-rejected, nothing written', async () => {
+    const { app, settings } = await start();
+    const res = await putAnt(app, 'sk-ant-api03-wrong-0000');
+    expect([res.statusCode, res.json().error]).toEqual([400, 'key-rejected']);
+    expect(settings.key('anthropic')).toBeNull();
+  });
+
+  it('DELETE removes only that key', async () => {
+    const { app, settings } = await start({ key: 'sk-or-v1-abcdef3f9a', anthropicKey: GOOD_ANT });
+    expect((await app.inject({ method: 'DELETE', url: '/api/link/anthropic' })).statusCode).toBe(204);
+    expect(settings.key('anthropic')).toBeNull();
+    expect(settings.key('openrouter')).toBe('sk-or-v1-abcdef3f9a');
+  });
+
+  it('an unknown provider → 404; the old unprefixed PUT is gone', async () => {
+    const { app } = await start();
+    expect((await app.inject({ method: 'PUT', url: '/api/link/bogus', payload: { apiKey: GOOD_ANT } })).statusCode).toBe(404);
+    expect((await app.inject({ method: 'PUT', url: '/api/link', payload: { apiKey: GOOD_ANT } })).statusCode).toBe(404);
+  });
+
+  it('a foreign Origin → 403', async () => {
+    const { app, settings } = await start();
+    expect((await putAnt(app, GOOD_ANT, 'https://evil.example')).statusCode).toBe(403);
+    expect(settings.key('anthropic')).toBeNull();
+  });
+
+  it('the combined state: ok when either is ok', async () => {
+    const { app, stub } = await start({ key: 'sk-or-v1-abcdef3f9a', anthropicKey: GOOD_ANT });
+    stub.key = { status: 401, json: {} };
+    const all = (await app.inject({ method: 'GET', url: '/api/link' })).json();
+    expect([all.openrouter.state, all.anthropic.state, all.state]).toEqual(['key-rejected', 'ok', 'ok']);
+  });
+});
+
+describe('/api/models with an Anthropic key', () => {
+  it('only that key: only Claude picks, from Anthropic\'s list, marked via anthropic', async () => {
+    const { app } = await start({ anthropicKey: GOOD_ANT });
+    const body = (await app.inject({ method: 'GET', url: '/api/models' })).json() as { picks: { id: string; via?: string; label: string }[] };
+    expect(body.picks.map((p) => [p.id, p.via])).toEqual([['anthropic/claude-sonnet-5.5', 'anthropic']]);
+    expect(body.picks[0]!.label).toBe('Claude Sonnet 5.5');
+  });
+
+  it('both keys: the OpenRouter list, with the Claude pick marked via anthropic', async () => {
+    const { app } = await start({ key: 'sk-or-k-123456', anthropicKey: GOOD_ANT });
+    const body = (await app.inject({ method: 'GET', url: '/api/models' })).json() as { picks: { id: string; via?: string }[] };
+    expect(body.picks.map((p) => [p.id, p.via])).toEqual([['z-ai/glm-5.2', undefined], ['anthropic/claude-sonnet-5.5', 'anthropic']]);
+  });
+});
+
+describe('/api/models: which results go through the Anthropic key', () => {
+  it("a plain Claude id is marked via anthropic; OpenRouter's :batch variant is not", async () => {
+    const { app, stub } = await start({ key: 'sk-or-k-123456', anthropicKey: GOOD_ANT });
+    stub.models = { status: 200, json: { data: [...MODELS.data, { id: 'anthropic/claude-sonnet-5.5:batch', name: 'Anthropic: Claude Sonnet 5.5 (batch)' }] } };
+    const body = (await app.inject({ method: 'GET', url: '/api/models?q=sonnet' })).json() as { results: { id: string; via?: string }[] };
+    expect(body.results.map((r) => [r.id, r.via])).toEqual([['anthropic/claude-sonnet-5.5', 'anthropic'], ['anthropic/claude-sonnet-5.5:batch', undefined]]);
   });
 });
 

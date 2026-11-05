@@ -18,5 +18,5 @@ export function parseStats(v: unknown): Stats | null {
   return Object.fromEntries(STAT_KEYS.map((k) => [k, o[k] as number])) as Stats;
 }
 
-/** EDGE rerolls between 06:00s: EDGE ÷ 3, rounded up. */
-export const edgeMax = (s: Stats): number => Math.ceil(s.edge / 3);
+/** NERVE between 06:00s (the table spec §3): 3 + EDGE ÷ 2, rounded up. */
+export const nerveMax = (s: Stats): number => 3 + Math.ceil(s.edge / 2);

@@ -43,23 +43,16 @@ describe('room chrome: HUD buttons', () => {
     return { root, h };
   }
 
-  it('SAVE while busy shows WAIT FOR NIX and does not open', () => {
-    const { root, h } = hud();
+  it('SAVE (Alt+S, the pause menu) does not open while she replies; it says who to wait for', () => {
+    const { h } = hud();
     const open = vi.fn();
     h.setSave(open);
-    const save = root.querySelector<HTMLElement>('.sys-row[data-row="save"]')!;
-    expect(save.hidden).toBe(false);
-    expect(save.querySelector('.sys-value')!.textContent).toBe('ALT+S');
-
     h.setSaveBusy('Nix');
-    expect(save.querySelector('.sys-value')!.textContent).toBe('WAIT FOR NIX');
-    save.click();
+    expect(h.saveBlockedBy).toBe('Nix');
     h.pressSave(); // the S hotkey
     expect(open).not.toHaveBeenCalled();
-
     h.setSaveBusy(null);
-    expect(save.querySelector('.sys-value')!.textContent).toBe('ALT+S');
-    save.click();
+    h.pressSave();
     expect(open).toHaveBeenCalledTimes(1);
   });
 
@@ -163,35 +156,38 @@ describe('room chrome: save card', () => {
     expect(document.querySelector('.save-card')).not.toBeNull();
     expect(document.querySelector('.save-card .error')!.textContent).toBe('// NAME IT — 1 TO 80 CHARACTERS');
   });
-  const SNAP = { picture: '/scenes/karasu/the-tilt/room.png', place: 'The Tilt', time: 'late', withName: 'Cass', withAccent: '#ff8a3c' };
+  const SNAP = { scene: 'karasu/the-tilt', you: '/api/agents/hicks/thumb', them: '/api/agents/cass/thumb', place: 'The Tilt', time: 'late', withName: 'Cass' };
 
-  it('shows the room picture and PLACE · TIME · WITH NAME', () => {
-    openSavePrompt(document.body, { defaultName: 'x', save: vi.fn(async () => {}), snapshot: SNAP, reducedMotion: true });
-    expect(document.querySelector('.save-card .sc-picture')!.getAttribute('src')).toBe('/scenes/karasu/the-tilt/room.png');
-    const line = document.querySelector<HTMLElement>('.save-card .sc-line')!;
-    expect(line.textContent).toBe('THE TILT · LATE · WITH CASS');
-    expect(line.querySelector<HTMLElement>('.sc-with')!.style.color).toBe('rgb(255, 138, 60)');
+  it('shows the strip LOAD will show: the room, both faces, the name as typed, PLACE · TIME · WITH NAME', () => {
+    openSavePrompt(document.body, { defaultName: 'The Tilt, late', save: vi.fn(async () => {}), snapshot: SNAP, reducedMotion: true });
+    const strip = document.querySelector<HTMLElement>('.save-card .sc-strip')!;
+    expect((strip.querySelector('.ss-room') as HTMLElement).style.backgroundImage).toContain('/scenes/karasu/the-tilt/room.png');
+    expect(strip.querySelector('.ss-face.ss-l')!.getAttribute('src')).toBe('/api/agents/hicks/thumb');
+    expect(strip.querySelector('.ss-face.ss-r')!.getAttribute('src')).toBe('/api/agents/cass/thumb');
+    expect(strip.querySelector('.ss-meta')!.textContent).toBe('The Tilt · late · with Cass');
+    expect(strip.querySelector('.ss-name')!.textContent).toBe('The Tilt, late');
+    const field = document.querySelector<HTMLInputElement>('.sc-field')!;
+    field.value = 'Cass at the Tilt';
+    field.dispatchEvent(new Event('input'));
+    expect(strip.querySelector('.ss-name')!.textContent).toBe('Cass at the Tilt');
   });
 
-  it('no time: PLACE · WITH NAME', () => {
-    openSavePrompt(document.body, { defaultName: 'x', save: vi.fn(async () => {}), snapshot: { ...SNAP, time: null }, reducedMotion: true });
-    expect(document.querySelector('.save-card .sc-line')!.textContent).toBe('THE TILT · WITH CASS');
+  it('alone: no face on the right, no WITH; no time: PLACE alone', () => {
+    openSavePrompt(document.body, { defaultName: 'x', save: vi.fn(async () => {}), snapshot: { ...SNAP, them: null, time: null }, reducedMotion: true });
+    expect(document.querySelector('.sc-strip .ss-face.ss-r')).toBeNull();
+    expect(document.querySelector('.sc-strip .ss-meta')!.textContent).toBe('The Tilt');
   });
 
-  it('a picture that fails is hidden, and none at all shows no picture', () => {
+  it('a face that fails to load is dropped, leaving the room', () => {
     openSavePrompt(document.body, { defaultName: 'x', save: vi.fn(async () => {}), snapshot: SNAP, reducedMotion: true });
-    document.querySelector('.sc-picture')!.dispatchEvent(new Event('error'));
-    expect(document.querySelector('.sc-picture')).toBeNull();
-    document.body.replaceChildren();
-    openSavePrompt(document.body, { defaultName: 'x', save: vi.fn(async () => {}), snapshot: { ...SNAP, picture: null }, reducedMotion: true });
-    expect(document.querySelector('.sc-picture')).toBeNull();
-    expect(document.querySelector('.sc-line')).not.toBeNull();
+    document.querySelector('.sc-strip .ss-face.ss-r')!.dispatchEvent(new Event('error'));
+    expect(document.querySelector('.sc-strip .ss-face.ss-r')).toBeNull();
+    expect(document.querySelector('.sc-strip .ss-room')).not.toBeNull();
   });
 
   it('without a snapshot it is just the title, the field and the hint', () => {
     openSavePrompt(document.body, { defaultName: 'x', save: vi.fn(async () => {}) });
-    expect(document.querySelector('.sc-picture')).toBeNull();
-    expect(document.querySelector('.sc-line')).toBeNull();
+    expect(document.querySelector('.sc-strip')).toBeNull();
     expect(document.querySelector('.save-card .sc-title')!.textContent).toBe('SAVE');
   });
 
@@ -224,7 +220,7 @@ describe('room chrome: navigation', () => {
     expect(chromeKey(k({ key: '∆', code: 'KeyJ', altKey: true }), false)).toBe('journal');
     expect(chromeKey(k({ key: 'j', code: 'KeyJ' }), false)).toBeNull();
     expect(chromeKey(k({ key: 's', code: 'KeyS' }), false)).toBeNull();
-    expect(chromeKey(k({ key: 'x', code: 'KeyX', altKey: true }), false)).toBeNull();
+    expect(chromeKey(k({ key: 'z', code: 'KeyZ', altKey: true }), false)).toBeNull();
     expect(chromeKey(k({ key: 's', code: 'KeyS', altKey: true }), true)).toBeNull();
     expect(chromeKey(k({ key: 's', code: 'KeyS', altKey: true, ctrlKey: true }), false)).toBeNull();
     expect(chromeKey(k({ key: 't', code: 'KeyT', altKey: true, metaKey: true }), false)).toBeNull();
@@ -285,7 +281,8 @@ describe('room chrome: navigation', () => {
     h.setSave(() => {});
     h.setPeople(() => {});
     h.setBackLink(() => {});
-    expect(root.querySelector<HTMLElement>('.sys-row[data-row="save"] .sys-value')!.textContent).toBe('ALT+S');
+    // SAVE isn't in SYS any more (the pause menu has it, ALT+S on its row).
+    expect(root.querySelector('.sys-row[data-row="save"]')).toBeNull();
     expect(root.querySelector<HTMLElement>('.hud-people')!.title).toBe('People (Alt+P)');
     expect(root.querySelector<HTMLElement>('.hud-back')!.title).toBe('Title (Alt+T)');
   });

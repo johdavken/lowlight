@@ -32,6 +32,24 @@ export interface SplashEntry {
   height: number;
   on: boolean;
   logo: SplashLogo;
+  /** Where the notice sits on this image; missing: defaultPanel. */
+  panel?: SplashPanel;
+}
+/** The notice's box on a splash, in the image's pixels, like the logo. */
+export interface SplashPanel {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+/** The message shown on the splash at launch: one for every splash, placed by each splash's panel. */
+export interface SplashNotice {
+  on: boolean;
+  title: string;
+  /** The small line beside the title (PREVIEW 5); may be empty. */
+  tag: string;
+  /** Plain text, read by parseNotice. */
+  text: string;
 }
 /** A logo's effects (spec 2026-10-11 logo effects §2), in the order Studio lists them. */
 export const LOGO_EFFECTS = ['glow', 'fringe', 'scanlines', 'shine', 'glitch', 'pulse', 'hologram', 'power-on'] as const;
@@ -78,6 +96,7 @@ export interface SplashLibrary {
   version: 1;
   logos?: SplashLogoEntry[];
   theme?: SplashTheme;
+  notice?: SplashNotice;
   splashes: SplashEntry[];
 }
 
@@ -104,14 +123,17 @@ export const splashEntrySchema = z.object({
   height: z.number().int().positive(),
   on: z.boolean(),
   logo: z.object({ id: logoIdSchema.optional(), x: px.min(0), y: px.min(0), width: px.positive() }),
+  panel: z.object({ x: px, y: px, width: px, height: px }).optional(),
 });
 /** A song keeps the name it was added with (spaces, brackets): one `.ogg` file name, never a path or a dot file. */
 const SONG_FILE = /^[^./\\\0][^/\\\0]*\.ogg$/;
 export const splashThemeSchema = z.object({ pack: z.string().regex(SLUG).optional(), file: z.string().max(255).regex(SONG_FILE) }).strict();
+export const splashNoticeSchema = z.object({ on: z.boolean(), title: z.string().max(60), tag: z.string().max(30), text: z.string().max(40000) }).strict();
 export const splashLibrarySchema: z.ZodType<SplashLibrary> = z.object({
   version: z.literal(1),
   logos: z.array(splashLogoEntrySchema).optional(),
   theme: splashThemeSchema.optional(),
+  notice: splashNoticeSchema.optional(),
   splashes: z.array(splashEntrySchema),
 });
 
@@ -137,6 +159,14 @@ export function readSplashTheme(json: unknown): { theme: SplashTheme | null; pro
   if (raw === undefined) return { theme: null, problem: null };
   const r = readWith(splashThemeSchema, raw);
   return r.entry ? { theme: r.entry, problem: null } : { theme: null, problem: `theme: ${r.problem}` };
+}
+
+/** The manifest's notice: null when it has none, else the notice, or what's wrong with it (a hand edit). */
+export function readSplashNotice(json: unknown): { notice: SplashNotice | null; problem: string | null } {
+  const raw = (json as { notice?: unknown } | null)?.notice;
+  if (raw === undefined) return { notice: null, problem: null };
+  const r = readWith(splashNoticeSchema, raw);
+  return r.entry ? { notice: r.entry, problem: null } : { notice: null, problem: `notice: ${r.problem}` };
 }
 
 /** The manifest's logos, each as it is; none when the list is missing (a library from before logos). */
@@ -194,4 +224,70 @@ export function clampLogo(logo: SplashLogo, width: number, height: number, aspec
   const clamp = (v: number, hi: number) => Math.round(Math.min(Math.max(0, hi), Math.max(0, v)));
   const placed = { x: clamp(logo.x, width - w), y: clamp(logo.y, Math.floor(height - logoHeight(w, aspect))), width: w };
   return logo.id === undefined ? placed : { id: logo.id, ...placed };
+}
+
+/** The notice's width, at least / at most, and its height, at least (in the image's pixels). */
+export const PANEL_W_MIN = 360;
+export const PANEL_W_MAX = 560;
+export const PANEL_H_MIN = 260;
+/** A splash with no panel: bottom left, as shares of the image (under the logo on the Nix splash, over the song line). */
+const PANEL_DEFAULT = { x: 0.04, y: 0.54, width: 0.287, height: 0.31 };
+
+/** The panel pulled back inside a width×height image, at a size it allows. */
+export function clampPanel(p: SplashPanel, width: number, height: number): SplashPanel {
+  const w = Math.round(Math.min(width, Math.max(PANEL_W_MIN, Math.min(PANEL_W_MAX, p.width))));
+  const h = Math.round(Math.min(height, Math.max(PANEL_H_MIN, p.height)));
+  const clamp = (v: number, hi: number) => Math.round(Math.min(hi, Math.max(0, v)));
+  return { x: clamp(p.x, width - w), y: clamp(p.y, height - h), width: w, height: h };
+}
+
+/** A splash's panel when it has none. */
+export function defaultPanel(width: number, height: number): SplashPanel {
+  const d = PANEL_DEFAULT;
+  return clampPanel({ x: width * d.x, y: height * d.y, width: width * d.width, height: height * d.height }, width, height);
+}
+
+export interface NoticeEntry {
+  head?: string;
+  body?: string;
+}
+export interface NoticeSection {
+  /** Null for entries before the first section line. */
+  title: string | null;
+  entries: NoticeEntry[];
+}
+
+/** A section line is at most this long; a lone sentence over this reads as body, not a head. */
+const SECTION_MAX = 40;
+const HEAD_MAX = 60;
+
+/**
+ * The notice's text, as it's pasted: blank lines split blocks. A short line with no end
+ * punctuation is a section; one straight over another goes, so a pasted heading doesn't show twice,
+ * and the last block is never one, so a short closing line stays. Any other block is an entry: its
+ * first sentence the head, the rest the body.
+ */
+export function parseNotice(text: string): NoticeSection[] {
+  const sections: NoticeSection[] = [];
+  let at: NoticeSection | null = null;
+  const blocks = text.split(/\n\s*\n/).map((b) => b.trim().replace(/\s*\n\s*/g, ' ')).filter(Boolean);
+  const isSection = (b: string | undefined) => b !== undefined && b.length <= SECTION_MAX && !/[.!?…:;,"')]$/.test(b);
+  for (const [i, block] of blocks.entries()) {
+    const next = blocks[i + 1];
+    if (isSection(block) && next !== undefined) {
+      if (isSection(next) && i + 1 < blocks.length - 1) continue;
+      at = { title: block, entries: [] };
+      sections.push(at);
+      continue;
+    }
+    if (!at) {
+      at = { title: null, entries: [] };
+      sections.push(at);
+    }
+    const m = block.match(/^(.+?[.!?…])\s+(.*)$/);
+    const head = (m ? m[1]! : block).replace(/\.$/, '');
+    if (m) at.entries.push({ head, body: m[2]! });
+    else at.entries.push(block.length <= HEAD_MAX ? { head } : { body: block });
+  }
+  return sections;
 }

@@ -139,3 +139,63 @@ describe('LinkPanel (review fixes)', () => {
     expect(document.activeElement).toBe(input);
   });
 });
+
+describe('LinkPanel: OPENROUTER · ANTHROPIC', () => {
+  function two(answer: () => Promise<PutResult> = async () => OK, provider?: 'openrouter' | 'anthropic') {
+    document.body.innerHTML = '';
+    const host = document.createElement('div');
+    document.body.append(host);
+    const sent: [string, string][] = [];
+    const linked: [LinkInfo, string][] = [];
+    const panel = new LinkPanel(host, {
+      put: (k, p) => {
+        sent.push([k, p]);
+        return answer();
+      },
+      onLinked: (i, p) => linked.push([i, p]),
+      onBack: () => {},
+      changing: false,
+      beatMs: 0,
+      ...(provider ? { provider } : {}),
+    });
+    const tab = (p: string) => host.querySelector<HTMLButtonElement>(`.lp-tab[data-provider="${p}"]`)!;
+    return { host, panel, tab, sent, linked, input: host.querySelector<HTMLInputElement>('.lp-key')! };
+  }
+
+  it('opens on OpenRouter; the switch shows both', () => {
+    const { tab } = two();
+    expect(tab('openrouter').getAttribute('aria-selected')).toBe('true');
+    expect(tab('anthropic').getAttribute('aria-selected')).toBe('false');
+    expect(tab('openrouter').textContent).toBe('OPENROUTER');
+    expect(tab('anthropic').textContent).toBe('ANTHROPIC');
+  });
+
+  it("ANTHROPIC: its own why line, field label and get-key link; the key goes up as anthropic's", async () => {
+    const { host, tab, sent, linked, panel, input } = two();
+    tab('anthropic').click();
+    expect(host.querySelector('.lp-why')!.textContent).toBe(COPY.link.anthropic.why);
+    expect(host.querySelector('.lp-lbl')!.textContent).toBe('ANTHROPIC KEY');
+    expect(host.querySelector<HTMLAnchorElement>('.lp-get a')!.href).toBe('https://platform.claude.com/settings/keys');
+    input.value = 'sk-ant-api03-abc';
+    panel.key(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await tick();
+    await tick();
+    expect(sent).toEqual([['sk-ant-api03-abc', 'anthropic']]);
+    expect(linked.map(([, p]) => p)).toEqual(['anthropic']);
+  });
+
+  it("a rejected Anthropic key names Anthropic", async () => {
+    const { tab, panel, input, host } = two(async () => ({ error: 'key-rejected' }));
+    tab('anthropic').click();
+    input.value = 'sk-ant-bad-123';
+    panel.key(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await tick();
+    expect(host.querySelector('.lp-msg')!.textContent).toBe(COPY.link.anthropic.errors['key-rejected']);
+    expect(COPY.link.anthropic.errors['key-rejected']).toContain('Anthropic');
+  });
+
+  it('can open on Anthropic', () => {
+    const { tab } = two(undefined, 'anthropic');
+    expect(tab('anthropic').getAttribute('aria-selected')).toBe('true');
+  });
+});

@@ -93,7 +93,7 @@ afterEach(() => (document.body.innerHTML = ''));
 describe('ModelPanel', () => {
   it('header shows the link: last 4 and credit', async () => {
     const { host } = setup();
-    expect(host.querySelector('.mp-link')!.textContent).toContain('LINK …3f9a · $4.12');
+    expect(host.querySelector('.mp-link')!.textContent).toContain('OPENROUTER …3f9a · $4.12');
   });
 
   it('loads picks and recent on open', async () => {
@@ -181,5 +181,58 @@ describe('ModelPanel', () => {
     await settle();
     rows()[1]!.click();
     expect(picks).toEqual([SONNET.id]);
+  });
+});
+
+describe('ModelPanel: two keys', () => {
+  const ANT: LinkInfo = { linked: true, last4: 'wxyz', credit: null, state: 'ok' };
+  const OFF: LinkInfo = { linked: false, last4: null, credit: null, state: 'no-link' };
+  function two(link: LinkInfo, anthropic: LinkInfo, results: ModelChoice[] = []) {
+    document.body.innerHTML = '';
+    const host = document.createElement('div');
+    document.body.append(host);
+    const said: string[] = [];
+    new ModelPanel(host, {
+      link,
+      anthropic,
+      agentModels: event(GLM.id),
+      search: async () => ({ picks: [GLM, { ...SONNET, via: 'anthropic' as const }], recent: [], results }),
+      onPick: () => {},
+      onBack: () => {},
+      onChangeKey: (p) => said.push(`change ${p}`),
+      onUnlink: (p) => said.push(`unlink ${p}`),
+      onLink: (p) => said.push(`link ${p}`),
+      debounceMs: 0,
+    });
+    const row = (p: string) => host.querySelector<HTMLElement>(`.mp-link[data-provider="${p}"]`)!;
+    return { host, said, row };
+  }
+
+  it('one row per provider: linked ones with CHANGE KEY / UNLINK, the other a + LINK button', () => {
+    const { row, said } = two(LINK, OFF);
+    expect(row('openrouter').textContent).toContain('OPENROUTER …3f9a · $4.12');
+    expect(row('anthropic').querySelector('.mp-change')).toBeNull();
+    const add = row('anthropic').querySelector<HTMLButtonElement>('.mp-add')!;
+    expect(add.textContent).toBe('+ LINK ANTHROPIC');
+    add.click();
+    expect(said).toEqual(['link anthropic']);
+  });
+
+  it("the Anthropic row's buttons name Anthropic", () => {
+    const { row, said } = two(OFF, ANT);
+    expect(row('anthropic').textContent).toContain('ANTHROPIC …wxyz');
+    row('anthropic').querySelector<HTMLButtonElement>('.mp-change')!.click();
+    const unlink = row('anthropic').querySelector<HTMLButtonElement>('.mp-unlink')!;
+    unlink.click();
+    unlink.click();
+    expect(said).toEqual(['change anthropic', 'unlink anthropic']);
+    expect(row('openrouter').querySelector('.mp-add')!.textContent).toBe('+ LINK OPENROUTER');
+  });
+
+  it('a model through the Anthropic key says so', async () => {
+    const { host } = two(LINK, ANT);
+    await settle();
+    const sonnet = [...host.querySelectorAll('.mp-row')].find((r) => r.querySelector('.mp-label')!.textContent === SONNET.label)!;
+    expect(sonnet.querySelector('.mp-via')!.textContent).toBe('via your Anthropic key');
   });
 });

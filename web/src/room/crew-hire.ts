@@ -13,14 +13,18 @@ const up = (x: string) => x.toUpperCase().replace(/-/g, ' ');
 export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLElement {
   const root = el('div', 'cr-hire');
   if (v.hires.length === 0) return root.appendChild(el('div', 'cr-empty', 'NOWHERE IS HIRING.')).parentElement as HTMLElement;
-  let place = v.hires.find((h) => h.place === v.here)?.place ?? v.hires[0].place;
+  // By entry, not place: a vouched hire (crew spec §5) is its own tab, even at a place that hires.
+  // Where you stand: its own hires first, else a vouched card there (a contact's home that doesn't hire).
+  const at = v.hires.findIndex((h) => h.place === v.here && !h.vouched);
+  let sel = Math.max(0, at >= 0 ? at : v.hires.findIndex((h) => h.place === v.here));
   const head = el('div', 'cr-hire-head');
   const tabs = el('div', 'cr-places');
-  const places = v.hires.map((h) => {
-    const b = el('button', 'cr-place', h.name.toUpperCase());
+  const places = v.hires.map((h, i) => {
+    const b = el('button', `cr-place${h.vouched ? ' vouched' : ''}`, h.vouched ? `${h.name.toUpperCase()} · ${h.vouched.name.toUpperCase()}` : h.name.toUpperCase());
     b.type = 'button';
+    if (h.vouched?.accent) b.style.setProperty('--cr-vouch', h.vouched.accent);
     b.addEventListener('click', () => {
-      place = h.place;
+      sel = i;
       draw();
     });
     return b;
@@ -30,11 +34,12 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
   const where = el('span', 'cr-where');
   head.append(title, where, tabs);
   const cards = el('div', 'cr-cards');
+  cards.dataset.keep = 'cards';
   root.append(head, cards, el('div', 'cr-foot', `Hiring takes a free slot (${v.used}/${v.slots}). Wages come out at 06:00; skip a night and loyalty drops. New faces at 06:00.`));
 
   function draw(): void {
-    const h = v.hires.find((x) => x.place === place)!;
-    for (const [i, b] of places.entries()) b.classList.toggle('on', v.hires[i].place === place);
+    const h = v.hires[sel];
+    for (const [i, b] of places.entries()) b.classList.toggle('on', i === sel);
     title.textContent = h.name.toUpperCase();
     where.textContent = `${up(h.district)}${v.here === h.place ? ' · YOU ARE HERE' : ''}`;
     cards.replaceChildren(
@@ -49,10 +54,13 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
           return card;
         }
         const r = c.recruit;
-        const card = el('div', 'cr-card');
+        const card = el('div', `cr-card${c.from ? ' free' : ''}`);
+        if (h.vouched?.accent) card.style.setProperty('--cr-vouch', h.vouched.accent);
         const pic = el('div', 'cr-pic');
         pic.append(el('span', 'cr-spec', up(r.spec)), el('span', 'cr-grade', GRADES[r.grade]), face(r, 'cr-card-face'));
         const body = el('div', 'cr-body');
+        // A free card (crew spec §5): who vouched, or the job it came from.
+        if (c.from) body.append(el('div', 'cr-vouch', 'vouched' in c.from ? `VOUCHED BY ${c.from.name.toUpperCase()}` : `FROM THE JOB · ${c.from.title.toUpperCase()}`));
         body.append(el('div', 'cr-cname', r.name.toUpperCase()));
         if (r.pitch) body.append(el('div', 'cr-pitch', r.pitch));
         for (const t of r.traits.filter((t) => t !== r.hidden)) {
@@ -60,9 +68,14 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
           if (tr) body.append(el('div', `cr-tr${tr.good ? '' : ' bad'}`, `${tr.good ? '+' : '−'} ${tr.label.toUpperCase()}`));
         }
         if (r.hidden) body.append(el('div', 'cr-tr q', '? ONE MORE TRAIT, SHOWN AFTER THREE RUNS'));
+        // The ability they come with (crew abilities spec §4).
+        for (const id of r.abilities ?? []) {
+          const a = v.abilities[id];
+          if (a) body.append(el('div', 'cr-tr ab', `◆ ${a.label.toUpperCase()} · ${a.job}`));
+        }
         const money = el('div', 'cr-money');
-        const sign = el('span', '', 'SIGN-ON ');
-        sign.append(el('b', '', String(c.cost)));
+        const sign = el('span', '', c.from ? 'FREE' : 'SIGN-ON ');
+        if (!c.from) sign.append(el('b', '', String(c.cost)));
         const wage = el('span', '', 'WAGE ');
         wage.append(el('b', '', String(r.wage)));
         money.append(sign, wage);

@@ -27,6 +27,15 @@ describe('settings', () => {
     expect(fs.statSync(file(d)).mode & 0o777).toBe(0o600);
   });
 
+  it('an anthropic key sits beside the openrouter one', () => {
+    const d = tempDir('nix-set-');
+    const s = openSettings(d);
+    s.setKey('openrouter', 'sk-or-1');
+    s.setKey('anthropic', 'sk-ant-1');
+    expect(openSettings(d).key('anthropic')).toBe('sk-ant-1');
+    expect(readSettingsKeys(d)).toEqual({ openrouter: true, anthropic: true });
+  });
+
   it('deleteKey removes it', () => {
     const d = tempDir('nix-set-');
     const s = openSettings(d);

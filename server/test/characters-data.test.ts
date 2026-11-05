@@ -21,7 +21,7 @@ describe("the shipped characters, in rooms", () => {
       startRoom: 'karasu/lowlight-intake',
       legacyDistrict: null,
     });
-    const nix = JSON.parse(fs.readFileSync(path.join(root, 'characters', 'nix', 'character.json'), 'utf8')) as { outfitByScene: Record<string, string> };
+    const nix = JSON.parse(fs.readFileSync(path.join(root, 'characters', 'nix-direct', 'character.json'), 'utf8')) as { outfitByScene: Record<string, string> };
     expect(Object.keys(nix.outfitByScene).every((k) => rooms.has(k))).toBe(true);
     expect(nix.outfitByScene['karasu/lowlight-intake']).toBe('indoors');
     expect(warnings.filter((w) => w.includes('scenePack') || w.includes('no room'))).toEqual([]);

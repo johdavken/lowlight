@@ -130,6 +130,55 @@ export function recordedRainVoice(ctx: BaseAudioContext, out: AudioNode, light: 
   };
 }
 
+/**
+ * An outdoor space: a reverb send for the dry voices (rain, wind, neon), so a street sounds like walls
+ * around you rather than a recording. The impulse is made, not sampled: slaps off two close brick walls,
+ * then a short tail whose highs die first. Its lows are cut so the wash never muddies the rain itself.
+ * `level` is the wet send: 0 dry, 1 about as loud as the dry sound.
+ */
+export const SPACE_SECONDS = 1.4;
+function alleyImpulse(ctx: BaseAudioContext): AudioBuffer {
+  const rate = ctx.sampleRate;
+  const len = Math.max(1, Math.floor(rate * SPACE_SECONDS));
+  const ir = ctx.createBuffer(2, len, rate);
+  // Seeded, so every player hears the same alley.
+  let seed = 0x5eed;
+  const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 0x100000000) * 2 - 1;
+  const slaps = [0.011, 0.019, 0.026, 0.034, 0.047, 0.061];
+  for (let ch = 0; ch < 2; ch++) {
+    const d = ir.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < len; i++) {
+      const t = i / rate;
+      // −60 dB at SPACE_SECONDS; a one-pole low-pass that closes as the tail ages (brick soaks the highs).
+      const env = Math.pow(10, (-3 * t) / SPACE_SECONDS);
+      const k = 0.85 - 0.75 * Math.min(1, t / SPACE_SECONDS);
+      lp += k * (rand() - lp);
+      d[i] = lp * env * Math.min(1, t / 0.02);
+    }
+    // The walls trade slaps left and right, each a little softer.
+    slaps.forEach((s, n) => {
+      const i = Math.floor((s + (n % 2 === ch ? 0 : 0.002)) * rate);
+      if (i < len) d[i] += (n % 2 === ch ? 0.9 : 0.5) * Math.pow(0.72, n);
+    });
+  }
+  return ir;
+}
+export function spaceVoice(ctx: BaseAudioContext, out: AudioNode): Voice & { readonly input: AudioNode } {
+  const input = gain(ctx, 1);
+  const pre = ctx.createDelay(0.1);
+  pre.delayTime.value = 0.008;
+  const conv = ctx.createConvolver();
+  conv.buffer = alleyImpulse(ctx);
+  const low = filter(ctx, 'highpass', 280, 0.7);
+  const high = filter(ctx, 'lowpass', 7000, 0.7);
+  // The convolver normalizes its impulse; the makeup puts a send of 1 about level with the dry sound.
+  const makeup = gain(ctx, 2.5);
+  const level = gain(ctx, 0);
+  input.connect(pre).connect(conv).connect(low).connect(high).connect(makeup).connect(level).connect(out);
+  return { input, level: level.gain, stop: () => input.disconnect() };
+}
+
 /** Wind: brown noise through a band-pass swept by a slow LFO (gusts); optional ash crackle. */
 export interface WindVoice extends Voice {
   readonly gustDepth: AudioParam;

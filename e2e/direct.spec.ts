@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { NixRoomTestHook } from '../web/src/main';
 import { arriveGo, DIRECT, SECOND, STUB_OR_LOG_PORT, awaitGreeting, dialIn, lockPlayer, newGame, phase, send, showTile, skipSplash, skipIntro } from './fixtures';
-import { E2E_ENCOUNTERS, E2E_GIG, E2E_SLIP, E2E_SUGGESTION } from './serve';
+import { E2E_ENCOUNTERS, E2E_GIG, E2E_SUGGESTION, E2E_SUGGESTION_PUSH } from './serve';
 
 // Rooms here skip the district load screen (arrival.spec covers it).
 test.beforeEach(async ({ page }) => {
@@ -41,7 +41,7 @@ test('nix-direct: a reply on GLM, a tool call, switching model, regenerate, a cr
   await expect(page.locator('.model-panel .mp-row.on .mp-label')).toHaveText('GLM 5.2');
   // Her current model, then the recent ones (the shipped picks aren't in the fake catalog, so they hide).
   await expect(page.locator('.model-panel .mp-row')).toHaveCount(DIRECT.models.length);
-  await expect(page.locator('.model-panel .mp-link')).toContainText('$9.50');
+  await expect(page.locator('.model-panel .mp-link[data-provider="openrouter"]')).toContainText('$9.50');
   await page.keyboard.press('Enter'); // keep GLM
   await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
   await page.keyboard.press('Enter');
@@ -108,19 +108,17 @@ test("Hae at the noodle stall: a tile in the who's-here strip, her own page, on 
 
   // Walk to the stall: her row joins the party window, in full colour.
   await page.locator('.hud-map').click();
-  // It opens on the whole city with your district open (no auto zoom); Esc closes the district, then its band tile reopens it.
+  // It opens on the whole city with no card (map pins spec §1); a pin's click opens its card.
   const world = page.locator('.map-world');
-  await expect(page.locator('.map-strip')).toBeVisible();
+  await expect(page.locator('#map .pin.here')).toBeAttached();
   await expect(world).toHaveAttribute('style', /scale\(1\)/);
-  await page.keyboard.press('Escape');
-  await expect(world).toHaveAttribute('style', /scale\(1\)/);
-  await expect(page.locator('#map')).toBeVisible();
-  await page.locator('.map-bt.dist[data-id="karasu"]').click();
-  await page.locator('.map-bt.place', { hasText: "Hae's Noodles" }).click();
+  await expect(page.locator('.map-strip')).toHaveCount(0);
+  await page.locator('.city-map .pin[data-place="haes-noodles"]').dispatchEvent('click');
   const strip = page.locator('.map-strip');
   await expect(strip).toContainText('HAE');
   await expect(strip).toContainText('FIXED');
-  await strip.locator('.go').click();
+  // GO rides on the picked pin's name tag.
+  await page.locator('.map-go .go').click();
   await expect(page.locator('#map')).toBeHidden();
   await arriveGo(page);
   await expect(hae).toBeVisible({ timeout: 10_000 });
@@ -199,8 +197,7 @@ test('open city: Alpha (no rooms of her own) walks to the noodle stall and meets
 
   // Alpha starts in the neutral workspace, which isn't on the map: open the Ribbon's district and GO.
   await page.locator('.hud-map').click();
-  await page.locator('.map-bt.dist[data-id="karasu"]').click();
-  await page.locator('.map-bt.place', { hasText: "Hae's Noodles" }).click();
+  await page.locator('.city-map .pin[data-place="haes-noodles"]').dispatchEvent('click');
   await page.keyboard.press('Enter');
   await expect(page.locator('#map')).toBeHidden();
   await arriveGo(page);
@@ -222,8 +219,11 @@ test('encounter: draw, play, she reacts, and the courier gets his own page', asy
   // Alt+D: three events from the narrator, the first bringing a courier.
   await page.keyboard.press('Alt+d');
   await expect(page.locator('.encounter-host .sp-card')).toHaveCount(3, { timeout: 15_000 });
-  await expect(page.locator('.encounter-host .sp-card.on .sp-title')).toHaveText(E2E_ENCOUNTERS[0].title);
+  await expect(page.locator('.encounter-host .sp-card.on .sp-title')).toContainText(E2E_ENCOUNTERS[0].title);
   await expect(page.locator('.encounter-host .sp-card.on .ep-who')).toContainText('+ COURIER');
+  // DRAW's kinds, in order; the stranger's card shows his face.
+  await expect(page.locator('.encounter-host .sp-sub-what')).toHaveText(['STRANGER', 'THE CITY', 'PERSONAL']);
+  await expect(page.locator('.encounter-host .sp-card.on .sp-art')).toHaveAttribute('style', /\/api\/extras\/local-01/);
   const before = await page.locator('.msg.agent.s-ok').count();
   await page.keyboard.press('Enter');
 
@@ -231,6 +231,9 @@ test('encounter: draw, play, she reacts, and the courier gets his own page', asy
   await expect(page.locator('.encounter-host')).toHaveCount(0);
   await expect(page.locator('.encounter-banner .eb-title')).toHaveText(`◆ ENCOUNTER · ${E2E_ENCOUNTERS[0].title.toUpperCase()}`);
   await expect(page.locator('.encounter-banner .eb-arrives')).toHaveText('COURIER ARRIVES');
+  // Played, he's here with his face: a stranger in the who's-here window.
+  await expect(page.locator('#whos-here .wh-tile', { hasText: 'Courier' }).locator('.wh-face img')).toHaveAttribute('src', '/api/extras/local-01');
+  await expect(page.locator('#whos-here .wh-role', { hasText: 'STRANGER' })).toHaveCount(1);
   await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
   const sent = (await completions()).at(-1)!;
   // The stranger's block rides in the latest message (cache-friendly order).
@@ -253,7 +256,7 @@ test('encounter: draw, play, she reacts, and the courier gets his own page', asy
   expect(errors).toEqual([]);
 });
 
-test('suggest: Alt+G drafts his next line into the box, unsent; what is typed steers it and is replaced', async ({ page }) => {
+test('suggest: Alt+G opens three drafts of his line on the cards panel; Esc keeps the box, E edits, Enter sends', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -262,28 +265,51 @@ test('suggest: Alt+G drafts his next line into the box, unsent; what is typed st
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   await awaitGreeting(page);
   const box = page.locator('.input textarea');
+  const panel = page.locator('.encounter-host.suggest-host');
+  const cards = panel.locator('.sp-card');
+  const asks = async () => (await orRequests()).filter((r) => r.body.stream === false && r.body.messages?.[0]?.content?.startsWith('You help the user play')).length;
   const sentBefore = await page.locator('#feed .msg.user').count();
   await expect(page.locator('button.suggest')).toBeEnabled();
 
-  // An empty box: a free draft, his name cleaned off, nothing sent.
+  // An empty box: three drafts, his name cleaned off, nothing sent.
   await page.keyboard.press('Alt+g');
-  await expect(box).toHaveValue(E2E_SUGGESTION, { timeout: 10_000 });
-  await expect(page.locator('#feed .msg.user')).toHaveCount(sentBefore);
+  await expect(panel.locator('.ep-title')).toHaveText('YOUR LINE');
+  await expect(cards).toHaveCount(3, { timeout: 10_000 });
+  await expect(cards.locator('.sp-title')).toHaveText([/^PLAIN/, /^PUSH/, /^TURN/]);
+  await expect(cards.nth(0).locator('.sp-card-text')).toHaveText(E2E_SUGGESTION.replace(/\*/g, ''));
   const asked = (await orRequests()).filter((r) => r.body.stream === false && r.body.messages?.[0]?.content?.startsWith('You help the user play')).at(-1)!;
-  // The player's name is the world's ("You" when no NEW GAME picked one).
   expect(asked.body.messages![0].content).toMatch(/Write only .+'s next line in this scene/);
   expect(asked.body.messages!.at(-1)!.content).toContain('What just happened:');
 
-  // A steer typed in the box: the draft replaces it.
+  // Esc: the box as it was. A steer typed, then SUGGEST again: a new set (the steer changed); E puts PUSH in the box.
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
   await box.fill('tell her no');
+  const askedSoFar = await asks();
   await page.locator('button.suggest').click();
-  await expect(box).toHaveValue(`${E2E_SUGGESTION} (tell her no)`, { timeout: 10_000 });
+  await expect(panel.locator('.sp-note')).toHaveText('STEER: tell her no');
+  await expect(cards).toHaveCount(3, { timeout: 10_000 });
+  expect(await asks()).toBe(askedSoFar + 1);
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('e');
+  await expect(panel).toHaveCount(0);
+  await expect(box).toHaveValue(E2E_SUGGESTION_PUSH);
   await expect(page.locator('#feed .msg.user')).toHaveCount(sentBefore);
 
   // Out of character, it waits.
   await page.keyboard.press('Alt+m');
   await expect(page.locator('button.suggest')).toBeDisabled();
   await page.keyboard.press('Alt+m');
+
+  // The box cleared, SUGGEST again with no steer, Enter: PLAIN goes as his line and the box empties.
+  await box.fill('');
+  await page.keyboard.press('Alt+g');
+  await expect(cards).toHaveCount(3, { timeout: 10_000 });
+  await page.keyboard.press('Enter');
+  await expect(panel).toHaveCount(0);
+  await expect(page.locator('#feed .msg.user')).toHaveCount(sentBefore + 1);
+  await expect(page.locator('#feed .msg.user').last()).toContainText('E2E suggested line.');
+  await expect(box).toHaveValue('');
   expect(errors).toEqual([]);
 });
 
@@ -317,7 +343,7 @@ test("encounter: the panel keeps its keys — typing doesn't leak, Alt+S waits, 
   await expect(page.locator('button.draw')).toBeEnabled();
 });
 
-test('gig: jack in at The Tilt, win the easy job, she reacts', async ({ page }) => {
+test('gig: sit down at The Tilt, walk away from the desk, she reacts', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -329,49 +355,33 @@ test('gig: jack in at The Tilt, win the easy job, she reacts', async ({ page }) 
   // The map, Karasu's panel, The Tilt: GIGS (no travel).
   const openTilt = async () => {
     await page.locator('.hud-map').click();
-    // The map opens on your district (Karasu: every room this suite visits is there).
-    const tilt = page.locator('.map-bt.place', { hasText: 'The Tilt' });
-    await expect(tilt.locator('.gt')).toHaveText('GIGS');
-    await tilt.click();
+    // The Tilt's pin carries the gig ring; its card has GIGS.
+    await expect(page.locator('.city-map .pin[data-place="the-tilt"] .gig-ring')).toHaveCount(1);
+    await page.locator('.city-map .pin[data-place="the-tilt"]').dispatchEvent('click');
     await page.locator('.map-strip .gig-open').click();
     await expect(page.locator('.gig-window')).toBeVisible();
   };
   await openTilt();
-  // The easy hack first, then the medium slip.
-  await expect(page.locator('.gig-job-title')).toHaveText([E2E_GIG.title, E2E_SLIP.title]);
+  // One papers card: hack and slip are gone.
+  await expect(page.locator('.gig-job-title')).toHaveText([E2E_GIG.title]);
+  await expect(page.locator('.gig-job-go')).toHaveText('SIT DOWN');
   await page.keyboard.press('Enter');
-  await expect(page.locator('.gig-run-title')).toHaveText(E2E_GIG.title);
+  await expect(page.locator('.gig-where')).toContainText('◢ DESK // THE TILT');
 
-  // The solver's route: Tab to each node, take it, then PULL.
-  const path = await page.evaluate(() => (window.__nixRoom as unknown as { gig: { path(): number[] } }).gig.path());
-  for (const id of path.slice(1)) {
-    for (let i = 0; i < 20; i++) {
-      if ((await page.locator('g.gig-node.gig-sel').count()) && (await page.locator('g.gig-node.gig-sel').getAttribute('data-id')) === String(id)) break;
-      await page.keyboard.press('Tab');
-    }
-    await expect(page.locator('g.gig-node.gig-sel')).toHaveAttribute('data-id', String(id));
-    await page.keyboard.press('e');
-  }
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.gig-result-big')).toHaveText('CLEAN');
-
-  // JACK OUT: the run goes to the room, the window and map close, she answers.
+  // WALK AWAY: turned back; LEAVE THE DESK sends it to the room, the window and map close, she answers.
+  await page.keyboard.press('Escape');
+  await page.locator('.gig-confirm-go').click();
+  await expect(page.locator('.gig-result-big')).toHaveText('TURNED BACK');
   const before = await page.locator('.msg.agent.s-ok').count();
   await page.keyboard.press('Enter');
   await expect(page.locator('.gig-window')).toHaveCount(0);
   await expect(page.locator('#map')).toBeHidden();
-  await expect(page.locator('#feed .gig-row .gig-head').last()).toHaveText(`◢ GIG · ${E2E_GIG.title.toUpperCase()} · EASY`);
+  await expect(page.locator('#feed .gig-row .gig-head').last()).toHaveText(`◢ GIG · DESK · ${E2E_GIG.title.toUpperCase()} · EASY`);
   await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
-  const sent = (await completions()).at(-1)!;
-  const last = sent.body.messages!.at(-1)!.content ?? '';
-  // The mode's note rides in the latest message (cache-friendly order).
-  expect(last).toContain('The user has just run a job while you watched');
-  // The player's name is the world's ("You" when no NEW GAME picked one).
-  expect(last).toMatch(/\[gig: \S+ just ran a job off The Tilt's board, on the grid from here while you watched: "E2E Line" \(easy\), targeting Voltaic · depot ledger\./);
-  expect(last).toContain(E2E_GIG.text);
+  const last = (await completions()).at(-1)!.body.messages!.at(-1)!.content ?? '';
+  expect(last).toMatch(/\[gig: \S+ just forged papers for a Ferrymen client/);
 
-  // Shrunk to phone width with the window open, it scrolls inside itself: no sideways page scroll
-  // (Review Focus 5). (The room's own HUD isn't laid out for phones, so the window opens first.)
+  // Shrunk to phone width with the window open, it scrolls inside itself: no sideways page scroll.
   await openTilt();
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.locator('.gig-job').first()).toBeVisible();
@@ -399,47 +409,7 @@ test('dice: DICE opens the tray, Esc closes it', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('gig: slip in at The Tilt, walk the clean route out, she reacts', async ({ page }) => {
-  const errors: string[] = [];
-  page.on('pageerror', (err) => errors.push(err.message));
-  await page.setViewportSize({ width: 1280, height: 720 });
-  await skipSplash(page);
-  await page.goto(`/room/${DIRECT.id}?as=hicks&gigSeed=12345`);
-  await page.waitForFunction(() => window.__nixRoom !== undefined);
-  await awaitGreeting(page);
-
-  await page.locator('.hud-map').click();
-  await page.locator('.map-bt.place', { hasText: 'The Tilt' }).click();
-  await page.locator('.map-strip .gig-open').click();
-  const card = page.locator('.gig-job').nth(1);
-  await expect(card.locator('.gig-job-kind')).toHaveText('◢ FLOOR');
-  await expect(card.locator('.gig-job-go')).toHaveText('SLIP IN');
-  await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.slip-heat')).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('.gig-where')).toHaveText(`◢ FLOOR // THE TILT · KARASU · ${E2E_SLIP.title.toUpperCase()}`);
-
-  // The dev strip's SHOW SOLUTION walks the clean route, one action a press.
-  const show = page.locator('.gig-dev button', { hasText: 'SHOW SOLUTION' });
-  // (Exactly as many presses as it has turns: the result comes a beat after the last move.)
-  const turns = Number((await page.locator('.gig-dev').textContent())!.match(/solution (\d+) turns/)![1]);
-  for (let i = 0; i < turns; i++) await show.click();
-  await expect(page.locator('.gig-result-big')).toHaveText('CLEAN');
-  await expect(page.locator('.gig-send')).toHaveText('[ENTER] WALK AWAY');
-
-  const before = await page.locator('.msg.agent.s-ok').count();
-  await page.keyboard.press('Enter');
-  await expect(page.locator('.gig-window')).toHaveCount(0);
-  await expect(page.locator('#map')).toBeHidden();
-  await expect(page.locator('#feed .gig-row .gig-head').last()).toHaveText(`◢ GIG · FLOOR · ${E2E_SLIP.title.toUpperCase()} · MEDIUM`);
-  await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
-  const last = (await completions()).at(-1)!.body.messages!.at(-1)!.content ?? '';
-  expect(last).toMatch(/\[gig: \S+ just slipped a job off The Tilt's board, on foot, with you on comms watching their cameras: "E2E Floor" \(medium\)/);
-  expect(last).toContain('Result: lifted it clean, never seen.');
-  expect(errors).toEqual([]);
-});
-
-test('YOU, PEOPLE, CREW and MAP: a bar word switches between them, and Tab cycles YOU → PEOPLE → CREW → MAP', async ({ page }) => {
+test('YOU, PEOPLE, TEXTS, QUEST, CREW and MAP: a bar word switches between them, and Tab cycles YOU → PEOPLE → TEXTS → QUEST → CREW → MAP', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await skipSplash(page);
   await page.goto(`/room/${DIRECT.id}?as=hicks`);
@@ -451,24 +421,40 @@ test('YOU, PEOPLE, CREW and MAP: a bar word switches between them, and Tab cycle
   await page.locator('.hud-people').click();
   await expect(page.locator('.people-screen')).toBeVisible();
   await expect(page.locator('.character-sheet')).toHaveCount(0);
+  await expect(page.locator('.pe-tab[data-tab="journal"]')).toBeEnabled();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.pe-tab.on')).toHaveText('JOURNAL');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.tx-pane')).toBeVisible();
+  await expect(page.locator('.people-screen')).toHaveCount(0);
+  await expect(page.locator('.hud-quest')).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.ql-pane')).toBeVisible();
+  await expect(page.locator('.tx-root')).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(page.locator('.crew-screen')).toBeVisible();
-  await expect(page.locator('.people-screen')).toHaveCount(0);
+  await expect(page.locator('.ql-pane')).toBeHidden();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('.ql-pane')).toBeVisible();
+  await expect(page.locator('.crew-screen')).toHaveCount(0);
+  await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await expect(page.locator('#map')).toBeVisible();
   await expect(page.locator('.crew-screen')).toHaveCount(0);
+  // Clicking QUEST from MAP switches too: the map goes.
+  await page.locator('.hud-quest').click();
+  await expect(page.locator('.ql-pane')).toBeVisible();
+  await expect(page.locator('#map')).toBeHidden();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
+  await expect(page.locator('#map')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.locator('.character-sheet')).toBeVisible();
   await expect(page.locator('#map')).toBeHidden();
   await page.keyboard.press('Shift+Tab');
   await expect(page.locator('#map')).toBeVisible();
-  // The map opens inside your own district once its data loads, so the first Esc steps back to the city
-  // and the second closes it. (Pressed before the load, one Esc closed it: the test raced the fetch.)
+  // The map opens on the whole city with no card once its data loads (map pins spec §1), so one Esc closes it.
   await expect(page.locator('#map .pin.here')).toBeAttached();
-  await expect(page.locator('#map .city-map.zoomed')).toHaveCount(1);
-  await page.keyboard.press('Escape');
-  await expect(page.locator('#map .city-map.zoomed')).toHaveCount(0);
-  await expect(page.locator('#map')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#map')).toBeHidden();
 });

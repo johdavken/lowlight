@@ -170,7 +170,7 @@ describe('audioStatus', () => {
     expect(status('web/public/sound/mission/tick.ogg')).toBe('public'); // Glitch Noises
     expect(status('web/public/sound/mission/start.ogg')).toBe('public'); // ElevenLabs, was JDSherbert
     expect(status('web/public/sound/mission/read-ok.ogg')).toBe('public'); // ElevenLabs, was Bleeoop
-    expect(status('web/public/sound/gig/traced.ogg')).toBe('public'); // ElevenLabs, was a CC0 + Sonniss mix
+    expect(status('web/public/sound/mission/blown.ogg')).toBe('public'); // ElevenLabs, Slip's old caught cue
     expect(status('web/public/sound/ui/move.ogg')).toBe('public'); // ElevenLabs
     expect(status('web/public/sound/gig/select.ogg')).toBe('public'); // Glitch Noises
     expect(status('web/public/sound/music/Lost in Lowlight.ogg')).toBe('public'); // Suno
@@ -224,6 +224,11 @@ describe('audioStatus', () => {
     const picks = audioStatus('## Library picks (Sonniss GDC bundles)\n\n- stall: sound/keep/bed.ogg ← Sonniss / x.wav\n');
     expect(picks('scenes/karasu/stall/sound/keep/bed.ogg')).toBe('restricted');
     expect(picks('scenes/strand/stall/sound/keep/bed.ogg')).toBe('restricted');
+  });
+
+  it('an ElevenLabs take picked in Studio is public, and credits its file', () => {
+    const text = '## Library picks\n\n- stall: sound/keep/bed.ogg ← ElevenLabs · Sound Effects v3 · take 2 of “Rain on a tarp.”\n';
+    expect(audioStatus(text)('scenes/karasu/stall/sound/keep/bed.ogg')).toBe('public');
   });
 
   it('knows every audio file on disk', () => {

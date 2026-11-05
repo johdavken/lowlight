@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
-import { arrangementKey, parseArrangement, type Arrangement } from '../../shared/arrangement';
-import { BIG, CHAIR, JOB } from '../../shared/quests.fixture';
+import { arrangementKey, cutOf, parseArrangement, type Arrangement } from '../../shared/arrangement';
+import { CHAIR, JOB } from '../../shared/quests.fixture';
+import { CONTRACT } from '../../shared/quests.contract.fixture';
 import { parseQuestFile, parseRun } from '../../shared/quests';
 import { at, intakeRelay, lastUser, OWN, parse, questRows } from './fixtures/intake-relay';
 
 export const CHAIR_Q = parse(CHAIR, 'the-chair');
 /** Writes a deal straight into her room (as the Chair's outcome would). */
 export const withDeal = (r: ReturnType<typeof intakeRelay>, deal: Partial<Arrangement> = {}) =>
-  r.db.setMeta(arrangementKey('hicks'), JSON.stringify({ role: 'operator', retainer: 150, nights: 1, since: 0, ...deal }));
+  r.db.setMeta(arrangementKey('hicks'), JSON.stringify({ role: 'operator', tier: 1, cut: 25, nights: 1, since: 0, ...deal }));
 const deal = (r: ReturnType<typeof intakeRelay>) => parseArrangement(r.db.getMeta(arrangementKey('hicks')));
 
 describe('the arrangement: writing it, her line', () => {
@@ -16,7 +17,7 @@ describe('the arrangement: writing it, her line', () => {
     const r = intakeRelay({ book: [CHAIR_Q, OWN], trust: 5 });
     await r.relay.startQuest('hicks', 'the-chair');
     await r.relay.chooseQuest('hicks', { id: 'the-chair', beat: 'offer', choice: 'deal' });
-    expect(deal(r)).toMatchObject({ role: 'operator', retainer: 150, nights: 1 });
+    expect(deal(r)).toMatchObject({ role: 'operator', tier: 1, cut: 25, nights: 1 });
     const prior = questRows(r.db).at(-2)!;
     await r.relay.rewind('hicks', prior.id);
     expect(deal(r)).toBeNull();
@@ -113,65 +114,72 @@ describe('the arrangement: her bonus', () => {
     if (o.deal !== false) withDeal(r);
     await r.relay.startQuest('hicks', 'back-door');
     if (o.beat === 'desk') await r.relay.chooseQuest('hicks', { id: 'back-door', beat: r.relay.questState('hicks').active!.beat, choice: 'wait' });
-    return r.relay.questState('hicks').active!.choices.find((c) => c.id === o.choice)!.odds!;
+    const pool = r.relay.questState('hicks').active!.choices.find((c) => c.id === o.choice)!.pool!;
+    return { ...pool, why: pool.parts.map((x) => x.label) };
   };
 
-  it('NIX +10 on COOL and WITS while active', async () => {
+  it('NIX +1d on COOL and WITS while active (the table: +10 is a die)', async () => {
     const withIt = await odds({ choice: 'talk' });
     const without = await odds({ deal: false, choice: 'talk' });
-    expect(withIt.why).toContain('NIX +10');
-    expect(withIt.chance - without.chance).toBe(10);
-    expect((await odds({ beat: 'desk', choice: 'grab' })).why).not.toContain('NIX +10');
+    expect(withIt.why).toContain('NIX');
+    expect(withIt.dice - without.dice).toBe(1);
+    expect((await odds({ beat: 'desk', choice: 'grab' })).why).not.toContain('NIX');
   });
 
   it('no stacking with a choice that names her', async () => {
     const named = await odds({ choice: 'talk', text: (t) => t.replace(/talk your way in\. → inside \/ turned \[check cool 50\]/gi, 'Talk your way in. → inside / turned [check cool 50 · nix-direct +15]') });
-    expect(named.why).toContain('NIX-DIRECT +15');
-    expect(named.why).not.toContain('NIX +10');
+    expect(named.why).toContain('NIX-DIRECT');
+    expect(named.why).not.toContain('NIX');
   });
 
   it('suspended: no bonus', async () => {
-    expect((await odds({ trust: 4, choice: 'talk' })).why).not.toContain('NIX +10');
+    expect((await odds({ trust: 4, choice: 'talk' })).why).not.toContain('NIX');
   });
 });
 
-describe('the arrangement: the retainer', () => {
+describe('the arrangement: her cut (Tier 2 spec §2)', () => {
   const lastRow = (r: ReturnType<typeof intakeRelay>) => questRows(r.db).at(-1)!;
-  const retainerOf = (r: ReturnType<typeof intakeRelay>) => lastRow(r).quest!.debrief!.retainer;
+  const cutOfRow = (r: ReturnType<typeof intakeRelay>) => lastRow(r).quest!.debrief!.cut;
 
-  it("the night's first job pays her", async () => {
+  it('each job with her pays her cut of what it paid', async () => {
     const r = intakeRelay({ book: JOBS, trust: 5, sol: 400 });
-    withDeal(r);
+    withDeal(r, { nights: 2 });
     const [first, second] = listed(r).map((o) => o.id);
     await finish(r, first);
-    expect(retainerOf(r)).toEqual({ name: 'Nix', amount: 150, paid: true });
     const pay = lastRow(r).quest!.debrief!.sol;
-    expect(r.kit().sol).toBe(400 + pay - 150);
-    withDeal(r, { nights: 2 });
+    expect(cutOfRow(r)).toEqual({ name: 'Nix', pct: 25, amount: cutOf(pay, 25) });
+    expect(r.kit().sol).toBe(400 + pay - cutOf(pay, 25));
     await finish(r, second);
-    expect(retainerOf(r)).toBeUndefined();
+    expect(cutOfRow(r)).toMatchObject({ pct: 25 });
+    expect(r.jobMoves().some((m) => m.reason === 'Unpaid retainer')).toBe(false);
   });
 
-  it('short: not paid, trust −1', async () => {
-    const r = intakeRelay({ book: JOBS, trust: 5, sol: 100 });
+  it('nothing paid, no cut', async () => {
+    const r = intakeRelay({ book: JOBS, trust: 5, sol: 0 });
     withDeal(r);
-    await finish(r, listed(r)[0].id);
-    expect(retainerOf(r)).toEqual({ name: 'Nix', amount: 150, paid: false });
-    expect(r.kit().sol).toBe(100 + lastRow(r).quest!.debrief!.sol);
-    expect(r.trustNow()).toBe(4);
-    expect(r.jobMoves().at(-1)).toMatchObject({ trust: -1, reason: 'Unpaid retainer' });
+    const id = listed(r)[0].id;
+    expect(await r.relay.startQuest('hicks', id)).toMatchObject({ ok: true });
+    const run = () => parseRun(r.db.metaWithPrefix(`quest.hicks.${id}@`).at(-1)?.v ?? null)!;
+    await r.relay.chooseQuest('hicks', { id, beat: run().beat!, choice: 'talk' });
+    // A miss on the door: turned, take none, blown.
+    if (!run().done) await r.relay.chooseQuest('hicks', { id, beat: run().beat!, choice: '!take' });
+    if (lastRow(r).quest?.debrief?.sol === 0) expect(cutOfRow(r)).toBeUndefined();
   });
 
-  it('her own jobs', async () => {
+  it('her own jobs, and suspended: no cut', async () => {
     const r = intakeRelay({ book: [JOBS[0], OWN], trust: 5, sol: 400 });
     withDeal(r, { nights: 2 });
     await finish(r, 'held-papers');
-    expect(retainerOf(r)).toBeUndefined();
+    expect(cutOfRow(r)).toBeUndefined();
     await finish(r, 'job-a');
-    expect(retainerOf(r)).toMatchObject({ paid: true });
+    expect(cutOfRow(r)).toMatchObject({ pct: 25 });
+    const off = intakeRelay({ book: JOBS, trust: 4, sol: 400 });
+    withDeal(off);
+    await finish(off, listed(off)[0].id);
+    expect(cutOfRow(off)).toBeUndefined();
   });
 
-  it('rewind takes the retainer back', async () => {
+  it('rewind takes the cut back', async () => {
     const r = intakeRelay({ book: JOBS, trust: 5, sol: 400 });
     withDeal(r);
     const id = listed(r)[0].id;
@@ -179,26 +187,31 @@ describe('the arrangement: the retainer', () => {
     const prior = questRows(r.db).at(-2)!;
     await r.relay.rewind('hicks', prior.id);
     expect(r.kit().sol).toBe(400);
-    await r.relay.chooseQuest('hicks', { id, beat: 'desk', choice: 'skim' });
-    expect(retainerOf(r)).toMatchObject({ paid: true });
   });
 
-  it('suspended: no retainer', async () => {
-    const r = intakeRelay({ book: JOBS, trust: 4, sol: 400 });
+  it('old retainer converts: a stored 150 a night is a 25% cut, never unpaid', async () => {
+    const r = intakeRelay({ book: JOBS, trust: 5, sol: 0 });
+    r.db.setMeta(arrangementKey('hicks'), JSON.stringify({ role: 'operator', retainer: 150, nights: 1, since: 0 }));
+    await finish(r, listed(r)[0].id);
+    expect(cutOfRow(r)).toMatchObject({ pct: 25 });
+    expect(r.trustNow()).toBe(5);
+  });
+
+  it('her closing note hears the cut', async () => {
+    const r = intakeRelay({ book: JOBS, trust: 5, sol: 400 });
     withDeal(r);
     await finish(r, listed(r)[0].id);
-    expect(retainerOf(r)).toBeUndefined();
+    expect(lastUser(r.backend.reqs.at(-1)!)).toContain(`You took your cut: ${cutOfRow(r)!.amount} sol.`);
   });
 
-  it('her closing note hears it', async () => {
-    const paid = intakeRelay({ book: JOBS, trust: 5, sol: 400 });
-    withDeal(paid);
-    await finish(paid, listed(paid)[0].id);
-    expect(lastUser(paid.backend.reqs.at(-1)!)).toContain('Your retainer was paid.');
-    const short = intakeRelay({ book: JOBS, trust: 5, sol: 0 });
-    withDeal(short);
-    await finish(short, listed(short)[0].id);
-    expect(lastUser(short.backend.reqs.at(-1)!)).toContain("Your retainer wasn't paid: they came up short.");
+  it('Tier 2: a deal from a pick that sets chair2 is tier 2, and the cap is 3', async () => {
+    const two = parse(CHAIR.replace('arrangement: chair-cut 25 / 1', 'arrangement: chair-cut 20 / 3').replace('[set chair=yes]', '[set chair2=yes]'), 'the-chair-again');
+    const r = intakeRelay({ book: [two, ...JOBS], trust: 5, sol: 400 });
+    await r.relay.startQuest('hicks', 'the-chair-again');
+    await r.relay.chooseQuest('hicks', { id: 'the-chair-again', beat: 'offer', choice: 'deal' });
+    expect(deal(r)).toMatchObject({ tier: 2, cut: 20, nights: 3 });
+    for (const id of listed(r).slice(0, 3).map((o) => o.id)) await finish(r, id);
+    expect(listed(r).every((o) => o.mission?.capped)).toBe(true);
   });
 });
 
@@ -217,15 +230,16 @@ describe('the shipped Chair (world/quests)', () => {
     expect(r.entry).toMatchObject({ kind: 'quest', starts: 'lowlight-intake', with: ['nix-direct'], posts: [1200, 120] });
   });
 
-  it('every deal is 100, 150 or 200 a night, one or two jobs, and sets chair=yes on the way', () => {
+  it('every deal is a 20, 25 or 30% cut, one or two jobs, and sets chair=yes on the way', () => {
     const q = load().entry;
     const choices = [...q.beats.values()].flat().flatMap((b) => b.choices);
     const deals = [...q.outcomes.values()].filter((o) => o.effects.arrangement);
     expect(deals.length).toBeGreaterThan(0);
     for (const o of deals) {
-      expect([100, 150, 200]).toContain(o.effects.arrangement!.retainer);
+      const a = o.effects.arrangement!;
+      expect('cut' in a ? [20, 25, 30].includes(a.cut) : false).toBe(true);
       expect([1, 2]).toContain(o.effects.arrangement!.nights);
-      for (const c of choices.filter((x) => [x.to, x.close, x.fail].includes(o.id))) expect(c.tags).toContainEqual({ kind: 'set', name: 'chair', value: 'yes' });
+      for (const c of choices.filter((x) => [x.to, x.fail].includes(o.id))) expect(c.tags).toContainEqual({ kind: 'set', name: 'chair', value: 'yes' });
     }
     // Two jobs a night only at high trust and high warmth.
     const two = deals.filter((o) => o.effects.arrangement!.nights === 2).map((o) => o.id);
@@ -267,20 +281,206 @@ describe('mid-run review fixes (server)', () => {
     // Another player's turn moves the relay's current player; hicks's cards still carry her +10.
     await r.relay.send('cass', 'evening');
     const talk = r.relay.questState('hicks').active!.choices.find((c) => c.id === 'talk')!;
-    expect(talk.odds!.why).toContain('NIX +10');
+    expect(talk.pool!.parts.map((x) => x.label)).toContain('NIX');
   });
 });
 
 describe('final review fixes', () => {
-  it('I1: a big job with her never counts toward the night, so small jobs stay uncapped and owe the retainer', async () => {
-    const big = parse(BIG.replace('starts: haes-noodles', 'starts: lowlight-intake'), 'north-gate');
-    const r = intakeRelay({ book: [...JOBS, big], trust: 5, sol: 1000 });
+  it('I1: a contract with her never counts toward the night, so small jobs stay uncapped and owe the retainer', async () => {
+    const con = parse(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]'), 'the-contract');
+    const r = intakeRelay({ book: [...JOBS, con], trust: 5, sol: 1000 });
     withDeal(r);
-    // A big job with her that ended tonight (walked away from, or finished).
+    // A contract with her that ended tonight (walked away from, or finished).
     const day = Math.floor((at(22, 0) - 360) / 1440);
-    r.db.setMeta(`quest.hicks.north-gate@${day}`, JSON.stringify({ beat: null, variant: 0, picks: [], flags: {}, done: true, endDay: day, wait: null, at: 0 }));
+    r.db.setMeta(`quest.hicks.the-contract@${day}`, JSON.stringify({ beat: null, variant: 0, picks: [], flags: {}, done: true, endDay: day, wait: null, at: 0 }));
     expect(listed(r).every((o) => !o.mission!.capped)).toBe(true);
     await finish(r, listed(r)[0].id);
-    expect(questRows(r.db).at(-1)!.quest!.debrief!.retainer).toMatchObject({ paid: true });
+    expect(questRows(r.db).at(-1)!.quest!.debrief!.cut).toMatchObject({ pct: 25 });
   });
 });
+
+describe('The Chair, again: deal2=ready and the locked row (Tier 2 spec §1)', () => {
+  const AGAIN = parse(
+    CHAIR.replace('title: The Chair', 'title: The Chair, again')
+      .replace('starts: lowlight-intake', 'starts: lowlight-intake\nafter: deal2=ready and trust=high and chair=yes and chair2!=yes\nposts: 20:00-02:00')
+      .replace('[set chair=yes]', '[set chair2=yes]')
+      .replace('arrangement: chair-cut 25 / 1', 'arrangement: chair-cut 20 / 3'),
+    'the-chair-again',
+  );
+  /** A finished run of `id` on story day `d`, ending `tier`, at minute `end` (newest last). */
+  const seedRun = (r: ReturnType<typeof intakeRelay>, id: string, d: number, tier: 'clean' | 'messy' | 'blown', end: number, kit: object[] = []) =>
+    r.db.setMeta(`quest.hicks.${id}@${d}`, JSON.stringify({ beat: null, variant: 0, wait: null, picks: [], flags: {}, done: true, day: d, endDay: d, take: tier === 'messy' ? 'part' : tier === 'blown' ? 'none' : 'full', ...(tier === 'blown' ? { blown: true } : {}), alarm: 0, setup: { approach: 'quiet', people: [], favour: false, at: end - 30, endAt: end }, kit, at: end }));
+  const struck = (r: ReturnType<typeof intakeRelay>) => r.db.setMeta('quest.hicks.the-chair', JSON.stringify({ beat: null, variant: 0, wait: null, picks: [], flags: { chair: 'yes' }, done: true, at: 1 }));
+  /** Six jobs with her (4 clean, the last 3 not blown) and Trusted in Karasu. */
+  const record = (r: ReturnType<typeof intakeRelay>, tiers: ('clean' | 'messy' | 'blown')[] = ['clean', 'messy', 'clean', 'clean', 'messy', 'clean']) =>
+    tiers.forEach((t, i) => seedRun(r, JOBS[i % 4].id, i, t, at(21, i), i === 0 ? [{ at: 0, rep: { district: 'karasu', delta: 45 } }] : []));
+  const row = (r: ReturnType<typeof intakeRelay>) => r.relay.questState('hicks').open.find((o) => o.id === 'the-chair-again');
+  const make = (o: { clock?: number; trust?: number } = {}) => {
+    const r = intakeRelay({ book: [CHAIR_Q, AGAIN, ...JOBS], trust: o.trust ?? 5, clock: o.clock ?? at(22, 0, 9) });
+    withDeal(r);
+    return r;
+  };
+
+  it('before Tier 1, no row', () => {
+    expect(row(make())).toBeUndefined();
+  });
+  it('after Tier 1, locked with its checklist', () => {
+    const r = make();
+    struck(r);
+    const x = row(r)!;
+    expect(x.locked).toBe('LOCKED');
+    expect(x.checks!.map((c) => [c.id, c.ok])).toEqual([['jobs', false], ['clean', false], ['blown', true], ['paid', true], ['standing', false], ['shift', true]]);
+    expect(x.checks![0].progress).toBe('0/6');
+  });
+  it('the record met, in her shift: it lists open and starts', async () => {
+    const r = make();
+    struck(r);
+    record(r);
+    const x = row(r)!;
+    expect(x.locked).toBeUndefined();
+    expect(await r.relay.startQuest('hicks', 'the-chair-again')).toMatchObject({ ok: true });
+  });
+  it('the record met, outside her shift: locked, only the shift failing', () => {
+    const r = make({ clock: at(12, 0, 9) });
+    struck(r);
+    record(r);
+    const x = row(r)!;
+    expect(x.locked).toBe('LOCKED');
+    expect(x.checks!.filter((c) => !c.ok).map((c) => [c.id, c.progress])).toEqual([['shift', 'FROM 20:00']]);
+  });
+  it('her trust not high: the trust line, locked', () => {
+    const r = make({ trust: 4 });
+    struck(r);
+    record(r);
+    expect(row(r)!.checks!.find((c) => c.id === 'trust')).toMatchObject({ ok: false });
+    expect(row(r)!.locked).toBe('LOCKED');
+  });
+  it('rewind drops a job: 5/6 again, locked', () => {
+    const r = make();
+    struck(r);
+    record(r);
+    r.db.setMeta(`quest.hicks.${JOBS[1].id}@5`, '');
+    const x = row(r)!;
+    expect(x.checks![0]).toMatchObject({ ok: false, progress: '5/6' });
+    expect(x.locked).toBe('LOCKED');
+  });
+  it("contracts and her own clients' jobs don't count", () => {
+    const con = parse(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]'), 'the-contract');
+    const r = intakeRelay({ book: [CHAIR_Q, AGAIN, ...JOBS, OWN, con], trust: 5, clock: at(22, 0, 9) });
+    withDeal(r);
+    struck(r);
+    record(r, ['clean', 'clean', 'clean', 'clean', 'clean']);
+    seedRun(r, 'held-papers', 6, 'clean', at(21, 6));
+    seedRun(r, 'the-contract', 7, 'clean', at(21, 7));
+    expect(row(r)!.checks![0]).toMatchObject({ ok: false, progress: '5/6' });
+  });
+  it('an unpaid night in her history fails the paid line', () => {
+    const r = make();
+    struck(r);
+    record(r);
+    r.deps.trust!.move('hicks', -1, 'Unpaid retainer', 'old');
+    r.deps.trust!.move('hicks', 1, 'Made up', 'later');
+    expect(row(r)!.checks!.find((c) => c.id === 'paid')!.ok).toBe(false);
+  });
+  it('the shipped The Chair, again: locked, then opens and starts on the record', async () => {
+    const map = JSON.parse(fs.readFileSync('map/lowlight.json', 'utf8')) as { places: { id: string }[] };
+    const live = { roster: new Set(fs.readdirSync('characters')), places: new Set(map.places.map((p) => p.id)), decks: null };
+    const shipped = parseQuestFile('the-chair-again', fs.readFileSync('world/quests/the-chair-again.md', 'utf8'), live as never);
+    if (!shipped.ok) throw new Error(JSON.stringify(shipped.problems));
+    const r = intakeRelay({ book: [CHAIR_Q, shipped.entry, ...JOBS], trust: 5, clock: at(22, 0, 9) });
+    withDeal(r);
+    struck(r);
+    expect(row(r)!.locked).toBe('LOCKED');
+    record(r);
+    expect(row(r)!.locked).toBeUndefined();
+    expect(await r.relay.startQuest('hicks', 'the-chair-again')).toMatchObject({ ok: true });
+  });
+
+  it("review: newest first across runs with and without a SETUP", () => {
+    const r = make();
+    struck(r);
+    // Three clean late on story day 7 (04:00–04:30, before day 8 starts at 06:00), then a BLOWN one on day 8 with no SETUP:
+    // the blown one is the newest, so it's in the last 3.
+    seedRun(r, JOBS[0].id, 5, 'clean', at(21, 0, 5));
+    seedRun(r, JOBS[1].id, 6, 'clean', at(21, 0, 6));
+    for (const [i, mm] of [[2, 10], [3, 20], [0, 30]] as const) seedRun(r, JOBS[i].id, 7, 'clean', at(4, mm, 7));
+    r.db.setMeta(`quest.hicks.${JOBS[1].id}@8`, JSON.stringify({ beat: null, variant: 0, wait: null, picks: [], flags: {}, done: true, day: 8, endDay: 8, take: 'none', blown: true, alarm: 0, at: 5 }));
+    expect(row(r)!.checks!.find((c) => c.id === 'blown')!.ok).toBe(false);
+  });
+  it("review: jobs ended before the deal on its own day don't count", () => {
+    const r = make();
+    struck(r);
+    withDeal(r, { since: at(22, 0, 3) });
+    seedRun(r, JOBS[0].id, 3, 'clean', at(20, 0, 3));
+    for (let i = 0; i < 5; i++) seedRun(r, JOBS[(i + 1) % 4].id, 4 + i, 'clean', at(21, 0, 4 + i));
+    expect(row(r)!.checks!.find((c) => c.id === 'jobs')!.progress).toBe('5/6');
+  });
+  it('review: chair=yes with no deal stored draws no row', () => {
+    const r = intakeRelay({ book: [CHAIR_Q, AGAIN, ...JOBS], trust: 5, clock: at(22, 0, 9) });
+    struck(r);
+    expect(row(r)).toBeUndefined();
+  });
+
+  it('final review I1: every ending of the shipped The Chair, again strikes the deal (a quest that ends without one never lists again)', () => {
+    const map = JSON.parse(fs.readFileSync('map/lowlight.json', 'utf8')) as { places: { id: string }[] };
+    const live = { roster: new Set(fs.readdirSync('characters')), places: new Set(map.places.map((p) => p.id)), decks: null };
+    const shipped = parseQuestFile('the-chair-again', fs.readFileSync('world/quests/the-chair-again.md', 'utf8'), live as never);
+    if (!shipped.ok) throw new Error(JSON.stringify(shipped.problems));
+    const endings = [...shipped.entry.outcomes.values()].filter((o) => o.to === 'end');
+    expect(endings.length).toBeGreaterThan(0);
+    for (const o of endings) expect(o.effects.arrangement, o.id).toBeDefined();
+  });
+
+  it('struck: row gone, cap 3', async () => {
+    const r = make();
+    struck(r);
+    record(r);
+    await r.relay.startQuest('hicks', 'the-chair-again');
+    await r.relay.chooseQuest('hicks', { id: 'the-chair-again', beat: 'offer', choice: 'deal' });
+    expect(row(r)).toBeUndefined();
+    expect(deal(r)).toMatchObject({ tier: 2, cut: 20, nights: 3 });
+  });
+});
+
+describe('her cut on the WALK card (final review deferred minor M6)', () => {
+  const PUSHES = `
+# push-1
+*The safe behind the desk is open.*
+
+- crack: Empty the safe. → won-1 / lost-1 [check reflex 50]
+- pocket: Take one bundle and go. → won-1
+
+## won-1
+*Folded notes.*
+pay: +150
+→ end
+
+## lost-1
+*Someone shouts.*
+lost
+→ end
+`;
+  const pushy = parse(JOB.replace('title: Back Door', 'title: push-job').replace('tier: 2', 'tier: 1').replace('starts: haes-noodles', 'starts: lowlight-intake').trimEnd() + '\n' + PUSHES, 'push-job');
+  const toCard = async (dealOn: boolean) => {
+    const r = intakeRelay({ book: [pushy], trust: dealOn ? 5 : 4, sol: 0, rolls: [66] });
+    withDeal(r);
+    expect(await r.relay.startQuest('hicks', 'push-job')).toMatchObject({ ok: true });
+    const run = () => parseRun(r.db.metaWithPrefix('quest.hicks.push-job@').at(-1)?.v ?? null)!;
+    await r.relay.chooseQuest('hicks', { id: 'push-job', beat: run().beat!, choice: 'wait' });
+    await r.relay.chooseQuest('hicks', { id: 'push-job', beat: 'desk', choice: 'grab' });
+    expect(run().beat).toBe('!push');
+    const gross = (run().kit ?? []).reduce((n, e) => n + (e.sol ?? 0), 0);
+    return { active: r.relay.questState('hicks').active!, gross };
+  };
+  it('in force: WALK shows the sol after her cut', async () => {
+    const { active, gross } = await toCard(true);
+    const net = gross - cutOf(gross, 25);
+    expect(active.choices[0].line).toBe(`WALK — ${net} SOL · HEAT +0`);
+    expect(active.push!.walk.sol).toBe(net);
+  });
+  it('suspended: WALK shows the whole sol', async () => {
+    const { active, gross } = await toCard(false);
+    expect(active.choices[0].line).toBe(`WALK — ${gross} SOL · HEAT +0`);
+  });
+});
+

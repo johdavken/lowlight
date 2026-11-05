@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import { SUGGEST_LINE_MAX, SUGGEST_STEER_MAX, cleanSuggestion, suggestPrompt, suggestSystem } from '../src/suggest';
+import { SUGGEST_LINE_MAX, SUGGEST_STEER_MAX, SUGGEST_THREADS_MAX, cleanSuggestion, openThreads, parseSuggestions, suggestPrompt, suggestSystem } from '../src/suggest';
 import { registerSuggestRoutes, type SuggestDeps } from '../src/suggest-routes';
 import { NarratorError } from '../src/scenario';
 
@@ -50,6 +50,56 @@ describe('suggestPrompt', () => {
   });
 });
 
+describe('suggestPrompt: the character, the steer, three angles and open threads', () => {
+  it('plays him as a person, keeps a steer whole, stops where someone else answers, never parrots', () => {
+    const sys = suggestSystem('Hicks');
+    expect(sys).toContain("Write Hicks as a person, not a winner");
+    expect(sys).toContain("Don't echo or repeat back what was just said to Hicks.");
+    expect(sys).toContain("keep that choice exactly: don't soften, reverse or water it down");
+    expect(sys).toContain('Stop where someone else would have to answer or react.');
+  });
+
+  it('asks for PLAIN, PUSH and TURN only with angles on', () => {
+    const [sys] = suggestPrompt({ ...base, angles: true });
+    for (const l of ['PLAIN:', 'PUSH:', 'TURN:']) expect(sys!.content).toContain(`\n${l}`);
+    expect(sys!.content).toContain('all three do it; they differ only in how');
+    const [one] = suggestPrompt(base);
+    expect(one!.content).not.toContain('PUSH:');
+    expect(one!.content).toContain('Answer with the line alone');
+  });
+
+  it('lists open threads before the scene, and none when there are none', () => {
+    const [, user] = suggestPrompt({ ...base, threads: ['Paper Trail: find the clerk', 'lead: a fence → Garro'] });
+    expect(user!.content).toContain('Open threads (TURN may pick one up; never invent how they turn out):\n- Paper Trail: find the clerk\n- lead: a fence → Garro');
+    expect(user!.content.indexOf('Open threads')).toBeLessThan(user!.content.indexOf('What just happened'));
+    expect(suggestPrompt({ ...base, threads: [] })[1]!.content).not.toContain('Open threads');
+  });
+});
+
+describe('openThreads', () => {
+  const none = { quest: null, plan: null, her: 'Nix', player: 'Hicks', leads: [], looseEnds: [] };
+  it('quest panel, plan card, held leads and loose ends, one line each, in that order', () => {
+    const t = openThreads({
+      ...none,
+      quest: { active: { title: 'Paper Trail', beat: 'counted-badly' } as { title: string }, waiting: null, elsewhere: [{ title: 'Cold Iron', contactName: 'Ines', next: null }] },
+      plan: { going: null, meet: { place: 'the Tilt', time: '23:00' } },
+      leads: [{ title: 'a fence', toName: 'Garro', place: 'the Spine', followed: false }],
+      looseEnds: [[{ text: 'old' }, { text: 'a burnt badge' }]],
+    });
+    // The beat is an id the player never sees: only the title goes.
+    expect(t.join(' ')).not.toContain('counted-badly');
+    expect(t).toEqual(['Paper Trail: under way', 'Cold Iron (with Ines)', 'Nix is meeting Hicks at the Tilt at 23:00', 'lead: a fence → Garro at the Spine', 'loose end: a burnt badge']);
+  });
+
+  it('skips followed leads, keeps two leads and two loose ends, and caps the whole', () => {
+    const lead = (n: number, followed = false) => ({ title: `L${n}`, toName: 'X', place: null, followed });
+    const t = openThreads({ ...none, leads: [lead(0, true), lead(1), lead(2), lead(3)], looseEnds: [[{ text: 'a' }], [{ text: 'b' }], [{ text: 'c' }]] });
+    expect(t).toEqual(['lead: L1 → X', 'lead: L2 → X', 'loose end: a', 'loose end: b']);
+    const many = openThreads({ ...none, quest: { active: null, waiting: null, elsewhere: Array.from({ length: 9 }, (_, i) => ({ title: `Q${i}`, contactName: 'Y', next: 'go' })) } });
+    expect(many).toHaveLength(SUGGEST_THREADS_MAX);
+  });
+});
+
 describe('suggestPrompt on the way somewhere (arrival screen spec §4)', () => {
   it('says where they are heading, before the steer', () => {
     const [, user] = suggestPrompt({ ...base, steer: 'the fence', travel: { from: 'the Tilt', to: 'the Low Roller', contact: 'Nix', comms: false } });
@@ -96,6 +146,50 @@ describe('cleanSuggestion', () => {
   });
 });
 
+describe('parseSuggestions', () => {
+  it('splits PLAIN, PUSH and TURN, bold or bulleted, each cleaned', () => {
+    const raw = 'PLAIN: *I nod.* "Fine."\n**PUSH:** "Pay me now."\n- TURN: Hicks: *I look at the door.* "Who else knows?"';
+    expect(parseSuggestions(raw, 'Hicks')).toEqual([
+      { angle: 'PLAIN', text: '*I nod.* "Fine."' },
+      { angle: 'PUSH', text: 'Pay me now.' },
+      { angle: 'TURN', text: '*I look at the door.* "Who else knows?"' },
+    ]);
+  });
+
+  it('numbered, bracketed, italic, dashed and one-line labels; an action keeps its asterisk', () => {
+    const want = [
+      { angle: 'PLAIN', text: 'a.' },
+      { angle: 'PUSH', text: 'b.' },
+      { angle: 'TURN', text: '*I look away.* c.' },
+    ];
+    for (const raw of [
+      '1. PLAIN: a.\n2. PUSH: b.\n3. TURN: *I look away.* c.',
+      '[PLAIN] - a.\n[PUSH] - b.\n[TURN] - *I look away.* c.',
+      '*PLAIN:* a.\n*PUSH:* b.\n*TURN:* *I look away.* c.',
+      '**PLAIN** — a.\n**PUSH** — b.\n**TURN** — *I look away.* c.',
+      'PLAIN (likely): a.\nPUSH: b.\nTURN: *I look away.* c.',
+      'PLAIN: a. PUSH: b. TURN: *I look away.* c.',
+      'Here are three:\nPLAIN: a.\nPUSH: b.\nTURN: *I look away.* c.\n\n(Each keeps the choice.)',
+    ])
+      expect(parseSuggestions(raw, 'Hicks')).toEqual(want);
+  });
+
+  it('an unlabelled first line is kept when fewer than three labels came; a word in lower case never splits', () => {
+    expect(parseSuggestions('a.\nPUSH: b.\nTURN: c.', 'Hicks')).toEqual([
+      { angle: null, text: 'a.' },
+      { angle: 'PUSH', text: 'b.' },
+      { angle: 'TURN', text: 'c.' },
+    ]);
+    expect(parseSuggestions('PLAIN: *I point.* Turn: left at the rail.', 'Hicks')).toEqual([{ angle: 'PLAIN', text: '*I point.* Turn: left at the rail.' }]);
+  });
+
+  it('no labels is one unlabelled draft; empty pieces and another speaker are dropped', () => {
+    expect(parseSuggestions('Hicks: "Fine."', 'Hicks')).toEqual([{ angle: null, text: 'Fine.' }]);
+    expect(parseSuggestions('PLAIN:\nPUSH: "No."\nNix: "Yes."', 'Hicks', ['Nix'])).toEqual([{ angle: 'PUSH', text: 'No.' }]);
+    expect(parseSuggestions('   ', 'Hicks')).toEqual([]);
+  });
+});
+
 describe('POST /api/suggest', () => {
   async function app(over: Partial<SuggestDeps> = {}) {
     const narrate = vi.fn(async () => 'Hicks: *I sit.* "Fine."');
@@ -117,10 +211,16 @@ describe('POST /api/suggest', () => {
   it('returns the cleaned line, passing the steer on', async () => {
     const { post, promptFor } = await app();
     const r = await post({ ai: 'nix-direct', steer: '  say yes  ' });
-    expect([r.statusCode, r.json()]).toEqual([200, { text: '*I sit.* "Fine."' }]);
+    expect([r.statusCode, r.json()]).toEqual([200, { text: '*I sit.* "Fine."', drafts: [{ angle: null, text: '*I sit.* "Fine."' }] }]);
     expect(promptFor).toHaveBeenCalledWith('nix-direct', 'say yes');
     await post({ ai: 'nix-direct', steer: '   ' });
     expect(promptFor).toHaveBeenLastCalledWith('nix-direct', null);
+  });
+
+  it('returns the three angles, the first as text', async () => {
+    const narrate = vi.fn(async () => 'PLAIN: "Fine."\nPUSH: "Now."\nTURN: "The badge?"');
+    const r = await (await app({ target: () => ({ kind: 'direct', ready: () => true, narrate }) })).post({ ai: 'nix-direct' });
+    expect(r.json()).toEqual({ text: 'Fine.', drafts: [{ angle: 'PLAIN', text: 'Fine.' }, { angle: 'PUSH', text: 'Now.' }, { angle: 'TURN', text: 'The badge?' }] });
   });
 
   it('passes a travel on to the prompt, and refuses a bad one', async () => {
@@ -162,7 +262,7 @@ describe('POST /api/suggest', () => {
   it('an empty answer is retried once, then 502 with the kind', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const retried = vi.fn().mockResolvedValueOnce('  ').mockResolvedValueOnce('Fine.');
-    expect((await (await app({ target: () => ({ kind: 'direct', ready: () => true, narrate: retried }) })).post({ ai: 'nix-direct' })).json()).toEqual({ text: 'Fine.' });
+    expect((await (await app({ target: () => ({ kind: 'direct', ready: () => true, narrate: retried }) })).post({ ai: 'nix-direct' })).json()).toEqual({ text: 'Fine.', drafts: [{ angle: null, text: 'Fine.' }] });
     const failing = vi.fn().mockResolvedValueOnce('').mockRejectedValueOnce(new NarratorError('timeout', 'no answer in 45 s'));
     const r = await (await app({ target: () => ({ kind: 'direct', ready: () => true, narrate: failing }) })).post({ ai: 'nix-direct' });
     expect([r.statusCode, r.json()]).toEqual([502, { error: 'failed', kind: 'timeout', why: 'no answer in 45 s' }]);

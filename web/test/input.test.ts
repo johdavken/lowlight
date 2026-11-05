@@ -366,81 +366,52 @@ describe('DICE in the scene stack', () => {
 });
 
 describe('SUGGEST', () => {
-  function suggestSetup(suggest = vi.fn(async (_steer: string | null) => '*I sit.* "Fine."')) {
+  function suggestSetup() {
     document.body.innerHTML = '';
     const root = document.createElement('div');
     document.body.appendChild(root);
     const send = vi.fn();
+    const suggest = vi.fn<(steer: string | null) => void>();
     const handle = mountInput(root, send, { suggest });
     const btn = root.querySelector('button.suggest') as HTMLButtonElement;
     const ta = root.querySelector('textarea')!;
-    const hint = () => root.querySelector('.hint')!.textContent;
-    return { root, send, handle, btn, ta, suggest, hint };
+    return { root, send, handle, btn, ta, suggest };
   }
-  const settle = () => new Promise((r) => setTimeout(r, 0));
 
-  it('Alt+G drafts into the empty box, unsent, and is not typed', async () => {
+  it('Alt+G opens the drafts with no steer; nothing is sent or typed', () => {
     const { ta, send, suggest, btn } = suggestSetup();
     expect(btn.title).toContain('Alt+G');
     const e = new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', altKey: true, bubbles: true, cancelable: true });
     window.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(true);
-    await settle();
     expect(suggest).toHaveBeenCalledWith(null);
-    expect(ta.value).toBe('*I sit.* "Fine."');
+    expect(ta.value).toBe('');
     expect(send).not.toHaveBeenCalled();
   });
 
-  it('what is typed is the steer, and the draft replaces it', async () => {
+  it('what is typed is the steer, and the box keeps it', () => {
     const { ta, btn, suggest } = suggestSetup();
     ta.value = '  tell her no ';
     btn.click();
-    await settle();
     expect(suggest).toHaveBeenCalledWith('tell her no');
-    expect(ta.value).toBe('*I sit.* "Fine."');
+    expect(ta.value).toBe('  tell her no ');
   });
 
-  it('while drafting it pulses and says so; a second press waits; typing meanwhile is kept after the draft', async () => {
-    let finish: (s: string) => void = () => {};
-    const suggest = vi.fn(() => new Promise<string>((r) => (finish = r)));
-    const { ta, btn, hint } = suggestSetup(suggest);
+  it('setDraft replaces the box to edit; suggestWhyNot says why not', () => {
+    const { ta, handle } = suggestSetup();
     ta.value = 'steer';
-    btn.click();
-    expect(btn.classList.contains('working')).toBe(true);
-    expect(hint()).toBe('// DRAFTING YOUR LINE');
-    btn.click();
-    expect(suggest).toHaveBeenCalledTimes(1);
-    ta.value = 'steer and more';
-    finish('Draft.');
-    await settle();
-    expect(ta.value).toBe('Draft.\nand more');
-    expect(btn.classList.contains('working')).toBe(false);
-    expect(hint()).toContain('[ENTER] SEND');
-  });
-
-  it('a draft that lands after a send is dropped', async () => {
-    let finish: (s: string) => void = () => {};
-    const { ta, btn, send } = suggestSetup(vi.fn(() => new Promise<string>((r) => (finish = r))));
-    btn.click();
-    ta.value = 'sent anyway';
-    ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
-    expect(send).toHaveBeenCalledWith('sent anyway', 'rp');
-    finish('Too late.');
-    await settle();
-    expect(ta.value).toBe('');
-  });
-
-  it('a failure leaves the box alone and says why in the hint for a while', async () => {
-    vi.useFakeTimers();
-    const { ta, btn, hint } = suggestSetup(vi.fn(async () => Promise.reject(new Error('NO CREDIT ON THE KEY'))));
-    ta.value = 'my steer';
-    btn.click();
-    await vi.advanceTimersByTimeAsync(0);
-    expect(ta.value).toBe('my steer');
-    expect(hint()).toBe('// NO LINE: NO CREDIT ON THE KEY');
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(hint()).toContain('[ENTER] SEND');
-    vi.useRealTimers();
+    handle.setDraft('*I nod.* Fine.');
+    expect(ta.value).toBe('*I nod.* Fine.');
+    expect(document.activeElement).toBe(ta);
+    expect(handle.suggestWhyNot()).toBeNull();
+    handle.setBusy(true);
+    expect(handle.suggestWhyNot()).toBe('Wait for her to finish.');
+    handle.setBusy(false);
+    handle.setWalkOut(true);
+    expect(handle.suggestWhyNot()).toBe('Walk out, or stay first.');
+    expect(document.querySelector<HTMLButtonElement>('button.suggest')!.disabled).toBe(true);
+    handle.setWalkOut(false);
+    expect(document.querySelector<HTMLButtonElement>('button.suggest')!.disabled).toBe(false);
   });
 
   it('waits while she transmits, in OOC, or without her link', () => {

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { mapIds } from '../lore';
 import { parseMap } from '../map-schema';
-import { briefId, dealJobs, gigActionLine, gigFile, gigKind, gigText, looseBrief, parseGigFile, parseGigSnapshot, RESULTS_FOR, tierMax, type Brief, type GigSnapshot } from './brief';
+import { briefId, dealJobs, gigActionLine, gigFile, gigKind, gigText, looseBrief, parseGigFile, parseGigSnapshot, RESULTS_FOR, type Brief, type GigSnapshot } from './brief';
 
 const map = parseMap(JSON.parse(fs.readFileSync('map/lowlight.json', 'utf8')));
 if (!map.ok) throw new Error('the shipped map should parse');
@@ -13,20 +13,21 @@ const file = (front: Record<string, string>, body = 'A job.') =>
   `---\n${Object.entries(front)
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n')}\n---\n${body}\n`;
-const good = { title: 'Held Pay', tier: 'hard', place: 'the-tilt', client: 'Nobody', target: 'Glass Orchid · house ledger', take: 'a payout' };
+const good = { title: 'Held Pay', tier: 'hard', kind: 'papers', place: 'the-tilt', client: 'Nobody', target: 'Glass Orchid · house ledger', take: 'a payout' };
 
 describe('parseGigFile', () => {
-  test('the six seed briefs parse, three per gig place, one per tier', () => {
+  test('the ten seed briefs parse, all papers: nine at the Ferry Stairs, one at the Tilt (hack and slip went 2026-11-01)', () => {
     const names = fs.readdirSync('world/gigs').filter((n) => n.endsWith('.md'));
     const all = names.map((n) => {
       const r = parseGigFile(n.slice(0, -3), fs.readFileSync(path.join('world/gigs', n), 'utf8'), ids);
       if (!r.ok) throw new Error(`${n}: ${JSON.stringify(r.problems)}`);
       return r.brief;
     });
-    const briefs = all.filter((b) => gigKind(b) === 'hack');
-    expect(briefs.map((b) => `${b.id}.md`).sort()).toEqual(['escort-route.md', 'four-oclock.md', 'held-pay.md', 'line-item.md', 'rerun.md', 'wrong-crate.md']);
-    for (const place of ['the-tilt', 'public-landing']) expect(briefs.filter((b) => b.place === place).map((b) => b.tier).sort()).toEqual(['easy', 'hard', 'medium']);
-    expect(briefs.find((b) => b.id === 'held-pay')).toMatchObject({ title: 'Held Pay', tier: 'hard', place: 'the-tilt', client: 'Nobody, through the Switchboard' });
+    expect(all).toHaveLength(10);
+    expect(all.every((b) => gigKind(b) === 'papers')).toBe(true);
+    expect(all.filter((b) => b.place === 'ferry-stairs')).toHaveLength(9);
+    expect(all.filter((b) => b.place === 'the-tilt').map((b) => b.id)).toEqual(['paper-for-a-cousin']);
+    expect(all.find((b) => b.id === 'first-boat')).toMatchObject({ title: 'First Boat', tier: 'easy', place: 'ferry-stairs' });
   });
   test.each([
     ['title', 'x'.repeat(41)],
@@ -115,7 +116,7 @@ describe('gigFile, looseBrief, briefId (Studio GIGS tab)', () => {
     }
   });
   test('awkward YAML in every field round-trips (Review Focus 1)', () => {
-    const awkward: Brief = { id: 'odd', title: 'Rates: high', tier: 'medium', place: 'the-tilt', client: '#1 fixer', target: '- dash · "quoted"', take: 'yes', text: "2049 Crew's job: don't ask." };
+    const awkward: Brief = { id: 'odd', title: 'Rates: high', tier: 'medium', kind: 'papers', place: 'the-tilt', client: '#1 fixer', target: '- dash · "quoted"', take: 'yes', text: "2049 Crew's job: don't ask." };
     expect(parseGigFile('odd', gigFile(awkward), ids)).toEqual({ ok: true, brief: awkward });
     for (const v of ['2049 Crew', 'no', "it's", 'a: b']) {
       const b = { ...awkward, client: v };
@@ -123,12 +124,12 @@ describe('gigFile, looseBrief, briefId (Studio GIGS tab)', () => {
     }
   });
   test('the front matter is in field order', () => {
-    const r = parseGigFile('held-pay', fs.readFileSync('world/gigs/held-pay.md', 'utf8'), ids);
+    const r = parseGigFile('first-boat', fs.readFileSync('world/gigs/first-boat.md', 'utf8'), ids);
     if (!r.ok) throw new Error('seed');
     const lines = gigFile(r.brief).split('\n');
-    expect([lines[0], lines[7]]).toEqual(['---', '---']);
-    expect(lines.slice(1, 7).map((l) => l.split(':')[0])).toEqual(['title', 'tier', 'place', 'client', 'target', 'take']);
-    expect(lines.slice(1, 4)).toEqual(['title: Held Pay', 'tier: hard', 'place: the-tilt']);
+    expect([lines[0], lines[8]]).toEqual(['---', '---']);
+    expect(lines.slice(1, 8).map((l) => l.split(':')[0])).toEqual(['title', 'tier', 'kind', 'place', 'client', 'target', 'take']);
+    expect(lines.slice(1, 5)).toEqual(['title: First Boat', 'tier: easy', 'kind: papers', 'place: ferry-stairs']);
     expect(gigFile(r.brief).endsWith('\n')).toBe(true);
   });
   test('briefId: from the title, unique, capped, never empty', () => {
@@ -150,31 +151,20 @@ describe('kinds (Slip)', () => {
     `---\ntitle: Back Office\ntier: medium\n${kind === null ? '' : `kind: ${kind}\n`}place: the-tilt\nclient: A worker\ntarget: Glass Orchid · back office\ntake: a ledger page\n---\nIn and out.\n`;
   const slipSnap: GigSnapshot = { ...snap, kind: 'slip', tier: 'medium', result: 'clean', trace: 0, max: 8 };
 
-  test('kind defaults to hack; kind: slip parses; kind: heist is a problem on kind', () => {
-    const plain = parseGigFile('back-office', file(null), ids);
-    expect(plain.ok && gigKind(plain.brief)).toBe('hack');
-    const slip = parseGigFile('back-office', file('slip'), ids);
-    expect(slip.ok && slip.brief.kind).toBe('slip');
+  test('hack and slip are gone: no kind, kind: slip and kind: hack are problems on kind; kind: heist too', () => {
+    for (const k of [null, 'slip', 'hack']) {
+      const r = parseGigFile('back-office', file(k), ids);
+      expect(!r.ok && r.problems).toEqual([{ field: 'kind', message: 'hack and slip are gone: a job here is kind: papers' }]);
+    }
+    expect(parseGigFile('back-office', file('papers'), ids).ok).toBe(true);
     const bad = parseGigFile('back-office', file('heist'), ids);
     expect(bad.ok).toBe(false);
     expect(!bad.ok && bad.problems.map((p) => p.field)).toContain('kind');
   });
 
-  test('gigFile round-trips both kinds and writes no kind line for a hack', () => {
-    const slip = parseGigFile('back-office', file('slip'), ids);
-    if (!slip.ok) throw new Error('slip did not parse');
-    const text = gigFile(slip.brief);
-    expect(text).toContain('\ntier: medium\nkind: slip\n');
-    expect(parseGigFile('back-office', text, ids)).toEqual(slip);
-    const hack = parseGigFile('back-office', file(null), ids);
-    if (!hack.ok) throw new Error('hack did not parse');
-    expect(gigFile(hack.brief)).not.toContain('kind:');
-    expect(looseBrief('x', file('slip'), ids).kind).toBe('slip');
-  });
-
-  test('tierMax and the results each kind can end in', () => {
-    expect([tierMax('hack', 'easy'), tierMax('hack', 'hard'), tierMax('slip', 'easy'), tierMax('slip', 'hard')]).toEqual([10, 14, 6, 10]);
+  test('the results each kind can end in (old saves still read hack and slip results)', () => {
     expect(RESULTS_FOR).toEqual({ hack: ['clean', 'close', 'traced'], slip: ['clean', 'close', 'caught'], papers: ['clean', 'close', 'back'] });
+    expect(looseBrief('x', file('slip'), ids).kind).toBe('slip');
   });
 
   test('parseGigSnapshot: no kind is a hack; slip with caught is fine; slip with traced and hack with caught are not', () => {

@@ -307,8 +307,8 @@ describe('knownContacts arrangement (spec 2026-10-20 §3)', () => {
     return knownContacts(chars, playthrough(), ROSTER, { ...names, standing: stand }).find((c) => c.id === 'cass')!;
   };
   it('a deal at high trust is active; below, it stepped back; none, null', () => {
-    expect(dealDb(5).arrangement).toEqual({ retainer: 150, nights: 1, active: true });
-    expect(dealDb(4).arrangement).toEqual({ retainer: 150, nights: 1, active: false });
+    expect(dealDb(5).arrangement).toEqual({ cut: 25, nights: 1, tier: 1, active: true });
+    expect(dealDb(4).arrangement).toEqual({ cut: 25, nights: 1, tier: 1, active: false });
     expect(dealDb(null).arrangement ?? null).toBeNull();
   });
 });

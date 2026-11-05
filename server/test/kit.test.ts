@@ -88,11 +88,11 @@ describe('the kit across the playthrough', () => {
     const res = await s.built.app.inject({ method: 'GET', url: '/api/kit' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({
-      kit: { deck: null, sol: 0, heat: 0, heatHere: 0, hottest: null, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, edgeLeft: 1, edgeMax: 1, stats: DEFAULT_STATS, crewLatest: null },
+      kit: { deck: null, owned: [], sol: 0, heat: 0, heatHere: 0, here: null, heatBy: {}, hottest: null, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: 5, nerveMax: 5, stats: DEFAULT_STATS, crewLatest: null, crewPicks: false },
     });
   });
 
-  it('GET /api/kit: heat in the room you stand in, and the hottest district', async () => {
+  it('GET /api/kit: heat in the room you stand in, every district with heat, and the hottest', async () => {
     const s = await start();
     const player = s.pt.player;
     const nix = s.open(s.pt.id, 'nix');
@@ -102,7 +102,7 @@ describe('the kit across the playthrough', () => {
     nix.setMeta(questKey(player, 'job-a@0'), runWith([{ at: 1300, heat: 2, district: 'karasu' }, { at: 1300, heat: 5, district: 'velvet' }, { at: 1300, rep: { district: 'karasu', delta: 25 } }]));
     nix.setReplyStamp(null);
     const kit = JSON.parse((await s.built.app.inject({ method: 'GET', url: '/api/kit' })).body).kit;
-    expect(kit).toMatchObject({ heatHere: 2, hottest: { district: 'velvet', heat: 5 }, rep: { karasu: 25 } });
+    expect(kit).toMatchObject({ heatHere: 2, here: 'karasu', heatBy: { karasu: 2, velvet: 5 }, hottest: { district: 'velvet', heat: 5 }, rep: { karasu: 25 } });
   });
 
   it('kitOf folds fixer purchases with runs', async () => {

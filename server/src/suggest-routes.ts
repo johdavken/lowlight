@@ -1,10 +1,10 @@
-/** POST /api/suggest: the player character's next line, drafted by her model for the chat box (never sent). */
+/** POST /api/suggest: the player character's next line, drafted by her model for the chat box (never sent): `drafts` (three angles in a scene), `text` the first. */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { NarratorKind } from '../../shared/narrator';
 import type { CompletionMessage } from './turn';
 import { NarratorError } from './scenario';
 import type { ScenarioDeps } from './scenario-routes';
-import { cleanSuggestion } from './suggest';
+import { parseSuggestions } from './suggest';
 
 export interface SuggestDeps extends Pick<ScenarioDeps, 'originAllowed' | 'busy' | 'target'> {
   /** The draft's request for `ai`'s room as it stands, with the player's name and everyone else's; null when there's no such room. */
@@ -60,8 +60,8 @@ export function registerSuggestRoutes(app: FastifyInstance, deps: SuggestDeps): 
       why = 'the answer was empty';
       kind = 'bad-answer';
       try {
-        const text = cleanSuggestion(await target.narrate(prompt.messages), prompt.player, prompt.others);
-        if (text) return { text };
+        const drafts = parseSuggestions(await target.narrate(prompt.messages), prompt.player, prompt.others);
+        if (drafts.length > 0) return { text: drafts[0]!.text, drafts };
       } catch (err) {
         const status = (err as { status?: unknown }).status;
         if (status === 401 || status === 403) return reply.code(409).send({ error: 'key-rejected' });

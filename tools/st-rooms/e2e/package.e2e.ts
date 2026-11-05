@@ -204,6 +204,13 @@ async function runAccepted() {
     // The key presses above unlocked the sound: the rain is the recording, not the engine's synthesized noise.
     const rain = await until(page, "window.lowlightRoom?.audio?.state?.().rain === 'recorded'", 20_000);
     check('the rain is the recording, not synthesized', rain, String(await page.evaluate("window.lowlightRoom?.audio?.state?.().rain")));
+    // The rooms' own beds ship in the package: the Noodle Stall's street, sizzle and crowd plays under it.
+    await page.evaluate("SillyTavern.getContext().executeSlashCommandsWithOptions('/room noodle-stall')");
+    const bed = await until(page, "(window.lowlightRoom?.audio?.state?.().voices ?? []).includes('bed')", 20_000);
+    check("a room's own bed plays (the Noodle Stall)", bed, JSON.stringify(await page.evaluate("window.lowlightRoom?.audio?.state?.().voices")));
+    await page.evaluate("SillyTavern.getContext().executeSlashCommandsWithOptions('/room lowlight-intake')");
+    await until(page, "/\\[room: lowlight-intake/.test(window.lowlightRoomTools.line())", 15_000);
+    await page.waitForTimeout(1500);
 
     // Her tools: the room follows, is saved on the message, and comes back after a reload.
     const tools = await inPage<any>(page, async () => {

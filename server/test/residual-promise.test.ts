@@ -119,3 +119,10 @@ describe('when promises apply', () => {
     expect(promisesApply(reply, line({ mode: 'end', leave: true, parting: 'her' }))).toBe(false);
   });
 });
+
+describe('notes leave jobs to the game (the hand)', () => {
+  it('NOTES says a job done together is remembered already: note only what it revealed or changed', () => {
+    const [sys] = residualMessages(input({ clock: 4030 }));
+    expect(sys.content).toContain('Jobs done together are remembered already (the [done together: …] line)');
+  });
+});

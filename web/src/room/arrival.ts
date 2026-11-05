@@ -80,6 +80,8 @@ const HINT = {
   travel: 'Leave it empty and you just go. Typed words steer SUGGEST.',
 } as const;
 const DRAFTING = 'SUGGEST IS DRAFTING';
+/** Enter on an opening before the room is up. */
+const ROOM_LOADING = 'THE ROOM IS STILL LOADING';
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string) => {
   const n = document.createElement(tag);
@@ -101,6 +103,16 @@ export function createArrival(
     fetchDistrict: (sceneId: string) => Promise<DistrictInfo | null>;
     /** SUGGEST: resolves with the draft or rejects with Error(copy). Absent: no SUGGEST key. */
     suggest?: (steer: string | null) => Promise<string>;
+    /**
+     * The opening's SUGGEST: opens three openings over the screen (a cards panel in `host`), steered by
+     * what's typed, in place of `suggest`'s one draft. `start` plays one (a refusal's words while the
+     * room loads), `edit` puts one in the box, `close` drops the panel.
+     */
+    openings?: (
+      host: HTMLElement,
+      steer: string | null,
+      h: { start(text: string): string | null; edit(text: string): void; close(): void },
+    ) => { key(e: KeyboardEvent): boolean; destroy(): void };
     /** Present: this is a travel screen. */
     travel?: ArrivalTravel;
     /** Travel: the italic line she'll read. */
@@ -123,6 +135,8 @@ export function createArrival(
   let state: IntroState = 'waiting';
   let sceneSet = false;
   let roomReady = false;
+  /** The opening's three openings, while they're up: they have the keyboard. */
+  let cards: { key(e: KeyboardEvent): boolean; destroy(): void } | null = null;
   let startedAt = 0;
   let roomName = '';
   let clock: number | null = null;
@@ -197,13 +211,13 @@ export function createArrival(
     wrap.append(head, area, el('div', 'ar-hint', HINT[m]), fail);
     notice.before(wrap);
     let suggest: HTMLButtonElement | null = null;
-    if (o.suggest) {
+    if (o.suggest || (m === 'opening' && o.openings)) {
       suggest = el('button', 'ar-suggest', 'SUGGEST');
       suggest.type = 'button';
       suggest.append(el('small', '', 'ALT+G'));
       suggest.addEventListener('click', (e) => {
         e.stopPropagation();
-        draftNow();
+        suggestNow();
       });
       keys.append(suggest);
     }
@@ -284,6 +298,8 @@ export function createArrival(
     if (modeFallback) clearTimeout(modeFallback);
     if (moveStuck) clearTimeout(moveStuck);
     window.removeEventListener('keydown', onKey, { capture: true });
+    cards?.destroy();
+    cards = null;
     if (document.activeElement instanceof HTMLElement && root.contains(document.activeElement)) document.activeElement.blur();
     if (o.reducedMotion) root.remove();
     else {
@@ -326,6 +342,40 @@ export function createArrival(
     for (const cb of backers) cb();
   }
 
+  function closeCards(): void {
+    if (!cards) return;
+    cards.destroy();
+    cards = null;
+    focusBox();
+  }
+  /** SUGGEST / Alt+G: on the opening, three openings over the screen; else one draft into the box. */
+  function suggestNow(): void {
+    if (mode === 'opening' && o.openings) return openCards();
+    draftNow();
+  }
+  function openCards(): void {
+    if (!o.openings || !box || cards || state === 'closed') return;
+    const b = box;
+    b.area.blur();
+    b.fail.textContent = '';
+    cards = o.openings(stage, b.area.value.trim() || null, {
+      // Enter on a card: as if it were typed and ENTER pressed, once the room is up.
+      start: (text) => {
+        if (state !== 'ready') return ROOM_LOADING;
+        cards?.destroy();
+        cards = null;
+        b.area.value = text;
+        send();
+        return null;
+      },
+      edit: (text) => {
+        b.area.value = text;
+        closeCards();
+      },
+      close: closeCards,
+    });
+  }
+
   function draftNow(): void {
     if (!o.suggest || !box || drafting || sending || state === 'closed') return;
     const b = box;
@@ -357,6 +407,17 @@ export function createArrival(
   function onKey(e: KeyboardEvent): void {
     if (state === 'closed') return;
     if (o.paused?.()) return;
+    // The three openings have every key while they're up: nothing on the screen or below it hears one.
+    // Browser shortcuts (Ctrl/Cmd, the F keys: a reload, the bug report) still pass, as they do below.
+    if (cards) {
+      if ((e.ctrlKey || e.metaKey || /^F\d+$/.test(e.key)) && e.key !== 'Enter') return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.repeat && e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      cards.key(e);
+      return;
+    }
     const plain = !e.ctrlKey && !e.metaKey && !e.altKey;
     // In the box: it types (Ctrl+V pastes, Shift+Enter breaks a line), and nothing under the screen hears it.
     if (box && e.target === box.area) {
@@ -370,7 +431,7 @@ export function createArrival(
         goBack();
       } else if (e.altKey && (e.key === 'g' || e.key === 'G')) {
         e.preventDefault();
-        draftNow();
+        suggestNow();
       }
       return;
     }
@@ -386,7 +447,7 @@ export function createArrival(
     e.preventDefault();
     if (e.repeat) return;
     if (e.key === 'Escape') return goBack();
-    if (e.altKey && (e.key === 'g' || e.key === 'G')) return draftNow();
+    if (e.altKey && (e.key === 'g' || e.key === 'G')) return suggestNow();
     if (!plain) return;
     if (mode === 'opening' || mode === 'travel') {
       if (e.key === 'Enter') send();
@@ -400,7 +461,7 @@ export function createArrival(
   });
   // A click anywhere but a key puts the caret back in the box, so typing never goes nowhere (review M6).
   root.addEventListener('mousedown', (e) => {
-    if (!box || state === 'closed' || (e.target instanceof Element && e.target.closest('button, textarea'))) return;
+    if (!box || cards || state === 'closed' || (e.target instanceof Element && e.target.closest('button, textarea'))) return;
     e.preventDefault();
     focusBox();
   });

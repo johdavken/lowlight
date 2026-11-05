@@ -111,6 +111,7 @@
     }
   },
   "standing": {
+    "vouches": "ears",
     "start": {
       "trust": 0,
       "warmth": 1

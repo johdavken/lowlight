@@ -43,26 +43,6 @@ describe('the nightly board', () => {
   });
 });
 
-describe('postedBig', async () => {
-  const { postedBig } = await import('./board');
-  const { parseQuestFile } = await import('./quests');
-  const { BIG } = await import('./quests.fixture');
-  const bigOf = (id: string, tier: 3 | 4) => {
-    const r = parseQuestFile(id, BIG.replace('tier: 3', `tier: ${tier}`), { roster: null, places: null });
-    if (!r.ok) throw new Error(JSON.stringify(r.problems));
-    return r.entry;
-  };
-  const book = [bigOf('gate-a', 3), bigOf('gate-b', 3), bigOf('gate-c', 4)];
-  it('none below Trusted; one at tier 3 (never the tier-4 one); tier-4 jobs only at tier 4; seeded', () => {
-    expect(postedBig({ book, place: 'haes-noodles', tier: 2, day: 1, seed: 's' })).toBeNull();
-    for (let d = 0; d < 20; d++) expect(['gate-a', 'gate-b']).toContain(postedBig({ book, place: 'haes-noodles', tier: 3, day: d, seed: 's' }));
-    const at4 = new Set(Array.from({ length: 30 }, (_, d) => postedBig({ book, place: 'haes-noodles', tier: 4, day: d, seed: 's' })));
-    expect(at4.has('gate-c')).toBe(true);
-    expect(postedBig({ book, place: 'haes-noodles', tier: 3, day: 5, seed: 's' })).toBe(postedBig({ book, place: 'haes-noodles', tier: 3, day: 5, seed: 's' }));
-    expect(postedBig({ book, place: 'the-tilt', tier: 4, day: 1, seed: 's' })).toBeNull();
-  });
-});
-
 describe('own jobs (Intake board spec §1)', () => {
   it('at most two of one contact\'s own jobs post', () => {
     const own = (id: string) => ({ ...job(id, 1), with: ['nix-direct'] }) as QuestEntry;
@@ -72,5 +52,14 @@ describe('own jobs (Intake board spec §1)', () => {
       expect(ids).toHaveLength(2);
       for (const id of ids) expect(['h1', 'h2', 'h3', 'h4']).toContain(id);
     }
+  });
+});
+
+describe('spring files (crew spec §5)', () => {
+  it('postedJobs never draws a spring file, and it isn’t a board', () => {
+    const spring = { id: 'spring-quiet', kind: 'mission', spring: true, starts: '', tier: 1 } as QuestEntry;
+    const plain = { id: 'back-door', kind: 'mission', starts: 'the-tilt', tier: 1 } as QuestEntry;
+    expect(postedJobs({ book: [spring, { ...spring, starts: 'the-tilt' }, plain], place: 'the-tilt', tier: 4, day: 0, seed: 's' })).toEqual(['back-door']);
+    expect(boardPlaces([spring, plain])).toEqual(['the-tilt']);
   });
 });

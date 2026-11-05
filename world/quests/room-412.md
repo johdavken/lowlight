@@ -1,12 +1,13 @@
 ---
 title: Room 412
+art: room-412.webp
 kind: mission
 tier: 1
-with: [nix-direct, cass, hicks, ember, silas]
+take-size: 4
 starts: under-the-cat
 after: null
 pitch: A guest checked out in a hurry and left a case in the room safe. Get it before the cleaners at six.
-pay: 220-300
+pay: 90-110
 draw complication: none | cleaner-early | guest-came-back
 draw cleaner: easy | hard
 ---
@@ -25,7 +26,7 @@ draw cleaner: easy | hard
 [complication=cleaner-early] *A cleaning trolley stands outside 410. Someone inside is singing along to a radio.*
 
 - key: Use the master card you were given. → door
-- lock: Work the lock yourself, quietly. → door / seen [check tech 40 · ember +10, set quiet=yes]
+- lock: Work the lock yourself, quietly. → door / seen [check tech 40 · ember +10 · rue +10, set quiet=yes]
 
 ## door
 *The lock blinks green. Inside, the bed's made and the wardrobe's open and empty.*
@@ -39,6 +40,7 @@ heat: +1
 # room
 
 stranger: The cleaner — sixty, unhurried, and nobody's fool
+face: local-07
 temper: cleaner
 
 *The safe's in the wardrobe, bolted to the floor. Behind you the room door opens. It's the cleaner, with an armful of towels, looking at you and the safe in that order.*
@@ -46,9 +48,9 @@ temper: cleaner
 [complication=guest-came-back] *Out in the corridor a man's voice is asking the lift why it's so slow. He sounds like he's in a hurry.*
 [cool 6] *She's not frightened. She's deciding how much this is worth to her.*
 
-- talk: Tell her you're the guest's brother. → open / screams [check cool 45 · if quiet +10 "she didn't hear you come in"]
-- pay: Fold a note into her hand. → open [clock +20m, set paid=yes]
-- code: Ignore her and punch the default code. → open / stuck [check tech 45 grid · silas +10, alarm +1]
+- talk: Tell the cleaner you're the guest's brother. → open / screams [check cool 45 · if quiet +10 "she didn't hear you come in"]
+- pay: Fold a note into the cleaner's hand. → open [clock +20m, set paid=yes]
+- code: Ignore the cleaner and punch the default code. → open / stuck [check tech 45 grid · silas +10 · rue +10, alarm +1]
 
 ## open
 *The safe door swings out. One hard case, heavier than it looks.*
@@ -69,8 +71,8 @@ take: none
 
 *There are two security men at the lift now and one on the stairs. The window at the end of the corridor opens onto the fire escape, and the rain.*
 
-- window: Go out the window and down the fire escape. → gone / dropped [check body 50]
-- lift: Walk to the lift and bluff. → gone / dropped [check cool 50 · nix-direct +15]
+- window: Go out the window and down the fire escape. → gone / dropped [check body 50 · ines +10]
+- lift: Walk to the lift and bluff. → gone / dropped [check cool 50 · nix-direct +15 · soren +10]
 
 # out
 

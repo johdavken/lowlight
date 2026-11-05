@@ -3,7 +3,7 @@
  * rules, and bracket pairs that strike duds or reset tries. Pure and seeded: the server and the browser
  * build the same terminal from the same seed, and the server scores the moves (plan ruling 3).
  */
-import { rng } from './gig/generate';
+import { rng } from './rng';
 import type { DeckSkin } from './gear';
 
 /** The terminal's look (deck skins spec): the deck's skin, or `corp` for a corporate terminal. */
@@ -19,7 +19,7 @@ export interface Terminal {
   words: { word: string; line: number; col: number }[];
   brackets: { line: number; from: number; to: number }[];
   password: string;
-  /** Duds struck before the first move (a strong deck). */
+  /** Duds struck before the first move (a quality-3+ deck). */
   struck: string[];
   /** One letter of the password shown (a ghost deck). */
   ghost: { index: number; letter: string } | null;

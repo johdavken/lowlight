@@ -1,0 +1,148 @@
+/* The deck's holo look (in-game texts spec §2): the room's TEXTS pane, the crack terminal's holo skin (pink glass,
+   cyan for you, VT323, no scanlines). Everything sits under .dk-holo; the phone (deck.css) is untouched. */
+.dk-holo {
+  --dk-pink: #ff4f8b;
+  --dk-cyan: #7fe9ff;
+  --dk-ink: #ffd9e6;
+  --dk-dim: rgba(255, 217, 230, 0.6);
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  color: var(--dk-ink);
+  font: 20px 'VT323', monospace;
+}
+
+/* One bar across the pane; the list's and the thread's own bars are the phone's. */
+.dk-holo > .dk-bar {
+  padding: 8px 14px 6px;
+  color: var(--dk-pink);
+  font: 18px 'VT323', monospace;
+  letter-spacing: 0.16em;
+}
+.dk-holo .dk-cols .dk-bar,
+.dk-holo .dk-title {
+  display: none;
+}
+.dk-holo .dk-clock {
+  color: var(--dk-pink);
+  font: inherit;
+}
+
+.dk-holo .dk-cols {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.dk-holo .dk-lcol {
+  flex: 0 0 38%;
+  border-right: 1px solid rgba(255, 79, 139, 0.3);
+}
+.dk-holo .dk-tcol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dk-holo .dk-row {
+  gap: 10px;
+  padding: 7px 12px;
+  border-bottom: 0;
+  cursor: pointer;
+}
+.dk-holo .dk-row:hover {
+  background: rgba(255, 79, 139, 0.08);
+}
+.dk-holo .dk-row.dk-on {
+  background: rgba(255, 79, 139, 0.2);
+}
+.dk-holo .dk-rname {
+  font-size: 20px;
+}
+.dk-holo .dk-rlast,
+.dk-holo .dk-rtime {
+  font-size: 17px;
+}
+
+.dk-holo .dk-face {
+  background: rgba(9, 4, 18, 0.4);
+}
+/* The pane is QUEST's size, so the faces can be read: the list's, and hers over the thread. */
+.dk-holo .dk-rface {
+  width: 56px;
+  height: 56px;
+}
+.dk-holo .dk-hface {
+  width: 88px;
+  height: 88px;
+}
+.dk-holo .dk-face-img {
+  opacity: 0.85;
+}
+
+.dk-holo .dk-head {
+  padding: 6px 14px 8px;
+  border-bottom-color: rgba(255, 79, 139, 0.25);
+  box-shadow: none;
+}
+.dk-holo .dk-name {
+  font-size: 22px;
+}
+.dk-holo .dk-where {
+  font-size: 16px;
+}
+
+.dk-holo .dk-msg {
+  max-width: 80%;
+  padding: 3px 10px;
+  font-size: 20px;
+  line-height: 1.15;
+  clip-path: none;
+  cursor: pointer;
+}
+.dk-holo .dk-her {
+  background: rgba(255, 79, 139, 0.2);
+  border-left: 0;
+}
+.dk-holo .dk-me {
+  background: rgba(127, 233, 255, 0.16);
+  border-right: 0;
+  color: #dff9ff;
+}
+.dk-holo .dk-divider {
+  color: var(--dk-dim);
+  font: 16px 'VT323', monospace;
+  letter-spacing: 0.14em;
+}
+
+.dk-holo .dk-input {
+  padding: 8px 14px 12px;
+  border-top: 0;
+}
+.dk-holo .dk-box {
+  border: 0;
+  border-bottom: 1px solid rgba(255, 79, 139, 0.55);
+  padding: 4px 2px;
+  color: var(--dk-ink);
+  font: 20px 'VT323', monospace;
+}
+.dk-holo .dk-box:focus {
+  border-color: var(--dk-cyan);
+}
+.dk-holo .dk-send {
+  border: 1px solid rgba(127, 233, 255, 0.55);
+  background: none;
+  color: var(--dk-cyan);
+  font: 18px 'VT323', monospace;
+}
+
+.dk-holo .dk-sheet,
+.dk-holo .dk-menu {
+  background: rgba(20, 8, 26, 0.92);
+  border-color: rgba(255, 79, 139, 0.5);
+}
+.dk-holo .dk-menu {
+  bottom: 70px;
+  left: calc(38% + 12px);
+}

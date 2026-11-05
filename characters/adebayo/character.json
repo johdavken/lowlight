@@ -77,6 +77,14 @@
         "fri",
         "sat"
       ]
+    },
+    {
+      "from": "17:00",
+      "to": "18:00",
+      "room": "spine/deck-market",
+      "days": [
+        "sun"
+      ]
     }
   ],
   "standing": {

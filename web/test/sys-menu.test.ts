@@ -16,7 +16,7 @@ const key = (k: string) => {
 const wheel = (el: HTMLElement, deltaY: number) => el.dispatchEvent(new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true }));
 
 beforeEach(() => {
-  h = { onVolume: vi.fn(), onMute: vi.fn(), onMusic: vi.fn(), onAmbient: vi.fn(), onTextSpeed: vi.fn(), onTextStep: vi.fn(), onSizeStep: vi.fn(), onFontStep: vi.fn(), onChatKeys: vi.fn(), onModel: vi.fn(), onThinking: vi.fn(), onOpenChange: vi.fn(), onSave: vi.fn() } as typeof h;
+  h = { onVolume: vi.fn(), onMute: vi.fn(), onMusic: vi.fn(), onAmbient: vi.fn(), onTextSpeed: vi.fn(), onTextStep: vi.fn(), onSizeStep: vi.fn(), onFontStep: vi.fn(), onChatKeys: vi.fn(), onModel: vi.fn(), onThinking: vi.fn(), onTips: vi.fn(), onTipsAgain: vi.fn(), onMirror: vi.fn(), onOpenChange: vi.fn(), onPause: vi.fn() } as typeof h;
   m = new SysMenu(h);
   document.body.append(m.el);
 });
@@ -26,6 +26,39 @@ afterEach(() => {
 });
 
 describe('SysMenu', () => {
+  it('the TIPS row: ON / OFF picks, SHOW AGAIN, ← → flip it', () => {
+    m.showTips(true);
+    m.open();
+    expect(q('.sys-row[data-row="tips"] .sys-label').textContent).toBe('TIPS');
+    expect(q('[data-tips="on"]').classList.contains('on')).toBe(true);
+    expect(q('[data-tips="off"]').classList.contains('on')).toBe(false);
+    q('[data-tips="off"]').click();
+    expect(h.onTips).toHaveBeenCalledWith(false);
+    q('.sys-tips-again').click();
+    expect(h.onTipsAgain).toHaveBeenCalledTimes(1);
+    m.showTips(false);
+    expect(q('[data-tips="off"]').classList.contains('on')).toBe(true);
+    while (q('.sys-row.on').dataset.row !== 'tips') key('ArrowDown');
+    key('ArrowRight');
+    expect(h.onTips).toHaveBeenLastCalledWith(true);
+    key('Enter');
+    expect(h.onTipsAgain).toHaveBeenCalledTimes(2);
+  });
+
+  it('the MIRROR row: ON / OFF picks, ← → flip it', () => {
+    m.showMirror(false);
+    m.open();
+    expect(q('.sys-row[data-row="mirror"] .sys-label').textContent).toBe('MIRROR');
+    expect(q('[data-mirror="off"]').classList.contains('on')).toBe(true);
+    q('[data-mirror="on"]').click();
+    expect(h.onMirror).toHaveBeenLastCalledWith(true);
+    m.showMirror(true);
+    expect(q('[data-mirror="on"]').classList.contains('on')).toBe(true);
+    while (q('.sys-row.on').dataset.row !== 'mirror') key('ArrowDown');
+    key('ArrowLeft');
+    expect(h.onMirror).toHaveBeenLastCalledWith(false);
+  });
+
   it('narrator thinking: shown with MODEL, the saved word lit, a click or ← → picks', () => {
     m.showModel('SONNET 5.5');
     m.showThinking('auto');
@@ -47,19 +80,17 @@ describe('SysMenu', () => {
   });
 
 
-  it('SAVE: hidden until showSave; then the first row, Enter saves and closes; busy it waits', () => {
-    m.showSave(true);
+  it('MENU (the pause menu, for a pointer or a phone): hidden until showPause; first row; Enter or a click opens it, SYS closes', () => {
+    expect(q('.sys-row[data-row="pause"]').hidden).toBe(true);
+    m.showPause(true);
     m.open();
-    expect(rows()[0]).toBe('save');
-    expect(q('.sys-row.on').dataset.row).toBe('save');
-    m.showSaveBusy('Nix');
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
-    expect(m.isOpen).toBe(true);
-    expect(h.onSave).not.toHaveBeenCalled();
-    m.showSaveBusy(null);
+    expect(q('.sys-row.on').dataset.row).toBe('pause');
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
     expect(m.isOpen).toBe(false);
-    expect(h.onSave).toHaveBeenCalledTimes(1);
+    expect(h.onPause).toHaveBeenCalledTimes(1);
+    m.open();
+    q('.sys-row[data-row="pause"]').click();
+    expect(h.onPause).toHaveBeenCalledTimes(2);
   });
 
   it('opens on the SOUND row with every row, in order; MODEL hidden until a label', () => {
@@ -67,15 +98,15 @@ describe('SysMenu', () => {
     expect(m.el.hidden).toBe(true);
     m.open();
     expect(m.isOpen).toBe(true);
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
     m.showModel('GLM 5.2');
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'model', 'think', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'model', 'think', 'link']);
     expect(q('.hud-model').textContent).toBe('GLM 5.2 ›');
     expect(q('.sys-row.on').dataset.row).toBe('sound');
     expect(q('.sys-foot').textContent).toBe('← → OR SCROLL TO CHANGE · ESC CLOSES');
-    expect([...m.el.querySelectorAll('.sys-label')].map((l) => l.textContent)).toEqual(['SAVE', 'SOUND', 'MUSIC', 'AMBIENT', 'TEXT', 'TEXT SIZE', 'FONT', 'CHAT KEYS', 'MODEL', 'NARRATOR THINKING', 'LINK']);
+    expect([...m.el.querySelectorAll('.sys-label')].map((l) => l.textContent)).toEqual(['MENU', 'SOUND', 'MUSIC', 'AMBIENT', 'TEXT', 'TEXT SIZE', 'FONT', 'CHAT KEYS', 'TIPS', 'MIRROR', 'MODEL', 'NARRATOR THINKING', 'LINK']);
     m.showModel(null);
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
   });
 
   it('sound: ten cells lit by volume, MUTED, CLICK FOR SOUND while locked', () => {
@@ -174,6 +205,10 @@ describe('SysMenu', () => {
     key('ArrowRight');
     expect(h.onChatKeys).toHaveBeenLastCalledWith('labels');
     key('ArrowDown');
+    expect(q('.sys-row.on').dataset.row).toBe('tips');
+    key('ArrowDown');
+    expect(q('.sys-row.on').dataset.row).toBe('mirror');
+    key('ArrowDown');
     expect(q('.sys-row.on').dataset.row).toBe('link');
     m.showModel('GLM 5.2');
     key('ArrowUp');
@@ -267,20 +302,20 @@ describe('SysMenu', () => {
   it('no sound at all (hidden): the SOUND row goes, and the menu opens on TEXT', () => {
     m.showSound({ kind: 'hidden' });
     m.open();
-    expect(rows()).toEqual(['text', 'size', 'font', 'keys', 'link']);
+    expect(rows()).toEqual(['text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
     expect(q('.sys-row.on').dataset.row).toBe('text');
     key('ArrowUp');
     expect(q('.sys-row.on').dataset.row).toBe('text');
     m.showSound({ kind: 'on', volume: 0.5, muted: false, music: 1, ambient: 1 });
-    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'link']);
+    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
   });
 
   it('music and ambient: own meters and percentages, only while sound plays; ← → and the wheel step them', () => {
     m.showSound({ kind: 'locked' });
     m.open();
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
     m.showSound({ kind: 'on', volume: 0.6, muted: true, music: 0.3, ambient: 0.85 });
-    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'link']);
+    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
     expect([...m.el.querySelectorAll('.sys-label')].slice(1, 4).map((l) => l.textContent)).toEqual(['SOUND', 'MUSIC', 'AMBIENT']);
     expect(lit('music')).toBe(3);
     expect(value('music')).toBe('30%');

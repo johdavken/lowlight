@@ -39,6 +39,7 @@ export function contentFixture(root: string): void {
     'map/city/districts/marsh.json': '{"blackout":{"outage":0.25}}',
     'map/city/structures/ribbon.json': '{}',
     'world/lore/city.md': '# City',
+    'world/readouts/the-tilt.md': 'WHAT: A bar.',
     'world/lore/history/old.md': '# Old',
     'world/gigs/job.md': '# Job',
     'world/standing.json': '{}',

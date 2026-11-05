@@ -30,7 +30,7 @@ export type SoundView = { kind: 'hidden' } | { kind: 'locked' } | { kind: 'on'; 
  */
 const FITS = ['full', 'snug', 'tight', 'no-weather', 'no-clock', 'short'] as const;
 
-/** A screen on the bar: its word, and its Alt key when it has one (the first letter, underlined). */
+/** A screen on the bar: its word, and its Alt key when it has one (that letter underlined where it sits in the word; CREW's K isn't in it, so none). */
 interface Screen {
   el: HTMLSpanElement;
   word: string;
@@ -59,8 +59,10 @@ export class Hud {
   private readonly notice = span('notice');
   private readonly back = span('hud-back', '‹');
   private readonly you = this.screen('hud-you', 'YOU', 'Y');
-  /** PEOPLE (contacts, leads and the journal, as tabs of one screen). */
+  /** PEOPLE (who you know: each one's file, and the journal). */
   private readonly people = this.screen('hud-people', 'PEOPLE', 'P');
+  /** TEXTS (in-game texts spec §2): the deck in the room; Alt+X, as Alt+T is the title. */
+  private readonly tx = this.screen('hud-tx', 'TEXTS', 'X');
   private readonly quest = this.screen('hud-quest', 'QUEST', 'Q');
   /** CREW (crew spec §4): the roster, tonight's errands and hires. */
   private readonly crew = this.screen('hud-crew', 'CREW', 'K');
@@ -68,8 +70,9 @@ export class Hud {
   private onSave: (() => void) | null = null;
   /** Whose reply is streaming (SAVE then reads WAIT FOR <NAME> and doesn't open), or null. */
   private saveBusy: string | null = null;
+  private onPause?: () => void;
   private readonly sys = span('hud-sys');
-  /** Texts you haven't seen on the deck (promised texts spec §6): `NIX · 1 TEXT`, opens the deck. */
+  /** Texts you haven't seen on the deck (promised texts spec §6): `NIX · 1 TEXT`, opens TEXTS on the first sender. */
   private readonly texts = span('hud-texts');
   /** The link light: `.link[data-status]`, as the bar's link status always was. */
   private readonly link = span('link');
@@ -82,6 +85,8 @@ export class Hud {
   private sizeStep: ((d: number) => void) | null = null;
   private fontStep: ((d: number) => void) | null = null;
   private chatKeys: ((k: ChatKeys) => void) | null = null;
+  private tips: { onTips(on: boolean): void; onTipsAgain(): void } | null = null;
+  private mirror: ((on: boolean) => void) | null = null;
   private onModel: (() => void) | null = null;
   private thinking: ((t: NarratorThinking) => void) | null = null;
   private readonly timer: ReturnType<typeof setInterval>;
@@ -136,10 +141,13 @@ export class Hud {
       onSizeStep: (d) => this.sizeStep?.(d),
       onFontStep: (d) => this.fontStep?.(d),
       onChatKeys: (k) => this.chatKeys?.(k),
+      onTips: (on) => this.tips?.onTips(on),
+      onTipsAgain: () => this.tips?.onTipsAgain(),
+      onMirror: (on) => this.mirror?.(on),
       onModel: () => this.onModel?.(),
       onThinking: (t) => this.thinking?.(t),
-      onSave: () => this.pressSave(),
       onOpenChange: (open) => this.sys.setAttribute('aria-expanded', String(open)),
+      onPause: () => this.onPause?.(),
     });
     this.sys.setAttribute('role', 'button');
     this.sys.setAttribute('aria-haspopup', 'menu');
@@ -168,16 +176,16 @@ export class Hud {
     const right = document.createElement('div');
     right.className = 'hud hud-right';
     this.notice.hidden = true;
-    for (const s of [this.you, this.people, this.quest, this.map]) s.el.hidden = true;
+    for (const s of [this.you, this.people, this.tx, this.quest, this.map]) s.el.hidden = true;
     this.texts.hidden = true;
     this.texts.setAttribute('role', 'button');
     this.texts.tabIndex = 0;
-    this.texts.title = 'Open your deck';
-    this.texts.addEventListener('click', () => window.open('/deck', '_blank'));
+    this.texts.title = 'Open your texts';
+    this.texts.addEventListener('click', () => this.openNotice());
     this.texts.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') window.open('/deck', '_blank');
+      if (e.key === 'Enter') this.openNotice();
     });
-    right.append(this.texts, this.notice, ...[this.you, this.people, this.quest, this.crew, this.map].map((s) => s.el), this.sys);
+    right.append(this.texts, this.notice, ...[this.you, this.people, this.tx, this.quest, this.crew, this.map].map((s) => s.el), this.sys);
 
     this.bar.className = 'hud-bar';
     this.bar.dataset.fit = 'full';
@@ -226,12 +234,13 @@ export class Hud {
   /** The screens' words with their Alt letter underlined, or (from the `short` step) just the letter; SAVE busy reads WAIT FOR <NAME>. */
   private labels(): void {
     const short = this.bar.dataset.fit === 'short';
-    for (const s of [this.you, this.people, this.quest, this.crew, this.map]) {
+    for (const s of [this.you, this.people, this.tx, this.quest, this.crew, this.map]) {
       if (short) s.el.textContent = s.short;
-      else if (s.key) {
+      else if (s.key && s.word.includes(s.key)) {
+        const at = s.word.indexOf(s.key);
         const u = document.createElement('u');
-        u.textContent = s.word.slice(0, 1);
-        s.el.replaceChildren(u, s.word.slice(1));
+        u.textContent = s.word.slice(at, at + 1);
+        s.el.replaceChildren(s.word.slice(0, at), u, s.word.slice(at + 1));
       } else s.el.textContent = s.word;
     }
   }
@@ -271,7 +280,7 @@ export class Hud {
     this.fit();
   }
 
-  /** Shows PEOPLE (opens the PEOPLE screen: CONTACTS, LEADS and JOURNAL as tabs). */
+  /** Shows PEOPLE (opens the PEOPLE screen: the roster, FILE and JOURNAL). */
   setPeople(onClick: () => void): void {
     this.button(this.people, onClick, 'People (Alt+P)');
   }
@@ -281,11 +290,9 @@ export class Hud {
     this.button(this.map, onClick);
   }
 
-  /** Shows SAVE (opens the save prompt), unless a reply is streaming (see setSaveBusy). */
+  /** What SAVE does (the pause menu's row, Alt+S): opens the save prompt, unless a reply is streaming (see setSaveBusy). */
   setSave(onClick: () => void): void {
     this.onSave = onClick;
-    // SAVE lives in SYS until there's an Esc menu; Alt+S still saves from anywhere.
-    this.menu.showSave(true);
   }
 
   /** SAVE pressed (its button or the S key): opens the prompt only while nobody is replying. */
@@ -293,16 +300,51 @@ export class Hud {
     if (this.saveBusy === null) this.onSave?.();
   }
 
-  /** While `contactName`'s reply streams SAVE reads WAIT FOR <NAME> and won't open; null restores it. */
+  /** While `contactName`'s reply streams SAVE won't open (the pause menu reads WAIT FOR <NAME>); null restores it. */
   setSaveBusy(contactName: string | null): void {
-    if (contactName === this.saveBusy) return;
     this.saveBusy = contactName;
-    this.menu.showSaveBusy(contactName);
   }
 
-  /** Lights the open screen's word (YOU, PEOPLE, CREW or MAP) in SYS's blue; null: none open. */
-  setOpen(screen: 'you' | 'people' | 'crew' | 'map' | null): void {
-    for (const [s, k] of [[this.you, 'you'], [this.people, 'people'], [this.crew, 'crew'], [this.map, 'map']] as const) s.el.classList.toggle('open', k === screen);
+  /** Who SAVE waits on (her reply streaming), or null. */
+  get saveBlockedBy(): string | null {
+    return this.saveBusy;
+  }
+
+  /** MENU in SYS opens the pause menu (a pointer's way in; Esc is the keyboard's). */
+  setPause(onClick: () => void): void {
+    this.onPause = onClick;
+    this.menu.showPause(true);
+  }
+
+  /** SETTINGS from the pause menu: SYS opens, its first row lit. */
+  openSys(): void {
+    this.menu.open();
+  }
+
+  /** The bar's place and clock as one line (`THE NOODLE STALL · SAT 05:30`), for the pause menu. */
+  where(): string {
+    return [this.scene.textContent, this.clock.textContent].filter((x) => x && x !== '——').join(' · ');
+  }
+
+  /** Lights the open screen's word (YOU, PEOPLE, TEXTS, QUEST, CREW or MAP) in SYS's blue; null: none open. */
+  setOpen(screen: 'you' | 'people' | 'texts' | 'quest' | 'crew' | 'map' | null): void {
+    for (const [s, k] of [[this.you, 'you'], [this.people, 'people'], [this.tx, 'texts'], [this.quest, 'quest'], [this.crew, 'crew'], [this.map, 'map']] as const) s.el.classList.toggle('open', k === screen);
+  }
+
+  /** Shows TEXTS (opens the deck in the room). */
+  setTextsScreen(onClick: () => void): void {
+    this.button(this.tx, onClick, 'Texts (Alt+X)');
+  }
+
+  /** What the texts notice does: opens TEXTS on its first sender. */
+  setTextsNotice(onOpen: (contact: string) => void): void {
+    this.onTextsNotice = onOpen;
+  }
+  private onTextsNotice: ((contact: string) => void) | null = null;
+  private textsFrom: readonly { id: string; name: string }[] = [];
+  private openNotice(): void {
+    const first = this.textsFrom[0];
+    if (first) this.onTextsNotice?.(first.id);
   }
 
   /** Shows CREW (opens the CREW screen). */
@@ -319,7 +361,9 @@ export class Hud {
 
   /** Who has texted you unseen: `NIX · 1 TEXT`, `2 TEXTS · NIX, HICKS`; hidden when nobody has. */
   setTexts(from: readonly { id: string; name: string }[]): void {
+    this.textsFrom = from;
     this.texts.hidden = from.length === 0;
+    this.tx.el.classList.toggle('texts-new', from.length > 0);
     const names = from.map((f) => f.name.toUpperCase()).join(', ');
     this.texts.textContent = from.length === 1 ? `${names} · 1 TEXT` : `${from.length} TEXTS · ${names}`;
     this.fit();
@@ -406,6 +450,24 @@ export class Hud {
 
   showChatKeys(k: ChatKeys): void {
     this.menu.showChatKeys(k);
+  }
+
+  /** SYS → TIPS: on/off and SHOW AGAIN (main.ts hands them to Graft's tips). */
+  setTipsControl(h: { onTips(on: boolean): void; onTipsAgain(): void }): void {
+    this.tips = h;
+  }
+
+  showTips(on: boolean): void {
+    this.menu.showTips(on);
+  }
+
+  /** SYS → MIRROR: what a pick does (main.ts flips her figure and saves it). */
+  setMirrorControl(onPick: (on: boolean) => void): void {
+    this.mirror = onPick;
+  }
+
+  showMirror(on: boolean): void {
+    this.menu.showMirror(on);
   }
 
   /** SYS → NARRATOR THINKING: what a pick does (main.ts saves it on the server). Shown with the MODEL row. */

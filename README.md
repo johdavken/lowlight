@@ -47,7 +47,7 @@ the model you give them, keeps their own hours and remembers you between nights.
 - **They point you to each other.** A contact can give you a lead: a name, a place, someone who knows
   something, with the details filled in by the one telling you. Raise it with the person it points to and they
   know what you mean; leave it, and they won't bring it up. Some leads open the next. They wait for you in
-  PEOPLE → LEADS (Alt+L).
+  QUEST → LEADS (Alt+L).
 - **You can text them.** The deck is a phone for Cortex Relay, the city's network: texts arrive wherever their
   schedule has them, they know you aren't there, and they'll text you when they said they would. A scene
   remembers the day's texts, and the texts remember the scene. Open `/deck` in the browser, or on your phone:
@@ -86,7 +86,7 @@ can't talk its way out of it.
 hides about themselves, what's between two people, what a place really is, what's moving in the streets, and
 what grew out of your own playthrough. A few replies into a story the Residual decides two or three, and only the
 people who'd know a secret are told it, and they guard it, avoid it or let it slip. Clues surface in the story over
-time. What you notice goes into PEOPLE → LOOSE ENDS (Alt+O), where and when you saw it, and a truth only
+time. What you notice goes into QUEST → LOOSE ENDS (Alt+O), where and when you saw it, and a truth only
 shows there once you've learned it.
 
 <br clear="right">
@@ -123,15 +123,17 @@ shows there once you've learned it.
 ### The YOU panel
 
 <p align="center">
-  <img src="docs/readme/shot-you.webp" alt="Soren's SHEET: his figure in his work outfit, six stats, and skills marked NOT YET" width="100%">
+  <img src="docs/readme/shot-you.webp" alt="Soren's YOU panel: his figure in his work outfit, six stats, and skills marked NOT YET" width="100%">
 </p>
 
-YOU (Alt+Y) opens on your FILE: who you are, from the select screen or your own persona. Tab turns to the
-SHEET and on to PEOPLE: your journal, your contacts' files and standing, and the leads you've been given.
+YOU (Alt+Y) opens on your FILE: who you are, from the select screen or your own persona. Your figure stands
+beside every page, where you change outfits, and Tab turns through STATS, STREET and KIT, then on to PEOPLE:
+your contacts' files and standing, and the journal of the one you're with.
 
-The SHEET shows your six stats (body, reflex, tech, cool, wits, edge), the numbers your jobs roll against,
-and your figure, where you change outfits. The rest is laid out but marked NOT YET, as a roadmap you can read
-in game: CONDITION (health, the hum of your chrome, SDG heat), SKILLS, grid and hard SOL, and CHROME & GEAR.
+STATS shows your six stats (body, reflex, tech, cool, wits, edge), the numbers your jobs roll against. STREET
+shows tonight's NERVE and your rep and heat in each district. KIT shows your sol, your decks and the cover you
+hold. The rest is laid out but marked NOT YET, as a roadmap you can read in game: SKILLS, health and the hum of
+your chrome, grid and hard SOL, and CHROME.
 
 ### Crew
 
@@ -243,6 +245,8 @@ The art, the songs and the characters' writing are made with AI tools and edited
   ([CONTENT-LICENSE](CONTENT-LICENSE)). Credit it as "Lowlight by Farban".
 - **Third-party material** keeps its own licence: [sounds/CREDITS.md](sounds/CREDITS.md), and what each
   one allows in [docs/LICENSING.md](docs/LICENSING.md).
+- **Graft's job rules** (the dice pool, position and effect, the clocks, NERVE as stress) are adapted from
+  Blades in the Dark. This work is based on Blades in the Dark (found at http://www.bladesinthedark.com/), product of One Seven Design, developed and authored by John Harper, and licensed for our use under the Creative Commons Attribution 3.0 Unported license (http://creativecommons.org/licenses/by/3.0/).
 
 ## Issues and pull requests
 

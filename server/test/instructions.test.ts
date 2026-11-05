@@ -8,7 +8,7 @@ const NOTES_RULE =
   "Your room keeps a journal of what should last — what's on the counter, what's owed, who's due back. It is kept for you: the [journal: …] line shows what matters now, the pinned notes and any that just came up. You don't write it.";
 const TOOLS_UNSEEN_RULE =
   'Your tools are not part of the story: never mention them, notes or logging in your reply — write what happens in the scene, and let the room and your journal show the rest.';
-const nix = () => readFileSync('characters/nix/instructions.md', 'utf8');
+const nix = () => readFileSync('characters/nix-direct/instructions.md', 'utf8');
 
 describe('room instructions know about travel', () => {
   it.each([

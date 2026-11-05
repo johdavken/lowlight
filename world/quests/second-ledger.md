@@ -1,12 +1,13 @@
 ---
 title: Second Ledger
+art: second-ledger.webp
 kind: mission
 tier: 1
 with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's debt was sold twice. The Counting House keeps a second ledger nobody's supposed to know about.
-pay: 70-150
+pay: 90-110
 posts: 20:00-02:00
 trust: 1 / 1
 comms: counting-house
@@ -14,6 +15,7 @@ comms: counting-house
 
 # client
 stranger: Dana — a client, an envelope of payment slips in both hands
+face: local-03
 
 *Dana paid her debt to the house in full. Then a second collector came for it, with a ledger page from the Counting House. Two buyers, one debt, and the books say she owes them both.*
 
@@ -40,6 +42,7 @@ blown
 
 # ledger
 stranger: A bookkeeper — sleeve garters, a green visor, wet boots
+face: local-02
 
 *The books for the house are open on the stand. Under them, half hidden, a second ledger with a different binding.*
 

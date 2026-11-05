@@ -48,6 +48,20 @@ describe('Feed', () => {
     expect(css).toMatch(/\.text\s*\{[^}]*white-space:\s*pre-wrap/);
   });
 
+  it('her line starting pulses only while the JOB column is up, and once', () => {
+    const { root, feed } = setup();
+    feed.upsert(msg({ id: 'n1', status: 'streaming' }));
+    feed.delta('n1', 'Quiet');
+    expect(root.classList.contains('line-new')).toBe(false);
+    root.classList.add('job-col');
+    feed.upsert(msg({ id: 'n2', status: 'streaming' }));
+    feed.delta('n2', 'Quiet');
+    expect(root.classList.contains('line-new')).toBe(true);
+    root.classList.remove('line-new');
+    feed.delta('n2', "'s earned.");
+    expect(root.classList.contains('line-new')).toBe(false);
+  });
+
   it('delta appends to the matching message', () => {
     const { root, feed } = setup();
     feed.upsert(msg({ id: 'n1', status: 'streaming' }));
@@ -332,6 +346,13 @@ describe('Feed paging (long replies in the collapsed feed)', () => {
     expect(textOf(root, 'long').style.maxHeight).toBe('400px');
     expect(textOf(root, 'long').dataset.page).toBe('0');
     expect(el(root, 'u1').classList.contains('hidden-collapsed')).toBe(true);
+  });
+
+  it('a short last page is filled out, so it starts clean and not on the tail of the page before', () => {
+    const { root, feed } = paged({ long: 1000 });
+    feed.upsert(msg({ id: 'long', text: 'x', status: 'ok' }));
+    // Three 400px pages hold 1200px: 200px under the text lets the last page scroll to its own top.
+    expect(textOf(root, 'long').style.getPropertyValue('--page-tail')).toBe('200px');
   });
 
   it('a click turns the page; past the last page the reply shows normally again', () => {

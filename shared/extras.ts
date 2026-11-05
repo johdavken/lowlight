@@ -50,3 +50,31 @@ export function tagCounts(extras: readonly Extra[]): { tag: string; count: numbe
   for (const e of extras) for (const t of e.tags) n.set(t, (n.get(t) ?? 0) + 1);
   return [...n].sort(([a], [b]) => a.localeCompare(b)).map(([tag, count]) => ({ tag, count }));
 }
+
+/**
+ * A face for a DRAW stranger (the narrator's gender and age): a `local` from the district or from no
+ * district in particular if there's one (only one or two fit each, so both), else from anywhere, then
+ * any age, then anyone. "middle" has no tag (neither young nor old). Null with no locals at all.
+ */
+export function pickStrangerFace(
+  extras: Extra[],
+  who: { gender?: string; age?: string; district?: string | null },
+  r: () => number = Math.random,
+): string | null {
+  const locals = extras.filter((e) => e.tags.includes('local'));
+  const age = (e: Extra) => (who.age === 'middle' ? !e.tags.includes('young') && !e.tags.includes('old') : !who.age || e.tags.includes(who.age));
+  const gender = (e: Extra) => !who.gender || e.tags.includes(who.gender);
+  const DISTRICTLESS = new Set(['local', 'man', 'woman', 'young', 'old']);
+  const district = (e: Extra) => !who.district || e.tags.includes(who.district) || e.tags.every((t) => DISTRICTLESS.has(t));
+  const tries = [
+    (e: Extra) => gender(e) && age(e) && district(e),
+    (e: Extra) => gender(e) && age(e),
+    (e: Extra) => gender(e),
+    () => true,
+  ];
+  for (const t of tries) {
+    const pool = locals.filter(t);
+    if (pool.length > 0) return pool[Math.floor(r() * pool.length)]!.id;
+  }
+  return null;
+}

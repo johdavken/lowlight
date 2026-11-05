@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
-import { reloadOnRestore, worldChangedPath, routeFromPath, shouldReturnToDialIn, showRoomNotice, lastMatch, rememberMatch, playerFromSearch, setFlash, takeFlash, markSkipIntro, takeSkipIntro } from '../src/room/identity';
+import { reloadOnRestore, worldChangedPath, routeFromPath, shouldPause, showRoomNotice, lastMatch, rememberMatch, playerFromSearch, setFlash, takeFlash, markSkipIntro, takeSkipIntro } from '../src/room/identity';
 import { Feed } from '../src/ui/feed';
 import { Hud } from '../src/ui/hud';
 import { mountInput } from '../src/ui/input';
@@ -76,17 +76,19 @@ describe('agent identity in the room', () => {
 
   it('Esc returns to the dial-in only with the feed collapsed and the dev panel closed', () => {
     const esc = new KeyboardEvent('keydown', { key: 'Escape' });
-    expect(shouldReturnToDialIn(esc, { feedExpanded: false, devPanelOpen: false, journalOpen: false })).toBe(true);
-    expect(shouldReturnToDialIn(esc, { feedExpanded: true, devPanelOpen: false, journalOpen: false })).toBe(false);
-    expect(shouldReturnToDialIn(esc, { feedExpanded: false, devPanelOpen: true, journalOpen: false })).toBe(false);
-    expect(shouldReturnToDialIn(esc, { feedExpanded: false, devPanelOpen: false, journalOpen: true })).toBe(false);
-    expect(shouldReturnToDialIn(new KeyboardEvent('keydown', { key: 'a' }), { feedExpanded: false, devPanelOpen: false, journalOpen: false })).toBe(false);
+    expect(shouldPause(esc, { feedExpanded: false, devPanelOpen: false, journalOpen: false })).toBe(true);
+    // A held Esc doesn't flicker the pause menu.
+    expect(shouldPause(new KeyboardEvent('keydown', { key: 'Escape', repeat: true }), { feedExpanded: false, devPanelOpen: false, journalOpen: false })).toBe(false);
+    expect(shouldPause(esc, { feedExpanded: true, devPanelOpen: false, journalOpen: false })).toBe(false);
+    expect(shouldPause(esc, { feedExpanded: false, devPanelOpen: true, journalOpen: false })).toBe(false);
+    expect(shouldPause(esc, { feedExpanded: false, devPanelOpen: false, journalOpen: true })).toBe(false);
+    expect(shouldPause(new KeyboardEvent('keydown', { key: 'a' }), { feedExpanded: false, devPanelOpen: false, journalOpen: false })).toBe(false);
   });
 
   it('Escape that already closed something (the archive collapsing first) stays in the room', () => {
     const esc = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
     esc.preventDefault();
-    expect(shouldReturnToDialIn(esc, { feedExpanded: false, devPanelOpen: false, journalOpen: false })).toBe(false);
+    expect(shouldPause(esc, { feedExpanded: false, devPanelOpen: false, journalOpen: false })).toBe(false);
   });
 
   it('an unconnected room says so instead of a dead room: no command, back link', () => {

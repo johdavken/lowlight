@@ -24,11 +24,12 @@ import { mountPlanCard } from './ui/plan-card';
 import { loadTextSpeed, saveTextSpeed, stepTextSpeed, textSpeedScale, type TextSpeed } from './ui/typing';
 import { applyTextSize, loadTextSize, saveTextSize, stepTextSize, type TextSize } from './ui/text-size';
 import { applyChatFont, loadChatFont, saveChatFont, stepChatFont, type ChatFont } from './ui/chat-font';
+import { loadMirror, saveMirror } from './ui/stage-mirror';
 import { applyChatKeys, loadChatKeys, saveChatKeys, type ChatKeys } from './ui/chat-keys';
 import type { ControlAction } from './ui/message-controls';
 import { Hud } from './ui/hud';
 import { JournalView } from './ui/journal';
-import { MAP_CUE_LEVEL, MAP_CUE_URL, MapPanel } from './ui/map';
+import { MAP_CUE_LEVEL, MAP_CUE_URL, MapPanel, PAUSE_IN_CUE_URL, PAUSE_OUT_CUE_URL } from './ui/map';
 import { StoryDark } from './ui/map/story-dark';
 import { MENU_CUE_LEVEL, MENU_CUE_URL } from './landing/menu-sound';
 import { mapWho } from './ui/map/who';
@@ -44,15 +45,27 @@ import { createRoomAudio } from './audio/room-audio';
 import { RecapCard, createRecapGate } from './ui/recap';
 import { createGreetGate } from './ui/greet-gate';
 import { createArrival, fetchDistrict, type Arrival, type IntroState } from './room/arrival';
-import { sceneDraft } from './net/scenario';
+import { sceneOptions, type OpeningSet } from './net/scenario';
+import { openOpeningPanel } from './room/opening-panel';
 import { moveLine } from '../../shared/arrival';
 import { createRecapHold } from './room/recap-hold';
 import { mountInput } from './ui/input';
-import { suggestLine } from './net/suggest';
+import { suggestLine, suggestLines, type SuggestDraft } from './net/suggest';
+import { openSuggestPanel } from './room/suggest-panel';
+import type { CardsPanel } from './room/cards-panel';
 import { EncounterPanel, ENCOUNTER_COPY, hereLine } from './room/encounter-panel';
 import { latestQuestStory, mountQuestCards } from './room/quest-cards';
+import { mountJobTable, tableAction } from './room/table/job-table';
+import { mountSetup, setupLine, type SetupCard } from './room/table/setup';
+import { mountJobColumn } from './room/job-column';
+import { watchTables } from './room/table/shell';
+import { mountTips } from './room/table/tips';
+import { FLIP_CUE_URL, type TableCue } from './room/table/el';
+import { GIG_CUE_LEVEL } from './ui/gig/sound';
+import { debriefEl, debriefRolls } from './room/debrief';
 import { mountSpeakerPortrait } from './room/speaker-portrait';
 import { mountCommsInset } from './room/comms-inset';
+import { mountCommsSlot } from './room/comms-slot';
 import { mountQuestList, newlyOpen } from './room/quest-list';
 import { WhosHere, partySpeaker, type Member } from './room/whos-here';
 import { DoorLayer } from './room/doors';
@@ -61,23 +74,28 @@ import { encounterOptions } from './net/encounter';
 import { getNarratorThinking, putNarratorThinking } from './net/link';
 import { createDealer } from './room/encounter-dealer';
 import { TurnTracker } from './ui/turn-state';
-import { lastAgent, listenChromeKeys, markSkipIntro, reloadOnRestore, playerFromSearch, rememberAgent, routeFromPath, shouldReturnToDialIn, setFlash, showRoomNotice, takeFlash, takeSkipIntro, worldChangedPath } from './room/identity';
+import { lastAgent, listenChromeKeys, markSkipIntro, reloadOnRestore, playerFromSearch, rememberAgent, routeFromPath, shouldPause, setFlash, showRoomNotice, takeFlash, takeSkipIntro, worldChangedPath } from './room/identity';
 import { openSavePrompt, saveFailure } from './room/save-prompt';
 import { sceneDir } from './scene-paths';
 import { listenScreenCycle, type CycleScreen } from './room/screen-cycle';
-import { crewSeen, openCrew, type CrewHandle, type CrewTab } from './room/crew-screen';
+import { crewDotOn, crewSeen, openCrew, type CrewHandle, type CrewTab } from './room/crew-screen';
 import { fetchCrew } from './net/crew';
 import { openPeople, type PeopleHandle, type PeopleTab } from './room/people-screen';
+import { openTexts, textsDeck, textsOwnsTab, type TextsDeck, type TextsHandle } from './ui/texts-screen';
+import { newDeckMemory } from './deck/deck-client';
 import { openCharacterSheet, type SheetPage, type SheetPlayer } from './room/character-sheet';
 import { fetchKit } from './net/kit';
 import { ApiError, branchFrom, contacts, goSolo, leads, listPlaythroughs, looseEnds, saveNow, setLocation, setOutfit, wait } from './net/playthroughs';
+import * as playthroughApi from './net/playthroughs';
+import { mountLoad } from './landing/load';
+import type { LandingAgent } from './landing/landing';
+import { openPauseMenu } from './room/pause-menu';
 import { greetAllowed, markWalkedOut, walkedOut, walkOutDue } from './room/walk-out';
 import { resolveRoomPlayer } from './room/room-player';
 import { residentOf } from './room/resident';
 import { markSplashSeen } from './landing/splash';
 import { GigWindow, type GigWindowOpts } from './ui/gig/window';
-import { GIG_CUE_URL, GIG_MUSIC_LEVEL, GIG_MUSIC_URL, gigCuePlayer, type GigCueName } from './ui/gig/sound';
-import { SLIP_CUE_URL, SLIP_MUSIC_LEVEL, SLIP_MUSIC_URL, slipCuePlayer, type SlipCueName } from './ui/slip/sound';
+import { GIG_CUE_URL, GIG_MUSIC_LEVEL, GIG_MUSIC_URL, TABLE_MUSIC_URL, gigCuePlayer, type GigCueName } from './ui/gig/sound';
 import { PAPERS_CUE_URL, papersCuePlayer, type PapersCueName } from './ui/papers/sound';
 import type { PapersData } from '../../shared/papers/data';
 import type { Brief } from '../../shared/gig/brief';
@@ -87,13 +105,13 @@ import { DEFAULT_SETTINGS, type DiceSettings } from '../../shared/dice/opponent'
 import type { DiceState } from '../../shared/dice/rules';
 import type { District, Place } from '../../shared/map-schema';
 import { gameRoot, mountGameStage } from './ui/game-stage';
-import { playCheck } from './room/check-anim';
+import { glitchSave, PARKED_HOLD_MS, playCheck } from './room/check-anim';
 import { checkToPlay, type Shown } from './room/job-moment';
 import { openTerminal } from './ui/crack/terminal';
 import { crackCuePlayer } from './ui/crack/sound';
 import { installLoreCard, markLore, setGlossary } from './ui/lore-hover';
 import type { GlossaryEntry } from '../../shared/lore';
-import { missionCuePlayer } from './ui/mission-sound';
+import { missionCuePlayer, MISSION_CUE_URL } from './ui/mission-sound';
 
 function byId(id: string): HTMLElement {
   const node = document.getElementById(id);
@@ -127,8 +145,6 @@ export interface NixRoomTestHook {
   greeting(): 'waiting' | 'sent' | 'not-due';
   /** Whether the room's socket is open: `send` drops events until it is. */
   connected(): boolean;
-  /** The open gig run's solver route, when the page was opened with ?gigSeed= (e2e). */
-  gig?: { path(): number[] | null };
   /** The open liar's dice game, when the page was opened with ?diceSeed= (e2e). */
   dice?: { state(): DiceState | null };
   /** Blacks out exactly these districts on the rendered map (spec 2026-10-27; [] brings the power back). */
@@ -164,7 +180,14 @@ function startRoom(agentId: string): void {
   let agentAccent = '#ff4f8b';
   /** A BRANCH HERE on its way: the controls wait for it. */
   let branching = false;
+  /** The moment moved (her turn starting, a swipe to another take, an edit of a line; set below, with
+   * the cards panels): SUGGEST's set, drafted for the moment before, is spent. */
+  let momentMoved = () => {};
+  let wasBusy = false;
   const updateBusy = () => {
+    // A swipe, a regenerate, a DRAW or a card pick moves the moment without a new line of yours.
+    if (turns.busy && !wasBusy) momentMoved();
+    wasBusy = turns.busy;
     if (!socketOpen) input.setBusy(true, '// NO CARRIER');
     else input.setBusy(turns.busy);
     feed.setBusy(!socketOpen || turns.busy || branching);
@@ -192,11 +215,14 @@ function startRoom(agentId: string): void {
       case 'rewind':
         socket.send({ type: a.kind, messageId: a.id });
         return;
+      // Another take, or a line rewritten, without a new turn streaming.
       case 'swipe':
         socket.send({ type: 'swipe', messageId: a.id, index: a.index });
+        momentMoved();
         return;
       case 'edit':
         socket.send({ type: 'edit_message', messageId: a.id, text: a.text });
+        momentMoved();
         return;
       case 'branch':
         // The world switches to the new playthrough: the room reloads into it, on this line.
@@ -299,7 +325,7 @@ function startRoom(agentId: string): void {
     onModeChange: saveMode,
     onDraw: () => openEncounter(),
     onDice: () => openDice(),
-    suggest: (steer) => suggestLine(agentId, steer),
+    suggest: (steer) => openSuggest(steer),
     onWalkOut: () => void walkOut(),
     // stay: no WALK OUT again for this goodbye while the page is open (a reconnect, an edit).
     onStay: () => {
@@ -328,7 +354,9 @@ function startRoom(agentId: string): void {
   /** Quest panel updates wait for a check playing on the cards. */
   let questPanel: Promise<void> = Promise.resolve();
   const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-  const cardFor = (choice: string) => questCardsHost.querySelector<HTMLElement>(`.qc-card[data-choice="${CSS.escape(choice)}"]`);
+  // A choice's card: on the table for a job, else on the quest panel.
+  const cardFor = (choice: string) =>
+    (jobTable.isOpen() ? jobTable.root : questCardsHost).querySelector<HTMLElement>(`.tb-card[data-choice="${CSS.escape(choice)}"], .qc-card[data-choice="${CSS.escape(choice)}"]`);
   /**
    * A job's check on its card before the panel moves on (small jobs spec §6): a fail that parked plays
    * on the card that rolled; the row that resolves it plays the rest (on REROLL's card), or the whole
@@ -345,44 +373,44 @@ function startRoom(agentId: string): void {
     }
     const row = freshQuestRow ? feed.messages().find((m) => m.id === freshQuestRow) : undefined;
     if (!now?.rolled && !now?.blown) freshQuestRow = null;
-    const { play, shown, blown } = checkToPlay(was, now, row, checkShown);
+    const { play, shown, blown, save } = checkToPlay(was, now, row, checkShown);
     checkShown = shown;
     const card = play ? cardFor(play.card) : null;
-    if (play && card) await playCheck(card, { ...play, reduced: reducedMotion(), cue: missionCue });
+    if (play && card) await playCheck(card, { ...play, reduced: reducedMotion(), cue: missionCue, ...(play.parked ? { hold: PARKED_HOLD_MS } : {}) });
+    // A save on the waiting miss: its dice glitch to the cost it became, where the table keeps them.
+    const parked = save ? jobTable.root.querySelector<HTMLElement>('.tb-parked') : null;
+    if (save && parked) await glitchSave(parked, { ...save, reduced: reducedMotion(), cue: missionCue });
     if (blown) missionCue('blown');
+  }
+  /** A choice clicked on the quest panel or the table: a crack's terminal first, else the pick (with a card from the hand). */
+  function chooseQuest(choice: string, said?: string, push?: boolean | 'dice' | 'effect', card?: string, trade?: 'safe' | 'bold', programs?: { load: string[]; run: string[] }, press?: string): void {
+    const at = said !== undefined && questHeld ? questHeld : questState.active;
+    if (!at || !socket) return;
+    markQuestHintDone();
+    if (said !== undefined) input.clearDraft();
+    questHeld = null;
+    const now = questState.active;
+    // A crack card (small jobs spec §4): the terminal opens first; its moves go with the pick.
+    const setup = now && now.id === at.id && now.beat === at.beat ? now.crack?.[choice] : undefined;
+    if (setup) {
+      const job = { id: at.id, beat: at.beat };
+      openTerminal(gameRoot(), {
+        setup,
+        title: now!.title,
+        cue: crackCue,
+        alarm: now!.alarm ?? 0,
+        reduced: reducedMotion(),
+        onDone: ({ moves }) => socket?.send({ type: 'quest_choose', id: job.id, beat: job.beat, choice, moves }),
+      });
+      return;
+    }
+    socket.send({ type: 'quest_choose', id: at.id, beat: at.beat, choice, ...(said !== undefined ? { said } : {}), ...(push ? { push: push === true ? ('dice' as const) : push } : {}), ...(trade ? { trade } : {}), ...(card ? { card } : {}), ...(press ? { press } : {}), ...(programs ? { programs } : {}) });
   }
   const questCards = mountQuestCards(questCardsHost, {
     // While the panel is up, the figures step out to either side to make room for it.
     onShown: (on) => gameRoot().classList.toggle('quest-up', on),
-    onChoose: (choice, said) => {
-      const at = said !== undefined && questHeld ? questHeld : questState.active;
-      if (!at || !socket) return;
-      markQuestHintDone();
-      if (said !== undefined) input.clearDraft();
-      questHeld = null;
-      const now = questState.active;
-      // A big job's route (big jobs spec §3): its gig window first, unless the e2e hook resolves it.
-      const routeOf = now && now.id === at.id && now.beat === at.beat ? now.big?.routes?.[choice] : undefined;
-      if (routeOf && !now?.big?.gigAuto) {
-        openRouteGig({ id: at.id, beat: at.beat }, choice, routeOf);
-        return;
-      }
-      // A crack card (small jobs spec §4): the terminal opens first; its moves go with the pick.
-      const setup = now && now.id === at.id && now.beat === at.beat ? now.crack?.[choice] : undefined;
-      if (setup) {
-        const job = { id: at.id, beat: at.beat };
-        openTerminal(gameRoot(), {
-          setup,
-          title: now!.title,
-          cue: crackCue,
-          alarm: now!.alarm ?? 0,
-          reduced: reducedMotion(),
-          onDone: ({ moves }) => socket?.send({ type: 'quest_choose', id: job.id, beat: job.beat, choice, moves }),
-        });
-        return;
-      }
-      socket.send({ type: 'quest_choose', id: at.id, beat: at.beat, choice, ...(said !== undefined ? { said } : {}) });
-    },
+    onChoose: (choice, said, push) => chooseQuest(choice, said, push),
+
     onContinue: (id) => socket?.send({ type: 'quest_continue', id }),
     // WAIT UNTIL (the waiting panel): the clock runs on to the hour it waits for, and the beat plays here.
     onWait: (minutes) => {
@@ -393,31 +421,98 @@ function startRoom(agentId: string): void {
     // Until your first pick ever, a line under the cards says you can talk it over first.
     hint: () => (questHintDone() ? null : `Talk it over with ${agentName}, or pick when you're ready. Saying what you do counts too.`),
     onHover: () => missionCue('hover'),
-    // A big job's read (big jobs spec §3): the three words go to the server, which scores them.
-    onRead: (read) => {
-      const a = questState.active;
-      if (a) socket?.send({ type: 'quest_choose', id: a.id, beat: a.beat, choice: '!read', read });
-    },
     onTalk: (text) => {
       questHeld = null;
       input.clearDraft();
       sendTurn({ type: 'user_message', text, mode: 'rp', talk: true });
     },
   });
+  // The table (the hand spec §5): a job's beats as dealt cards over the dimmed room, your hand along the bottom.
+  // A deal-in flips several cards in a row, so the flip sits a little lower.
+  const tableCue = (n: TableCue) =>
+    n === 'beat' ? missionCue('beat') : n === 'flip' ? roomAudio.cue(FLIP_CUE_URL, GIG_CUE_LEVEL * 0.7) : roomAudio.cue(MENU_CUE_URL[n], GIG_CUE_LEVEL * (n === 'move' ? 0.5 : 1));
+  // Graft tips (spec 2026-10-30-graft-tips): one-time callouts on a first player's jobs; SYS → TIPS below.
+  const tips = mountTips(gameRoot(), { reduced: reducedMotion });
+  const jobTable = mountJobTable(gameRoot(), {
+    onChoose: (choice, c) => chooseQuest(choice, c.said, c.push, c.card, c.trade, c.programs, c.press),
+    onTalk: (text) => {
+      questHeld = null;
+      input.clearDraft();
+      sendTurn({ type: 'user_message', text, mode: 'rp', talk: true });
+    },
+    onHover: () => missionCue('hover'),
+    cue: tableCue,
+    reduced: reducedMotion,
+    tips,
+  });
+  // Graft plays the papers desk's track (the gig track) while a table is up. Closing waits a moment, so SETUP's
+  // GO IN handing over to the job's first beat doesn't dip; then the room's song comes back (a gig window keeps its own).
+  let tableUp = false;
+  let tableDown: ReturnType<typeof setTimeout> | null = null;
+  // The job's written text beside the subtitles while a table is up (the JOB column, 2026-11-02); the last table closing takes it.
+  const jobColumn = mountJobColumn(byId('feed'), gameRoot(), () => feed.relayout());
+  /** What the job table last put in the column: a SETUP card closing over its debrief hands the column back to it. */
+  let tableText: { title: string; text: string | undefined; rolls?: HTMLElement | null } | null = null;
+  const showTableText = (title: string, text: string | undefined, rolls?: HTMLElement | null) => {
+    tableText = { title, text, rolls };
+    jobColumn.show(title, text, undefined, rolls);
+  };
+  const setupGone = () => {
+    if (jobTable.isOpen() && tableText) jobColumn.show(tableText.title, tableText.text, undefined, tableText.rolls);
+    else jobColumn.clear();
+  };
+  watchTables((on) => {
+    tableUp = on;
+    if (!on) jobColumn.clear();
+    if (tableDown) clearTimeout(tableDown);
+    tableDown = null;
+    if (on) roomAudio.overrideMusic(TABLE_MUSIC_URL, GIG_MUSIC_LEVEL);
+    else tableDown = setTimeout(() => !tableUp && !gigWindow && roomAudio.overrideMusic(null), 1500);
+  });
+  /** The SETUP card before a job's first beat (the hand spec §1), and the job it's for. */
+  let setupCard: { id: string; card: SetupCard; offer: string } | null = null;
+  const startQuest = (id: string) => {
+    const open = questState.open.find((q) => q.id === id);
+    // A job with a SETUP card: how you go in and who you bring first; anything else starts now.
+    if (!open?.setup) {
+      socket?.send({ type: 'quest_start', id });
+      return;
+    }
+    setupCard?.card.close();
+    const card = mountSetup(gameRoot(), {
+      offer: open.setup,
+      title: open.title,
+      pitch: open.pitch,
+      tier: open.mission?.tier ?? null,
+      reduced: reducedMotion(),
+      cue: tableCue,
+      onGo: (setup) => socket?.send({ type: 'quest_start', id, setup }),
+      onBack: () => {
+        setupCard = null;
+        setupGone();
+      },
+      tips,
+    });
+    setupCard = { id, card, offer: JSON.stringify(open.setup) };
+    jobColumn.show(open.title, open.pitch, setupLine(open.setup));
+  };
   // The stranger present, with a face: a framed bust beside the subtitles while they're in the scene (speaker portrait, 2026-10-17).
-  const speakerPortrait = mountSpeakerPortrait(byId('feed'));
+  const speakerPortrait = mountSpeakerPortrait(byId('feed'), gameRoot());
   const commsInset = mountCommsInset(byId('feed'));
+  // On comms with a stranger here, one face by the subtitles: the speaker's (comms speaker slot, spec 2026-11-01).
+  const commsSlot = mountCommsSlot(commsInset, speakerPortrait);
+  feed.onCurrent((c) => commsSlot.setLine(c ? `${c.id}:${c.speaker}` : '', c?.speaker ?? null));
   /** Comms on the stage (spec §2): no figure for her, her face on the monitor, her role, HANG UP, her pages tagged. */
   const applyComms = () => {
     byId('stage-figures').classList.toggle('on-comms', comms.on);
     document.querySelector('.feed-root')?.classList.toggle('comms', comms.on);
-    commsInset.show(comms.on && partyContact ? { name: partyContact.name, face: `/api/agents/${encodeURIComponent(agentId)}/sprite`, where: comms.where ?? '', accent: partyContact.accent } : null);
+    commsSlot.setComms(comms.on && partyContact ? { name: partyContact.name, face: `/api/agents/${encodeURIComponent(agentId)}/sprite`, where: comms.where ?? '', accent: partyContact.accent } : null);
     whosHere.setParty(partyYou, partyContact, { comms: comms.on });
     input.setComms(comms.on);
   };
   feed.onStranger((st) => {
     const s = st?.face ? { name: st.name, url: `/api/extras/${encodeURIComponent(st.face)}` } : null;
-    speakerPortrait.show(s);
+    commsSlot.setStranger(s);
     // They're in the party window too, while they're here.
     partyStranger = s?.name ?? null;
     whosHere.setStranger(s);
@@ -425,10 +520,22 @@ function startRoom(agentId: string): void {
   const questListHost = document.createElement('div');
   gameRoot().append(questListHost);
   const questList = mountQuestList(questListHost, {
-    onStart: (id) => socket?.send({ type: 'quest_start', id }),
-    onOpen: () => hud.setQuestNew(false),
+    leads,
+    looseEnds,
+    onNotes: () => hud.setQuestShown(questList.has()),
+    onStart: (id) => startQuest(id),
+    onOpen: () => {
+      roomAudio.cue(MAP_CUE_URL, MAP_CUE_LEVEL);
+      hud.setQuestNew(false);
+      hud.setOpen('quest');
+    },
+    onClose: () => hud.setOpen(null),
     onBuy: (item) => socket?.send({ type: 'fixer_buy', item }),
     onWalk: (id) => socket?.send({ type: 'quest_walk', id }),
+    // GO THERE on another place's board: the map's GO, arrival screen and all.
+    onGoTo: (place) => void map.findPlace(place).then(() => openTravel(place, false)),
+    onGoToContact: (id) => void goToContact(id),
+    reduced: reducedMotion,
   });
   /** Quests this tab has already announced as able to start here. */
   const questsAnnounced = new Set<string>();
@@ -436,6 +543,7 @@ function startRoom(agentId: string): void {
   byId('input').addEventListener('input', () => {
     questHeld = null;
     questCards.clearPick();
+    jobTable.clearPick();
   });
   // Text size (SYS → TEXT SIZE): the reading text on the stage, kept per browser.
   let textSize = loadTextSize();
@@ -472,6 +580,25 @@ function startRoom(agentId: string): void {
   };
   hud.setChatKeysControl(showChatKeys);
   showChatKeys(loadChatKeys());
+  // SYS → TIPS: Graft's tips on or off (SKIP TIPS on a callout lands here too), SHOW AGAIN.
+  tips.onChange = (on) => hud.showTips(on);
+  hud.setTipsControl({
+    onTips: (on) => tips.setEnabled(on),
+    // SHOW AGAIN wants them shown: every tip unseen, and tips on.
+    onTipsAgain: () => {
+      tips.reset();
+      tips.setEnabled(true);
+    },
+  });
+  hud.showTips(tips.enabled());
+  // SYS → MIRROR: her figure faces the other way, kept per contact, per browser.
+  const showMirror = (on: boolean) => {
+    saveMirror(agentId, on);
+    stage.setMirror('right', on);
+    hud.showMirror(on);
+  };
+  hud.setMirrorControl(showMirror);
+  showMirror(loadMirror(agentId));
   // Narrator thinking (SYS → NARRATOR THINKING): kept on the server, in data/settings.json. Lit only once it answers.
   hud.setThinkingControl((t) => {
     void putNarratorThinking(t).then(
@@ -526,6 +653,8 @@ function startRoom(agentId: string): void {
   });
   // A job's cues (small jobs spec §6), at the UI cue level.
   const missionCue = missionCuePlayer(roomAudio);
+  // The dice's tumble, knock and landings, warmed: a first roll's taps would otherwise all wait on one fetch and knock at once.
+  for (const n of ['tick', 'tap', 'land-crit', 'land-clean', 'land-cost', 'land-miss'] as const) roomAudio.preloadCue(MISSION_CUE_URL[n]);
   const crackCue = crackCuePlayer(roomAudio);
   hud.setSoundControl({
     onToggle: () => roomAudio.toggleMute(),
@@ -542,13 +671,33 @@ function startRoom(agentId: string): void {
   // on it, except a reload from inside the room (leave() marks it). Created right after the audio
   // unlock, so the key that closes it still turns the sound on, and before every other room key
   // listener, which it blocks. The history decides whether it's a new game's opening or a resume.
+  // The opening's three openings: the last set is kept for the same steer while the screen is up.
+  let openingKept: { steer: string | null; set: OpeningSet } | null = null;
   const intro: Arrival | null = takeSkipIntro()
     ? null
     : createArrival(byId('district-intro'), {
         reducedMotion: reducedMotion(),
         fetchDistrict,
         paused: bugReportOpen,
-        suggest: (steer) => sceneDraft(agentId, steer),
+        openings: (host, steer, h) =>
+          openOpeningPanel(host, {
+            her: { id: agentId, name: agentName },
+            // Where and when, as the room has it by now (the screen opens on a loaded room's facts).
+            where: [
+              currentSceneId ? scenes.get(currentSceneId)?.name.toUpperCase() : null,
+              atmosphere?.timeOfDay.toUpperCase(),
+              atmosphere && atmosphere.weather !== 'none' ? atmosphere.weather.toUpperCase() : null,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+            steer,
+            cached: openingKept && openingKept.steer === steer ? openingKept.set : null,
+            load: () => sceneOptions(agentId, steer),
+            onCache: (set) => (openingKept = { steer, set }),
+            onStart: h.start,
+            onEdit: h.edit,
+            onCancel: h.close,
+          }),
       });
   /** The history has said whether the page-load screen is an opening or a resume (only the first counts). */
   let introModeSet = false;
@@ -609,17 +758,22 @@ function startRoom(agentId: string): void {
     intro.onClose(() => recapHold.introClosed());
   }
   // Every screen in the keys bar opens on the MAP's page-swap cue.
-  // The journal: PEOPLE's JOURNAL tab (2026-10-18 spec §2); its notes arrive whether or not it's showing.
+  // The journal: PEOPLE's JOURNAL page (2026-10-18 spec §2); its notes arrive whether or not it's showing.
   const journal = new JournalView((e) => socket?.send(e));
-  /** PEOPLE (CONTACTS · LEADS · JOURNAL), while it's up. */
+  /** PEOPLE (who you know: FILE · JOURNAL), while it's up. */
   let people: PeopleHandle | null = null;
   // CREW (crew spec 2026-10-19 §4): its screen while open, and the playthrough its seen-results mark belongs to.
   let crew: CrewHandle | null = null;
+  // TEXTS (in-game texts spec §2): the deck in the room. Its client is made on the first open and kept for the page,
+  // connected, so texts land and fail while the pane is put away (final review C1, I3).
+  let texts: TextsHandle | null = null;
+  const textsMemory = newDeckMemory();
+  let textsKept: TextsDeck | null = null;
   let crewPt = '';
   void listPlaythroughs().then((l) => (crewPt = l.active ?? ''), () => {});
   /** The tab PEOPLE last showed: the bar's PEOPLE and Alt+P open it there. */
-  let lastPeopleTab: PeopleTab = 'contacts';
-  // Gig runs: the hack window over the map (GIGS at a gig place); one at a time.
+  let lastPeopleTab: PeopleTab = 'file';
+  // Gig runs: the gig window over the map (GIGS at a gig place); one at a time.
   let gigWindow: GigWindow | null = null;
   /** Why GIGS can't open (her link), or null; a down connection is checked when the map asks. */
   /** Why GIGS can't run: read when asked, since words about her follow her pronoun (her portrait can come after). */
@@ -629,11 +783,10 @@ function startRoom(agentId: string): void {
     if (!gigWindow) return;
     gigWindow.destroy();
     gigWindow = null;
-    // The room's own song comes back.
-    roomAudio.overrideMusic(null);
+    // The room's own song comes back, or the table's track if a job is still on it.
+    roomAudio.overrideMusic(tableUp ? TABLE_MUSIC_URL : null, GIG_MUSIC_LEVEL);
   };
   const gigCue = gigCuePlayer(roomAudio);
-  const slipCue = slipCuePlayer(roomAudio);
   const papersCue = papersCuePlayer(roomAudio);
   /** What every gig window shares: who's playing, the cues, the music, papers data, the dev strip. */
   const gigShared = (): Pick<GigWindowOpts, 'you' | 'contact' | 'onClose' | 'loadPapers' | 'cue' | 'music' | 'reducedMotion' | 'dev'> => ({
@@ -642,23 +795,20 @@ function startRoom(agentId: string): void {
     onClose: closeGig,
     loadPapers: () => fetch('/api/papers').then(async (r) => (r.ok ? ((await r.json()) as PapersData & { firstNight: boolean }) : null)),
       cue: (name) => {
-        if (name.startsWith('slip:')) {
-          const n = name.slice(5);
-          if (n in SLIP_CUE_URL) slipCue(n as SlipCueName);
-        } else if (name.startsWith('papers:')) {
+        if (name.startsWith('papers:')) {
           const n = name.slice(7);
           if (n in PAPERS_CUE_URL) papersCue(n as PapersCueName);
         } else if (name in GIG_CUE_URL) gigCue(name as GigCueName);
       },
-      // The floor's track while a slip runs; the gig track on the jobs and result screens, and at the desk
-      // until its track is made (PAPERS_MUSIC_URL: a missing file would stop the music, not fall back).
-      music: (kind) => (kind === 'slip' ? roomAudio.overrideMusic(SLIP_MUSIC_URL, SLIP_MUSIC_LEVEL) : roomAudio.overrideMusic(GIG_MUSIC_URL, GIG_MUSIC_LEVEL)),
+      // The gig track on the jobs and result screens, and at the desk until its track is made (PAPERS_MUSIC_URL:
+      // a missing file would stop the music, not fall back).
+      music: () => roomAudio.overrideMusic(GIG_MUSIC_URL, GIG_MUSIC_LEVEL),
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
-      // The dev strip (seed, solver, REVEAL…): with the admin panel open, or a fixed ?gigSeed=.
+      // The dev strip (the run's seed and result): with the admin panel open, or a fixed ?gigSeed=.
       dev: devPanel.open || new URLSearchParams(location.search).has('gigSeed'),
   });
   const gigAudio = () => {
-    for (const url of [...Object.values(GIG_CUE_URL), ...Object.values(SLIP_CUE_URL), ...Object.values(PAPERS_CUE_URL)]) roomAudio.preloadCue(url);
+    for (const url of [...Object.values(GIG_CUE_URL), ...Object.values(PAPERS_CUE_URL)]) roomAudio.preloadCue(url);
     roomAudio.overrideMusic(GIG_MUSIC_URL, GIG_MUSIC_LEVEL);
   };
   const openGig = (place: Place, district: District) => {
@@ -674,18 +824,6 @@ function startRoom(agentId: string): void {
         if (socket && socketOpen) socket.send({ type: 'gig', ...run });
         else gigWindow?.showRefusal('no link');
       },
-    });
-  };
-  /** A big job's route (big jobs spec §3): its gig, straight onto the board; the result goes back as the route's pick. */
-  const openRouteGig = (job: { id: string; beat: string }, choice: string, route: { brief: Brief; seed: number }) => {
-    if (gigWindow) return;
-    gigAudio();
-    gigWindow = new GigWindow(gameRoot(), {
-      ...gigShared(),
-      place: { id: route.brief.place, name: route.brief.title, district: '' },
-      load: async () => [],
-      direct: { brief: route.brief, seed: route.seed },
-      onSend: (run) => socket?.send({ type: 'quest_choose', id: job.id, beat: job.beat, choice, gig: { result: run.result, seed: route.seed } }),
     });
   };
   const map = new MapPanel(byId('map'), {
@@ -716,8 +854,6 @@ function startRoom(agentId: string): void {
         busy: turns.busy,
         gigBlock: gigBlock(),
       }),
-      // A big job's marked places (big jobs spec §2).
-      ...(questState.active?.big?.marks.length ? { jobMarks: Object.fromEntries(questState.active.big.marks.map((mk) => [mk.place, mk.line])) } : {}),
       comms: { on: comms.on, can: comms.can, herAt: comms.herAt },
     }),
     onTravel: (place, onComms) => openTravel(place, onComms === true),
@@ -729,7 +865,7 @@ function startRoom(agentId: string): void {
     },
     // The menus' move/confirm, under the landing's 0.25 scale like the map's own cue.
     onCue: (c) => roomAudio.cue(MENU_CUE_URL[c], MENU_CUE_LEVEL[c] * 0.25),
-    // The hack window and the MODEL menu over the map take their own keys (Enter in OTHER… must not GO).
+    // The gig window and the MODEL menu over the map take their own keys (Enter in OTHER… must not GO).
     overlayOpen: () => gigWindow !== null || modelMenu.isOpen,
   });
   /**
@@ -782,6 +918,8 @@ function startRoom(agentId: string): void {
     storyDark.devToggled(open);
   });
   roomAudio.preloadCue(MAP_CUE_URL);
+  roomAudio.preloadCue(PAUSE_IN_CUE_URL);
+  roomAudio.preloadCue(PAUSE_OUT_CUE_URL);
   hud.setMapLink(() => {
     if (dice.open) return;
     // From YOU or PEOPLE it's a switch (the old one goes at once); otherwise MAP opens or closes.
@@ -818,23 +956,44 @@ function startRoom(agentId: string): void {
   if (new URLSearchParams(location.search).has('diceSeed')) window.__nixRoom!.dice = { state: () => dice.state() };
   const modelMenu = new ModelMenu(byId('hud'), (e) => socket?.send(e));
   document.addEventListener('click', () => modelMenu.close());
+  // SETUP (mockup setup-frames.html, B): Enter goes in, Esc backs out, with nothing over it and nothing typed in the prompt.
+  // Early (capture), since the prompt takes every Enter and the feed turns pages on it: a page waiting keeps its Enter.
+  window.addEventListener('keydown', (e) => void (setupCard?.card.isOpen() && setupKeys(e)), true);
   window.addEventListener('keydown', (e) => {
-    if (shouldReturnToDialIn(e, { feedExpanded: feed.expanded, devPanelOpen: devPanel.open, journalOpen: people !== null })) location.assign('/');
+    if (shouldPause(e, { feedExpanded: feed.expanded, devPanelOpen: devPanel.open, journalOpen: people !== null })) openPause();
   });
+  /** SETUP's Enter / Esc: true when it took the key. */
+  const setupKeys = (e: KeyboardEvent): boolean => {
+    if (e.defaultPrevented || e.repeat || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return false;
+    if (e.key !== 'Enter' && e.key !== 'Escape') return false;
+    if (paused || chromeOpen || currentScreen() !== null || feed.expanded || devPanel.open || people !== null || dice.open || questList.isOpen) return false;
+    // Typing in a field: Enter is its own (the prompt sends); an empty prompt passes it on. A reply's next page keeps Enter.
+    const t = e.target as HTMLElement | null;
+    const field = t?.closest('input, textarea, [contenteditable="true"]') as HTMLInputElement | HTMLTextAreaElement | null;
+    if (field && e.key === 'Enter' && (field.value ?? field.textContent ?? '').trim() !== '') return false;
+    if (e.key === 'Enter' && feed.pageWaiting()) return false;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    if (e.key === 'Enter') setupCard!.card.go();
+    else setupCard!.card.back();
+    return true;
+  };
 
   // The chrome beside MAP: SAVE, CONTACTS and TITLE (spec 2026-10-07 §6), on S, C and T too.
   /** Set once the room is navigating away, so a later reason (the socket closing) can't redirect it. */
   let leaving = false;
-  const leave = (path: string, o: { branched?: true } = {}) => {
-    if (leaving) return;
+  /** Navigates away once; false when it didn't (already leaving, or a branch is on its way). */
+  const leave = (path: string, o: { branched?: true } = {}): boolean => {
+    if (leaving) return false;
     // A branch on its way switches the world (world-changed, the socket closing): the room waits
     // for its answer and leaves with it, so the new page can say where it is.
-    if (branching && !o.branched) return;
+    if (branching && !o.branched) return false;
     leaving = true;
     // A reload into a room (a branch, a world change, another contact) skips the district screen;
     // the title and /solo don't, so the next room opened from them shows it.
     if (path.startsWith('/room')) markSkipIntro();
     location.assign(path);
+    return true;
   };
   /** Who a `busy` refusal waits on: her, or (named by id) another contact. */
   const waitFor = (contact: string | undefined) =>
@@ -847,19 +1006,20 @@ function startRoom(agentId: string): void {
   let sheetPlayer: SheetPlayer | null = null;
   // Missions (spec 2026-10-18 §4): the kit the YOU sheet shows, fetched at load and after every quest move.
   let lastKit: KitView | null = null;
-  // A job's cues on the kit (small jobs spec §6): heat here up, sol up, a new deck, EDGE back at 06:00.
+  // A job's cues on the kit (small jobs spec §6): heat here up, sol up, a new deck, NERVE back at 06:00.
   const refreshKit = () =>
     void fetchKit().then((k) => {
       const was = lastKit;
       lastKit = k;
+      if (k) sheet?.setKit(k);
       if (!was || !k) return;
       if (k.heatHere > was.heatHere) missionCue('heat');
       if (k.sol > was.sol) missionCue('sol');
       if (k.deck && k.deck.id !== was.deck?.id) missionCue('deck');
-      if (k.edgeLeft > was.edgeLeft) missionCue('edge');
+      if (k.nerveLeft > was.nerveLeft) missionCue('edge');
     }).then(() => crewDot());
   /** CREW's dot: a crew result newer than the last one seen on its ASSIGN tab. */
-  const crewDot = () => hud.setCrewDot(!crew && lastKit !== null && lastKit.crewLatest !== null && lastKit.crewLatest > crewSeen(crewPt));
+  const crewDot = () => hud.setCrewDot(!crew && lastKit !== null && crewDotOn(lastKit, crewSeen(crewPt)));
   refreshKit();
   // Lore words (feedback 2026-10-19): the glossary once, the card over the stage, and the lines already up marked.
   installLoreCard(gameRoot());
@@ -868,7 +1028,7 @@ function startRoom(agentId: string): void {
     .then((b) => {
       if (!b) return;
       setGlossary(b.glossary);
-      for (const n of document.querySelectorAll<HTMLElement>('#feed .msg.agent .text, #feed .quest-row .text, .qc-story')) markLore(n);
+      for (const n of document.querySelectorAll<HTMLElement>('#feed .msg.agent .text, #feed .quest-row .text, .qc-story, .jc-body')) markLore(n);
     })
     .catch(() => {});
   let personaName: string | null = null;
@@ -882,9 +1042,11 @@ function startRoom(agentId: string): void {
     // The card's line, as LOAD will show the save: where, when, and who's with you.
     let place = defaultName;
     let time: string | null = null;
+    let me: string | null = null;
     try {
       const [list, known] = await Promise.all([listPlaythroughs(), contacts().catch(() => [])]);
       active = list.active;
+      me = list.playthroughs.find((p) => p.id === active)?.player ?? null;
       const here = known.find((c) => c.id === agentId);
       if (here) {
         defaultName = here.timeOfDay ? `${here.placeName}, ${here.timeOfDay}` : here.placeName;
@@ -901,7 +1063,8 @@ function startRoom(agentId: string): void {
     roomAudio.cue(MAP_CUE_URL, MAP_CUE_LEVEL);
     openSavePrompt(gameRoot(), {
       defaultName,
-      snapshot: { picture: scene?.layers[0] ? sceneDir(scene) + scene.layers[0].src : null, place, time, withName: agentName, withAccent: agentAccent },
+      // The strip LOAD will show (pause menu mockup 2026-10-30): the room, your face and hers.
+      snapshot: { scene: currentSceneId, you: me ? `/api/agents/${encodeURIComponent(me)}/thumb` : null, them: agentId !== me ? `/api/agents/${encodeURIComponent(agentId)}/thumb` : null, place, time, withName: agentName },
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
       onClose: () => (chromeOpen = false),
       save: async (name) => {
@@ -910,7 +1073,10 @@ function startRoom(agentId: string): void {
           feed.showNotice(`Saved: ${saved.name}`);
         } catch (err) {
           const f = saveFailure(err, waitFor);
-          if ('leave' in f) return leave(f.leave);
+          if ('leave' in f) {
+            leave(f.leave);
+            return;
+          }
           if ('notice' in f) {
             feed.showNotice(f.notice);
             return;
@@ -945,12 +1111,13 @@ function startRoom(agentId: string): void {
     }
     leave(`/room/${encodeURIComponent(id)}`);
   };
-  // PEOPLE (2026-10-18 spec §2): CONTACTS, LEADS and JOURNAL as tabs of one screen. Its key on its own tab closes it.
+  // PEOPLE (2026-10-18 spec §2): who you know, each one's FILE, and JOURNAL for the one you're with. A page's key on that page closes it.
   const openPeopleOn = (tab: PeopleTab) => {
     if (people) return people.tab === tab ? void people.requestClose() : people.show(tab);
     if (chromeOpen || dice.open) return;
     chromeOpen = true;
     map.close();
+    questList.close();
     roomAudio.cue(MAP_CUE_URL, MAP_CUE_LEVEL);
     const playthrough = <T,>(load: () => Promise<T>) => () =>
       load().catch((err: unknown) => {
@@ -961,12 +1128,12 @@ function startRoom(agentId: string): void {
       tab,
       contacts: playthrough(contacts),
       leads: playthrough(leads),
-      looseEnds: playthrough(looseEnds),
       journal,
       current: agentId,
       persona: personaName,
       dev: devPanel.open,
       pick: (id) => (people?.requestClose() ?? true) && void goToContact(id),
+      toQuest: (t) => (people?.requestClose(true) ?? true) && questList.openOn(t),
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
       onClose: () => {
         if (people) lastPeopleTab = people.tab;
@@ -1000,6 +1167,38 @@ function startRoom(agentId: string): void {
     hud.setOpen('crew');
     hud.setCrewDot(false);
   };
+  // TEXTS: Alt+X or its word opens it, the texts notice opens it on her thread; Alt+X, Esc or the word closes it.
+  const openTextsOn = (contact?: string) => {
+    if (texts) return contact ? texts.show(contact) : texts.close();
+    const cur = currentScreen();
+    if (cur) {
+      // From another screen of the cycle: switch, then her thread.
+      switchTo('texts');
+      if (contact) (texts as TextsHandle | null)?.show(contact);
+      return;
+    }
+    if (chromeOpen || dice.open) return;
+    chromeOpen = true;
+    map.close();
+    roomAudio.cue(MAP_CUE_URL, MAP_CUE_LEVEL);
+    textsKept ??= textsDeck(textsMemory);
+    texts = openTexts(gameRoot(), {
+      contact: contact ?? null,
+      deck: textsKept,
+      reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      onClose: () => {
+        texts = null;
+        chromeOpen = false;
+        hud.setOpen(null);
+      },
+    });
+    hud.setOpen('texts');
+  };
+  /** The room you're in, as a picture: YOU's banner. */
+  const roomPicture = (): string | undefined => {
+    const scene = currentSceneId ? scenes.get(currentSceneId) : undefined;
+    return scene?.layers[0] ? sceneDir(scene, '/scenes/') + scene.layers[0].src : undefined;
+  };
   // YOU (character sheet, 2026-10-16): who you're playing; its sections are the roadmap until they're built.
   const toggleSheet = (page: SheetPage = 'file') => {
     if (sheet) return sheet.close();
@@ -1012,8 +1211,10 @@ function startRoom(agentId: string): void {
     refreshKit();
     sheet = openCharacterSheet(gameRoot(), {
       page,
-      player: { ...(sheetPlayer ?? { name: personaName ?? 'You', sprite: null }), ...(lastKit ? { kit: lastKit } : {}) },
+      player: { ...(sheetPlayer ?? { name: personaName ?? 'You', sprite: null }), ...(lastKit ? { kit: lastKit } : {}), room: roomPicture() },
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      // CARRY another deck you own: kit_changed refreshes the kit, and the sheet with it.
+      onCarry: (deck) => socket?.send({ type: 'kit_carry', deck }),
       onClose: () => {
         sheet = null;
         chromeOpen = false;
@@ -1037,32 +1238,37 @@ function startRoom(agentId: string): void {
     });
     hud.setOpen('you');
   };
-  /** Which of YOU, PEOPLE, CREW and MAP is up (one at a time), or null. */
-  const currentScreen = (): CycleScreen | null => (sheet ? 'you' : people ? 'people' : crew ? 'crew' : map.isOpen ? 'map' : null);
+  /** Which of YOU, PEOPLE, TEXTS, QUEST, CREW and MAP is up (one at a time), or null. */
+  const currentScreen = (): CycleScreen | null => (sheet ? 'you' : people ? 'people' : texts ? 'texts' : questList.isOpen ? 'quest' : crew ? 'crew' : map.isOpen ? 'map' : null);
   /** From the open one of the three to `s`: the old one goes at once (unsaved journal work refuses), the new one glitches in. */
-  /** `dir` -1 (Shift+Tab on the cycle) comes into YOU at its last page, SHEET, so the ring runs the same both ways. */
+  /** `dir` -1 (Shift+Tab on the cycle) comes into YOU at its last page, KIT, so the ring runs the same both ways. */
   const switchTo = (s: CycleScreen, dir: 1 | -1 = 1) => {
     const cur = currentScreen();
     if (cur === s || dice.open) return;
     if (cur === 'people' && !people?.requestClose(true)) return;
     if (cur === 'you') sheet?.close(true);
+    if (cur === 'texts') texts?.close(true);
+    if (cur === 'quest') questList.close();
     if (cur === 'crew') crew?.close(true);
     if (cur === 'map') map.close(true);
-    if (s === 'you') toggleSheet(dir < 0 ? 'sheet' : 'file');
-    else if (s === 'people') openPeopleOn(lastPeopleTab);
+    if (s === 'you') toggleSheet(dir < 0 ? 'kit' : 'file');
+    else if (s === 'people') openPeopleOn(dir < 0 ? 'journal' : 'file');
+    else if (s === 'texts') openTextsOn();
+    else if (s === 'quest') questList.toggle();
     else if (s === 'crew') openCrewOn();
     else map.open();
   };
-  // Tab cycles YOU → PEOPLE → MAP while one is up (Shift+Tab back), unless a field of its own or something over it has the keys.
+  // Tab cycles YOU → PEOPLE → TEXTS → QUEST → CREW → MAP while one is up (Shift+Tab back), unless a field of its own or something over it has the keys.
   listenScreenCycle(window, {
     current: currentScreen,
     inField: () => {
       const a = document.activeElement;
-      return (a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) && a.closest('.scr-root, #map') !== null;
+      return ((a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) && a.closest('.scr-root, #map') !== null) || textsOwnsTab(a);
     },
-    blocked: () => gigWindow !== null || modelMenu.isOpen || bugReportOpen() || dice.open || recap.visible || encounterPanel !== null,
+    blocked: () => gigWindow !== null || modelMenu.isOpen || bugReportOpen() || dice.open || recap.visible || cardsOpen(),
     go: switchTo,
-    turnPage: (cur, dir) => cur === 'you' && sheet !== null && sheet.turnPage(dir),
+    turnPage: (cur, dir) => (cur === 'you' ? sheet?.turnPage(dir) : cur === 'people' ? people?.turnPage(dir) : false) ?? false,
+    shown: (s) => s !== 'quest' || questList.has(),
   });
   hud.setYou(() => {
     if (dice.open) return;
@@ -1074,21 +1280,90 @@ function startRoom(agentId: string): void {
     if (!dice.open) void openSave();
   });
   hud.setPeople(() => ((currentScreen() ?? 'people') === 'people' ? openPeopleOn(lastPeopleTab) : switchTo('people')));
+  hud.setTextsScreen(() => ((currentScreen() ?? 'texts') === 'texts' ? openTextsOn() : switchTo('texts')));
+  hud.setTextsNotice((contact) => openTextsOn(contact));
   hud.setCrew(() => ((currentScreen() ?? 'crew') === 'crew' ? openCrewOn() : switchTo('crew')));
   hud.setQuest(() => {
-    if (!dice.open) questList.toggle();
+    if (!dice.open) (currentScreen() ?? 'quest') === 'quest' ? questList.toggle() : switchTo('quest');
   });
   hud.setBackLink(() => leave('/'));
+  // MENU in SYS: the pause menu for a pointer or a phone (no Esc there).
+  hud.setPause(() => openPause());
+
+  // PAUSED (spec 2026-10-30): Esc with nothing else open. SAVE, LOAD (the title's, over the room), SETTINGS (SYS) or TITLE.
+  let paused: { close(): void } | null = null;
+  /** LOAD is up over the room: a world change waits for it (it navigates itself), or runs if it's backed out of. */
+  let loadOver: { pending: (() => void) | null } | null = null;
+  const openPause = () => {
+    if (paused || chromeOpen || currentScreen() !== null || dice.open || recap.visible || cardsOpen() || (intro?.open ?? false) || (travelScreen?.screen.open ?? false)) return;
+    chromeOpen = true;
+    roomAudio.cue(PAUSE_IN_CUE_URL, MAP_CUE_LEVEL);
+    paused = openPauseMenu(gameRoot(), {
+      where: [hud.where(), agentName ? `WITH ${agentName.toUpperCase()}` : null].filter(Boolean).join(' · '),
+      saveBlockedBy: () => hud.saveBlockedBy,
+      reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      onClose: (resumed) => {
+        paused = null;
+        chromeOpen = false;
+        // Back to the room: the tape spins up. SAVE, LOAD, SETTINGS and TITLE go on to their own screens.
+        if (resumed) roomAudio.cue(PAUSE_OUT_CUE_URL, MAP_CUE_LEVEL);
+      },
+      onSave: () => hud.pressSave(),
+      onLoad: () => openLoadOver(),
+      onSettings: () => hud.openSys(),
+      onTitle: () => leave('/'),
+    });
+  };
+  /** LOAD from PAUSED: the title's LOAD over the room; Esc goes back to PAUSED, a load leaves for the room it opens. */
+  const openLoadOver = () => {
+    chromeOpen = true;
+    loadOver = { pending: null };
+    const host = document.createElement('div');
+    host.className = 'pause-load';
+    gameRoot().append(host);
+    const roster = new Map<string, LandingAgent>();
+    const load = mountLoad(host, {
+      api: playthroughApi,
+      // A branch on its way keeps the room: LOAD says so and unlocks.
+      nav: (path) => {
+        if (!leave(path)) throw new Error('wait for the branch to finish');
+      },
+      back: () => {
+        load.destroy();
+        host.remove();
+        chromeOpen = false;
+        const pending = loadOver?.pending;
+        loadOver = null;
+        if (pending) pending();
+        else openPause();
+      },
+      sound: () => {},
+      agents: () => roster,
+      reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      exclusive: true,
+    });
+    // Faces arrive with the roster.
+    void fetch('/api/agents')
+      .then((r) => (r.ok ? (r.json() as Promise<{ agents: LandingAgent[] }>) : null))
+      .then((b) => {
+        for (const a of b?.agents ?? []) roster.set(a.id, a);
+        load.refresh();
+      })
+      .catch(() => {});
+  };
   const hideUi = listenHideUi(window, document.body);
   listenChromeKeys(window, {
-    modalOpen: () => chromeOpen || map.isOpen || recap.visible || encounterPanel !== null || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false),
+    modalOpen: () => chromeOpen || map.isOpen || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false),
     run: (k) => {
       if (k === 'you') toggleSheet();
       else if (k === 'save') hud.pressSave();
       else if (k === 'people') openPeopleOn(lastPeopleTab);
-      else if (k === 'contacts' || k === 'leads' || k === 'journal' || k === 'loose') openPeopleOn(k);
-      else if (k === 'quest') questList.toggle();
+      else if (k === 'contacts') openPeopleOn('file');
+      else if (k === 'journal') openPeopleOn('journal');
+      else if (k === 'leads' || k === 'loose') questList.openOn(k);
+      else if (k === 'quest') (currentScreen() ?? 'quest') === 'quest' ? questList.toggle() : switchTo('quest');
       else if (k === 'crew') openCrewOn();
+      else if (k === 'texts') openTextsOn();
       else if (k === 'hide') hideUi.toggle();
       else leave('/');
     },
@@ -1097,7 +1372,7 @@ function startRoom(agentId: string): void {
   // Doors (clickable doors spec §3): click one to go through its exit; inert while a panel is open.
   const doors = new DoorLayer(byId('doors'), {
     send: (to) => socket?.send({ type: 'exit', to }),
-    blocked: () => chromeOpen || map.isOpen || whosHere.cardOpen || questList.isOpen || recap.visible || encounterPanel !== null || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigWindow !== null,
+    blocked: () => chromeOpen || map.isOpen || whosHere.cardOpen || questList.isOpen || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigWindow !== null,
     roomRect: () => renderer?.roomRect() ?? { left: 0, top: 0, width: 0, height: 0 },
     stage: () => gameStage.rect(),
   });
@@ -1116,10 +1391,10 @@ function startRoom(agentId: string): void {
     encounterPanel?.destroy();
     encounterPanel = null;
   };
-  const openEncounter = () => {
-    if (encounterPanel) return;
+  /** The three-card panels' header: who, where, when, and who else is here. */
+  const cardsHeader = () => {
     const scene = currentSceneId ? scenes.get(currentSceneId) : undefined;
-    const header = [
+    return [
       `${(personaName ?? 'YOU').toUpperCase()} × ${agentName.toUpperCase()}`,
       scene?.name.toUpperCase(),
       atmosphere?.timeOfDay.toUpperCase(),
@@ -1128,8 +1403,11 @@ function startRoom(agentId: string): void {
     ]
       .filter(Boolean)
       .join(' · ');
+  };
+  const openEncounter = () => {
+    if (cardsOpen()) return;
     encounterPanel = new EncounterPanel(gameRoot(), {
-      header,
+      header: cardsHeader(),
       ...(modelText ? { model: modelText } : {}),
       cached: dealer.cached,
       load: () => dealer.load(),
@@ -1143,19 +1421,66 @@ function startRoom(agentId: string): void {
       onCache: () => {}, // the dealer keeps it
     });
   };
-  // While the panel is up it has the keyboard: its own keys, and no typing into the prompt behind
-  // it. Alt+M (out of character) and Alt+E (END SCENE) close it first — its events were for this
+  // SUGGEST: her model's three drafts of your next line on DRAW's panel, in cyan. Enter sends one,
+  // E puts it in the box to edit, Esc leaves the box as it was. The last set is kept, like DRAW's,
+  // for the same steer until a new turn lands or you move.
+  let suggestPanel: CardsPanel<SuggestDraft> | null = null;
+  let suggestSteer: string | null = null;
+  const suggestDealer = createDealer(() => suggestLines(agentId, suggestSteer));
+  const closeSuggest = () => {
+    suggestPanel?.destroy();
+    suggestPanel = null;
+  };
+  /** The moment changed (her turn, a rewind, a resync): SUGGEST's set is spent, and its panel goes. */
+  const suggestSpent = () => {
+    suggestDealer.clear();
+    closeSuggest();
+  };
+  momentMoved = suggestSpent;
+  /** One of the three-card panels (DRAW's or SUGGEST's) is up. */
+  const cardsOpen = () => encounterPanel !== null || suggestPanel !== null;
+  const openSuggest = (steer: string | null) => {
+    if (cardsOpen()) return;
+    if (steer !== suggestSteer) suggestDealer.clear();
+    suggestSteer = steer;
+    suggestPanel = openSuggestPanel(gameRoot(), {
+      header: cardsHeader(),
+      ...(modelText ? { model: modelText } : {}),
+      steer,
+      cached: suggestDealer.cached,
+      load: () => suggestDealer.load(),
+      onSend: (text) => {
+        // Still in character, connected and idle? (The bar's SUGGEST state says why not.)
+        const why = input.suggestWhyNot() ?? (socket ? null : her().waitToFinish);
+        if (why) return suggestPanel?.showRefusal(why);
+        // A send the server refuses comes back to the box (restoreDraft).
+        input.clearDraft();
+        closeSuggest();
+        sendTurn({ type: 'user_message', text, mode: 'rp' });
+      },
+      onEdit: (text) => {
+        closeSuggest();
+        input.setDraft(text);
+      },
+      onCancel: closeSuggest,
+      onCache: () => {}, // the dealer keeps it
+    });
+  };
+  // While a panel is up it has the keyboard: its own keys, and no typing into the prompt behind
+  // it. Alt+M (out of character) and Alt+E (END SCENE) close it first — its cards were for this
   // scene, in character. Other Alt shortcuts wait (the save prompt checks it as a modal).
   window.addEventListener(
     'keydown',
     (e) => {
-      if (!encounterPanel) return;
+      const panel = encounterPanel ?? suggestPanel;
+      if (!panel) return;
       if (e.altKey && !e.ctrlKey && !e.metaKey && (e.code === 'KeyM' || e.code === 'KeyE')) {
         closeEncounter();
+        closeSuggest();
         return;
       }
       if (e.altKey || e.ctrlKey || e.metaKey) return;
-      encounterPanel.key(e);
+      panel.key(e);
       e.preventDefault();
       e.stopImmediatePropagation();
     },
@@ -1172,6 +1497,7 @@ function startRoom(agentId: string): void {
     switch (e.type) {
       case 'history':
         feed.setHistory(e.messages);
+        suggestSpent();
         input.setWalkOut(walkOutDue(feed.messages(), noWalkOut()));
         greetGate.onHistory(greetAllowed(e.greetDue, feed.messages(), noWalkOut()));
         // The page-load screen: a new game opens on HOW IT OPENS, anything else picks up where it was.
@@ -1198,6 +1524,7 @@ function startRoom(agentId: string): void {
         if (e.message.role === 'user' && e.message.status === 'ok') {
           dealer.clear();
           if (e.message.mode === 'encounter') closeEncounter();
+          suggestSpent();
           // Her turn has started on the game: the tray goes, her face back to hers.
           if (e.message.mode === 'dice') dice.row(e.message);
           // Her turn has started on the run: the window and the map go.
@@ -1218,6 +1545,7 @@ function startRoom(agentId: string): void {
         break;
       case 'messages_removed':
         feed.remove(e.ids);
+        suggestSpent();
         input.setWalkOut(walkOutDue(feed.messages(), noWalkOut()));
         break;
       case 'control_rejected':
@@ -1271,14 +1599,48 @@ function startRoom(agentId: string): void {
             // A blown job's cover cards read under the pick that blew it (its row is written after the card).
             const blown = next.active?.blown;
             const shownStory = blown ? (blown.pick && blown.text.startsWith(blown.pick.line) ? blown.text.slice(blown.pick.line.length).replace(/^\n+/, '') : blown.text) : story?.text;
+            // The job GO IN started, or it left the board while its card was up: the setup card goes.
+            if (setupCard && (next.active?.id === setupCard.id || !next.open.some((q) => q.id === setupCard!.id))) {
+              setupCard.card.close();
+              setupGone();
+              setupCard = null;
+            } else if (setupCard) {
+              // Still up with a fresh offer (a deck carried on YOU, a recruit back): it follows, picks kept.
+              const open = next.open.find((q) => q.id === setupCard!.id);
+              const offer = open?.setup ? JSON.stringify(open.setup) : setupCard.offer;
+              if (open?.setup && offer !== setupCard.offer) {
+                setupCard.offer = offer;
+                setupCard.card.update(open.setup);
+                jobColumn.show(open.title, open.pitch, setupLine(open.setup));
+              }
+            }
+            // A job's ending that came in since the last one shown: its debrief deals on the table.
+            const ending = story?.ended && story.id !== questEndShown ? story : null;
+            const debrief = ending ? feed.messages().find((m) => m.id === ending.id)?.quest?.debrief : undefined;
+            // A job plays on the table (the hand spec §5); story quests on the panel.
+            const act = tableAction({ active: next.active, debrief: debrief !== undefined, tableOpen: jobTable.isOpen(), tableEnded: jobTable.ended() });
+            if (act === 'show') {
+              questCards.show(null);
+              jobTable.show(next.active!, shownStory);
+              showTableText(next.active!.title, shownStory);
+              return;
+            }
+            if (act === 'close') jobTable.close();
+            if (act === 'end' && ending && debrief) {
+              questEndShown = ending.id;
+              // Its stamp sounds and its sol counts up only for an ending that came in on this tab.
+              const live = ending.id === lastJobEnd;
+              const card = debriefEl(debrief, { cue: live ? missionCue : () => {}, reduced: !live || reducedMotion() });
+              jobTable.end(ending.title, ending.text, card, debrief);
+              // At the HUD table the rolls read in the JOB column; a phone's table has no column and keeps them on the card.
+              showTableText(ending.title, ending.text, jobTable.root.classList.contains('phone') ? null : debriefRolls(card));
+            }
             if (next.active) questCards.show(next.active, shownStory);
             else if (next.waiting) questCards.waiting(next.waiting, storyClock, story?.text);
             else if (story?.ended && story.id !== questEndShown) {
+              // A story quest's end stays on the panel.
               questEndShown = story.id;
-              // A job's debrief (small jobs spec §6); its stamp sounds and its sol counts up only for an ending that came in on this tab.
-              const debrief = feed.messages().find((m) => m.id === story.id)?.quest?.debrief;
-              const live = story.id === lastJobEnd;
-              questCards.end(story.title, story.text, debrief ? { debrief, cue: live ? missionCue : () => {}, reduced: !live || reducedMotion() } : undefined);
+              questCards.end(story.title, story.text);
             } else questCards.show(null);
           });
         questList.show(e.state);
@@ -1296,7 +1658,8 @@ function startRoom(agentId: string): void {
       }
       case 'quest_pick':
         questHeld = { id: e.id, beat: e.beat };
-        questCards.pick(e.choice, e.text);
+        if (jobTable.isOpen()) jobTable.pick(e.choice, e.text);
+        else questCards.pick(e.choice, e.text);
         break;
       case 'notice':
         // A play the server refused (busy, no key) is said in the open panel; anything else in the feed.
@@ -1304,12 +1667,18 @@ function startRoom(agentId: string): void {
         else if (e.for === 'gig' && gigWindow) gigWindow.showRefusal(e.text);
         else if (e.for === 'dice' && dice.open) dice.refusal(e.text);
         else if (e.for === 'crew' && crew) crew.refusal(e.text);
+        else if (e.for === 'kit' && sheet) sheet.refusal(e.text);
+        // GO IN refused (someone isn't ready, no favours): said on the setup card, which stays open.
+        else if (e.for === 'quest' && setupCard?.card.isOpen()) setupCard.card.refuse(e.text);
         // GO refused (busy, no key, not on your line): said on the arrival screen, the line kept.
         else if (e.for === 'travel' && travelScreen?.screen.open) travelScreen.screen.notice(e.text);
         else {
           feed.showNotice(e.text);
           doors.refused();
         }
+        break;
+      case 'kit_changed':
+        refreshKit();
         break;
       case 'crew_changed':
         crew?.refresh();
@@ -1325,7 +1694,7 @@ function startRoom(agentId: string): void {
         hud.setTexts(e.from);
         break;
       case 'clock':
-        // A WAIT or a trip moves the clock: heat cools and EDGE refills at 06:00 (missions spec §1); crew errands land.
+        // A WAIT or a trip moves the clock: heat cools and NERVE refills at 06:00 (missions spec §1); crew errands land.
         refreshKit();
         crew?.refresh();
         storyClock = e.clock;
@@ -1341,15 +1710,21 @@ function startRoom(agentId: string): void {
         comms = { on: e.on, can: e.can, where: e.where, herAt: e.herAt };
         applyComms();
         break;
-      case 'world-changed':
+      case 'world-changed': {
         // Another tab switched playthroughs: follow the world to its contact, or to the solo screen (this socket closes next).
         // The server sent you solo after her goodbye (HANG UP, a dropped line): that goodbye is walked out on.
-        if (e.solo === true && walkOutDue(feed.messages(), noWalkOut())) {
-          const goodbye = feed.messages().findLast((m) => m.role === 'agent');
-          if (goodbye) markWalkedOut(goodbye.id);
-        }
-        leave(worldChangedPath(e.location, e.solo === true));
+        const follow = () => {
+          if (e.solo === true && walkOutDue(feed.messages(), noWalkOut())) {
+            const goodbye = feed.messages().findLast((m) => m.role === 'agent');
+            if (goodbye) markWalkedOut(goodbye.id);
+          }
+          leave(worldChangedPath(e.location, e.solo === true));
+        };
+        // LOAD over the room switched it (review I3): LOAD goes where it loaded; if it's backed out of, follow then.
+        if (loadOver) loadOver.pending = follow;
+        else follow();
         break;
+      }
       case 'portrait': {
         const chain: FigureSource[] = [];
         if (e.sprite) {
@@ -1409,6 +1784,7 @@ function startRoom(agentId: string): void {
         if (currentSceneId !== null && currentSceneId !== e.state.sceneId) {
           dealer.clear();
           closeEncounter();
+          suggestSpent();
           dice.roomChanged();
         }
         atmosphere = e.state.atmosphere;

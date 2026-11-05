@@ -33,6 +33,7 @@
     "mother-rot": "Ines Calder. Night-crew foreperson at a Drownworks pump house; a Waterkeeper. She turned your man away at the Works gate in front of her whole crew, and she sends your new-year crate back every year. You'd give a great deal to hear her call you clean water."
   },
   "standing": {
+    "vouches": "muscle",
     "start": {
       "trust": -1,
       "warmth": 0

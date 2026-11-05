@@ -127,8 +127,8 @@ describe('map schema', () => {
     expect(parseMap(m).ok).toBe(false);
   });
 
-  it("has gigs at The Tilt, the public landing, Under the Cat (the Glass Orchid's slips) and the Ferry Stairs (papers) on the shipped map", () => {
-    expect(parsed(shipped()).places.filter((p) => p.gigs).map((p) => p.id).sort()).toEqual(['ferry-stairs', 'public-landing', 'the-tilt', 'under-the-cat']);
+  it('has gigs (papers) at The Tilt and the Ferry Stairs on the shipped map; hack and slip went 2026-11-01', () => {
+    expect(parsed(shipped()).places.filter((p) => p.gigs).map((p) => p.id).sort()).toEqual(['ferry-stairs', 'the-tilt']);
   });
 
   it("keeps her apartment private: the walk-up's pin is its landing, the apartment has no place, and no room's exit leads inside", () => {

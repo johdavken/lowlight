@@ -108,6 +108,7 @@ const soundSchema = z.object({
   indoor: z.boolean().optional(),
   bed: z.object({ src: z.string(), level: unit().optional() }).optional(),
   hum: unit().optional(),
+  reverb: unit().optional(),
   // A list of songs; the old single `{ src }` loads as a one-song list.
   music: z
     .union([

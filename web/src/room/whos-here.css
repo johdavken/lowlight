@@ -142,3 +142,5 @@
 @media (prefers-reduced-motion: reduce) {
   .wh-tile, .wh-face { transition: none; }
 }
+/* HUD (2026-11-02): the job table's log column stands where the party window is; the people with you are in the hand. */
+#game:has(> .tb.hud:not([hidden]):not(.phone)) .wh-party { display: none; }

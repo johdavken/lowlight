@@ -185,9 +185,11 @@ export function createRoomAudio(deps: {
       if (unlocked) engine.burst();
     },
 
-    /** A one-shot UI sample (e.g. the select screen's page swap); silent until unlocked. */
-    cue(url: string, level?: number): void {
-      if (unlocked) engine.oneShot(url, level);
+    /** A one-shot UI sample (e.g. the select screen's page swap); silent until unlocked. `o` as `oneShot`'s. */
+    cue(url: string, level?: number, o?: { rate?: number; overlap?: boolean }): void {
+      if (!unlocked) return;
+      if (o) engine.oneShot(url, level, undefined, o);
+      else engine.oneShot(url, level);
     },
 
     /**

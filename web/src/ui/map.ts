@@ -2,7 +2,8 @@
 import { bugReportOpen } from './bug-report';
 import { insideBorder, parseMap, type CityMapData, type District, type Place } from '../../../shared/map-schema';
 import { AmbienceLayer } from './map/ambience-layer';
-import { CITY_VIEW, cityView, clampView, coverSize, pinchView, zoomAt, type Point, type Size, type View } from './map/camera';
+import { CITY_VIEW, cityView, clampView, coverSize, frameView, pinchView, zoomAt, type Frame, type Point, type Size, type View } from './map/camera';
+import { toScreen } from '../../../shared/map-projection';
 import { CityMap, type MapCue, type WhoIsWhere } from './map/city-map';
 import type { LitWindow } from './map/ambience';
 import { BlackoutLayer } from './map/blackout-layer';
@@ -11,13 +12,16 @@ import { ScreenFx } from './map/screen-fx';
 import type { Weather } from '../../../shared/types';
 
 export const MAP_URL = '/map/lowlight.webp';
-/** The page-swap cue (once the select screen's roster swap). */
-export const MAP_CUE_URL = '/sound/ui/page-swap.ogg';
-/** 0.9 (the cue's chosen level) under the landing's 0.25 audio scale. */
-export const MAP_CUE_LEVEL = 0.9 * 0.25;
+/** The panel cue: MAP, QUEST, PEOPLE, CREW, TEXTS, YOU and the save prompt open on it. */
+export const MAP_CUE_URL = '/sound/ui/panel.ogg';
+/** PAUSED opening, and closing back to the room. */
+export const PAUSE_IN_CUE_URL = '/sound/ui/pause-in.ogg';
+export const PAUSE_OUT_CUE_URL = '/sound/ui/pause-out.ogg';
+/** As auditioned on the Transition Mix (straight out, over scene music at 0.3); the old 0.25 landing scale made it inaudible. */
+export const MAP_CUE_LEVEL = 0.9;
 /** The glitch-out's length (`map-glitch-out` in style.css); the overlay hides when it ends. */
 const GLITCH_OUT_MS = 600;
-/** The camera's ease into and out of a district. */
+/** The camera's ease to a district (its name clicked) and back out to the city. */
 const CAMERA_MS = 700;
 /** The picture's shape (w / h) until it has loaded. */
 const MAP_ASPECT = 3 / 2;
@@ -66,10 +70,11 @@ export interface MapPanelOptions {
 }
 
 /**
- * The MAP overlay, filling the game stage: the HUD link toggles it, Esc closes (an open district first, back to the city).
- * The picture covers the screen at 1×; scroll zooms about the pointer and dragging moves it; opening a district leaves
- * the camera where it is (no auto district zoom); the arrows move along the band and Enter opens a district or GOes. It glitches in each time it opens and
- * out each time it closes (neither under reduced motion), and calls `onOpen` (the page-swap cue). The screen sits under scanlines,
+ * The MAP overlay, filling the game stage: the HUD link toggles it. The picture covers the screen at 1×; scroll zooms
+ * about the pointer and dragging moves it; a district's name eases the camera to it (map pins spec, 2026-10-30). A pin
+ * opens its place's card; the arrows walk the places and Enter GOes. Esc closes the card, then zooms back out to the
+ * city, then closes the map. It glitches in each time it opens and
+ * out each time it closes (neither under reduced motion), and calls `onOpen` (the panel cue). The screen sits under scanlines,
  * a rolling bar, a faint animated fuzz and a vignette, like looking at a CRT.
  */
 export class MapPanel {
@@ -98,6 +103,8 @@ export class MapPanel {
   /** Where the camera is now, and its running ease (stepped here, so the pins' counter-scale moves with it frame by frame). */
   private view: View = CITY_VIEW;
   private easing = 0;
+  /** Where a running ease is going (null when none): Esc reads the zoom it's heading for. */
+  private target: View | null = null;
   // A resize keeps the player's zoom, only clamped so the map still covers the screen.
   private readonly onResize = () => this.setView(clampView(this.view, this.mapSize(), this.screenSize()));
   /** Bumped per open, so a slow load never draws over a later one. */
@@ -144,7 +151,8 @@ export class MapPanel {
     const onTravel = opts.onTravel;
     this.city = new CityMap(this.world, {
       overlay: this.overlay,
-      // (No onFrame: opening or closing a district no longer moves the camera.)
+      onZoomTo: (f) => this.zoomToFrame(f),
+      onFocus: (p) => p && this.bringIntoView(p),
       onCue: opts.onCue,
       reducedMotion: opts.reducedMotion,
       onTravel: onTravel
@@ -176,6 +184,12 @@ export class MapPanel {
     this.screen.addEventListener('pointerup', this.onUp);
     this.screen.addEventListener('pointercancel', this.onUp);
     this.screen.addEventListener('wheel', this.onWheel, { passive: false });
+    // A click on the map itself (not a pin, a name or the card) closes the card; the click ending a drag never gets here.
+    this.screen.addEventListener('click', (e) => {
+      const t = e.target as Element | null;
+      if (!this.isOpen || this.onOverlay(t) || t?.closest('.pin')) return;
+      this.city.select(null);
+    });
   }
 
   get isOpen(): boolean {
@@ -190,7 +204,7 @@ export class MapPanel {
     this.play('map-glitch-in');
     // Nothing from the last opening shows while this one loads (or if it fails): pins, panel, nor its zoom.
     this.city.clear();
-    cancelAnimationFrame(this.easing);
+    this.stopEase();
     this.drag = null;
     this.pinch = null;
     this.pts.clear();
@@ -202,6 +216,19 @@ export class MapPanel {
   /** A place by its id, from the map as last loaded (null before it loads, or for no such place): the arrival screen names where GO goes. */
   place(id: string): Place | null {
     return this.mapData?.places.find((p) => p.id === id) ?? null;
+  }
+
+  /** A place by its id, the map's data loaded first if it never has been: QUEST's GO THERE can come before the map ever opened. */
+  async findPlace(id: string): Promise<Place | null> {
+    if (!this.mapData) {
+      try {
+        const parsed = parseMap(await this.opts.load());
+        if (parsed.ok) this.mapData ??= parsed.map;
+      } catch {
+        // Broken map data: the map says so when it opens; GO THERE does nothing.
+      }
+    }
+    return this.place(id);
   }
 
   /** The place a room is, from the map as last loaded: where GO leaves from. */
@@ -390,7 +417,7 @@ export class MapPanel {
     window.removeEventListener('keydown', this.onKey, true);
     window.removeEventListener('resize', this.onResize);
     this.img.removeEventListener('load', this.onResize);
-    cancelAnimationFrame(this.easing);
+    this.stopEase();
     this.ambience.dispose();
     this.fx.dispose();
     this.tiles?.dispose();
@@ -448,7 +475,7 @@ export class MapPanel {
   private wheel(e: WheelEvent): void {
     if (!this.isOpen || this.onOverlay(e.target) || !e.deltaY) return;
     e.preventDefault();
-    cancelAnimationFrame(this.easing);
+    this.stopEase();
     const px = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
     const factor = Math.exp(-Math.max(-200, Math.min(200, px)) * 0.0015);
     this.setView(zoomAt(this.view, factor, this.screenPoint(e), this.mapSize(), this.screenSize(), this.maxScale()));
@@ -472,7 +499,7 @@ export class MapPanel {
       return;
     }
     // A second finger: the drag becomes a pinch, from where the camera is now; its end is swallowed like a drag's.
-    cancelAnimationFrame(this.easing);
+    this.stopEase();
     const a = this.pts.get(d.id)!, b = this.pts.get(e.pointerId)!;
     this.pinch = { a: d.id, b: e.pointerId, view: this.view, mid: midpoint(a, b), dist: Math.hypot(b.x - a.x, b.y - a.y) };
     this.startDragging(d);
@@ -497,7 +524,7 @@ export class MapPanel {
     const z = this.zoom();
     if (!d.moved) {
       if (Math.hypot(e.clientX - d.x, e.clientY - d.y) / z < DRAG_PX) return;
-      cancelAnimationFrame(this.easing);
+      this.stopEase();
       // From where the camera is now (it may have been easing) and the pointer now, so nothing jumps.
       d.x = e.clientX;
       d.y = e.clientY;
@@ -556,17 +583,46 @@ export class MapPanel {
     this.moveCamera(w && h ? cityView(this.mapSize(), { w, h }) : CITY_VIEW);
   }
 
+  /** A district's frame, fitted and eased to (the deep-zoom limit where the frame lands on a deep district). */
+  private zoomToFrame(f: Frame): void {
+    const map = this.mapSize(), screen = this.screenSize();
+    const deep = frameView(f, map, screen, DEEP_MAX_SCALE);
+    this.moveCamera(frameView(f, map, screen, Math.min(USER_MAX_SCALE, this.maxScale(deep))));
+  }
+
+  /** The focused place's pin, eased to the screen's middle when it's off screen (the arrows can walk to any place). */
+  private bringIntoView(p: Place): void {
+    const map = this.mapSize(), screen = this.screenSize();
+    const [x, y] = toScreen(p.pin, this.tilesOn ? (this.tiles?.manifest?.pinHeights?.[p.id] ?? 0) : 0);
+    const sx = (x / 100) * map.w * this.view.scale + this.view.tx;
+    const sy = (y / 100) * map.h * this.view.scale + this.view.ty;
+    const m = 60;
+    if (sx >= m && sx <= screen.w - m && sy >= m && sy <= screen.h - m) return;
+    const v = this.view;
+    this.moveCamera(clampView({ scale: v.scale, tx: v.tx + screen.w / 2 - sx, ty: v.ty + screen.h / 2 - sy }, map, screen));
+  }
+
+  /** Stops a running ease where it is. */
+  private stopEase(): void {
+    cancelAnimationFrame(this.easing);
+    this.target = null;
+  }
+
   /** Eases the camera to `to` (at once under reduced motion), setting the transform and --inv together each frame. */
   private moveCamera(to: View): void {
-    cancelAnimationFrame(this.easing);
+    this.stopEase();
     const from = this.view;
     if (this.opts.reducedMotion || (from.scale === to.scale && from.tx === to.tx && from.ty === to.ty)) return this.setView(to);
+    this.target = to;
     const t0 = performance.now();
     const step = (now: number) => {
       const k = Math.min(1, (now - t0) / CAMERA_MS);
       const e = ease(k);
       const at = (a: number, b: number) => a + (b - a) * e;
-      if (k === 1) return this.setView(to);
+      if (k === 1) {
+        this.target = null;
+        return this.setView(to);
+      }
       this.setView({ scale: at(from.scale, to.scale), tx: at(from.tx, to.tx), ty: at(from.ty, to.ty) });
       this.easing = requestAnimationFrame(step);
     };
@@ -580,6 +636,8 @@ export class MapPanel {
     this.world.style.height = `${map.h}px`;
     this.world.style.transform = `translate(${v.tx}px, ${v.ty}px) scale(${v.scale})`;
     this.world.style.setProperty('--inv', String(1 / v.scale));
+    // Pins: dots far out, names near (map pins spec §2).
+    this.city.setScale(v.scale);
     // The survey grid past the city's edges (spec 2026-10-28 §3): lines every 10 % and 2.5 % of the map, on the camera.
     const W = map.w * v.scale, H = map.h * v.scale;
     this.screen.style.backgroundSize = [10, 10, 40, 40].map((n) => `${W / n}px ${H / n}px`).join(', ');
@@ -612,7 +670,13 @@ export class MapPanel {
       e.preventDefault();
       e.stopImmediatePropagation();
       if (this.closing === null && this.opts.escapeFirst?.()) return;
-      if (this.closing !== null || !this.city.handleEscape()) this.close();
+      if (this.closing !== null) return this.close();
+      // The card, then the zoom (back out to the whole city), then the map.
+      if (this.city.handleEscape()) return;
+      // The zoom an ease is heading for: a second Esc during the ease out closes the map (review M10).
+      const easingRunning = this.target !== null;
+      if ((easingRunning ? this.target!.scale : this.view.scale) > 1.02) return this.moveCamera(cityView(this.mapSize(), this.screenSize()));
+      this.close();
     }
   }
 }

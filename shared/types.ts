@@ -1,11 +1,15 @@
 import type { CipherState } from './cipher';
 import type { Pronoun } from './pronoun';
-import type { Band, Risk, Specialty } from './crew-book';
+import type { ChairCheck } from './arrangement';
+import type { Band, Grade, JobEffect, Risk, Specialty, Timing } from './crew-book';
+import type { Approach } from './hand';
 import type { CrewOdds, ErrandInstance, HireCard, LoyaltyWord } from './crew';
 import type { CrewMember, CrewResult } from './crew-fold';
 import type { DiceSettings } from './dice/opponent';
 import type { Stats } from './stats';
-import type { Odds } from './mission';
+import type { CostId } from './costs';
+import type { ProgramKind } from './programs';
+import type { Effect, Pool, Position } from './dice';
 import type { Roll } from './quests';
 import type { Deck } from './gear';
 import type { TerminalSetup } from './crack';
@@ -173,6 +177,8 @@ export interface SceneSound {
   bed?: { src: string; level?: number };
   /** Synthesized room tone level (0..1) when there's no bed. */
   hum?: number;
+  /** How much the street's walls answer the rain, wind and neon (0..1; a reverb send, 0.3 is subtle). Off when unset. */
+  reverb?: number;
   /** The place's songs, shuffled with pauses between them: file names in the pack's `_music/` folder; `level` 0..1 (default 0.3). */
   music?: SceneMusic;
   /** One-off sounds: on a timer, on entry, or played by the agent (`play_sound`). */
@@ -204,40 +210,118 @@ export interface RoomState {
 /** Roleplay (in character), out of character, ending the scene, or her greeting as you walk in. Messages without a mode are roleplay. */
 export type ChatMode = 'rp' | 'ooc' | 'end' | 'greet' | 'travel' | 'scene' | 'encounter' | 'quest' | 'gig' | 'dice' | 'text';
 
+/** A contact's card (contact cards spec §1): someone who gave the player a lead, in their trade. */
+export interface ContactCard {
+  id: string;
+  name: string;
+  accent: string;
+  portrait: string | null;
+  spec: Specialty;
+}
+
+/** A job's SETUP card (the hand spec §1): its district, your tier and heat there, the favour (null: allowed, else why not) and your ready crew. */
+export interface SetupOffer {
+  district: string;
+  tier: string;
+  heat: number;
+  favour: string | null;
+  /** `abilities`: the slotted abilities' labels (crew abilities spec §4). */
+  crew: { id: string; name: string; spec: Specialty; grade: Grade; /** Clean runs to the next grade; 0 at VET. Absent from older servers. */ toNext?: number; face: string | null; traits: { label: string; good: boolean }[]; abilities: string[] }[];
+  /** Contact cards you can bring (contact cards spec §2), never the job's own contact. */
+  contacts: ContactCard[];
+  /** The deck you carry and its program slots (programs spec §2.4); null: none. Absent from older servers. */
+  deck?: { name: string; quality: number; slots: number } | null;
+  /** The programs SETUP can load (programs spec §1.2a), with a deck; absent without one. */
+  programs?: { id: string; name: string; stat: string; kind: ProgramKind; line: string }[];
+  /** The stats the job's checks lean on, most used first, at most three: `LEANS TECH · COOL`. */
+  leans?: string[];
+  /** What the job's tier asks for (tier effect spec §2); absent on tier 1. */
+  tierLine?: string;
+}
+
+/** The hand during a job (the hand spec §2): each recruit brought (free calls left, an again-call's 1-in-N, face down) and the favour. */
+export interface HandView {
+  approach: Approach;
+  people: {
+    id: string;
+    name: string;
+    spec: Specialty;
+    grade: Grade;
+    /** Clean runs to the next grade; 0 at VET. Absent from older servers. */
+    toNext?: number;
+    face: string | null;
+    traits: { label: string; good: boolean }[];
+    free: number;
+    risk: number | null;
+    down: boolean;
+    /** The loadout taken at GO IN (crew abilities spec §2): `playable` is an AFTER A ROLL card that can act on the parked roll now. */
+    abilities: { id: string; label: string; kind: JobEffect['kind']; timing: Timing; words: string; /** NERVE a press costs (effect and NERVE spec §2): 0 for NERVE +1 and AT THE END ones. */ nerve: 0 | 1; /** NERVE enough to press it now. */ afford: boolean; used: boolean; playable: boolean }[];
+  }[];
+  favour: 'ready' | 'used' | null;
+  /** Contact cards brought (contact cards spec §3): each plays once. */
+  contacts: (ContactCard & { used: boolean })[];
+  /**
+   * POCKETS as the deck (programs spec §2.1): the deck carried at GO IN, its slots, what's loaded (in load order) and the
+   * catalog to load from; absent on a run from before programs.
+   */
+  pockets?: {
+    deck: { name: string; quality: number; skin: string } | null;
+    slots: number;
+    dead: boolean;
+    loaded: { id: string; name: string; stat: string; kind: ProgramKind; burned: boolean }[];
+    catalog: { id: string; name: string; stat: string; kind: ProgramKind; line: string }[];
+  };
+}
+
+/** A program alone on a choice (programs spec §2.1): the position and effect it gives and its lacquer ALARM, or why it can't run. */
+export type ProgramPreview = { position: Position; effect?: Effect; alarm: 0 | 1; tier?: Pool['tier'] } | { why: string };
+
 /** Quest lines in a room for one pair: the quests that can start here, the one at a beat here (its shown choices), and why a run here can't go on. */
 export interface QuestState {
   /** Quests that can start here: the list's pitch line (null: none), and whether it has a deadline. */
-  open: { id: string; title: string; pitch: string | null; timed: boolean; big?: { tier: number; range: [number, number] | null; stake: [number, number] }; mission?: { pay: number | null; tier?: number; range?: [number, number]; scouted?: { draws: Record<string, string>; pay: number | null }; cased?: true; /** A contact's own job (Intake board spec §3): her display name. */ own?: string; /** Its stake is trust, not rep. */ trust?: true; /** The arrangement's nights are used up tonight (spec 2026-10-20 §2): her name. */ capped?: string; /** A desk job (comms spec §3): the place it's played at, on comms. */ comms?: string } }[];
+  /** NERVE ran out (the table spec §3): no new job until the next 06:00. */
+  nerveGone?: { back: string };
+  /** `checks`: a locked Tier 2 Chair's requirements (Tier 2 spec 2026-11-01 §1). */
+  open: { id: string; title: string; pitch: string | null; timed: boolean; checks?: ChairCheck[]; /** Its quest art (the file's banner). */ art?: string; /** Why a job can't start now (NERVE GONE). */ locked?: string; mission?: { pay: number | null; tier?: number; range?: [number, number]; scouted?: { draws: Record<string, string>; pay: number | null }; cased?: true; /** A contact's own job (Intake board spec §3): her display name. */ own?: string; /** Its stake is trust, not rep. */ trust?: true; /** The arrangement's nights are used up tonight (spec 2026-10-20 §2): her name. */ capped?: string; /** A desk job (comms spec §3): the place it's played at, on comms. */ comms?: string }; /** A job's SETUP card (spec 2026-10-29-the-hand §1). */ setup?: SetupOffer; /** A one-off job (once: true): it never posts again after it ends. */ once?: true }[];
   /** A checked choice's card carries its odds (missions spec §3); during a reroll the cards are `!reroll` and `!take`. */
   active: {
     id: string;
     title: string;
     beat: string;
     /** A red check's card (ONE SHOT); a crack card's letters and tries (small jobs spec §3–§4). */
-    choices: { id: string; line: string; odds?: Odds; red?: true; crack?: { length: number; tries: number } }[];
+    /** A job's tier (card hover info): what its cut asks of a recruit or a program. */
+    tier?: number;
+    /** On a push beat (card hover info): a win here fills no TAKE. */
+    pressing?: true;
+    choices: { id: string; line: string; pool?: Pool; /** The route's own ALARM (its [alarm +n]), landed on the pick whatever the dice. */ alarm?: number; red?: true; crack?: { length: number; tries: number; /** What a win fills. */ take?: number }; /** Each playable card's pool on this choice (the hand spec §2), by card id: the preview is the roll. */ plays?: Record<string, { /** The stat it rolls on, where a card moves it (One More Thing). */ stat?: string; dice: number; position: Position; effect?: Effect; effectRaw?: number; tier?: Pool['tier']; path?: Pool['path']; /** Each program on this card's pool, where a card changes what fits. */ previews?: Record<string, ProgramPreview>; /** On a call: what each ability beside it would make the roll (ability pass spec §1). */ presses?: Record<string, { dice: number; position: Position; effect?: Effect; effectRaw?: number; tier?: Pool['tier']; path?: Pool['path']; previews?: Record<string, ProgramPreview> }> }>; /** SAFE / BOLD here (effect and NERVE spec §1): null where allowed, else why not. */ trade?: { safe: string | null; bold: string | null }; /** PUSH for effect: null where allowed, else why not. */ pushEffect?: string | null; /** Each program alone on this choice (programs spec §2.1): its pool, or why it can't run here; absent on a run from before programs. */ programs?: Record<string, ProgramPreview> }[];
     art?: string;
-    /** A job's run (small jobs spec §6): ALARM 0–3, EDGE left, heat in its district, and its pay range. */
+    /** A job's run (small jobs spec §6; the table spec §2–§3): ALARM 0–4, NERVE left of its max, heat in its district, and its pay range. */
     alarm?: number;
-    edge?: number;
+    nerve?: { left: number; max: number };
+    /** The TAKE clock (the table spec §2): segments filled of its size. */
+    take?: { filled: number; size: number };
+    /** On its getaway beat (a full ALARM): the panel head reads GET OUT. */
+    getaway?: true;
     heat?: number;
     pay?: [number, number];
     /** Each crack card's terminal, by choice id: the browser builds it, the server scores the moves. */
     crack?: Record<string, TerminalSetup>;
-    /** A failed check parked for REROLL / TAKE IT: the card that rolled, its odds and the rolls so far (the browser animates them). */
-    rolled?: { choice: string; chance: number; rolls: number[] };
-    /** A big job (big jobs spec §5): its section, the go hour and minutes to it (null: passed), the clues held, the marked places still to visit; the read's sentence and bank; each route's gig. */
-    big?: {
-      section: 'legwork' | 'read' | 'approach' | 'out';
-      go: string;
-      left: number | null;
-      clues: { id: string; text: string }[];
-      marks: { place: string; name: string; line: string }[];
-      read?: { parts: string[]; bank: string[] };
-      routes?: Record<string, { kind: GigKind; tier: 'easy' | 'medium' | 'hard'; why: string[]; seed: number; brief: Brief }>;
-      gigAuto?: true;
+    /** A costly roll's dealt costs while it waits (roll lifecycle spec §1.5): pick, then settle each; RESIST's dice; ARMOUR. */
+    costs?: {
+      pick: number;
+      dealt: { cost: CostId; tag: string; line: string; by: 'gm' | 'written'; picked: boolean; settled?: 'taken' | 'resisted' | 'armour' | 'ability'; faces?: number[]; nerve?: number }[];
+      resist: { dice: number; ok: boolean; why?: string };
+      /** FIREWALL (programs spec §2.3): `load` when it isn't loaded but a free slot would take it. */
+      armour: { ok: boolean; left: number; load?: true };
     };
+    /** A waiting roll: the card that rolled and its faces (the browser animates them); an old save's parked REROLL keeps its d100s. */
+    rolled?: { choice: string; faces: number[]; keep: 'high' | 'low'; kind: 'crit' | 'clean' | 'cost' | 'miss'; /** The ALARM and heat it will land (after a deck or ALARM −1), for the line under its stamp; absent from older servers. */ cost?: { alarm: number; heat: number }; saved?: true; /** A gamble on it: the die, and what it was (ability pass spec §2). */ gamble?: { die: number; from: 'cost' | 'miss' }; /** Run It Twice rolled it again (tier 3 beat play spec §2). */ rerun?: true; /** TAKE a trade gave up, and a greed press's risk (ability pass spec §2). */ lessTake?: number; missTake?: true; /** Not FAIR: how much it fills TAKE (effect and NERVE spec §1). */ effect?: Effect } | { choice: string; chance: number; rolls: number[] };
     /** A blown job waiting on its cover cards: the row it will write (the pick and its roll) and the debrief as it stands. */
     blown?: { text: string; pick?: { choice: string; line: string; roll?: Roll }; debrief: Debrief };
+    /** A job on its WALK / PRESS ON card (pressing on spec §4): push beats played, the pot won, what WALK keeps. */
+    push?: { stage: number; pot: number; walk: { sol: number; heat: number } };
+    /** The hand (spec 2026-10-29-the-hand §2): what was brought and what can still be played. */
+    hand?: HandView;
   } | null;
   /** A run here whose quest file no longer has its beat: the notice to show; null otherwise. */
   changed: string | null;
@@ -245,8 +329,14 @@ export interface QuestState {
   waiting: { id: string; title: string; next: string; at: string | null; from: number | null; by: number | null; ready: boolean; here: boolean; /** A desk job's wait (comms spec §3): due only on comms. */ comms?: true } | null;
   /** Quests at a beat or waiting in another contact's room, for this player. */
   elsewhere: { id: string; title: string; contact: string; contactName: string; next: string | null }[];
+  /** ELSEWHERE's boards (2026-11-01): tonight's missions posted at other places; `with` names whose job it is when it isn't yours, `opens` the hour it posts. */
+  /** A contract under way with this contact (tier 3 contracts spec §2). */
+  arc?: { id: string; title: string; next: string; stage: 'waiting' | 'night' | 'fallout'; walk: boolean; pieces: { id: string; spec: string; state: 'open' | 'out' | 'back' }[] };
+  /** RUMORS (tier 3 contracts spec §5): contracts come looking for you. `leaving`: who you'd leave to go; null if you're with them. */
+  rumors?: { id: string; line: string; place: string; placeName: string; contact: string; contactName: string; here: boolean; leaving: string | null }[];
+  boards?: { place: string; name: string; jobs: { id: string; title: string; pitch: string | null; art?: string; tier?: number; pay: number | null; range?: [number, number]; with?: string; opens?: string; comms?: string; once?: true }[] }[];
   /** The fixer at a board (small jobs spec §5): its stock, each item buyable, above your tier there, or more than your sol. */
-  fixer?: { place: string; items: { id: string; name: string; price: number; tier: number; state: 'ok' | 'locked' | 'short' }[] };
+  fixer?: { place: string; items: { id: string; name: string; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: number; state: 'ok' | 'locked' | 'short' | 'owned' }[] };
 }
 
 /** No quest lines to show. */
@@ -263,8 +353,6 @@ export interface QuestRow {
   stranger?: { name: string; voice: string; face?: string };
   /** A mission beat she doesn't answer (between the first and the last): no reply follows this row. */
   silent?: true;
-  /** A big job's row she answers mid-job: after the read, or after the gig (big jobs spec §4). */
-  after?: 'read' | 'gig';
   /** A job's run key (`<id>@<day>`, small jobs plan ruling 2): which run this row belongs to. */
   run?: string;
   /** A job's ending (small jobs spec §6): the debrief card. */
@@ -274,20 +362,41 @@ export interface QuestRow {
 /** A job's debrief (small jobs spec §6): the tier, every check and crack, and the totals. */
 export interface Debrief {
   tier: 'clean' | 'messy' | 'blown';
-  checks: { line: string; stat?: string; chance?: number; rolls?: number[]; crack?: { tries: number; state: string } }[];
+  /** Crew spec §5: a `gives: recruit` ending's line, `RECRUIT · SAIDA RAHM WANTS IN`. */
+  recruit?: string;
+  /** The lot a `loot:` job dropped (crew goods spec §6); `lost`: no room in the stash. */
+  loot?: { label: string; lost?: true };
+  /** Each check: a d100 roll (before the table), the table's dice (spec 2026-10-29), or a crack. */
+  checks: { line: string; stat?: string; chance?: number; rolls?: number[]; dice?: number; position?: 'dark' | 'open' | 'wire'; faces?: number[]; keep?: 'high' | 'low'; kind?: 'crit' | 'clean' | 'cost' | 'miss'; steadied?: true; pushed?: true; crack?: { tries: number; state: string } }[];
+  /** Pressing on (spec 2026-10-29 §1): each push played, its roll, and what it won or that it lost; absent with none. */
+  pushes?: { line: string; stat?: string; chance?: number; rolls?: number[]; dice?: number; position?: 'dark' | 'open' | 'wire'; faces?: number[]; keep?: 'high' | 'low'; kind?: 'crit' | 'clean' | 'cost' | 'miss'; steadied?: true; pushed?: true; result: 'won' | 'lost'; sol: number }[];
+  /** How the push ended, when the card came up. */
+  push?: 'walked' | 'won' | 'lost';
+  /** The TAKE clock as the job ended (the table spec §4); absent before the table. */
+  take?: { filled: number; size: number };
+  /** The ALARM clock as the job ended, for the table's clocks (graft results 2026-11-04); absent with `take`. */
+  alarm?: number;
+  /** NERVE spent on the job (the table spec §4); absent when none was. */
+  nerve?: number;
   sol: number;
   heat: { district: string; delta: number };
   rep: { district: string; before: number; after: number };
   deck?: { from: string | null; to: string | null };
   cover?: 'burner' | 'fall-guy';
-  /** A big job (big jobs spec §4): the clues found, how the read went (never its words), the gig and its result. */
-  big?: { clues: string[]; read: 'full' | 'half' | 'wrong' | null; gig: { kind: GigKind; tier: 'easy' | 'medium' | 'hard'; result: GigResult } | null };
   /** A job with a trust stake (Intake board spec §2): her word before and after when it changed; null when it held; absent on other jobs. */
   trust?: { name: string; before: string; after: string } | null;
   /** Which way a trust job moved her trust, when it did (her closing line hears it even when the word held). */
   trustMoved?: 'up' | 'down';
   /** The arrangement's retainer (spec 2026-10-20 §2), on the night's first job with her: paid, or not (short). */
   retainer?: { name: string; amount: number; paid: boolean };
+  /** Her cut of this job (Tier 2 spec §2): her share, in percent, and the sol it took. */
+  cut?: { name: string; pct: number; amount: number };
+  /** The crew brought (the hand spec §4): a line each, `DEZ · CLEAN RUN · 2 TO HAND`; absent with none. */
+  crew?: string[];
+  /** Who those lines are about, for their cards (graft results 2026-11-04): the first name as the lines have it, a recruit's face or a contact's card art. */
+  people?: { name: string; face: string | null; art?: string }[];
+  /** Programs that ran (programs spec §2.5): `SOLVENT · RAN 2 · TECH IN THE DARK`, `FIREWALL · BURNED`, the lacquer's ALARM. */
+  programs?: string[];
 }
 
 export interface ChatMessage {
@@ -305,7 +414,7 @@ export interface ChatMessage {
   /** The opening scene's card (mode 'scene', the conversation's first row): its title and where it came from. */
   scene?: { title: string; source: 'generated' | 'written' };
   /** An event that cut in (mode 'encounter'; its text is the row's): its title and the stranger it brought, if any. */
-  encounter?: { title: string; stranger?: { name: string; voice: string }; power?: 'out' };
+  encounter?: { title: string; stranger?: { name: string; voice: string; /** A DRAW stranger's face, an extra's id. */ face?: string }; power?: 'out' };
   /** A quest's beat, or a pick and what followed (mode 'quest'). */
   quest?: QuestRow;
   /** A finished gig run (mode 'gig', the user's row): the brief and result as they were, so history never changes. */
@@ -401,12 +510,14 @@ export type ServerEvent =
   | { type: 'control_rejected'; reason: ControlRejection }
   /** A quiet line for the dialogue box (a direct character's provider trouble). */
   /** `for: 'encounter'`: a refused play, said in the open ENCOUNTER panel. */
-  | { type: 'notice'; text: string; for?: 'encounter' | 'quest' | 'gig' | 'dice' | 'crew' | 'travel' }
+  | { type: 'notice'; text: string; for?: 'encounter' | 'quest' | 'gig' | 'dice' | 'crew' | 'travel' | 'kit' }
   /** What the room shows of quest lines for this pair: QUEST's list, the cards (spec 2026-10-16 quest lines §3). */
   | { type: 'quest_state'; state: QuestState }
   | { type: 'plan_card'; card: PlanCard | null }
   /** Crew spec §4: a crew action was written; an open CREW screen fetches again. */
   | { type: 'crew_changed' }
+  /** CARRY landed: the kit changed without the quest state changing. */
+  | { type: 'kit_changed' }
   /** To the sending tab only: its line acts out `choice`, so it was held for CONFIRM / SEND AS TALK (spec §3). */
   | { type: 'quest_pick'; id: string; beat: string; choice: string; text: string }
   /** Her line for a liar's dice round (that tab only), with the face she makes. */
@@ -435,6 +546,8 @@ export interface ModelChoice {
   priceOut: number | null;
   /** A shipped pick's one-line reason. */
   why?: string;
+  /** This model runs through the player's Anthropic key (Anthropic backend spec §2). */
+  via?: 'anthropic';
 }
 
 export type ControlRejection = 'busy' | 'not-latest' | 'unknown' | 'empty';
@@ -442,11 +555,13 @@ export type ControlRejection = 'busy' | 'not-latest' | 'unknown' | 'empty';
 export type ClientEvent =
   | { type: 'user_message'; text: string; mode?: ChatMode; leave?: boolean; talk?: boolean }
   /** QUEST: start a quest open here (quest lines spec §3). */
-  | { type: 'quest_start'; id: string }
+  | { type: 'quest_start'; id: string; setup?: { approach: Approach; people: string[]; favour: boolean; contacts?: string[]; programs?: string[] } }
   /** A card, or CONFIRM on a held line (`said`): the pick at `beat`. */
-  | { type: 'quest_choose'; id: string; beat: string; choice: string; said?: string; moves?: ({ word: string } | { bracket: number })[]; read?: [string, string, string]; gig?: { result: GigResult; seed: number } }
+  | { type: 'quest_choose'; id: string; beat: string; choice: string; /** PUSH (effect and NERVE spec §1): `true` from older clients is dice. */ push?: true | 'dice' | 'effect'; trade?: 'safe' | 'bold'; card?: string; /** An ON A ROLL ability beside `card` (ability pass spec §1). */ press?: string; /** Programs to load and to run on this roll (programs spec §2.2). */ programs?: { load: string[]; run: string[] }; said?: string; moves?: ({ word: string } | { bracket: number })[]; }
   | { type: 'quest_walk'; id: string }
   | { type: 'fixer_buy'; item: string }
+  /** CARRY on the YOU sheet: another deck you own. */
+  | { type: 'kit_carry'; deck: string }
   | { type: 'crew'; action: CrewAction }
   /** CONTINUE on a quest waiting for the player (`wait: ready`). */
   | { type: 'quest_continue'; id: string }
@@ -481,7 +596,7 @@ export type ClientEvent =
   | { type: 'exit'; to: string }
   /** DRAW: play an event (encounter cards); she reacts at once. */
   | { type: 'encounter'; encounter: Encounter | null }
-  /** A finished gig run (from GIGS on the map): she reacts at once. No `kind` means a hack; `trace` is the run's meter (HEAT for a slip). */
+  /** A finished gig run (from GIGS on the map): she reacts at once. Only papers runs are taken since hack and slip went (2026-11-01); `trace` is the desk's RISK. */
   | { type: 'gig'; kind?: GigKind; place: string; brief: string; result: GigResult; trace: number; max: number; seed: number; papers?: { overlooked: number | null } }
   /** A liar's dice round just ended: ask her for one line and a face. */
   | { type: 'dice_line'; round: number; record: RoundRecord; stake: string; seed: number }
@@ -660,7 +775,7 @@ export interface ContactEntry {
    */
   standing?: { word: string; trust: number; warmth: number; last: string | null } | null;
   /** Her deal to sit the player's chair (arrangement spec 2026-10-20 §3); absent or null with none. */
-  arrangement?: { retainer: number; nights: 1 | 2; active: boolean } | null;
+  arrangement?: { cut: number; nights: 1 | 2 | 3; tier: 1 | 2; active: boolean } | null;
   /** Her file in CONTACTS (spec 2026-10-28 §4): the select screen's bio paragraphs and facts; absent when there are none. */
   bio?: string[];
   facts?: Fact[];
@@ -741,7 +856,7 @@ export interface LooseClue {
   at: number;
 }
 
-/** PEOPLE → LOOSE ENDS: clues grouped by the truth they point to (never named), and the truths the player learned. */
+/** QUEST → LOOSE ENDS: clues grouped by the truth they point to (never named), and the truths the player learned. */
 export interface LooseEndsView {
   open: LooseClue[][];
   solved: { truth: string; clues: LooseClue[] }[];
@@ -790,19 +905,26 @@ export interface ResidualRunInfo {
 /** GET /api/kit (missions spec §4): the YOU sheet's live rows for the active playthrough's player. */
 export interface KitView {
   deck: Deck | null;
+  /** Every deck you own, the carried one too (the YOU sheet's CARRY). */
+  owned: Deck[];
   sol: number;
   /** The hottest district's heat (the missions-era number; the YOU sheet moves to heatHere). */
   heat: number;
   /** Small jobs spec §2: heat in the district you stand in, the hottest district, rep per district, cover held. */
   heatHere: number;
+  /** The district you stand in (null: nowhere on the map), and heat in every district that has any (the YOU sheet lists them). */
+  here?: string | null;
+  heatBy?: Record<string, number>;
   hottest: { district: string; heat: number } | null;
   rep: Record<string, number>;
   cover: { burner: number; 'fall-guy': number };
-  edgeLeft: number;
-  edgeMax: number;
+  nerveLeft: number;
+  nerveMax: number;
   stats: Stats;
   /** Crew spec §4: the newest crew result's story time (the CREW word's dot), null with none. */
   crewLatest: number | null;
+  /** Crew abilities spec §4: a recruit has a promotion's pick waiting (the dot too). */
+  crewPicks?: boolean;
 }
 
 /** A recruit on the CREW screen (crew spec §4): the folded member plus what the profile shows. */
@@ -814,6 +936,15 @@ export interface CrewRosterEntry extends CrewMember {
   line: string;
   /** The next grade's name; null at VET. */
   next: string | null;
+  /** SPRING THEM (crew spec §5): it can post a rescue tonight; else why not (null when not held). */
+  canSpring: boolean;
+  springWhy: string | null;
+  /** Where tonight's rescue is posted (their hire place's name); null when none is. */
+  springPlace: string | null;
+  /** The contact who vouched for them, by name (crew spec §5); null: hired off a list. */
+  vouchedBy: string | null;
+  /** Ability slots at their grade (crew abilities spec §1). */
+  slots: number;
 }
 
 /** GET /api/crew (crew spec §4). */
@@ -828,7 +959,8 @@ export interface CrewView {
   nextSix: number;
   /** The place you stand at (HIRE works only there); null off the map. */
   here: string | null;
-  hires: { place: string; name: string; district: string; cards: HireCard[] }[];
+  /** `vouched`: a contact's vouched hire, its own entry at her home place (crew spec §5). */
+  hires: { place: string; name: string; district: string; cards: HireCard[]; vouched?: { contact: string; name: string; accent?: string } }[];
   errands: (ErrandInstance & {
     label: string;
     /** What the label's {job} / {district} / {place} names: the job's title or the district's name. */
@@ -838,22 +970,53 @@ export interface CrewView {
     hours: number;
     risk: Risk;
     blurb: string;
-    /** Each band's first line, for the brief. */
+    /** Its picture's URL: the errand's own, or a contract piece's contract's. */
+    art?: string;
+    /** Each band's first line. */
     bands: Record<Band, string>;
     taken: boolean;
-    /** Per ready recruit id. */
+    /** Per ready recruit id; on a sale, only those who can sell in that district. */
     odds: Record<string, CrewOdds>;
+    group?: 'collect' | 'hustle';
+    /** A sale: tonight's board wants this lot here. */
+    wanted?: boolean;
+    /** A sale, per recruit: the price of a clean result and their route's hours. */
+    routes?: Record<string, { price: number; hours: number }>;
+    /** Sol paid when sent (Buy It Cheap). */
+    cost?: number;
   })[];
+  /** Tonight's wanted kinds, where you're Known (crew goods spec §4). */
+  wanted?: { district: string; name: string; kind: string; label: string }[];
+  stash?: { id: string; kind: string; label: string; value: number; nightsLeft: number; stale: boolean; damaged: boolean; district: string; art?: string; out?: { recruit: string; due?: number } }[];
+  /** Lots held and on their way fill the stash: COLLECT is refused. */
+  stashFull?: boolean;
+  /** Contracts waiting for their night, with all their groundwork, sendable or not. `hours` and `risk`: a piece's errand. */
+  contracts?: {
+    run: string;
+    title: string;
+    nightsLeft: number;
+    art?: string;
+    hours: number;
+    risk: Risk;
+    /** `errand`: the instance to send (open) or the one in flight (out). `recruit`: who's out on it, by id. */
+    pieces: { id: string; label: string; spec: Specialty; line: string; state: 'open' | 'out' | 'waits' | 'back'; recruit?: string; due?: number; errand?: string }[];
+  }[];
   /** Every result, newest first, with whose it was. */
   results: (CrewResult & { recruit: string; name: string })[];  /** The trait book's labels (hire cards carry ids). */
   traits: Record<string, { label: string; good: boolean; text: string }>;
+  /** The ability book (crew abilities spec §4): the effects in words, by id. */
+  abilities: Record<string, { label: string; timing: Timing; job: string; text: string; from: Grade }>;
 }
 
 /** A CREW screen action (crew spec §4), sent over the ws to the room's relay. */
 export type CrewAction =
   | { do: 'hire'; recruit: string }
   | { do: 'send'; recruit: string; errand: string }
-  | { do: 'recall' | 'doc' | 'bail' | 'letgo' | 'leave'; recruit: string };
+  | { do: 'recall' | 'doc' | 'bail' | 'letgo' | 'leave' | 'spring'; recruit: string }
+  /** Crew abilities (spec 2026-11-01 §4): KEEP on a promotion's pick, and the loadout. */
+  | { do: 'learn'; recruit: string; ability: string; grade: Grade }
+  | { do: 'slot'; recruit: string; ability: string; out?: string }
+  | { do: 'unslot'; recruit: string; ability: string };
 
 /** Her plan's card while she's with you (her plans spec §5): `NIX IS HEADING HOME · Hae's at 21:00`. */
 export interface PlanCard {

@@ -39,6 +39,9 @@ export { BUG_RELAY_PORT, STUB_OR_LOG_PORT } from './ports';
 /** The key e2e links with, and one the fake OpenRouter refuses (the link panel's rejected path). */
 export const GOOD_KEY = 'sk-or-e2e';
 export const BAD_KEY = 'sk-or-bad-e2e-key';
+/** The Anthropic stand-in's one good key, and its every reply (link.spec). */
+export const ANT_KEY = 'sk-ant-e2e-good';
+export const ANT_REPLY = 'Claude reply';
 
 /**
  * Opens the dial-in straight on the select screen, as if this session had already dismissed the
@@ -77,6 +80,33 @@ export async function arriveGo(page: Page, line?: string): Promise<void> {
 /** Every room this page opens skips the page-load arrival screen (only arrival.spec looks at it); GO's still shows. */
 export async function skipIntro(page: Page): Promise<void> {
   await page.addInitScript(() => sessionStorage.setItem('lowlight.skipIntro', '1'));
+  // Graft's tips stay off for every test but graft-tips.spec (tipsOn), so job clicks and screenshots are as before.
+  // Set once per page (a reload or a branch keeps what the test did with them).
+  await page.addInitScript(() => localStorage.getItem('nix-room.graft-tips') ?? localStorage.setItem('nix-room.graft-tips', JSON.stringify({ off: true, seen: [] })));
+}
+
+/** QUEST's pane (quest panel 2026-10-31): a row on the HERE tab's list. */
+export const questRow = (page: Page, title: string) => page.locator('.ql-list .ql-row', { hasText: title }).first();
+
+/** Opens a QUEST tab (HERE, ELSEWHERE or FIXER) in the open pane. */
+export async function questTab(page: Page, tab: 'here' | 'away' | 'fixer'): Promise<void> {
+  await page.locator(`.ql-tab[data-tab="${tab}"]`).click();
+}
+
+/** Picks a quest on QUEST's HERE tab and presses START in its file (the pane is open). */
+export async function startQuest(page: Page, title: string): Promise<void> {
+  if ((await page.locator('.ql-pane[data-tab="here"]').count()) === 0) await questTab(page, 'here');
+  await questRow(page, title).click();
+  await page.locator('.ql-file .ql-start').click();
+}
+
+/** Graft's tips on, nothing seen, from this page's first load (graft-tips): after skipIntro, which turns them off. */
+export async function tipsOn(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    if (sessionStorage.getItem('e2e.tipsOn')) return;
+    sessionStorage.setItem('e2e.tipsOn', '1');
+    localStorage.setItem('nix-room.graft-tips', JSON.stringify({ off: false, seen: [] }));
+  });
 }
 
 /** The select screen's current phase (`p1`, `p2`, `model`, `ready`). */
@@ -117,8 +147,8 @@ export async function activeId(page: Page): Promise<string> {
 }
 
 /**
- * Continues playthrough `id` from the LOAD screen: TITLE → LOAD, ↑↓ until its row is selected (the
- * band is then on NOW), Enter. Waits for the room it opens.
+ * Continues playthrough `id` from the LOAD screen: TITLE → LOAD, ←→ until its row is selected (the
+ * saves are then on NOW), Enter. Waits for the room it opens.
  */
 export async function continuePlaythrough(page: Page, id: string): Promise<void> {
   await toTitle(page);
@@ -127,10 +157,10 @@ export async function continuePlaythrough(page: Page, id: string): Promise<void>
   await expect(row).toBeVisible();
   // The cursor starts on the active playthrough; the list is newest first.
   const on = async () => row.evaluate((n) => n.classList.contains('on'));
-  for (let i = 0; i < 50 && !(await on()); i++) await page.keyboard.press('ArrowDown');
-  for (let i = 0; i < 50 && !(await on()); i++) await page.keyboard.press('ArrowUp');
+  for (let i = 0; i < 50 && !(await on()); i++) await page.keyboard.press('ArrowRight');
+  for (let i = 0; i < 50 && !(await on()); i++) await page.keyboard.press('ArrowLeft');
   await expect(row).toHaveClass(/\bon\b/);
-  await expect(page.locator('.load-screen .tile[data-id="now"].on')).toBeVisible();
+  await expect(page.locator('.load-screen .ss[data-id="now"].on')).toBeVisible();
   await page.keyboard.press('Enter');
   await page.waitForURL('**/room/**');
   await page.waitForFunction(() => window.__nixRoom !== undefined);
@@ -243,4 +273,44 @@ export async function chatsOf(who: { identityLine: string }): Promise<{ role: st
     .filter((r) => r.method === 'POST' && r.url.endsWith('/chat/completions') && r.body.stream !== false)
     .filter((r) => r.body.messages?.[0]?.role === 'system' && (r.body.messages[0].content ?? '').includes(who.identityLine))
     .map((r) => r.body.messages!.map((m) => ({ role: m.role, content: m.content ?? '' })));
+}
+
+/** Says `text` in the room and waits for her reply to finish. */
+export async function say(page: Page, text: string): Promise<void> {
+  const before = await page.locator('.msg.agent.s-ok').count();
+  await send(page, { type: 'user_message', text });
+  await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
+}
+
+/** A new game with Nix, who shares Alpha (the fake OpenRouter's share_contact). */
+export async function nixSharesAlpha(page: Page): Promise<void> {
+  await dialIn(page, DIRECT.id);
+  await page.waitForFunction(() => window.__nixRoom !== undefined);
+  await awaitGreeting(page);
+  await say(page, 'where do I find Alpha?');
+  await expect(page.locator('#feed .tool', { hasText: 'Nix shared a contact: ALPHA' })).toHaveCount(1);
+}
+
+/** A job's SETUP card (the hand spec §1): GO IN as it stands (QUIET, nobody brought). A story quest has none. */
+export async function goIn(page: Page): Promise<void> {
+  const go = page.locator('.ts-go');
+  if (await go.waitFor({ timeout: 3_000 }).then(() => true, () => false)) await go.click();
+}
+
+/**
+ * Settles one step of a dealt roll on the table (roll lifecycle spec §1.5): picks the first free cost, else TAKES IT on
+ * the first picked one. True when it clicked something.
+ */
+export async function settleCostStep(page: Page): Promise<boolean> {
+  const take = page.locator('.tb-costs .tb-cost-btn.take').first();
+  if (await take.isVisible()) {
+    await take.click();
+    return true;
+  }
+  const free = page.locator('.tb-costs .tb-cost.pickable').first();
+  if (await free.isVisible()) {
+    await free.click();
+    return true;
+  }
+  return false;
 }

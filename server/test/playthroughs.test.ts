@@ -197,7 +197,7 @@ describe('playthroughs', () => {
     expect(pts.save(pt.id, cp, fakeDbs({ nix: [4, 1], cass: [1, 0] }))).not.toBe('unchanged');
   });
 
-  it('prune keeps 20 checkpoints and every manual save', () => {
+  it('prune keeps 10 checkpoints and every manual save', () => {
     let t = NOW;
     const { pts } = make({ now: () => t });
     const pt = pts.create({ player: 'hicks', startContact: 'nix' });
@@ -205,16 +205,16 @@ describe('playthroughs', () => {
       t += 1000;
       return pts.save(pt.id, req({ name: `m${i}` }), fakeDbs({ nix: [0, i] }));
     });
-    const cps = Array.from({ length: 25 }, (_, i) => {
+    const cps = Array.from({ length: 15 }, (_, i) => {
       t += 1000;
       return pts.save(pt.id, req({ kind: 'checkpoint', trigger: 'end', name: `c${i}` }), fakeDbs({ nix: [i + 1, 0] }));
     });
     const names = pts.saves(pt.id).map((s) => s.name);
-    expect(names).toHaveLength(22);
+    expect(names).toHaveLength(12);
     for (const m of manual) expect(names).toContain((m as { name: string }).name);
     for (const gone of cps.slice(0, 5)) expect(names).not.toContain((gone as { name: string }).name);
     expect(names).toContain('c5');
-    expect(names[0]).toBe('c24');
+    expect(names[0]).toBe('c14');
   });
 
   it('failed copy removes the half-written save', () => {
@@ -380,6 +380,17 @@ describe('playthroughs', () => {
     if (sv === 'unchanged') throw new Error('expected a save');
     pts.removeSave(sv.id);
     expect(pts.saves(pt.id)).toEqual([]);
+  });
+
+  it('renameSave names a save in whichever playthrough holds it; a bad id throws', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const sv = pts.save(pt.id, req({ name: 'Old' }), fakeDbs({ nix: [1, 1] }));
+    if (sv === 'unchanged') throw new Error('expected a save');
+    expect(pts.renameSave(sv.id, 'Before the weigh station')).toMatchObject({ id: sv.id, name: 'Before the weigh station' });
+    expect(pts.saves(pt.id)[0].name).toBe('Before the weigh station');
+    expect(pts.renameSave('sv-20260101-zzzz', 'x')).toBeNull();
+    expect(() => pts.renameSave('../x', 'x')).toThrow('bad-id');
   });
 
   it('json writes are atomic: no .tmp files remain', () => {

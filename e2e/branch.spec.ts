@@ -102,5 +102,5 @@ test('branch from an early line', async ({ page }) => {
   // The branch is the newest, so selected: its file says where it came from.
   await expect(page.locator(`.load-screen .pt[data-id="${branch}"]`)).toBeVisible();
   await expect(page.locator(`.load-screen .pt[data-id="${original}"]`)).toBeVisible();
-  await expect(page.locator('.load-screen .fighter.p1 .fighter-file > p')).toContainText('branched from');
+  await expect(page.locator('.load-screen .ld-from')).toContainText('branched from');
 });

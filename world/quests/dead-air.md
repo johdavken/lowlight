@@ -1,12 +1,13 @@
 ---
 title: Dead Air
+art: dead-air.webp
 kind: mission
 tier: 1
-with: [silas, ember, hicks, cass, nix-direct]
+take-size: 4
 starts: second-socket
 after: null
 pitch: Something on Second Socket's roof is broadcasting a tracking tone. Find it and kill it before the wrong people listen.
-pay: 180-240
+pay: 90-110
 draw complication: none | bird-nest | someone-on-the-roof
 draw squatter: easy | hard
 ---
@@ -18,7 +19,7 @@ draw squatter: easy | hard
 *There's a drone sitting on the next roof over with its lens turned this way. It hasn't moved in a minute.*
 
 - low: Stay low and work along the parapet. → found / seen [check reflex 50]
-- jam: Blind the drone first. → found / seen [check tech 45 grid · ember +15, alarm +1]
+- jam: Blind the drone first. → found / seen [check tech 45 grid · ember +15 · rue +10, alarm +1]
 
 # roof
 
@@ -27,8 +28,8 @@ draw squatter: easy | hard
 [complication=bird-nest] *Gulls have nested in the old satellite dish. They don't like you.*
 [tech 6] *Eleven seconds is a beacon's interval. Cheap, and old, and somebody's.*
 
-- listen: Find it by ear, aerial by aerial. → found / seen [check wits 45 · hicks +10, set listened=yes]
-- scan: Sweep for it on your deck. → found / seen [check tech 45 grid · silas +10]
+- listen: Find it by ear, aerial by aerial. → found / seen [check wits 45 · hicks +10 · soren +10, set listened=yes]
+- scan: Sweep for it on your deck. → found / seen [check tech 45 grid · silas +10 · rue +15]
 
 ## found
 *It's taped inside a dead aerial's junction box: a beacon the size of a matchbox, with a fresh battery.*
@@ -42,11 +43,12 @@ heat: +1
 # beacon if alarm>=1
 
 stranger: The squatter — an old wireman who lives in the stair tower and thinks the roof is his
+face: local-02
 temper: squatter
 
 *He's out on the roof in his slippers now, with a torch. "That's mine," he says. "Somebody pays me to keep it ticking."*
 
-- talk: Tell him who's listening to it. → killed / argued [check cool 45 · cass +10 · if listened +10 "you know what it is"]
+- talk: Tell him who's listening to it. → killed / argued [check cool 45 · cass +10 · soren +15 · if listened +10 "you know what it is"]
 - take: Take it off him. → killed / argued [check body 45]
 
 # beacon

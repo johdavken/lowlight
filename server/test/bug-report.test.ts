@@ -88,6 +88,13 @@ describe('buildReport', () => {
     expect(buildReport(input({ contact: 'pat' }), state(), 'log', []).replyTo).toBeUndefined();
   });
 
+  it('scrubs an Anthropic-shaped key it was never told about (an old one in the log tail)', () => {
+    const old = 'sk-ant-api03-Old_Key-9z';
+    const r = buildReport(input({ description: 'x' }), state(), `error: auth ${old}`, []);
+    const all = [r.subject, r.text, ...r.attachments.map((a) => decode(a.content))].join('\n');
+    expect(all).not.toContain('Old_Key');
+  });
+
   it('scrubs the key everywhere', () => {
     const k = 'sk-or-v1-abc123';
     const r = buildReport(

@@ -1,7 +1,8 @@
 /**
- * A character that runs on a model directly: OpenRouter's (OpenAI-compatible) chat completions,
- * streamed, with the room's tools run in-process. The relay sees one turn's frames, whatever the provider.
- * The key goes only into the Authorization header; error text is redacted before it leaves here.
+ * A character that runs on a model directly: OpenRouter's (OpenAI-compatible) chat completions, or Anthropic's
+ * Messages API when her model routes there (Anthropic backend spec §2–3), streamed, with the room's tools run
+ * in-process. Both arrive as the same chat chunks; the relay sees one turn's frames, whatever the provider.
+ * The key goes only into the request's auth header; error text is redacted before it leaves here.
  */
 import { modelLabel } from '../../shared/model-label';
 import type { LinkState } from '../../shared/types';
@@ -11,6 +12,9 @@ import { DIRECT_TOOL_ROUNDS, runToolCall, ToolCallAssembler, toolDefinitions } f
 import { TurnError, STREAM_OPEN_EVENT, type CompletionMessage } from './turn';
 import { parseSse, type SseFrame } from './sse';
 import { StrayCallFilter } from './stray-calls';
+import type { AnthropicUsage, ChatBody, ChunkData } from './anthropic-convert';
+import { checkAnthropicKey, openAnthropicRound } from './anthropic';
+import type { Route } from './model-route';
 
 /** Extra room for the retry of a round her thinking used up (the narrator's retry uses the same, scenario.ts). */
 const DIRECT_THINKING_ROOM = 2100;
@@ -78,8 +82,14 @@ export interface DirectBackendOptions {
   tools: ToolContext;
   /** Her saved model choice (null: back to her default). */
   model: { get(): string; set(id: string | null): void };
-  /** The linked key, read per request (null: none linked yet; '' for an address without auth). */
+  /** The linked key, read per request (null: none linked yet; '' for an address without auth). Unused when `route` is given. */
   apiKey: () => string | null;
+  /** Where a call to `model` goes, read per round (null: no key it could use). Absent: her own setup with `apiKey`. */
+  route?: (model: string) => Route | null;
+  /** Where Anthropic is reached (tests point it at a stub). */
+  anthropicBaseUrl?: string;
+  /** What each Anthropic round cost, cache included (the dev log). */
+  onUsage?: (u: AnthropicUsage) => void;
   /** A quiet line for the dialogue box. */
   onNotice: (text: string) => void;
   /** A model's short label (the catalog's, once loaded). */
@@ -105,7 +115,11 @@ export type DirectBackend = Backend & {
 /** Whether the text says something beyond *actions* (a line of dialogue or plain narration). */
 export const spoke = (text: string): boolean => text.replace(/\*[^*]*\*/g, '').trim() !== '';
 
-export type WireMessage = CompletionMessage | { role: 'assistant'; content: string | null; tool_calls: unknown[] } | { role: 'tool'; tool_call_id: string; content: string };
+/** `thinking`: Anthropic only, her round's thinking blocks, sent back beside her tool calls (never to OpenRouter). */
+export type WireMessage =
+  | CompletionMessage
+  | { role: 'assistant'; content: string | null; tool_calls: unknown[]; thinking?: unknown[] }
+  | { role: 'tool'; tool_call_id: string; content: string };
 
 /** `text` when it parses to a JSON object, else `fallback`. */
 function jsonObjectOr(text: string, fallback: string): string {
@@ -117,6 +131,37 @@ function jsonObjectOr(text: string, fallback: string): string {
   }
 }
 
+/** The end of an OpenRouter stream (`[DONE]`). */
+const DONE = Symbol('done');
+
+/** An OpenRouter SSE body as chat chunks; every byte resets the stall clock. */
+async function* sseChunks(res: Response, poke: () => void): AsyncGenerator<ChunkData | typeof DONE> {
+  const watched = (res.body as ReadableStream<Uint8Array>).pipeThrough(
+    new TransformStream<Uint8Array, Uint8Array>({
+      transform(c, out) {
+        poke();
+        out.enqueue(c);
+      },
+    }),
+  );
+  for await (const frame of parseSse(watched)) {
+    if (frame.event !== 'message') continue;
+    if (frame.data === '[DONE]') {
+      yield DONE;
+      return;
+    }
+    yield (frame.data ?? {}) as ChunkData;
+  }
+}
+
+/** Anthropic's chunks; every one (thinking included) resets the stall clock. */
+async function* poked(chunks: AsyncIterable<ChunkData>, poke: () => void): AsyncGenerator<ChunkData> {
+  for await (const c of chunks) {
+    poke();
+    yield c;
+  }
+}
+
 export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
   const { setup } = opts;
   const fetchImpl = opts.fetchImpl ?? fetch;
@@ -125,13 +170,22 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
   const label = (id: string) => (opts.labelFor ?? ((m: string) => modelLabel(m)))(id);
   let probed: { at: number; state: LinkState } | null = null;
   let credit: number | null = null;
+  /** Anthropic said the credits are spent (it has no balance to ask): until resetProbe. */
+  let creditOut = false;
 
   /** Every key a request was sent with (the key can change mid-turn): all are redacted. */
   const sentKeys = new Set<string>();
 
+  /** Her route for `model` now: the given one, else her own address with the linked key. */
+  const routeOf = (model: string): Route | null => {
+    if (opts.route) return opts.route(model);
+    const key = opts.apiKey();
+    return key === null ? null : { provider: setup.provider, baseUrl: setup.baseUrl, key, model };
+  };
+
   /** Removes the key (and anything key-shaped) from text that may reach a log or the page. */
   const redact = (text: string): string => {
-    let out = text.replace(/sk-or-[A-Za-z0-9_-]+/g, 'sk-or-…');
+    let out = text.replace(/sk-or-[A-Za-z0-9_-]+/g, 'sk-or-…').replace(/sk-ant-[A-Za-z0-9_-]+/g, 'sk-ant-…');
     const current = opts.apiKey();
     for (const key of current ? [...sentKeys, current] : sentKeys) out = out.split(key).join('…');
     return out;
@@ -143,13 +197,11 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
     'X-Title': 'Lowlight',
   });
 
-  async function request(path: string, init: RequestInit): Promise<Response> {
-    // Read now: unlinked since the turn began means no request at all, not an unauthenticated one.
-    const key = opts.apiKey();
-    if (key === null) throw new TurnError('no-link', 'no key linked');
+  async function request(path: string, init: RequestInit, route: Exclude<Route, { provider: 'anthropic' }>): Promise<Response> {
+    const key = route.key;
     if (key) sentKeys.add(key);
     try {
-      return await fetchImpl(`${setup.baseUrl}${path}`, { ...init, headers: headers(key) });
+      return await fetchImpl(`${route.baseUrl}${path}`, { ...init, headers: headers(key) });
     } catch (err) {
       if (err instanceof TypeError) throw new TurnError('unreachable', redact(err.message));
       throw err;
@@ -175,25 +227,49 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
     return new TurnError(kind, message, res.status);
   }
 
-  /** Opens a streamed completion: one wait-and-retry on 429, one fall back to her default on an unknown model. */
-  async function open(body: Record<string, unknown>, model: string, signal?: AbortSignal): Promise<{ res: Response; model: string }> {
-    const post = (m: string) => request('/chat/completions', { method: 'POST', body: JSON.stringify({ ...body, model: m }), signal });
-    let res = await post(model);
-    if (res.status === 429) {
-      const after = Number(res.headers.get('retry-after'));
-      await res.body?.cancel();
-      await sleep(Number.isFinite(after) && after > 0 ? Math.min(after * 1000, RETRY_AFTER_CAP_MS) : RETRY_AFTER_DEFAULT_MS);
-      res = await post(model);
+  type Source = { kind: 'sse'; res: Response } | { kind: 'chunks'; chunks: AsyncIterable<ChunkData> };
+  type Attempt = { ok: true; source: Source; model: string } | { ok: false; err: TurnError; retryAfter: number; anthropic: boolean };
+
+  /** One try at opening a round on the route `model` takes now. Read per try: unlinked since the turn began means no request at all. */
+  async function attempt(body: Record<string, unknown>, chat: ChatBody, model: string, signal?: AbortSignal): Promise<Attempt> {
+    const route = routeOf(model);
+    if (!route) throw new TurnError('no-link', 'no key linked');
+    if (route.provider === 'anthropic') {
+      sentKeys.add(route.key);
+      try {
+        const chunks = await openAnthropicRound(route, chat, { signal, baseUrl: opts.anthropicBaseUrl, fetchImpl: opts.fetchImpl, onUsage: opts.onUsage });
+        return { ok: true, source: { kind: 'chunks', chunks }, model: route.model };
+      } catch (err) {
+        if (!(err instanceof TurnError)) throw err;
+        // Spent credits: her link reads no-credit until it's checked afresh (a relink resets it).
+        if (err.kind === 'credit') creditOut = true;
+        return { ok: false, err: new TurnError(err.kind, redact(err.message), err.status, err.retryAfter, err.provider), retryAfter: err.retryAfter ?? NaN, anthropic: true };
+      }
     }
-    if (res.ok) return { res, model };
-    const err = await errorFor(res);
-    const unknownModel = (res.status === 400 || res.status === 404) && /model|endpoints/i.test(err.message);
+    const res = await request('/chat/completions', { method: 'POST', body: JSON.stringify({ ...body, model: route.model }), signal }, route);
+    if (res.ok) return { ok: true, source: { kind: 'sse', res }, model: route.model };
+    const retryAfter = Number(res.headers.get('retry-after'));
+    return { ok: false, err: await errorFor(res), retryAfter, anthropic: false };
+  }
+
+  /** Opens a streamed round: one wait-and-retry on 429, one fall back to her default on an unknown model. */
+  async function open(body: Record<string, unknown>, chat: ChatBody, model: string, signal?: AbortSignal): Promise<{ source: Source; model: string }> {
+    let a = await attempt(body, chat, model, signal);
+    if (!a.ok && a.err.status === 429) {
+      const after = a.retryAfter;
+      await sleep(Number.isFinite(after) && after > 0 ? Math.min(after * 1000, RETRY_AFTER_CAP_MS) : RETRY_AFTER_DEFAULT_MS);
+      a = await attempt(body, chat, model, signal);
+    }
+    if (a.ok) return a;
+    const err = a.err;
+    // Anthropic's 400s often name the model for other reasons (a parameter it won't take): only its 404 is a model it doesn't have.
+    const unknownModel = a.anthropic ? err.status === 404 : (err.status === 400 || err.status === 404) && /model|endpoints/i.test(err.message);
     if (!unknownModel || model === setup.defaultModel) throw err;
     opts.onNotice(`// ${label(model).toUpperCase()} UNAVAILABLE — BACK ON ${label(setup.defaultModel).toUpperCase()}`);
     opts.model.set(setup.defaultModel);
-    res = await post(setup.defaultModel);
-    if (!res.ok) throw await errorFor(res);
-    return { res, model: setup.defaultModel };
+    a = await attempt(body, chat, setup.defaultModel, signal);
+    if (!a.ok) throw a.err;
+    return a;
   }
 
   return {
@@ -229,6 +305,14 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
           ...(tools && (nudging || finishing) ? { tool_choice: 'none' } : {}),
           ...(thinkingLow ? { reasoning: { effort: 'low' } } : {}),
         };
+        // The same round for Anthropic: no temperature (spec §3); its thinking is always low here.
+        const chat: ChatBody = {
+          max_tokens: body.max_tokens,
+          messages,
+          ...(tools ? { tools } : {}),
+          ...(tools && (nudging || finishing) ? { tool_choice: 'none' as const } : {}),
+          effort: 'low',
+        };
         const idle = new AbortController();
         let stallTimer: ReturnType<typeof setTimeout> | undefined;
         const poke = () => {
@@ -238,7 +322,7 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
         poke();
         let opened: Awaited<ReturnType<typeof open>>;
         try {
-          opened = await open(body, model, signal ? AbortSignal.any([signal, idle.signal]) : idle.signal);
+          opened = await open(body, chat, model, signal ? AbortSignal.any([signal, idle.signal]) : idle.signal);
         } catch (err) {
           clearTimeout(stallTimer);
           if (!idle.signal.aborted) throw err;
@@ -247,8 +331,9 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
         }
         model = opened.model;
         if (round === 1) yield { event: STREAM_OPEN_EVENT, data: { model } };
-        if (!opened.res.body) return;
+        if (opened.source.kind === 'sse' && !opened.source.res.body) return;
         const assembler = new ToolCallAssembler();
+        const roundThinking: unknown[] = [];
         let roundText = '';
         let finished = false;
         let cutOff = false;
@@ -271,23 +356,13 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
           written += delta;
           yield { event: 'assistant.delta', data: { delta } };
         };
-        // Every byte from OpenRouter resets the stall clock.
-        const watched = (opened.res.body as ReadableStream<Uint8Array>).pipeThrough(
-          new TransformStream<Uint8Array, Uint8Array>({
-            transform(c, out) {
-              poke();
-              out.enqueue(c);
-            },
-          }),
-        );
+        const chunks = opened.source.kind === 'sse' ? sseChunks(opened.source.res, poke) : poked(opened.source.chunks, poke);
         try {
-          for await (const frame of parseSse(watched)) {
-            if (frame.event !== 'message') continue;
-            if (frame.data === '[DONE]') {
+          for await (const data of chunks) {
+            if (data === DONE) {
               finished = true;
               break;
             }
-            const data = frame.data as { error?: unknown; choices?: { delta?: { content?: unknown; tool_calls?: unknown }; finish_reason?: unknown }[] } | undefined;
             const choice = data?.choices?.[0];
             const content = choice?.delta?.content;
             if (typeof content === 'string' && content.length > 0 && holding) roundText += content;
@@ -303,6 +378,7 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
               }
             }
             assembler.add(choice?.delta?.tool_calls);
+            if (data.blocks) roundThinking.push(...data.blocks);
             if (data?.error || choice?.finish_reason === 'error') {
               yield* release();
               yield { event: 'run.failed', data: redact(JSON.stringify(data?.error ?? choice)) };
@@ -356,6 +432,7 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
           content: roundText || null,
           // Echo only valid JSON objects: strict providers refuse a garbled call on the next round.
           tool_calls: calls.map((c) => ({ id: c.id, type: 'function', function: { name: c.name, arguments: jsonObjectOr(c.args, '{}') } })),
+          ...(roundThinking.length > 0 ? { thinking: roundThinking } : {}),
         });
         const results = calls.map((c) => {
           const out = runToolCall(opts.tools, c);
@@ -387,13 +464,21 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
     async probe(): Promise<LinkState> {
       if (probed && now() - probed.at < PROBE_CACHE_MS) return probed.state;
       let state: LinkState;
-      if (opts.apiKey() === null) {
+      const route = routeOf(opts.model.get());
+      if (route === null) {
         credit = null;
         probed = { at: now(), state: 'no-link' };
         return 'no-link';
       }
+      if (route.provider === 'anthropic') {
+        // Anthropic reports no balance: spent credits show on the turn that hits them.
+        credit = null;
+        state = creditOut ? 'no-credit' : await checkAnthropicKey(route.key, { baseUrl: opts.anthropicBaseUrl, fetchImpl: opts.fetchImpl, timeoutMs: opts.probeTimeoutMs ?? PROBE_TIMEOUT_MS });
+        probed = { at: now(), state };
+        return state;
+      }
       try {
-        const res = await request('/key', { method: 'GET', signal: AbortSignal.timeout(opts.probeTimeoutMs ?? PROBE_TIMEOUT_MS) });
+        const res = await request('/key', { method: 'GET', signal: AbortSignal.timeout(opts.probeTimeoutMs ?? PROBE_TIMEOUT_MS) }, route);
         if (res.status === 401) state = 'key-rejected';
         else if (res.status === 404) {
           state = 'ok';
@@ -412,13 +497,15 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
     },
 
     async currentModel() {
-      return { model: opts.model.get(), provider: setup.provider };
+      const m = opts.model.get();
+      return { model: routeOf(m)?.model ?? m, provider: routeOf(m)?.provider ?? setup.provider };
     },
 
     credit: () => credit,
-    ready: () => opts.apiKey() !== null,
+    ready: () => routeOf(opts.model.get()) !== null,
     resetProbe() {
       probed = null;
+      creditOut = false;
     },
   };
 }

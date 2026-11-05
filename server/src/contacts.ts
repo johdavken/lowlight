@@ -170,7 +170,7 @@ function known(facts: Map<string, DbFacts>, pt: PlaythroughInfo, roster: RosterC
       ...(names.standing ? { standing: status === 'shared' ? null : names.standing(c.id, f?.standing ?? null) } : {}),
       // Her deal (arrangement spec §3): in force while her trust is high.
       ...(f?.arrangement
-        ? { arrangement: { retainer: f.arrangement.retainer, nights: f.arrangement.nights, active: arrangementActive(f.arrangement, names.standing ? names.standing(c.id, f.standing).trust : (f.standing?.trust ?? null)) } }
+        ? { arrangement: { cut: f.arrangement.cut, nights: f.arrangement.nights, tier: f.arrangement.tier, active: arrangementActive(f.arrangement, names.standing ? names.standing(c.id, f.standing).trust : (f.standing?.trust ?? null)) } }
         : {}),
       ...(c.bio?.length ? { bio: c.bio } : {}),
       ...(c.facts?.length ? { facts: c.facts } : {}),

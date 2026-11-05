@@ -47,7 +47,7 @@ afterEach(async () => {
   vi.mocked(foldWithCrew).mockClear();
 });
 
-async function start() {
+async function start(o: { quests?: Record<string, string> } = {}) {
   const or = await startStubOpenRouter([], { fallback: { raw: [':\n\n'], chunks: [chunk('hello'), chunk(undefined, 'stop')] } });
   cleanups.push(() => or.close());
   const { root, cfg } = await makeFixture([
@@ -65,6 +65,11 @@ async function start() {
     if (p.id === 'low-roller') p.hires = ['face', 'fence'];
     if (p.id === 'pump-house-nine') p.hires = ['muscle', 'ears'];
     if (p.id === 'second-socket') p.hires = ['wire', 'runner'];
+  }
+  if (o.quests) {
+    cfg.questsDir = path.join(root, 'quests');
+    fs.mkdirSync(cfg.questsDir);
+    for (const [id, text] of Object.entries(o.quests)) fs.writeFileSync(path.join(cfg.questsDir, `${id}.md`), text);
   }
   cfg.mapFile = path.join(root, 'map.json');
   fs.writeFileSync(cfg.mapFile, JSON.stringify(map));
@@ -140,11 +145,11 @@ describe('crew in the playthrough', () => {
     expect(v.slots).toBe(3);
     expect(v.used).toBe(1);
     expect(v.roster[0]).toMatchObject({ recruit: { id: 'r-juno' }, word: 'STEADY', line: 'Shows up. Gets paid. Fair enough.', next: 'PRO', traitsShown: [{ label: 'Sure Thing', good: true, text: 'Never misses.' }], hiddenTraits: 0 });
-    expect(v.hires.map((h: { place: string }) => h.place).sort()).toEqual(['low-roller', 'pump-house-nine', 'second-socket']);
+    expect(v.hires.map((h: { place: string }) => h.place).sort()).toEqual(['long-haul', 'low-roller', 'pump-house-nine', 'second-socket']);
     const lr = v.hires.find((h: { place: string }) => h.place === 'low-roller');
     expect(lr).toMatchObject({ name: 'The Low Roller', district: 'strand' });
     expect(lr.cards.length).toBeGreaterThanOrEqual(2);
-    expect(v.wages).toBe(40);
+    expect(v.wages).toBe(0); // idle tonight: a wage is only due for a night they run
     expect(typeof v.nextSix).toBe('number');
     expect('here' in v).toBe(true);
     expect(Array.isArray(v.errands)).toBe(true);
@@ -212,5 +217,95 @@ describe('a WAIT re-sends quest state too', () => {
     const spy = vi.spyOn(rt.relay, 'emitQuestState');
     s.built.world.wait({ minutes: 60 });
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe('spring runs in the playthrough (crew spec §5)', () => {
+  const dez: Recruit = { id: 'r-dez', name: 'Dez Okoro', face: null, origin: 'karasu', spec: 'runner', grade: 1, traits: [], hidden: null, pitch: '', wage: 40 };
+  const base = { variant: 0, wait: null, picks: [], flags: {}, at: 1 };
+  // Dez is taken on a hand job's call at 20:10 and held; SPRING THEM at 20:30; the rescue runs 20:40–21:30.
+  const taken = { ...base, beat: null, done: true, take: 'full', blown: true, setup: { approach: 'quiet', people: ['r-dez'], favour: false, at: 1200, endAt: 1220 }, calls: [{ beat: 'b', choice: 'c', card: 'r-dez', again: true, at: 1210, loss: 'held' }] };
+  const rescue = (o: object = {}) => ({ ...base, beat: null, done: true, take: 'full', setup: { approach: 'quiet', people: [], favour: false, at: 1240, endAt: 1290 }, spring: { recruit: 'r-dez', place: 'low-roller', tier: 2 }, kit: [{ at: 1260, heat: 2 }], ...o });
+  const SPRING_FILE = `---
+title: Get {recruit} Out
+kind: mission
+spring: true
+after: null
+pitch: Their people know where SDG took {recruit}.
+---
+
+# door
+
+*The holding floor.*
+
+- walk: Walk {recruit} out. → out
+- wait: Wait for the shift change. → out
+
+## out
+*Out.*
+→ end
+`;
+  async function setUp(run: object, quests?: Record<string, string>) {
+    const s = await start(quests ? { quests } : {});
+    const db = s.open('nix');
+    db.insertMessage(s.pt.player, line('n1', 10));
+    db.setReplyStamp({ messageId: 'n1', take: 0 });
+    db.setMeta(crewKey(s.pt.player, 'r-dez'), JSON.stringify([{ type: 'hire', at: 1190, recruit: dez, place: 'low-roller', cost: 0 }, { type: 'spring', at: 1230, job: 'spring-quiet' }]));
+    db.setMeta(questKey(s.pt.player, 'back-door@0'), JSON.stringify(taken));
+    db.setMeta(questKey(s.pt.player, 'spring-quiet@0'), JSON.stringify(run));
+    db.setReplyStamp(null);
+    return s;
+  }
+
+  it('a clean rescue frees them in kitOf', async () => {
+    const s = await setUp(rescue());
+    expect(s.built.world.kitOf(s.pt.player, 1235)!.crew.members[0].state).toBe('held');
+    expect(s.built.world.kitOf(s.pt.player, 1300)!.crew.members[0]).toMatchObject({ state: 'ready', loyalty: 65 });
+  });
+
+  it("crew on a rescue log its filled title", async () => {
+    const pell: Recruit = { id: 'r-pell', name: 'Pell Ash', face: null, origin: 'karasu', spec: 'muscle', grade: 1, traits: [], hidden: null, pitch: '', wage: 40 };
+    const s = await setUp(rescue({ setup: { approach: 'quiet', people: ['r-pell'], favour: false, at: 1240, endAt: 1290 } }), { 'spring-quiet': SPRING_FILE });
+    const db = s.open('nix');
+    db.insertMessage(s.pt.player, line('n2', 20));
+    db.setReplyStamp({ messageId: 'n2', take: 0 });
+    db.setMeta(crewKey(s.pt.player, 'r-pell'), JSON.stringify([{ type: 'hire', at: 1191, recruit: pell, place: 'low-roller', cost: 0 }]));
+    db.setReplyStamp(null);
+    const p = s.built.world.kitOf(s.pt.player, 1300)!.crew.members.find((m) => m.recruit.id === 'r-pell')!;
+    expect(p.log[0].line).toContain('Get Dez Out');
+  });
+
+  it("a rescue's heat lands where they were hired", async () => {
+    const s = await setUp(rescue());
+    expect(s.built.world.kitOf(s.pt.player, 1300)!.kit.heat.strand).toBe(2);
+  });
+});
+
+describe('a job card on GET /api/crew (crew spec §5)', () => {
+  it("a rescue's card sits at its post's place", async () => {
+    const s = await start({ quests: { 'spring-quiet': '---\ntitle: Get {recruit} Out\nkind: mission\nspring: true\nafter: null\n---\n\n# door\n\n*Holding.*\n\n- walk: Walk out. → out\n- wait: Wait. → out\n\n## out\n*Out.*\n→ end\n' } });
+    const db = s.open('nix');
+    db.insertMessage(s.pt.player, line('n1', 10));
+    db.setReplyStamp({ messageId: 'n1', take: 0 });
+    const run = { variant: 0, wait: null, picks: [], flags: {}, at: 1, beat: null, done: true, take: 'full', setup: { approach: 'quiet', people: [], favour: false, at: 1100, endAt: 1150 }, spring: { recruit: 'r-x', place: 'low-roller', tier: 1 }, recruit: { spec: 'muscle', grade: 1 } };
+    db.setMeta(questKey(s.pt.player, 'spring-quiet@0'), JSON.stringify(run));
+    db.setReplyStamp(null);
+    const v = JSON.parse((await s.built.app.inject({ method: 'GET', url: '/api/crew' })).body).crew;
+    const lr = v.hires.find((h: { place: string; vouched?: unknown }) => h.place === 'low-roller' && !h.vouched);
+    expect(lr.cards.some((c: { from?: { job?: string } }) => c.from?.job === questKey(s.pt.player, 'spring-quiet@0'))).toBe(true);
+  });
+
+  it("an ended run's gives: recruit shows a free card at its place", async () => {
+    const s = await start();
+    const db = s.open('nix');
+    db.insertMessage(s.pt.player, line('n1', 10));
+    db.setReplyStamp({ messageId: 'n1', take: 0 });
+    const run = { variant: 0, wait: null, picks: [], flags: {}, at: 1, beat: null, done: true, take: 'full', setup: { approach: 'quiet', people: [], favour: false, at: 1100, endAt: 1150 }, recruit: { spec: 'muscle', grade: 1 } };
+    db.setMeta(questKey(s.pt.player, 'weigh-station@0'), JSON.stringify(run));
+    db.setReplyStamp(null);
+    const v = JSON.parse((await s.built.app.inject({ method: 'GET', url: '/api/crew' })).body).crew;
+    const lh = v.hires.find((h: { place: string }) => h.place === 'long-haul');
+    const card = lh.cards.find((c: { from?: unknown }) => c.from);
+    expect(card).toMatchObject({ cost: 0, loyalty: 50, from: { job: questKey(s.pt.player, 'weigh-station@0'), title: 'Weigh Station' }, recruit: { spec: 'muscle', grade: 1 } });
   });
 });

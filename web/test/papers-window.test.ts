@@ -159,7 +159,7 @@ describe('the job card', () => {
 describe('found in the browser check', () => {
   it("the boot line names the forger's kit (spec §3.1)", async () => {
     await open();
-    expect(text('.gig-boot')).toContain("street kit · 3 charges · forger's kit · Ines · Nix on comms");
+    expect(text('.gig-boot')).toContain("> forger's kit · Ines · Nix on comms");
   });
 
   it('SIT DOWN starts the desk at the top, not where the job board was scrolled', async () => {

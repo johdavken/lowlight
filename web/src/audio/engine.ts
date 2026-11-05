@@ -2,7 +2,7 @@ import type { Transition } from '../../../shared/types';
 import { flickerFactor } from '../renderer/flicker';
 import type { Mix } from './mix';
 import { defaultSoundCheck, MissingSound } from './present';
-import { bedVoice, humVoice, neonVoice, rainVoice, recordedRainVoice, staticBurst, windVoice, type NeonVoiceNode, type RainVoice, type RecordedRainVoice, type Voice, type WindVoice } from './voices';
+import { bedVoice, humVoice, neonVoice, rainVoice, recordedRainVoice, spaceVoice, staticBurst, windVoice, type NeonVoiceNode, type RainVoice, type RecordedRainVoice, type Voice, type WindVoice } from './voices';
 
 export type Channel = 'weather' | 'room' | 'lights' | 'music';
 export const CHANNELS: Channel[] = ['weather', 'room', 'lights', 'music'];
@@ -238,6 +238,15 @@ export class AudioEngine {
     }
 
     this.glide(this.fog.gain, mix.fogDb, d, now);
+    if (mix.space > 0 || this.voices.has('space')) {
+      const space = this.voice('space', () => {
+        const v = spaceVoice(ctx, this.fog);
+        this.channel('weather').connect(v.input);
+        this.channel('lights').connect(v.input);
+        return v;
+      });
+      this.glide(space.level, mix.space, d, now);
+    }
 
     this.applyRain(mix, d, now);
     if (mix.wind.level > 0 || this.voices.has('wind')) {
@@ -295,14 +304,15 @@ export class AudioEngine {
    * Plays a one-shot sample at `this.masterTarget() * level`, straight to the output (no room
    * dropout, no mix change — like `burst()`, but a decoded sample rather than synthesized static).
    * With a `channel` (a room's own sounds), it plays at `level` through that channel instead.
-   * Each url is fetched and decoded once; a failed load warns once and resolves to silence.
+   * Each url is fetched and decoded once; a failed load warns once and resolves to silence. `rate` plays it faster
+   * or slower (pitch with it); `overlap` lets it ring under its own next play instead of being cut by it (dice taps).
    */
-  oneShot(url: string, level = 1, channel?: Channel): void {
+  oneShot(url: string, level = 1, channel?: Channel, o: { rate?: number; overlap?: boolean } = {}): void {
     const ctx = this.ctx;
     if (!ctx) return;
     this.sample(ctx, url).then((b) => {
       if (!b || this.ctx !== ctx) return; // the context closed (or was replaced) before it decoded
-      const prev = this.oneShotSources.get(url);
+      const prev = o.overlap ? undefined : this.oneShotSources.get(url);
       if (prev) {
         try {
           prev.stop();
@@ -321,13 +331,14 @@ export class AudioEngine {
       }
       const src = ctx.createBufferSource();
       src.buffer = b;
+      if (o.rate) src.playbackRate.value = o.rate;
       src.connect(out);
       src.onended = () => {
         src.disconnect();
         out.disconnect();
         if (this.oneShotSources.get(url) === src) this.oneShotSources.delete(url);
       };
-      this.oneShotSources.set(url, src);
+      if (!o.overlap) this.oneShotSources.set(url, src);
       src.start();
     });
   }

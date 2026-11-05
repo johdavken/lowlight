@@ -48,6 +48,13 @@ const RAMP =
 let lightFilters = 0;
 
 /**
+ * Firefox crops an SVG filter on her art inside the zoomed stage: its region comes out smaller than
+ * her box as the stage shrinks, cutting her down a vertical line (2026-11-03; a region three times
+ * her size still cut at the smallest window). There the stage figures take one brightness, as portraits do.
+ */
+export const FLAT_LIGHT = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
+
+/**
  * The room's light as an SVG filter on her art: the multiply colour (--light-l → --light-r across her)
  * and the add colour (--glow-l → --glow-r), then cut by her own drawn pixels (SourceGraphic). A mask
  * of her images drawn separately lands a device pixel off her art at some window sizes and showed the
@@ -104,13 +111,16 @@ export class StageLight {
   private readonly written = new WeakMap<HTMLElement, number[]>();
   private readonly off: () => void;
   private readonly now: () => number;
+  /** One brightness for every figure, sprites too (FLAT_LIGHT). */
+  private readonly flat: boolean;
 
   constructor(
     private readonly renderer: Pick<Renderer, 'lightAt' | 'onFrame'>,
     private readonly figures: () => HTMLElement[],
-    opts: { now?: () => number } = {},
+    opts: { now?: () => number; flat?: boolean } = {},
   ) {
     this.now = opts.now ?? (() => performance.now());
+    this.flat = opts.flat ?? FLAT_LIGHT;
     this.off = renderer.onFrame(() => this.frame());
   }
 
@@ -132,7 +142,7 @@ export class StageLight {
   private light(fig: HTMLElement): void {
     const box = fig.getBoundingClientRect();
     if (box.width === 0 || box.height === 0) return;
-    if (fig.dataset.kind !== 'sprite') {
+    if (fig.dataset.kind !== 'sprite' || this.flat) {
       const c = this.sample(box, CENTRE);
       if (!c) return;
       const v = figureLight(c);
@@ -150,11 +160,13 @@ export class StageLight {
     const head = figureLight(h);
     const left = mean(figureLight(l), figureLight(l), head);
     const right = mean(figureLight(r), figureLight(r), head);
-    const both = [...left, ...right];
+    // A mirrored figure's art (and its filter) is flipped: its left side is on screen right.
+    const flip = fig.hasAttribute('data-mirror');
+    const both = [...left, ...right, flip ? 1 : 0];
     if (!moved(this.written.get(fig), both)) return;
     this.written.set(fig, both);
-    const L = lightCss(left);
-    const R = lightCss(right);
+    const L = lightCss(flip ? right : left);
+    const R = lightCss(flip ? left : right);
     fig.style.setProperty('--light-l', L.shade);
     fig.style.setProperty('--light-r', R.shade);
     fig.style.setProperty('--glow-l', L.glow);

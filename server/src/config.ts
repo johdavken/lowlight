@@ -15,6 +15,8 @@ export interface Config {
   personaDir: string;
   /** The lore book: world/lore/<id>.md (read once at startup). */
   loreDir: string;
+  /** The map's place readouts (world/readouts/<id>.md). */
+  readoutsDir?: string;
   /** Leads: world/leads/<id>.md (read once at startup). Default ./world/leads. */
   leadsDir?: string;
   /** Quest lines: world/quests/<id>.md (read once at startup). Default ./world/quests. */
@@ -44,6 +46,8 @@ export interface Config {
   mapFile?: string;
   /** Where OpenRouter is reached (tests point it at a stub). Default OPENROUTER_BASE_URL. */
   openrouterBaseUrl?: string;
+  /** Where Anthropic's API is reached (NIX_ANTHROPIC_BASE_URL; tests point it at a stub). Not ANTHROPIC_BASE_URL: Claude Code sets that. */
+  anthropicBaseUrl?: string;
   /** Playthroughs: index.json and one folder per playthrough. Default <dataDir>/playthroughs. */
   playthroughsDir: string;
   /** Tests and e2e only: at boot with no active playthrough, create and activate one. */
@@ -67,6 +71,7 @@ export interface Config {
 }
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+export const ANTHROPIC_BASE_URL = 'https://api.anthropic.com';
 
 const DEFAULT_PORT = 7700;
 export const DEFAULT_MAP_FILE = './map/lowlight.json';
@@ -92,6 +97,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, opts: { generatedToken?: () =
     scenesDir: env.SCENES_DIR ?? './scenes',
     personaDir: env.PERSONA_DIR ?? './persona',
     loreDir: env.LORE_DIR ?? './world/lore',
+    readoutsDir: env.READOUTS_DIR ?? './world/readouts',
     leadsDir: env.LEADS_DIR ?? './world/leads',
     questsDir: env.QUESTS_DIR ?? './world/quests',
     extrasDir: env.EXTRAS_DIR ?? './world/extras',
@@ -107,6 +113,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, opts: { generatedToken?: () =
     mapFile: env.MAP_FILE ?? DEFAULT_MAP_FILE,
     artScenesDir: env.ART_SCENES_DIR,
     openrouterBaseUrl: env.OPENROUTER_BASE_URL ?? OPENROUTER_BASE_URL,
+    anthropicBaseUrl: env.NIX_ANTHROPIC_BASE_URL ?? ANTHROPIC_BASE_URL,
     playthroughsDir: env.PLAYTHROUGHS_DIR ?? path.join(dataDir, 'playthroughs'),
     bugRelayUrl: env.BUG_RELAY_URL || null,
     logFile: env.LOG_FILE || null,

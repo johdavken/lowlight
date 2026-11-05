@@ -1,3 +1,4 @@
+import { facesFor } from '../../../shared/dice';
 /** The Intake board's relay harness (Hicks with Nix at the Intake), shared by intake-board and arrangement tests. Registers its own setup hooks. */
 import { afterAll, afterEach, beforeAll, expect } from 'vitest';
 import fs from 'node:fs';
@@ -17,7 +18,7 @@ import { flagsOf, ownedBy, parseQuestFile, parseRun, questKey, type QuestEntry, 
 import { JOB } from '../../../shared/quests.fixture';
 import { foldKit, heatIn, type KitEvent } from '../../../shared/mission';
 import type { Deck } from '../../../shared/gear';
-import { edgeMax, type Stats } from '../../../shared/stats';
+import { nerveMax, type Stats } from '../../../shared/stats';
 import { bandOf, DEFAULT_SHARED_STANDING, parseStored, standingKey } from '../../../shared/standing';
 import { trustControl } from '../../src/standing';
 import { BURNER, TAKE } from '../../src/mission-run';
@@ -35,7 +36,7 @@ afterEach(() => {
   while (dbs.length) dbs.pop()!.close();
 });
 
-const DECKS: Deck[] = [{ id: 'stall-build', name: 'Stall build', bonus: 15, heat: 0, traits: ['fragile'] }];
+const DECKS: Deck[] = [{ id: 'stall-build', name: 'Stall build', quality: 2, heat: 0, traits: ['fragile'] }];
 const HICKS: Stats = { body: 4, reflex: 6, tech: 7, cool: 7, wits: 6, edge: 4 };
 export const parse = (text: string, id: string): QuestEntry => {
   const r = parseQuestFile(id, text, { roster: null, places: null, decks: new Set(DECKS.map((d) => d.id)) });
@@ -54,7 +55,7 @@ export const OWN = parse(OWN_TEXT, 'held-papers');
 export const at = (hh: number, mm: number, d = 1) => 360 + d * 1440 + ((hh * 60 + mm - 360 + 1440) % 1440);
 
 /** Hicks with `contact` (Nix) at `place` (the Intake), rep 0, on a settable clock. */
-export function intakeRelay(o: { book?: QuestEntry[]; clock?: number; contact?: string; place?: string; rolls?: number[]; burner?: number; trust?: number; sol?: number; warmth?: 'low' | 'mid' | 'high' } = {}) {
+export function intakeRelay(o: { book?: QuestEntry[]; clock?: number; contact?: string; place?: string; rolls?: number[]; burner?: number; trust?: number; sol?: number; warmth?: 'low' | 'mid' | 'high'; others?: () => QuestStatus[] } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const events: ServerEvent[] = [];
@@ -67,10 +68,10 @@ export function intakeRelay(o: { book?: QuestEntry[]; clock?: number; contact?: 
     db.metaWithPrefix(`quest.${p}.`).flatMap(({ k, v }) => {
       const run = parseRun(v);
       return run ? [{ id: k.slice(`quest.${p}.`.length), contact, run }] : [];
-    });
+    }).concat(o.others?.() ?? []);
   const seed: KitEvent[] = [...(o.burner ? [{ at: 0, cover: { id: 'burner' as const, delta: o.burner } }] : []), ...(o.sol ? [{ at: 0, sol: o.sol }] : [])];
   const kit = (p: string, when?: number) =>
-    foldKit({ deck: 'stall-build', edgeMax: edgeMax(HICKS), from: 0 }, [...seed, ...status(p).flatMap((s) => (s.run.kit ?? []) as KitEvent[])].filter((e) => when === undefined || e.at <= when), when ?? clock, {
+    foldKit({ deck: 'stall-build', nerveMax: nerveMax(HICKS), from: 0 }, [...seed, ...status(p).flatMap((s) => (s.run.kit ?? []) as KitEvent[])].filter((e) => when === undefined || e.at <= when), when ?? clock, {
       districtOf: () => 'karasu',
     });
   const quests: NonNullable<ChatRelayDeps['quests']> = {
@@ -100,7 +101,7 @@ export function intakeRelay(o: { book?: QuestEntry[]; clock?: number; contact?: 
     emit: (e) => events.push(e),
     instructions: 'ROOM NOTE',
     quests,
-    roll: () => rolls.shift() ?? 50,
+    rollDice: (n: number, keep: 'high' | 'low') => facesFor(rolls.shift() ?? 6, n, keep),
     clockNow: () => clock,
     trust: trustControl({ db, name: 'Nix', start: () => ({ trust: o.trust ?? 0, warmth: 0 }), config: () => null, shared: () => DEFAULT_SHARED_STANDING }),
   };
@@ -136,7 +137,7 @@ export async function play(r: ReturnType<typeof intakeRelay>, tier: 'clean' | 'm
     await go(r.run()!.beat!, 'wait');
     await go('desk', tier === 'clean' ? 'grab' : 'skim');
   }
-  // A failed roll parks for REROLL: take it; a blown job with cover held parks for the cover cards.
+  // A costly roll parks for STEADY: take it; a blown job with cover held parks for the cover cards.
   if (r.run()!.pending) await go(r.run()!.beat!, TAKE);
   if (r.run()!.pendingCover) await go(r.run()!.beat!, cover === 'burner' ? BURNER : TAKE);
   expect(r.run()!.done).toBe(true);

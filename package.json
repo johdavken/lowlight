@@ -25,12 +25,16 @@
     "package:win": "electron-builder --win nsis zip",
     "e2e:desktop": "playwright test -c e2e-desktop/playwright.config.ts",
     "chat-stress": "tsx tools/chat-stress/run.ts",
+    "job-sim": "tsx tools/job-sim/run.ts",
+    "job-audit": "tsx tools/job-sim/audit.ts",
+    "errand-sim": "tsx tools/errand-sim/run.ts",
     "st-rooms": "tsx tools/st-rooms/build.ts",
     "st-cast": "tsx tools/st-rooms/export-cast.ts",
     "map-render": "tsx tools/map3d/render.ts",
     "st-publish": "tsx tools/st-rooms/publish.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@fastify/static": "^8.0.0",
     "@fastify/websocket": "^11.0.0",
     "@fontsource/chakra-petch": "^5.3.0",

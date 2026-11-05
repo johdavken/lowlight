@@ -14,6 +14,7 @@ import { formatToolLine } from './tool-line';
 import type { Journal } from './journal';
 import { greetDue } from './greet';
 import { parseEncounter } from '../../shared/encounter';
+import { EXTRA_ID } from '../../shared/extras';
 import fs from 'node:fs';
 import { parseMap, type CityMapData } from '../../shared/map-schema';
 import { DEFAULT_GIGS_DIR, DEFAULT_MAP_FILE, DEFAULT_PAPERS_DIR } from './config';
@@ -24,11 +25,10 @@ import { loadPapersData, markFirstNightSeen } from './papers';
 import { loadGigBriefs, readMap } from './gigs';
 import type { DiceLiner } from './dice';
 import { cleanStake, isRoundRecord, parseDiceSnapshot } from '../../shared/dice/text';
-import { gigKind, parseGigSnapshot, RESULTS_FOR, tierMax, type Brief, type GigKind, type GigResult } from '../../shared/gig/brief';
-/** Every gig result a big job's route can report (big jobs spec §3). */
-const GIG_RESULTS: readonly GigResult[] = [...new Set(Object.values(RESULTS_FOR).flat())];
+import { gigKind, parseGigSnapshot, RESULTS_FOR, type Brief, type GigKind, type GigResult } from '../../shared/gig/brief';
 import { parsePick } from '../../shared/quests';
 import { EMPTY_QUEST_STATE } from '../../shared/types';
+import { APPROACHES, MAX_CONTACTS, MAX_PEOPLE, type Approach } from '../../shared/hand';
 import { exitPlaces } from '../../shared/exits';
 
 export interface HubDeps {
@@ -96,6 +96,13 @@ export const PICK_CHECK_TIMEOUT_MS = 6000;
 const QUEST_SAID_MAX = 2000;
 /** A terminal's moves (small jobs spec §4): a few dozen at most (14 words, 4 brackets, guesses after a reset). */
 const CRACK_MOVES_MAX = 60;
+/** A pick's programs (programs spec §2.2): `{ load, run }`, each at most 3 ids of 1–40 characters. */
+const validPrograms = (v: unknown): boolean => {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return false;
+  const o = v as Record<string, unknown>;
+  const ids = (x: unknown) => Array.isArray(x) && x.length <= 3 && x.every((id) => typeof id === 'string' && id.length > 0 && id.length <= 40);
+  return ids(o.load) && ids(o.run);
+};
 const validMoves = (m: unknown): boolean =>
   Array.isArray(m) &&
   m.length <= CRACK_MOVES_MAX &&
@@ -158,12 +165,24 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
     case 'fixer_buy':
       if (typeof v.item !== 'string' || v.item === '' || v.item.length > 80) return "fixer_buy needs a string 'item'";
       return { type: 'fixer_buy', item: v.item };
+    case 'kit_carry':
+      if (typeof v.deck !== 'string' || v.deck === '' || v.deck.length > 80) return "kit_carry needs a string 'deck'";
+      return { type: 'kit_carry', deck: v.deck };
     case 'crew': {
       const x = v.action as Record<string, unknown> | undefined;
       const str = (k: string) => typeof x?.[k] === 'string' && (x[k] as string) !== '' && (x[k] as string).length <= 80;
       if (!x || !str('recruit')) return "crew needs an 'action' with a string 'recruit'";
-      if (x.do === 'hire' || x.do === 'recall' || x.do === 'doc' || x.do === 'bail' || x.do === 'letgo' || x.do === 'leave') return { type: 'crew', action: { do: x.do, recruit: x.recruit as string } };
+      if (x.do === 'hire' || x.do === 'recall' || x.do === 'doc' || x.do === 'bail' || x.do === 'letgo' || x.do === 'leave' || x.do === 'spring') return { type: 'crew', action: { do: x.do, recruit: x.recruit as string } };
       if (x.do === 'send') return str('errand') ? { type: 'crew', action: { do: 'send', recruit: x.recruit as string, errand: x.errand as string } } : "crew send needs a string 'errand'";
+      // Crew abilities (spec 2026-11-01 §4): KEEP on a pick, and the loadout.
+      if (x.do === 'learn' || x.do === 'slot' || x.do === 'unslot') {
+        if (!str('ability')) return `crew ${x.do} needs a string 'ability'`;
+        const base = { recruit: x.recruit as string, ability: x.ability as string };
+        if (x.do === 'unslot') return { type: 'crew', action: { do: 'unslot', ...base } };
+        if (x.do === 'learn') return x.grade === 0 || x.grade === 1 || x.grade === 2 || x.grade === 3 ? { type: 'crew', action: { do: 'learn', ...base, grade: x.grade } } : 'crew learn needs a grade 0–3';
+        if (x.out !== undefined && !str('out')) return "crew slot's 'out' must be a string";
+        return { type: 'crew', action: { do: 'slot', ...base, ...(x.out !== undefined ? { out: x.out as string } : {}) } };
+      }
       return 'crew: unknown action';
     }
     case 'quest_continue':
@@ -171,15 +190,29 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
       return { type: 'quest_continue', id: v.id };
     case 'quest_start':
       if (typeof v.id !== 'string' || v.id === '') return "quest_start needs a string 'id'";
-      return { type: 'quest_start', id: v.id };
+      if (v.setup === undefined) return { type: 'quest_start', id: v.id };
+      {
+        // The hand's SETUP card (spec 2026-10-29-the-hand §1): the server judges who's ready and the favour.
+        const st = v.setup as { approach?: unknown; people?: unknown; favour?: unknown; contacts?: unknown; programs?: unknown };
+        if (!isPlainObject(st) || !APPROACHES.includes(st.approach as Approach) || typeof st.favour !== 'boolean' || !Array.isArray(st.people) || st.people.length > MAX_PEOPLE || !st.people.every((p) => typeof p === 'string' && p !== ''))
+          return `quest_start 'setup' must be { approach, people (at most ${MAX_PEOPLE}), favour }`;
+        // Contact cards (spec 2026-10-31-contact-cards §2): bare character ids, at most MAX_CONTACTS.
+        if (st.contacts !== undefined && !(Array.isArray(st.contacts) && st.contacts.length <= MAX_CONTACTS && st.contacts.every((c) => typeof c === 'string' && c !== '')))
+          return `quest_start 'setup.contacts' must be at most ${MAX_CONTACTS} character ids`;
+        // Programs loaded at SETUP (programs spec §1.2a): at most 3 ids of 1–40 characters; the server judges the slots.
+        if (st.programs !== undefined && !(Array.isArray(st.programs) && st.programs.length <= 3 && st.programs.every((p) => typeof p === 'string' && p.length > 0 && p.length <= 40)))
+          return "quest_start 'setup.programs' must be at most 3 program ids";
+        return { type: 'quest_start', id: v.id, setup: { approach: st.approach as Approach, people: st.people as string[], favour: st.favour, ...(st.contacts !== undefined ? { contacts: st.contacts as string[] } : {}), ...(st.programs !== undefined ? { programs: st.programs as string[] } : {}) } };
+      }
     case 'quest_choose':
       if (typeof v.id !== 'string' || typeof v.beat !== 'string' || typeof v.choice !== 'string') return "quest_choose needs string 'id', 'beat' and 'choice'";
       if (v.said !== undefined && (typeof v.said !== 'string' || v.said.length > QUEST_SAID_MAX)) return `quest_choose 'said' must be a string of at most ${QUEST_SAID_MAX} characters`;
       if (v.moves !== undefined && !validMoves(v.moves)) return `quest_choose 'moves' must be at most ${CRACK_MOVES_MAX} of { word } or { bracket }`;
-      // Big jobs: the read's three words; a route's gig result and the seed it was dealt from.
-      if (v.read !== undefined && !(Array.isArray(v.read) && v.read.length === 3 && v.read.every((w) => typeof w === 'string' && w.length <= 40))) return "quest_choose 'read' must be three words of at most 40 characters";
-      const gig = v.gig as { result?: unknown; seed?: unknown } | undefined;
-      if (gig !== undefined && !(isPlainObject(gig) && GIG_RESULTS.includes(gig.result as GigResult) && Number.isInteger(gig.seed) && (gig.seed as number) >= 0)) return "quest_choose 'gig' must be { result, seed }";
+      if (v.push !== undefined && v.push !== true) return "quest_choose 'push' must be true when sent";
+      if (v.card !== undefined && (typeof v.card !== 'string' || v.card === '' || v.card.length > 80)) return "quest_choose 'card' must be a card id";
+      if (v.press !== undefined && (typeof v.press !== 'string' || v.press === '' || v.press.length > 80)) return "quest_choose 'press' must be a card id";
+      // Programs (programs spec §2.2): ids to load and to run, at most a deck's slots each.
+      if (v.programs !== undefined && !validPrograms(v.programs)) return "quest_choose 'programs' must be { load, run }, each at most 3 ids of at most 40 characters";
       return {
         type: 'quest_choose',
         id: v.id,
@@ -187,8 +220,11 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
         choice: v.choice,
         ...(typeof v.said === 'string' ? { said: v.said } : {}),
         ...(v.moves !== undefined ? { moves: v.moves as ({ word: string } | { bracket: number })[] } : {}),
-        ...(v.read !== undefined ? { read: v.read as [string, string, string] } : {}),
-        ...(gig !== undefined ? { gig: { result: gig.result as GigResult, seed: gig.seed as number } } : {}),
+        ...(v.push === true || v.push === 'dice' || v.push === 'effect' ? { push: v.push } : {}),
+        ...(v.trade === 'safe' || v.trade === 'bold' ? { trade: v.trade } : {}),
+        ...(typeof v.card === 'string' ? { card: v.card } : {}),
+        ...(typeof v.press === 'string' ? { press: v.press } : {}),
+        ...(v.programs !== undefined ? { programs: v.programs as { load: string[]; run: string[] } } : {}),
       };
     case 'quest_walk':
       if (typeof v.id !== 'string' || v.id === '') return "quest_walk needs a string 'id'";
@@ -299,9 +335,9 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
       return { type: 'gig', ...(v.kind === undefined ? {} : { kind }), place: v.place, brief: v.brief, result: v.result as GigResult, trace: v.trace as number, max: v.max as number, seed: v.seed as number, ...(papers ? { papers } : {}) };
     }
     case 'encounter': {
-      // Its shape only: the relay checks the stranger's name against who's here.
+      // Its shape only: the relay checks the stranger's name against who's here, and their face against the extras.
       // A broken one goes on as null: the handler tells the tab, so the panel can show it.
-      return { type: 'encounter', encounter: parseEncounter(v.encounter, []) };
+      return { type: 'encounter', encounter: parseEncounter(v.encounter, [], { faceOk: (id) => EXTRA_ID.test(id) }) };
     }
     case 'set_model':
       if (typeof v.model !== 'string' || v.model.length === 0 || v.model.length > 200) return "set_model needs a 'model' string (1–200 characters)";
@@ -334,9 +370,11 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
       // An event's row comes back with its card: its title and the stranger it brought (a broken stranger goes).
       // Her reaction to it carries the mode only (it inherits its prompt's), never a card.
       const eventRow = m.mode === 'encounter' && m.role === 'user';
-      const card = eventRow ? parseEncounter({ ...(typeof m.encounter === 'object' && m.encounter !== null ? m.encounter : {}), text: 'x' }, []) : null;
+      // A DRAW stranger's face comes back in shape only (the relay keeps it only if it's one of the extras).
+      const card = eventRow ? parseEncounter({ ...(typeof m.encounter === 'object' && m.encounter !== null ? m.encounter : {}), text: 'x' }, [], { faceOk: (id) => EXTRA_ID.test(id) }) : null;
       if (eventRow && !card) return 'restore_message needs a whole message';
-      const encounter = card ? { title: card.title, ...(card.stranger ? { stranger: card.stranger } : {}), ...(card.power ? { power: card.power } : {}) } : null;
+      const stranger = card?.stranger ? { name: card.stranger.name, voice: card.stranger.voice, ...(card.stranger.face ? { face: card.stranger.face } : {}) } : null;
+      const encounter = card ? { title: card.title, ...(stranger ? { stranger } : {}), ...(card.power ? { power: card.power } : {}) } : null;
       // A run's row comes back with its snapshot; her reaction carries the mode only.
       const gig = m.mode === 'gig' && m.role === 'user' ? parseGigSnapshot(m.gig) : null;
       if (m.mode === 'gig' && m.role === 'user' && !gig) return 'restore_message needs a whole message';
@@ -746,36 +784,45 @@ export function createHub(deps: HubDeps): Hub {
   }
 
   /**
+   * GO WITH HER (her plans spec §5): her plan goes, then you walk to where she was heading, together, as through a
+   * door. She takes you, so an invite-only or side room is fine. Heading here, nowhere, or to a room that's gone: she stays.
+   */
+  function goWithHer(ws: WebSocket, player: string): void {
+    const relay = deps.getRelay();
+    // Checked before the drop: no key means no walk, and the plan isn't dropped without it.
+    if (!relay.ready || pickChecking) {
+      if (!relay.ready) rejectNoLink(ws);
+      else send(ws, { type: 'control_rejected', reason: 'busy' });
+      relay.resendPlanCard(player);
+      return;
+    }
+    const dropped = relay.dropPlan(player);
+    if (!dropped.ok) {
+      if ((CONTROL_REASONS as readonly string[]).includes(dropped.error)) send(ws, { type: 'control_rejected', reason: dropped.error as ControlRejection });
+      return;
+    }
+    const current = deps.room.state.sceneId;
+    const to = dropped.going;
+    if (!to || to === current || !deps.scenes.some((s) => s.id === to)) return;
+    const map = readMap(deps.mapFile ?? DEFAULT_MAP_FILE);
+    const name = (id: string) => placeName(map, id) ?? deps.scenes.find((s) => s.id === id)?.name ?? id;
+    walk(ws, player, relay, { scene: to, from: name(current), to: name(to) });
+  }
+
+  /**
    * A finished gig run (spec §6.1): checked against the map and the brief files (read now), then
-   * her reaction starts on the brief's snapshot. A refusal tells this tab only, for its hack window.
+   * her reaction starts on the brief's snapshot. A refusal tells this tab only, for its gig window.
+   * Only papers runs (2026-11-01): a hack or slip run, or one with no kind (an old client's hack), is refused.
    */
   function gig(ws: WebSocket, player: string, run: Extract<ClientEvent, { type: 'gig' }>): void {
     const refuse = (text: string) => send(ws, { type: 'notice', text, for: 'gig' });
+    if (gigKind(run) !== 'papers') return refuse('hack and slip are gone');
     const map = readMap(deps.mapFile ?? DEFAULT_MAP_FILE);
     const place = map?.places.find((p) => p.id === run.place);
     if (!map || !place?.gigs) return refuse(`no jobs at ${run.place}`);
     const brief = loadGigBriefs(deps.gigsDir ?? DEFAULT_GIGS_DIR, map, () => {}).find((b) => b.id === run.brief && b.place === place.id);
     if (!brief) return refuse(`no job '${run.brief}' here`);
-    const kind = gigKind(run);
-    if (kind === 'papers' || gigKind(brief) === 'papers') return papersRun(ws, player, run, brief, place.name, refuse);
-    const traceOk =
-      run.result === 'traced'
-        ? run.trace > run.max && run.trace <= run.max + 20
-        : run.result === 'caught'
-          ? run.trace >= 0 && run.trace <= run.max + 20
-          : run.trace >= 0 && run.trace <= run.max;
-    if (kind !== gigKind(brief) || !RESULTS_FOR[kind].includes(run.result) || run.max !== tierMax(kind as 'hack' | 'slip', brief.tier) || !traceOk) return refuse("that run doesn't add up");
-    const relay = deps.getRelay();
-    if (relay.busy) return refuse('wait for her to finish');
-    if (!relay.ready) return refuse(NO_LINK_NOTICE);
-    const { title, tier, client, target, take, text } = brief;
-    relay
-      .gig(player, { ...(kind === 'slip' ? { kind } : {}), title, tier, place: place.name, client, target, take, brief: text, result: run.result, trace: run.trace, max: run.max })
-      // Dropped (a turn started first): say so, or the window would wait on a row that never comes.
-      .then((r) => {
-        if (r === null) refuse('wait for her to finish');
-      })
-      .catch(reportAsyncError(ws, 'gig'));
+    return papersRun(ws, player, run, brief, place.name, refuse);
   }
 
   /**
@@ -942,6 +989,11 @@ export function createHub(deps: HubDeps): Hub {
         if (typeof r === 'string') send(ws, { type: 'notice', text: r, for: 'quest' });
         return;
       }
+      case 'kit_carry': {
+        const r = deps.getRelay().carry(player, event.deck);
+        if (typeof r === 'string') send(ws, { type: 'notice', text: r, for: 'kit' });
+        return;
+      }
       case 'crew': {
         const r = deps.getRelay().crew(player, event.action);
         if (typeof r === 'string') send(ws, { type: 'notice', text: r, for: 'crew' });
@@ -951,7 +1003,7 @@ export function createHub(deps: HubDeps): Hub {
       case 'quest_choose': {
         const relay = deps.getRelay();
         if (pickChecking) return send(ws, { type: 'notice', text: 'wait for her to finish', for: 'quest' });
-        const done = event.type === 'quest_start' ? relay.startQuest(player, event.id) : relay.chooseQuest(player, { id: event.id, beat: event.beat, choice: event.choice, ...(event.said !== undefined ? { said: event.said } : {}), ...(event.moves ? { moves: event.moves } : {}), ...(event.read ? { read: event.read } : {}), ...(event.gig ? { gig: event.gig } : {}) });
+        const done = event.type === 'quest_start' ? relay.startQuest(player, event.id, event.setup) : relay.chooseQuest(player, { id: event.id, beat: event.beat, choice: event.choice, ...(event.said !== undefined ? { said: event.said } : {}), ...(event.moves ? { moves: event.moves } : {}), ...(event.push ? { push: event.push } : {}), ...(event.trade ? { trade: event.trade } : {}), ...(event.card ? { card: event.card } : {}), ...(event.press ? { press: event.press } : {}), ...(event.programs ? { programs: event.programs } : {}) });
         done.then((r) => (typeof r === 'string' ? send(ws, { type: 'notice', text: r, for: 'quest' }) : undefined)).catch(reportAsyncError(ws, event.type));
         return;
       }
@@ -991,7 +1043,7 @@ export function createHub(deps: HubDeps): Hub {
         }
         return control(ws, 'let her go', (r) => r.letHerGo(player, event.text ?? ''));
       case 'plan_drop':
-        return control(ws, 'go with her', async (r) => r.dropPlan(player));
+        return goWithHer(ws, player);
       case 'greet':
         // Busy, or no longer due (another tab, or they spoke first): no greeting, and nothing to say about it.
         if (!deps.getRelay().busy) deps.getRelay().greet(player, event.opening).catch(reportAsyncError(ws, 'greet'));

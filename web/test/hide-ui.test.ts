@@ -4,6 +4,13 @@ import { listenHideUi } from '../src/room/hide-ui';
 
 const key = (o: KeyboardEventInit) => new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...o });
 
+describe('Alt+X is TEXTS (in-game texts spec §2)', () => {
+  it('is a chrome key; Alt+T is still the title', () => {
+    expect(chromeKey(key({ key: 'x', code: 'KeyX', altKey: true }), false)).toBe('texts');
+    expect(chromeKey(key({ key: 't', code: 'KeyT', altKey: true }), false)).toBe('title');
+  });
+});
+
 describe('Alt+H hides the UI', () => {
   it('is a chrome key', () => {
     expect(chromeKey(key({ key: 'h', code: 'KeyH', altKey: true }), false)).toBe('hide');

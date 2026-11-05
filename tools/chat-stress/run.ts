@@ -104,8 +104,8 @@ async function waitUp(base: string, port: number, server: ChildProcess): Promise
 /** The linked key's remaining credit, as the game reads it (null: unknown). */
 async function credit(base: string, origin: Record<string, string>): Promise<number | null> {
   try {
-    const link = (await (await fetch(`${base}/api/link`, { headers: origin })).json()) as { credit?: unknown };
-    return typeof link.credit === 'number' ? link.credit : null;
+    const link = (await (await fetch(`${base}/api/link`, { headers: origin })).json()) as { openrouter?: { credit?: unknown } };
+    return typeof link.openrouter?.credit === 'number' ? link.openrouter.credit : null;
   } catch {
     return null;
   }

@@ -309,6 +309,16 @@ describe('Stage: no centre figure (the others are in the who\'s-here strip)', ()
     expect(ids[0]).not.toBe(ids[1]);
   });
 
+  it('Firefox: no SVG filter on the art (it crops the figure inside the zoomed stage), one brightness instead', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    new Stage(root, { probe: async () => ({ aspect: 2 / 3 }), flatLight: true });
+    for (const f of [left(root), right(root)]) {
+      expect(f.querySelector('filter')).toBeNull();
+      expect(f.style.getPropertyValue('--fig-filter')).toBe('brightness(var(--fig-light, 1))');
+    }
+  });
+
   it("the light is cut by her own drawn pixels, not a separate mask (no pale fringe past her edge at any window size)", () => {
     const { root } = setup();
     const filter = right(root).querySelector('filter')!;

@@ -15,7 +15,7 @@ import { oneLine } from './persona';
 
 /** The narrator's instructions (spec §2, exact). */
 export const ENCOUNTER_SYSTEM =
-  'You write events for a roleplay in Lowlight. Write three different events that could happen right now to the two people in this scene: something from outside that cuts in — a person, a call, a failure, a discovery. Each fits the place and what just happened, in the third person and present tense, with a title of at most 40 characters and two or three sentences of at most 600 characters. Never write what the user does, says or feels. An event may bring in one new person: give them a short name (at most 24 characters, not one already taken) and a few words on how they speak. Use only the places and facts given. Only an event whose text cuts this district\'s power — the grid fails, the lights die — says so with "power": "out"; every other event leaves it out. Answer only with a JSON array of three {"title","text","stranger","power"} objects, where stranger is {"name","voice"} or null and power is "out" or absent.';
+  'You write events for a roleplay in Lowlight. Write three events that could happen right now to the two people in this scene, one of each kind, in this order. First, "stranger": someone new walks in, calls out or stops by — anyone the place might bring, a man or a woman, young, middle-aged or old; give them a short name (at most 24 characters, not one already taken), a few words on how they speak, and say whether they are a "man" or a "woman" and "young", "middle" or "old". Second, "city": the place itself acts — the weather turns, something fails or breaks, a sound, a call, something is found; no new person. Third, "personal": something in the room that touches the two of them — a name lighting up the other character\'s phone, a song, an object that means something, an open thread coming back; no new person. Each fits the place and what just happened, in the third person and present tense, with a title of at most 40 characters and two or three sentences of at most 600 characters. Write only what happens: never what the user does, says or feels, and never how the other character reacts. Use only the places and facts given. Only a "city" event whose text cuts this district\'s power — the grid fails, the lights die — says so with "power": "out"; every other event leaves it out. Answer only with a JSON array of three {"kind","title","text","stranger","power"} objects in that order, where kind is "stranger", "city" or "personal", stranger is {"name","voice","gender","age"} on the first and null on the others, and power is "out" or absent.';
 
 const cut = (s: string) => (s.length > ENCOUNTER_LINE_MAX ? `${s.slice(0, ENCOUNTER_LINE_MAX - 1)}…` : s);
 
@@ -90,6 +90,8 @@ export function encounterPrompt(o: {
   power?: string | null;
   /** The Cipher's open truths (cipher spec §2.7): an event may carry a small hint to one. */
   cipher?: string | null;
+  /** Open threads the player already knows of (suggest.ts `openThreads`), for the PERSONAL card. */
+  threads?: string[];
 }): CompletionMessage[] {
   const when = [o.room.timeOfDay, o.room.weather && o.room.weather !== 'none' ? o.room.weather : null].filter(Boolean).join(', ');
   const facts = [
@@ -102,6 +104,7 @@ export function encounterPrompt(o: {
     `The other character:\n${o.her}`,
     ...o.others.map((x) => `Also here: ${named(x.name, x.pronoun)} — ${oneLine(x.voice)}`),
     o.stranger ? `Also here: ${o.stranger.name}, a stranger from an earlier event — ${o.stranger.voice}` : null,
+    o.threads && o.threads.length > 0 ? `Open threads (PERSONAL may bring one back; never invent how they turn out):\n${o.threads.map((t) => `- ${t}`).join('\n')}` : null,
     o.recent.length > 0 ? `What just happened:\n${o.recent.join('\n')}` : null,
     `Names already taken: ${o.reserved.join(', ')}.`,
   ].filter((x): x is string => Boolean(x));

@@ -129,6 +129,9 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         const asked = body.messages.at(-1)?.content ?? '';
         const content = body.messages[0].content.includes('running summary')
           ? 'They talked for a while.'
+          : /meet ember and me/i.test(asked) && /\[places: /.test(asked)
+            ? // Shared plans (e2e/plans.spec.ts): a meeting at 03:00 that names Ember.
+              JSON.stringify({ notes: [], plan: { going: null, meet: { place: awayFrom(asked), at: '03:00', with: ['ember'] } } })
           : /go home and shower/i.test(asked) && /\[places: /.test(asked)
             ? // Her plans (e2e/plans.spec.ts): she heads to the first place listed that isn't her room (final review M4).
               JSON.stringify({ notes: [], plan: { going: { place: awayFrom(asked), until: null }, meet: null } })

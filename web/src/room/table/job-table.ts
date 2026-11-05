@@ -93,7 +93,7 @@ function handGroups(hand: NonNullable<Active['hand']>, nerveLeft = 0, prog?: Pro
     const first = p.name.split(' ')[0].toUpperCase();
     // Down from a loss: the whole stack face down, the card's back.
     if (p.down) return [{ id: p.id, face: backFace(first, 'DOWN'), state: 'down', stack: p.id }, ...p.abilities.map((a): TableCard => ({ id: `${p.id}/${a.id}`, face: backFace(first, 'DOWN'), state: 'down', stack: p.id, glyph: { kind: a.kind, timing: a.timing, label: a.label } }))];
-    const note = !callable ? 'PLAYS AT THE END' : p.free > 0 ? '1 FREE' : `AGAIN · RISK 1 IN ${p.risk}`;
+    const note = !callable ? (p.guest ? 'SPENT' : 'PLAYS AT THE END') : p.free > 0 ? '1 FREE' : `AGAIN · RISK 1 IN ${p.risk}`;
     const call: TableCard = { id: p.id, face: crewFace({ ...p, abilities: [] }, note), state: callable ? 'up' : 'locked', stack: p.id };
     // Their abilities (crew abilities spec §2): ON A ROLL lift like a call; AFTER A ROLL light on a parked roll and play on a
     // tap; AT THE END play themselves.

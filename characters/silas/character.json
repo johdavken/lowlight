@@ -90,7 +90,8 @@
     {
       "from": "18:00",
       "to": "22:00",
-      "room": "karasu/second-socket"
+      "room": "karasu/second-socket",
+      "fixed": true
     },
     {
       "from": "22:00",

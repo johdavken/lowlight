@@ -256,7 +256,7 @@ async function main(): Promise<void> {
   // A tier 2 job at the Intake (e2e/tier-cut.spec.ts): only Cass's Trusted rep sees it, so Nobody's boards keep their count.
   fs.writeFileSync(path.join(questsDir, 'two-step.md'), JOB.replace('title: Back Door', 'title: Two Step').replace('starts: haes-noodles', 'starts: lowlight-intake'));
   // A contract at the Intake (e2e/contracts.spec.ts): the same rep, with her.
-  fs.writeFileSync(path.join(questsDir, 'test-contract.md'), CONTRACT.replace('with: [mother-rot]', `with: [${DIRECT.id}]`).replace('starts: haes-noodles', 'starts: lowlight-intake'));
+  fs.writeFileSync(path.join(questsDir, 'test-contract.md'), CONTRACT.replace('kind: contract', 'kind: contract\nart: test-contract.webp').replace('with: [mother-rot]', `with: [${DIRECT.id}]`).replace('starts: haes-noodles', 'starts: lowlight-intake'));
   process.env.NIX_TEST_REP = 'cass@karasu:50';
   process.env.NIX_TEST_SOL = 'cass:1000';
   // One of Nix's own clients' jobs (e2e/intake.spec.ts), at Hae's so the Intake's pool stays as jobs.spec counts it:

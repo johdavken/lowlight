@@ -71,6 +71,7 @@
       "from": "20:00",
       "to": "04:00",
       "room": "karasu/lowlight-intake",
+      "fixed": true,
       "days": ["mon", "tue", "wed", "thu", "fri"]
     },
     {
@@ -88,6 +89,7 @@
       "from": "18:00",
       "to": "19:00",
       "room": "karasu/the-tilt",
+      "why": "one drink before shift, as a customer",
       "days": ["mon", "tue", "wed", "thu", "fri"]
     },
     {

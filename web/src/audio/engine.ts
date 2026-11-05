@@ -217,7 +217,8 @@ export class AudioEngine {
     return () => this.stateListeners.delete(fn);
   }
 
-  apply(mix: Mix, duration: number, transition?: Transition): void {
+  /** `swapIn`: seconds until a glitch's picture swaps; with none, the room drops out at once. */
+  apply(mix: Mix, duration: number, transition?: Transition, swapIn = 0): void {
     this.mix = mix;
     const ctx = this.ctx;
     if (!ctx) return;
@@ -226,15 +227,23 @@ export class AudioEngine {
 
     if (transition === 'glitch') {
       // The static stands in front of the dropout: its own gain (at the master level, so mute holds)
-      // straight to the output, while the room is held silent for the burst and comes back quickly.
-      this.playBurst(ctx);
+      // straight to the output. A room move sinks under it to the swap and rises back as the picture
+      // clears; otherwise the room is held silent for the burst and comes back quickly.
+      this.playBurst(ctx, swapIn);
       const g = this.master.gain;
       const target = this.masterTarget();
+      const back = swapIn > 0 ? swapIn : GLITCH_SECONDS;
+      const backEnd = now + back + (swapIn > 0 ? swapIn : GLITCH_RETURN_SECONDS);
       g.cancelScheduledValues(now);
-      g.setValueAtTime(0, now);
-      g.setValueAtTime(0, now + GLITCH_SECONDS);
-      g.linearRampToValueAtTime(target, now + GLITCH_SECONDS + GLITCH_RETURN_SECONDS);
-      this.ramps.set(g, { from: 0, to: target, t0: now + GLITCH_SECONDS, t1: now + GLITCH_SECONDS + GLITCH_RETURN_SECONDS });
+      if (swapIn > 0) {
+        g.setValueAtTime(target, now);
+        g.linearRampToValueAtTime(0, now + back);
+      } else {
+        g.setValueAtTime(0, now);
+        g.setValueAtTime(0, now + back);
+      }
+      g.linearRampToValueAtTime(target, backEnd);
+      this.ramps.set(g, { from: 0, to: target, t0: now + back, t1: backEnd });
     }
 
     this.glide(this.fog.gain, mix.fogDb, d, now);
@@ -292,12 +301,12 @@ export class AudioEngine {
     this.playBurst(ctx);
   }
 
-  /** The static burst's own gain and node, straight to the output. */
-  private playBurst(ctx: AudioContext): void {
+  /** The static burst's own gain and node, straight to the output; with `swell`, it climbs that long and tails off. */
+  private playBurst(ctx: AudioContext, swell = 0): void {
     const burstOut = ctx.createGain();
     burstOut.gain.value = this.masterTarget();
     burstOut.connect(ctx.destination);
-    staticBurst(ctx, burstOut, GLITCH_SECONDS);
+    staticBurst(ctx, burstOut, swell + GLITCH_SECONDS, swell);
   }
 
   /**

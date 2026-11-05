@@ -185,6 +185,8 @@ export interface RuntimeOptions {
     gmWritten?(): Partial<Record<CostId, string[]>>;
     /** Contact cards the player holds (contact cards spec §1). */
     contactCards?(): ContactCard[];
+    /** The ids of the leads `player` holds. */
+    heldLeads?(player: string): string[];
     /** Crew spec §5: the latest story minute any room's `[crew]` line told up to. */
     crewToldUntil?(): number | null;
     /** Crew spec §5: the recruit a job's `gives: recruit` card draws. */
@@ -443,6 +445,15 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           },
           setLight: (p, lightId, intensity) => dispatchTool({ ...tools, player: () => p }, 'set_light', { light_id: lightId, intensity }, 'world'),
           passTime: (p, r, minutes) => relay.residualPass(p, r.id, r.take, minutes),
+          // A lead she told without give_lead: what's on offer and not given, recorded as the tool would.
+          leads: (p) => {
+            const given = new Set(db.leadsGiven(p).map((l) => l.id));
+            return {
+              offered: relay.lastOffer().filter((l) => !given.has(l.id)).map((l) => ({ id: l.id, title: l.title, knows: l.giverKnows })),
+              give: (id, details, messageId) => db.giveLead({ id, player: p, details, messageId, at: Date.now() }),
+              recorded: (title) => relay.leadRecorded(p, title),
+            };
+          },
           // Her plans: in a stamped in-character turn, not on comms (spec 2026-10-21 §4, §5).
           plan: (p, r) => {
             const reply = db.getMessage(p, r.id);
@@ -453,7 +464,9 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             // Her plans name the map's places and the rooms of her day (her home is often off the map).
             const map = opts.planPlaces?.() ?? [];
             const places = cp?.promisePlaces ? cp.promisePlaces(id, map) : map;
-            return places.length > 0 ? { places, ...(line?.mode === 'text' ? {} : { here: room.state.sceneId }), onSet: () => relay.emitPlanCard(p) } : null;
+            return places.length > 0
+              ? { places, ...(line?.mode === 'text' ? {} : { here: room.state.sceneId }), onSet: () => relay.emitPlanCard(p), ...(cp ? { people: cp.planPeople(id), held: (who: string, from: number, to: number, place: string) => cp.planHeld(who, from, to, place) } : {}) }
+              : null;
           },
           herDay: () => cp?.dayLine?.(id) ?? null,
           storyClock: () => cp?.clockNow?.() ?? null,
@@ -616,7 +629,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
     ...(cp ? { cutPower: (rowId: string, at: number) => cp.cutPower(id, rowId, at, room.state.sceneId), cityLine: (clock: number) => {
       const p = cp.powerOf(room.state.sceneId, clock);
       return p.outage ? cityLine(cp.districtName(p.district), p.outage.from) : null;
-    }, clockNow: () => cp.clockNow(), onClock: () => cp.clockChanged(), onLiveClock: () => cp.storyClock(id), scheduleLine: (clock: number) => cp.scheduleLine(id, clock), planCard: () => { const c = cp.planCard(id); return c ? { name: rec.info.name, ...c } : null; }, planNote: (mode, raw) => cp.planNote(id, mode, raw), planLeave: () => cp.planLeave(id), planNow: () => cp.planNow?.(id) ?? null } : {}),
+    }, clockNow: () => cp.clockNow(), onClock: () => cp.clockChanged(), onLiveClock: () => cp.storyClock(id), scheduleLine: (clock: number) => cp.scheduleLine(id, clock), planCard: () => { const c = cp.planCard(id); return c ? { name: rec.info.name, ...c } : null; }, planNote: (mode, raw, rawSeen) => cp.planNote(id, mode, raw, rawSeen), planLeave: () => cp.planLeave(id), planNow: () => cp.planNow?.(id) ?? null } : {}),
     ...(direct ? { identity: direct.identity } : {}),
     db,
     players: opts.players,
@@ -674,6 +687,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             crewAbilities: () => opts.quests!.crewAbilities?.() ?? [],
             gmWritten: () => opts.quests!.gmWritten?.() ?? {},
             contactCards: () => opts.quests!.contactCards?.() ?? [],
+            heldLeads: (p: string) => opts.quests!.heldLeads?.(p) ?? [],
             ...(opts.quests!.jobRecruit ? { jobRecruit: opts.quests!.jobRecruit } : {}),
             ...(opts.quests!.crewToldUntil ? { crewToldUntil: opts.quests!.crewToldUntil } : {}),
             ...(opts.quests!.districtName ? { districtName: (id: string) => opts.quests!.districtName!(id) } : {}),

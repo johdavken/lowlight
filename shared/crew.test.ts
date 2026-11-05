@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Ability, CrewBook, ErrandKind, Trait } from './crew-book';
+import { worksInGraft, type Ability, type CrewBook, type ErrandKind, type Trait } from './crew-book';
 import { growthStep, abilityPool, crewOdds, sellErrand, traitHas, dueAt, hireAbility, offerFor, errandsFor, hiresFor, jobRecruitCard, loyaltyWord, parseInstance, rollSend, slots, vouchedFor, WAGE, type Recruit } from './crew';
 import hiresBefore from './crew-hires.fixture.json';
 import type { Extra } from './extras';
@@ -379,5 +379,13 @@ describe('groundwork (tier 3 contracts spec §3)', () => {
     const recruit = { id: 'r', name: 'R', spec: 'muscle', grade: 1, traits: [], hidden: null, wage: 40, cost: 250, pitch: '', face: '' } as unknown as Parameters<typeof crewOdds>[0]['recruit'];
     const odds = (match?: 'muscle' | 'ears') => crewOdds({ errand: gw, recruit, traits: [], heat: 0, ...(match ? { match } : {}) }).clean;
     expect(odds('muscle') - odds('ears')).toBe(10);
+  });
+});
+
+describe('traits on a job', () => {
+  const trait = (effect: Trait['effect']): Trait => ({ id: 't', label: 'T', good: true, effect, for: 'any', text: '' });
+  it('a job reads heat, wages and the two falls; errand effects stay off its cards', () => {
+    for (const e of [{ kind: 'heat-on-messy', n: 1 }, { kind: 'never-held' }, { kind: 'hurt-not-gone-once' }, { kind: 'wage-on-clean', n: 15 }] as const) expect(worksInGraft(trait(e))).toBe(true);
+    for (const e of [{ kind: 'odds', errand: 'any', delta: 5 }, { kind: 'pay', errand: 'any', pct: 10 }, { kind: 'hours', pct: -33 }, { kind: 'busy', days: 2 }, { kind: 'sells-anywhere' }, { kind: 'full-route' }] as const) expect(worksInGraft(trait(e))).toBe(false);
   });
 });

@@ -44,6 +44,10 @@ export interface Trait {
   text: string;
 }
 
+/** What a Graft job reads off a trait: the rest shape errands only, so a job's cards leave them off. */
+const ON_A_JOB: TraitEffect['kind'][] = ['heat-on-messy', 'never-held', 'hurt-not-gone-once', 'wage-on-clean'];
+export const worksInGraft = (t: Trait): boolean => ON_A_JOB.includes(t.effect.kind);
+
 export interface ErrandEffect {
   sol?: [number, number];
   rep?: number;

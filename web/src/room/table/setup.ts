@@ -169,7 +169,7 @@ export function mountSetup(
         o.cue?.('move');
         render();
       }, undefined, offer.tierLine, 'ts-tierline'),
-      decked ? group('DECK', deckCards, deckTap, deckLabel(offer.deck ?? null), leans) : group('POCKETS', pockets, (id) => {
+      decked ? group('DECK', deckCards, deckTap, offer.barred ? `${offer.barred.toUpperCase()} STAYS HOME` : deckLabel(offer.deck ?? null), leans) : group('POCKETS', pockets, (id) => {
         if (id === 'favour') return;
         contacts.splice(contacts.indexOf(id.slice('contact:'.length)), 1);
         o.cue?.('move');

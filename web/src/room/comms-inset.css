@@ -90,3 +90,25 @@
   font-size: 0.7em;
   letter-spacing: 0.2em;
 }
+
+/* A beat's room (`room:` on a beat): no monitor, a full hand needs the room. The contact's lines come over the line in CRT cyan.
+   The tag rides the time: a new line takes the name's ::after for NEW. */
+.feed-root.on-line .msg.agent:not(.other-page):not(.stranger-page) .meta .name {
+  color: #7fe9ff;
+  text-shadow: 0 0 8px rgba(127, 233, 255, 0.7);
+}
+.feed-root.on-line .msg.agent:not(.other-page):not(.stranger-page) .meta .ts::before {
+  content: '(ON COMMS)';
+  margin-right: 12px;
+  color: #7fe9ff;
+  letter-spacing: 0.2em;
+}
+.feed-root.on-line .msg.agent:not(.other-page):not(.stranger-page) .text,
+.feed-root.on-line .msg.agent:not(.other-page):not(.stranger-page) .text * {
+  color: #9ff4e8;
+}
+.feed-root.on-line .msg.agent:not(.other-page):not(.stranger-page) .text {
+  text-shadow: 0 0 6px rgba(127, 233, 255, 0.55);
+  -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.62) 2px 3px);
+  mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.62) 2px 3px);
+}

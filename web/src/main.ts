@@ -12,12 +12,15 @@ import '@fontsource/chakra-petch/400.css';
 import '@fontsource/chakra-petch/400-italic.css';
 import '@fontsource/libre-baskerville/400.css';
 import '@fontsource/libre-baskerville/400-italic.css';
+import '@fontsource/libre-baskerville/700.css';
 import '@fontsource/share-tech-mono';
 import './ui/style.css';
-import type { Atmosphere, ChatMessage, ChatMode, ClientEvent, Crop, KitView, LinkStatus, OtherInfo, PersonaInfo, QuestState, ResidentInfo, SceneDef, ServerEvent } from '../../shared/types';
+import type { Atmosphere, ChatMessage, ChatMode, ClientEvent, Crop, KitView, LinkStatus, OtherInfo, PersonaInfo, QuestState, ResidentInfo, RoomState, SceneDef, ServerEvent, SpriteRef } from '../../shared/types';
 import { connectSocket } from './net/socket';
 import { createRenderer, type Renderer } from './renderer';
 import type { EffectsState } from './renderer/effects';
+import { signalShape } from './renderer/signal-shape';
+import { TRANSITION_DURATION } from './renderer/transitions';
 import { DevPanel } from './ui/devpanel';
 import { Feed, type CurrentLine } from './ui/feed';
 import { mountPlanCard } from './ui/plan-card';
@@ -121,6 +124,8 @@ function byId(id: string): HTMLElement {
 
 /** Test hook for the Playwright e2e smoke test, installed on every page load (cheap). */
 export interface NixRoomTestHook {
+  /** The scene drawn now: a beat's `room:` over the real one. */
+  viewScene(): string | null;
   /** The district load screen: its state, or 'closed' when this page skipped it. */
   intro(): IntroState;
   nonBlank(): boolean;
@@ -305,12 +310,12 @@ function startRoom(agentId: string): void {
   let currentLine: CurrentLine | null = null;
   const applyFaces = () => {
     const faces = stageFaces(currentLine, { her: herFaces, you: yourFaces, herPronoun });
-    if (!diceOpen()) stage.setExpression('right', faces.right);
+    if (!diceOpen() && !beatRoom) stage.setExpression('right', faces.right);
     stage.setExpression('left', faces.left);
   };
   feed.onCurrent((c) => {
     // Someone in the strip, or an encounter's stranger, has no figure: neither side is marked (their card lights instead).
-    if (c) stage.setSpeaker(c.speaker === 'user' ? 'left' : c.speaker === 'contact' ? 'right' : null);
+    if (c) stage.setSpeaker(c.speaker === 'user' ? 'left' : c.speaker === 'contact' && !beatRoom ? 'right' : null);
     whosHere.speaking(partySpeaker(c, partyStranger));
     // Faces from actions (spec 2026-10-20): hers from her *actions* on the page showing (else the reply's
     // stored face), yours from your line's; each neutral while the other speaks.
@@ -347,8 +352,6 @@ function startRoom(agentId: string): void {
   byId('input').before(questCardsHost);
   /** A quest row that came in on this tab (not history): only those play their check. */
   let freshQuestRow: string | null = null;
-  /** A job's ending row that came in on this tab: its debrief shows. */
-  let lastJobEnd: string | null = null;
   /** A failed check already played while it waited for REROLL / TAKE IT: its card and how many rolls. */
   let checkShown: Shown | null = null;
   /** Quest panel updates wait for a check playing on the cards. */
@@ -448,6 +451,37 @@ function startRoom(agentId: string): void {
   // Graft plays the papers desk's track (the gig track) while a table is up. Closing waits a moment, so SETUP's
   // GO IN handing over to the job's first beat doesn't dip; then the room's song comes back (a gig window keeps its own).
   let tableUp = false;
+  /** The room a quest beat shows (view only): the contact stays home, on the inset; `null`: the real room. */
+  let beatRoom: string | null = null;
+  /** The contact's figure, kept while a guest stands in the slot, and the room as the server has it. */
+  let contactFigure: { chain: FigureSource[]; name: string; accent: string } | null = null;
+  let realRoom: RoomState | null = null;
+  /** The song a quest beat is playing (guest crew spec §3b): it holds the music over the table's. */
+  let beatSong: string | null = null;
+  let beatSongUrl: string | null = null;
+  let songList: Promise<{ title: string; url: string }[]> | null = null;
+  /** The newest ask: a song still being looked up when the beat moves on doesn't start late. */
+  let songAsk = 0;
+  const playBeatSong = async (title: string | null): Promise<void> => {
+    const ask = ++songAsk;
+    if (title === beatSong) return;
+    if (title === null) {
+      beatSong = null;
+      beatSongUrl = null;
+      if (!gigWindow) roomAudio.overrideMusic(tableUp ? TABLE_MUSIC_URL : null, GIG_MUSIC_LEVEL);
+      return;
+    }
+    songList ??= fetch('/api/songs').then((r) => r.json() as Promise<{ songs: { title: string; url: string }[] }>).then((j) => j.songs).catch(() => {
+      songList = null;
+      return [];
+    });
+    // A title with no file yet plays nothing: the beat can be written before its song is in.
+    const song = (await songList).find((s) => s.title === title);
+    if (!song || ask !== songAsk) return;
+    beatSong = title;
+    beatSongUrl = song.url;
+    if (!gigWindow) roomAudio.overrideMusic(song.url, GIG_MUSIC_LEVEL);
+  };
   let tableDown: ReturnType<typeof setTimeout> | null = null;
   // The job's written text beside the subtitles while a table is up (the JOB column, 2026-11-02); the last table closing takes it.
   const jobColumn = mountJobColumn(byId('feed'), gameRoot(), () => feed.relayout());
@@ -466,8 +500,8 @@ function startRoom(agentId: string): void {
     if (!on) jobColumn.clear();
     if (tableDown) clearTimeout(tableDown);
     tableDown = null;
-    if (on) roomAudio.overrideMusic(TABLE_MUSIC_URL, GIG_MUSIC_LEVEL);
-    else tableDown = setTimeout(() => !tableUp && !gigWindow && roomAudio.overrideMusic(null), 1500);
+    if (on && !beatSong) roomAudio.overrideMusic(TABLE_MUSIC_URL, GIG_MUSIC_LEVEL);
+    else if (!on) tableDown = setTimeout(() => !tableUp && !gigWindow && !beatSong && roomAudio.overrideMusic(null), 1500);
   });
   /** The SETUP card before a job's first beat (the hand spec §1), and the job it's for. */
   let setupCard: { id: string; card: SetupCard; offer: string } | null = null;
@@ -503,11 +537,13 @@ function startRoom(agentId: string): void {
   const commsSlot = mountCommsSlot(commsInset, speakerPortrait);
   feed.onCurrent((c) => commsSlot.setLine(c ? `${c.id}:${c.speaker}` : '', c?.speaker ?? null));
   /** Comms on the stage (spec §2): no figure for her, her face on the monitor, her role, HANG UP, her pages tagged. */
+  let beatGuest = false;
   const applyComms = () => {
-    byId('stage-figures').classList.toggle('on-comms', comms.on);
+    byId('stage-figures').classList.toggle('on-comms', comms.on || (beatRoom !== null && !beatGuest));
     document.querySelector('.feed-root')?.classList.toggle('comms', comms.on);
+    document.querySelector('.feed-root')?.classList.toggle('on-line', beatRoom !== null);
     commsSlot.setComms(comms.on && partyContact ? { name: partyContact.name, face: `/api/agents/${encodeURIComponent(agentId)}/sprite`, where: comms.where ?? '', accent: partyContact.accent } : null);
-    whosHere.setParty(partyYou, partyContact, { comms: comms.on });
+    whosHere.setParty(partyYou, partyContact, { comms: comms.on || beatRoom !== null });
     input.setComms(comms.on);
   };
   feed.onStranger((st) => {
@@ -616,7 +652,16 @@ function startRoom(agentId: string): void {
   let renderer: Renderer | null = null;
   const devPanel = new DevPanel(byId('devpanel'), (e) => socket?.send(e), () => renderer?.fps() ?? 0);
   const warnings: string[] = [];
-  const rendererReady: Promise<Renderer | null> = createRenderer(host, gameStage).then(
+  // The figures and the UI are DOM over the canvas: they go down the same line as the room.
+  const signalGame = (amount: number) => {
+    const game = gameRoot();
+    const s = signalShape(amount);
+    game.style.transform = amount > 0 ? `scale(${s.width}, ${s.height})` : '';
+    game.style.filter = amount > 0 ? `brightness(${1 + 3 * s.flash})` : '';
+    // The figures' art runs past the frame's foot: squeezed, that would show under the band.
+    game.style.clipPath = amount > 0 ? 'inset(0)' : '';
+  };
+  const rendererReady: Promise<Renderer | null> = createRenderer(host, gameStage, { onSignal: signalGame }).then(
     (r) => {
       renderer = r;
       // The room's light on you, your contact and whoever in the strip is speaking (no renderer, no light: they stay as drawn).
@@ -724,6 +769,7 @@ function startRoom(agentId: string): void {
     fps: () => renderer?.fps() ?? 0,
     warnings,
     send: (e) => socket?.send(e),
+    viewScene: () => loadedSceneId,
     audio: () => roomAudio.state(),
     setMusicPause: (min, max) => roomAudio.setMusicPause(min, max),
     greeting: () => greetGate.state(),
@@ -783,8 +829,8 @@ function startRoom(agentId: string): void {
     if (!gigWindow) return;
     gigWindow.destroy();
     gigWindow = null;
-    // The room's own song comes back, or the table's track if a job is still on it.
-    roomAudio.overrideMusic(tableUp ? TABLE_MUSIC_URL : null, GIG_MUSIC_LEVEL);
+    // The room's own song comes back, or a beat's song, or the table's track if a job is still on it.
+    roomAudio.overrideMusic(beatSongUrl ?? (tableUp ? TABLE_MUSIC_URL : null), GIG_MUSIC_LEVEL);
   };
   const gigCue = gigCuePlayer(roomAudio);
   const papersCue = papersCuePlayer(roomAudio);
@@ -1497,6 +1543,11 @@ function startRoom(agentId: string): void {
     switch (e.type) {
       case 'history':
         feed.setHistory(e.messages);
+        // An ending in the history was played when it happened: only one that comes in on this tab shows.
+        {
+          const story = latestQuestStory(feed.messages());
+          if (story?.ended) questEndShown = story.id;
+        }
         suggestSpent();
         input.setWalkOut(walkOutDue(feed.messages(), noWalkOut()));
         greetGate.onHistory(greetAllowed(e.greetDue, feed.messages(), noWalkOut()));
@@ -1514,10 +1565,7 @@ function startRoom(agentId: string): void {
         break;
       case 'message':
         feed.upsert(e.message);
-        if (e.message.role === 'user' && e.message.mode === 'quest') {
-          freshQuestRow = e.message.id;
-          if (e.message.quest?.debrief) lastJobEnd = e.message.id;
-        }
+        if (e.message.role === 'user' && e.message.mode === 'quest') freshQuestRow = e.message.id;
         if (e.message.role === 'user' && e.message.parting === 'her') letGoDraft = null;
         input.setWalkOut(walkOutDue(feed.messages(), noWalkOut()));
         // A new turn: the dealt set was for the moment before it. A played event closes the panel.
@@ -1587,6 +1635,9 @@ function startRoom(agentId: string): void {
         const prev = questState;
         const next = e.state;
         questState = next;
+        void playBeatSong(next.active?.song ?? null);
+        void showBeatRoom(next.active?.room ?? null, next.active?.roomGuest ?? null);
+        jobColumn.setOnLine(partyContact?.name ?? '', next.active?.onLine ?? []);
         refreshKit();
         questHeld = null;
         // A job's check plays on the cards first; then the written text stays readable in the panel (the box moves on to her reply).
@@ -1628,9 +1679,7 @@ function startRoom(agentId: string): void {
             if (act === 'close') jobTable.close();
             if (act === 'end' && ending && debrief) {
               questEndShown = ending.id;
-              // Its stamp sounds and its sol counts up only for an ending that came in on this tab.
-              const live = ending.id === lastJobEnd;
-              const card = debriefEl(debrief, { cue: live ? missionCue : () => {}, reduced: !live || reducedMotion() });
+              const card = debriefEl(debrief, { cue: missionCue, reduced: reducedMotion() });
               jobTable.end(ending.title, ending.text, card, debrief);
               // At the HUD table the rolls read in the JOB column; a phone's table has no column and keeps them on the card.
               showTableText(ending.title, ending.text, jobTable.root.classList.contains('phone') ? null : debriefRolls(card));
@@ -1733,7 +1782,8 @@ function startRoom(agentId: string): void {
         }
         if (e.kind !== 'monogram') chain.push({ kind: 'portrait', url: e.url });
         chain.push({ kind: 'monogram', letter: e.name.charAt(0).toUpperCase() });
-        stage.setRight(chain, e.name, e.accent);
+        contactFigure = { chain, name: e.name, accent: e.accent };
+        if (!beatRoom) stage.setRight(chain, e.name, e.accent);
         partyContact = { name: e.name, accent: e.accent, thumb: e.kind === 'monogram' ? null : `/api/agents/${encodeURIComponent(agentId)}/thumb` };
         journal.setContact({ name: e.name, accent: e.accent, face: partyContact.thumb });
         whosHere.setParty(partyYou, partyContact, { comms: comms.on });
@@ -1794,7 +1844,7 @@ function startRoom(agentId: string): void {
         hud.setAtmosphere(e.state.atmosphere);
         devPanel.setRoom(e.state);
         if (scene) {
-          roomAudio.room(e.state, scene, '/scenes/', e.source === 'restore' ? 0 : e.duration, e.transition);
+          roomAudio.room(e.state, scene, '/scenes/', e.source === 'restore' ? 0 : e.duration, e.transition, e.transition === 'glitch' ? TRANSITION_DURATION.signal / 2 : undefined);
           roomAudio.place(scene, '/scenes/', e.source === 'restore' ? 0 : e.duration);
           devPanel.setSoundState(roomAudio.state());
         }
@@ -1812,6 +1862,9 @@ function startRoom(agentId: string): void {
       for (const s of e.scenes) scenes.set(s.id, s);
       devPanel.setScenes(e.scenes);
     } else if (e.type === 'room') {
+      realRoom = e.state;
+      // A beat's room holds the picture; this one comes back when the beat moves on.
+      if (beatRoom) return;
       /** The room has drawn (or can't): the page-load screen's bar fills, and GO's screen steps aside. */
       const arrived = (sceneId: string) => {
         markSceneReady();
@@ -1850,7 +1903,8 @@ function startRoom(agentId: string): void {
             };
             // The first scene just appears; later scene changes play their transition (default fade).
             if (loadedSceneId === null) await swap();
-            else await renderer.playTransition(e.transition ?? 'fade', swap);
+            // A room's glitch shows as a signal drop (the select keeps the real one).
+            else await renderer.playTransition(e.transition === 'glitch' ? (reducedMotion() ? 'fade' : 'signal') : (e.transition ?? 'fade'), swap);
           } else {
             renderer.applyState(e.state, e.duration, e.transition);
           }
@@ -1861,6 +1915,31 @@ function startRoom(agentId: string): void {
           arrived(e.state.sceneId);
         });
     }
+  };
+
+  /** A beat's room (`room:`, view only): that picture, the contact's lines in CRT cyan, a brought guest in the figure slot. */
+  const showBeatRoom = async (room: string | null, guest: string | null): Promise<void> => {
+    if (room === beatRoom) return;
+    if (room !== null && !scenes.has(room)) return console.warn(`[room] unknown beat room ${room}`);
+    beatRoom = room;
+    beatGuest = room !== null && guest !== null;
+    const figure = beatGuest ? ((await (await fetch('/api/agents')).json()) as { agents: { id: string; name: string; accent: string; sprite: SpriteRef | null }[] }).agents.find((a) => a.id === guest) : undefined;
+    if (figure?.sprite) stage.setRight([{ kind: 'sprite', url: figure.sprite.url, crop: figure.sprite.crop, height: figure.sprite.height, pixel: figure.sprite.pixel, outfits: figure.sprite.outfits }, { kind: 'monogram', letter: figure.name.charAt(0).toUpperCase() }], figure.name, figure.accent);
+    else if (contactFigure) stage.setRight(contactFigure.chain, contactFigure.name, contactFigure.accent);
+    applyComms();
+    const target = scenes.get(room ?? realRoom?.sceneId ?? '');
+    if (!target) return;
+    hud.setScene(target.name);
+    queue = queue.then(async () => {
+      const renderer = await rendererReady;
+      if (!renderer) return;
+      await renderer.playTransition('fade', async () => {
+        await renderer.loadScene(target);
+        loadedSceneId = target.id;
+        doors.show(room ? null : target);
+        renderer.applyState(room ? { sceneId: target.id, lights: target.lights, atmosphere: target.defaults } : (realRoom ?? { sceneId: target.id, lights: target.lights, atmosphere: target.defaults }), 0);
+      });
+    });
   };
 
   const fetchPersona = (as: string | null): Promise<{ persona: PersonaInfo | null }> =>

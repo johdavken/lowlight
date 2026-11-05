@@ -299,7 +299,8 @@ export function rerunRoll(o: { seed: string; roll: DiceRoll; faces?: number[] })
   const faces = o.faces ?? o.roll.faces.map(() => 1 + Math.floor(r() * 6));
   const { saved: _saved, deck: _deck, ...was } = o.roll;
   const result = resultOf(faces, o.roll.keep, o.roll.position, o.roll.effect);
-  return { ...(result.kind === 'miss' ? o.roll : was), faces, kind: result.kind, pass: result.pass, rerun: true };
+  const { saved: _gone, ...unsaved } = o.roll;
+  return { ...(result.kind === 'miss' ? unsaved : was), faces, kind: result.kind, pass: result.pass, rerun: true };
 }
 
 /** A gamble's die (ability pass spec §2), seeded so rewind and BRANCH HERE roll the same. */

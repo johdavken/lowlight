@@ -1,12 +1,18 @@
 import type { Transition } from '../../../shared/types';
 
-/** Total duration of each scene transition, in seconds. */
-export const TRANSITION_DURATION: Record<Transition, number> = { fade: 1.2, glitch: 0.6 };
+/** The renderer's transitions: the room's two, and the signal drop a room move shows for a `glitch`. */
+export type SceneTransition = Transition | 'signal';
 
-/** What a transition drives each frame: a black overlay alpha, and a glitch strength (0..1). */
+/** Total duration of each scene transition, in seconds. */
+export const TRANSITION_DURATION: Record<SceneTransition, number> = { fade: 1.2, glitch: 0.6, signal: 1 };
+/** How long a signal drop stays black after the swap, on top of its duration. */
+const SIGNAL_HOLD = 0.3;
+
+/** What a transition drives each frame: a black overlay alpha, a glitch strength and a signal drop (0..1). */
 export interface TransitionTargets {
   setFade(alpha: number): void;
   setGlitch(amount: number): void;
+  setSignal(amount: number): void;
 }
 
 interface Ramp {
@@ -21,16 +27,17 @@ interface Ramp {
  * Scene transitions, advanced by the renderer's frame clock (`update(dt)`).
  * `fade`: black overlay 0→1 over half the duration, `swap()`, then 1→0.
  * `glitch`: glitch strength 0→1, `swap()`, then 1→0 (the grade ramps RGB split and slice tearing).
+ * `signal`: the picture collapses to a line and out, `swap()` on black, a held beat, then opens again.
  * Transitions run one at a time; a new one waits for the previous to finish.
  */
 export class Transitions {
   private ramp: Ramp | null = null;
-  private kind: Transition = 'fade';
+  private kind: SceneTransition = 'fade';
   private chain: Promise<void> = Promise.resolve();
 
   constructor(private readonly targets: TransitionTargets) {}
 
-  playTransition(kind: Transition, swap: () => Promise<void>): Promise<void> {
+  playTransition(kind: SceneTransition, swap: () => Promise<void>): Promise<void> {
     const run = async () => {
       this.kind = kind;
       const half = TRANSITION_DURATION[kind] / 2;
@@ -38,6 +45,7 @@ export class Transitions {
       try {
         await swap();
       } finally {
+        if (kind === 'signal') await this.animate(1, 1, SIGNAL_HOLD);
         await this.animate(1, 0, half);
       }
     };
@@ -66,13 +74,9 @@ export class Transitions {
   }
 
   private set(v: number): void {
-    if (this.kind === 'fade') {
-      this.targets.setFade(v);
-      this.targets.setGlitch(0);
-    } else {
-      this.targets.setGlitch(v);
-      this.targets.setFade(0);
-    }
+    this.targets.setFade(this.kind === 'fade' ? v : 0);
+    this.targets.setGlitch(this.kind === 'glitch' ? v : 0);
+    this.targets.setSignal(this.kind === 'signal' ? v : 0);
   }
 }
 

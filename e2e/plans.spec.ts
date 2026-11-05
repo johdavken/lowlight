@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { ContactEntry } from '../shared/types';
+import type { AroundEntry, ContactEntry } from '../shared/types';
 import { DIRECT, awaitGreeting, send, skipSplash } from './fixtures';
 
 // Her plans (spec 2026-10-21 §5): a line about her going home makes the fake residual record a going plan; the card
@@ -58,4 +58,20 @@ test('GO WITH HER: the card goes and you walk to her place together', async ({ p
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   await expect(page.locator('.plan-card')).toHaveCount(0);
   expect(page.url()).toContain(`/room/${DIRECT.id}`);
+});
+
+test('a named person turns up: her row has the meeting, and she is there for the hour', async ({ page, request }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await skipSplash(page);
+  await page.goto(`/room/${DIRECT.id}`);
+  await page.waitForFunction(() => window.__nixRoom !== undefined);
+  await awaitGreeting(page);
+  await send(page, { type: 'user_message', text: 'Meet Ember and me there at three.', mode: 'rp' });
+  const ember = async () => ((await (await request.get('/api/playthroughs/active/around')).json()) as AroundEntry[]).find((e) => e.contactId === 'ember');
+  await expect.poll(async () => (await ember())?.planTail ?? null, { timeout: 15_000 }).toMatch(/ 03:00$/);
+  const before = (await ember())!.sceneId;
+  expect((await request.post('/api/playthroughs/active/wait', { data: { until: '03:10' } })).status()).toBe(200);
+  const there = (await ember())!;
+  expect(there.sceneId).not.toBe(before);
+  expect(there.planTail).toBe(`${there.placeName} 03:00`);
 });

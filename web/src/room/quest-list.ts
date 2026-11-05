@@ -34,7 +34,7 @@ type Open = QuestState['open'][number];
 type Board = NonNullable<QuestState['boards']>[number];
 type BoardJob = Board['jobs'][number];
 /** A row on ELSEWHERE: the quest waiting, one in someone else's room, or a mission on another place's board. */
-type Away = { key: string; kind: 'wait' | 'away' | 'job'; id: string; title: string; line: string; hint: string; job?: BoardJob; place?: Board };
+type Away = { key: string; kind: 'wait' | 'away' | 'job'; id: string; title: string; line: string; hint: string; art?: string; job?: BoardJob; place?: Board };
 
 const TAB_NAME: Record<Tab, string> = { here: 'HERE', away: 'ELSEWHERE', rumors: 'RUMORS', fixer: 'FIXER', leads: 'LEADS', loose: 'LOOSE ENDS' };
 
@@ -65,11 +65,11 @@ function terms(q: Open): string | null {
 function awayRows(state: QuestState): Away[] {
   const rows: Away[] = [];
   // A contract under way: on this list, not on the room's waiting card, since it runs for days around everything else.
-  if (state.arc) rows.push({ key: `arc:${state.arc.id}`, kind: 'wait', id: state.arc.id, title: state.arc.title, line: state.arc.next, hint: 'A CONTRACT' });
+  if (state.arc) rows.push({ key: `arc:${state.arc.id}`, kind: 'wait', id: state.arc.id, title: state.arc.title, line: state.arc.next, hint: 'A CONTRACT', ...(state.arc.art ? { art: state.arc.art } : {}) });
   const w = state.waiting;
   if (w) rows.push({ key: `wait:${w.id}`, kind: 'wait', id: w.id, title: w.title, line: w.next, hint: w.comms ? 'ON COMMS' : w.here ? 'IT GOES ON HERE' : w.at ? `AT ${w.at.toUpperCase()}` : 'WAITING' });
   // Quests in someone else's room: listed so they're never lost; they go on only with that contact.
-  for (const e of state.elsewhere) rows.push({ key: `away:${e.id}`, kind: 'away', id: e.id, title: e.title, line: [`With ${e.contactName}`, e.next].filter(Boolean).join(' · '), hint: `GOES ON ONLY WITH ${e.contactName.toUpperCase()}` });
+  for (const e of state.elsewhere) rows.push({ key: `away:${e.id}`, kind: 'away', id: e.id, title: e.title, ...(e.art ? { art: e.art } : {}), line: [`With ${e.contactName}`, e.next].filter(Boolean).join(' · '), hint: `GOES ON ONLY WITH ${e.contactName.toUpperCase()}` });
   // Tonight's missions on the other places' boards (2026-11-01), a group per place.
   for (const b of state.boards ?? []) {
     for (const j of b.jobs) {
@@ -341,15 +341,19 @@ export function mountQuestList(
     (state.rumors ?? []).map((r) => {
       const row = el('button', 'ql-row ql-story');
       row.type = 'button';
-      row.append(el('span', 'ql-title', r.contactName), el('span', 'ql-line', r.placeName));
+      row.append(el('span', 'ql-title', r.contactName), el('span', 'ql-line', r.needs ? `${r.placeName} · REP ${r.needs}` : r.placeName));
       pick(row, r.id);
       return row;
     });
 
   /** A rumor: its line, and the way to it. Leaving your contact asks first (tier 3 contracts spec §5). */
   const rumorFile = (r: Rumor): HTMLElement[] => {
-    const inner = el('div', 'ql-in');
+    const inner = el('div', 'ql-in ql-plain');
     inner.append(el('p', 'ql-pitch', r.line));
+    if (r.needs) {
+      inner.append(el('p', 'ql-locked-note', `NEEDS REP ${r.needs}`));
+      return [inner];
+    }
     const button = el('button', 'ql-goto', r.here ? 'START' : `GO TO ${r.contactName.toUpperCase()}`);
     button.type = 'button';
     let asked = false;
@@ -457,7 +461,7 @@ export function mountQuestList(
       go.append(walk);
     }
     inner.append(go);
-    return [art(undefined), inner];
+    return [art(a.art), inner];
   };
 
   /** LEADS' rows: who each points to (a ? before you've met them), the followed ones under FOLLOWED, dimmed. */

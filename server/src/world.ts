@@ -18,12 +18,13 @@ import { readHeldLeads } from './leads-held';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
-import { blockStartedBetween, DAY, hhmmOf, minuteOfDay, nextBlock, nextBlockStart, nextOccurrence, parseHhmm, scheduledRoom, START, weekdayName, weekdayOf, type Block } from '../../shared/clock';
+import { blockStartedBetween, DAY, fixedBlockDuring, hhmmOf, minuteOfDay, nextBlock, nextBlockStart, nextOccurrence, parseHhmm, scheduledRoom, START, weekdayName, weekdayOf, type Block } from '../../shared/clock';
 import type { AroundEntry, ChatMessage, ChatMode, ContactEntry, HeldLead, LeadView, Location, PlaythroughInfo, Present, SaveInfo, SaveTrigger } from '../../shared/types';
 import { strangerAt } from '../../shared/encounter';
 import { speakerBeats } from '../../shared/beats';
 import type { PlaythroughPersona } from '../../shared/persona';
-import { contactsAndAround, knownContacts, placesOf, type RosterContact } from './contacts';
+import { contactsAndAround, hasRow, knownContacts, placesOf, readPlanMeta, type RosterContact } from './contacts';
+import { guestWords } from './residual';
 import { whoIsHere } from './others';
 import { openDb, type Db } from './db';
 import { storedStanding } from './standing';
@@ -37,6 +38,9 @@ import type { ContactCard, LooseEndsView } from '../../shared/types';
 import { contactCardsFrom, giversFromEnv } from './contact-cards';
 
 type Players = ReturnType<typeof createPlayers>;
+
+/** Closes a `[your usual day: …]` line. */
+const HABITS = 'Habits, not appointments: skip them if you like';
 
 /** `lastLine.text` keeps this many characters. */
 export const LAST_LINE_MAX = 120;
@@ -105,9 +109,13 @@ export interface CheckpointPort {
    * Her plan's line for this turn while she's with you (spec §6): the meeting you came to (a greet), or the one you
    * missed; `spend` when the plan is over and her reply should drop it. Null: nothing to say or spend.
    */
-  planNote(contactId: string, mode: ChatMode, raw?: string | null): { line: string | null; spend: boolean } | null;
+  planNote(contactId: string, mode: ChatMode, raw?: string | null, rawSeen?: string | null): { line: string | null; spend: boolean } | null;
   /** Her plan's places by name, for her goodbye (mid review M3): whatever the clock or where you are; null without one. */
   planLeave(contactId: string): { going: string; meet: { place: string; time: string } | null } | null;
+  /** Who `contactId` can name on a meeting (shared plans spec §2): the roster, without her or the player. */
+  planPeople(contactId: string): { id: string; name: string }[];
+  /** Where something holds `id` during `[from, to)` (spec §4): a FIXED block's place or her own meeting's, else null. */
+  planHeld(id: string, from: number, to: number, place: string): string | null;
   /** Where her body is while you're on comms with her (spec 2026-10-20 §1); null when you're not. */
   herPlace(contactId: string): string | null;
   /** The comms line dropped (spec §1): go solo, and every tab hears it (they go to /solo). */
@@ -506,6 +514,8 @@ export function createWorld(deps: {
    * runtime (each tab's strip, the prompt, the tools) at the same clock.
    */
   let placesMemo: { key: string; places: Map<string, string> } | null = null;
+  /** Closed rooms' plans, read once per tick: every list asks after every contact. */
+  let closedPlans: { pt: string; metas: Map<string, { plan: string | null; seen: string | null }> } | null = null;
   /** The last kitOf: the same playthrough, clock and database fingerprints fold the same (crew spec §3). */
   let kitMemo: { key: string; value: { kit: Kit; stats: Stats; crew: CrewState } } | null = null;
   let cipherMemo: { key: string; value: CipherState } | null = null;
@@ -545,7 +555,9 @@ export function createWorld(deps: {
         // With her, she's right there: no tail (final review M7).
         if (!pt.solo && pt.location?.contactId === id) return null;
         const p = planOf(pt, id);
-        return p ? planTail(p, now(), deps.placeName) : null;
+        const own = p ? planTail(p, now(), deps.placeName) : null;
+        const asked = own ? null : invitations(pt, id, now())[0];
+        return own ?? (asked ? planTail(asked.plan, now(), deps.placeName) : null);
       },
       // Where she is now: her schedule's place (when it has her), else her open room's scene.
       liveScene: (id: string) => scheduledPlace(pt, id, now) ?? runtimeOf(id)?.room.state.sceneId ?? null,
@@ -568,6 +580,11 @@ export function createWorld(deps: {
     const plan = planOf(pt, contactId);
     const planned = plan ? planPlaceAt(plan, clock) : null;
     if (planned) return planned;
+    // Someone else's meeting that names her (shared plans spec §3): there for the hour, over her habits.
+    for (const { plan: asked } of invitations(pt, contactId, clock)) {
+      const place = planPlaceAt({ ...asked, going: null }, clock);
+      if (place) return place;
+    }
     if (blocks.length === 0) return null;
     // A parting later than the clock was rewound away: it never happened.
     const parted = pt.parted?.[contactId];
@@ -575,11 +592,79 @@ export function createWorld(deps: {
     return scheduledRoom(blocks, clock);
   }
 
-  /** Her plan with `pt`'s player (spec 2026-10-21 §2); null: none, or her room isn't open. */
-  function planOf(pt: PlaythroughInfo, contactId: string, raw?: string | null): Plan | null {
+  /** Her plan with `pt`'s player (spec 2026-10-21 §2); null: none. `raw` and `rawSeen` stand in for what's stored (a regenerate). */
+  function planOf(pt: PlaythroughInfo, contactId: string, raw?: string | null, o: { rawSeen?: string | null; clock?: number } = {}): Plan | null {
+    const stored = planMetaOf(pt, contactId);
+    const parsed = parsePlan(raw !== undefined ? raw : stored.plan);
+    if (!parsed) return null;
+    const plan = withSeen(parsed, o.rawSeen !== undefined ? o.rawSeen : stored.seen, o.clock ?? clockOf(pt));
+    // Marked from another room: a rewind or a branch there took the visit back, and the clock alone can't show it.
+    if (!plan.metWith || !plan.metRow || rowThere(pt, plan.metWith, plan.metRow)) return plan;
+    const { met: _met, metWith: _with, metRow: _row, ...unmet } = plan;
+    return unmet;
+  }
+
+  /** Whether row `id` is still in `contactId`'s room. */
+  function rowThere(pt: PlaythroughInfo, contactId: string, id: string): boolean {
     const db = runtimeOf(contactId)?.db;
-    const plan = parsePlan(raw !== undefined ? raw : (db?.getMeta(planKey(pt.player)) ?? null));
-    return plan && db ? withSeen(plan, db.getMeta(planSeenKey(pt.player)), clockOf(pt)) : plan;
+    return db ? db.getMessage(pt.player, id) !== undefined : hasRow(path.join(playthroughs.charsDir(pt.id), contactId, 'room.db'), id);
+  }
+
+  /** Her plan and seen record as stored: from her room when it's open, off disk when it isn't (shared plans spec §3). */
+  function planMetaOf(pt: PlaythroughInfo, contactId: string): { plan: string | null; seen: string | null } {
+    const db = runtimeOf(contactId)?.db;
+    if (db) return { plan: db.getMeta(planKey(pt.player)), seen: db.getMeta(planSeenKey(pt.player)) };
+    if (closedPlans?.pt !== pt.id) {
+      closedPlans = { pt: pt.id, metas: new Map() };
+      setImmediate(() => (closedPlans = null));
+    }
+    let meta = closedPlans.metas.get(contactId);
+    if (!meta) closedPlans.metas.set(contactId, (meta = readPlanMeta(path.join(playthroughs.charsDir(pt.id), contactId, 'room.db'), pt.player)));
+    return meta;
+  }
+
+  /** The plans that name `contactId` and aren't over, in roster order (shared plans spec §3). */
+  function invitations(pt: PlaythroughInfo, contactId: string, clock: number): { by: string; plan: Plan }[] {
+    return deps.roster().flatMap((c) => {
+      if (c.id === contactId || c.id === pt.player) return [];
+      const plan = planOf(pt, c.id, undefined, { clock });
+      return plan?.meet?.with?.includes(contactId) && !planOver(plan, clock) ? [{ by: c.id, plan }] : [];
+    });
+  }
+
+  /** A mark on `contactId`'s plan, in her room or, closed, in her database (you came with someone else). */
+  function markPlan(pt: PlaythroughInfo, contactId: string, plan: Plan, mark: SeenMark, clock: number, came?: { with: string; row: string | null }): void {
+    const write = (db: Db) => db.setMeta(planSeenKey(pt.player), markSeen(db.getMeta(planSeenKey(pt.player)), plan.from, mark, clock, came));
+    const open = runtimeOf(contactId)?.db;
+    if (open) return void write(open);
+    const db = openDb(path.join(playthroughs.charsDir(pt.id), contactId, 'room.db'), { defaultPlayer: pt.player });
+    try {
+      write(db);
+    } finally {
+      db.close();
+      closedPlans = null;
+    }
+  }
+
+  /** You're in the room during the hour, however you got there (shared plans spec §8): every meeting here counts. */
+  function markMeetings(pt: PlaythroughInfo, contactId: string, sceneId: string | undefined): void {
+    const clock = clockOf(pt);
+    const row = runtimeOf(contactId)?.db.stamp().messageId ?? null;
+    for (const c of deps.roster()) {
+      if (c.id === pt.player) continue;
+      const plan = planOf(pt, c.id, undefined, { clock });
+      if (!plan?.meet || plan.met || plan.meet.place !== sceneId || clock < plan.meet.at || clock >= plan.meet.at + MEET_WAIT) continue;
+      markPlan(pt, c.id, plan, 'met', clock, c.id === contactId ? undefined : { with: contactId, row });
+    }
+  }
+
+  /** `[Ember asked you to Hae's at 09:00, with Hicks]` for a guest who's your contact (spec §9), or null. */
+  function guestLine(pt: PlaythroughInfo, contactId: string, clock: number): string | null {
+    const asked = invitations(pt, contactId, clock)[0];
+    const meet = asked?.plan.meet;
+    if (!meet) return null;
+    const others = [playerName(pt), ...(meet.with ?? []).filter((id) => id !== contactId).map((id) => deps.contactName(id))];
+    return `[${deps.contactName(asked.by)} asked you to ${deps.placeName(meet.place)} at ${hhmmOf(minuteOfDay(meet.at))},${guestWords(others, (n) => n)}]`;
   }
 
   /** Comms on `pt`'s player in `contactId`'s room (null: none stored, or her room isn't open). */
@@ -590,6 +675,8 @@ export function createWorld(deps: {
   /**
    * `[your schedule: …]` for her prompt (with you), or null without a schedule. A start more than a
    * day away is named by its weekday (spec 2026-10-20 weekdays): `free until Monday 20:00, then …`.
+   * Only `fixed` blocks read as times she's held to; the rest are `[your usual day: …]`, habits she
+   * can skip (playtest: Ember needed "to be at the Tilt by", Nix acted like she worked there).
    */
   function scheduleLineOf(pt: PlaythroughInfo, contactId: string, at?: number): string | null {
     const blocks = deps.schedule?.(contactId) ?? [];
@@ -599,11 +686,19 @@ export function createWorld(deps: {
     const when = (start: number) => (start - clock <= DAY ? hhmmOf(minuteOfDay(start)) : `${weekdayName(weekdayOf(start))} ${hhmmOf(minuteOfDay(start))}`);
     const current = blocks.find((b) => scheduledRoom([b], clock) !== null) ?? null;
     const next = nextBlockStart(blocks, clock);
-    if (!current) return next ? `[your schedule: free until ${when(next.at)}, then ${name(next.block.room)}]` : null;
+    const note = (b: Block) => (b.why ? ` (${b.why})` : '');
+    if (!current) {
+      if (!next) return null;
+      const { block } = next;
+      return block.fixed ? `[your schedule: free until ${when(next.at)}, then ${name(block.room)}${note(block)}]` : `[your usual day: free; ${name(block.room)} around ${when(next.at)}${note(block)}. ${HABITS}]`;
+    }
     // The same block again only when it's more than a day off (a daily block reads as before, on its start minute too).
     const shown = next && (next.block !== current || next.at - clock > DAY) ? next : null;
-    const then = shown ? `; then ${name(shown.block.room)} ${when(shown.at)}–${hhmmOf(shown.block.to)}` : '';
-    return `[your schedule: ${name(current.room)} until ${hhmmOf(current.to)}${then}]`;
+    const firm = current.fixed || shown?.block.fixed;
+    const habit = (b: Block, at: string) => (firm ? `usually ${name(b.room)} around ${at}${note(b)}, a habit you can skip` : `${name(b.room)} around ${at}${note(b)}`);
+    const now = current.fixed ? `${name(current.room)} until ${hhmmOf(current.to)}${note(current)}` : habit(current, 'now');
+    const then = !shown ? '' : shown.block.fixed ? `; then ${name(shown.block.room)} ${when(shown.at)}–${hhmmOf(shown.block.to)}${note(shown.block)}` : `; then ${habit(shown.block, when(shown.at))}`;
+    return firm ? `[your schedule: ${now}${then}]` : `[your usual day: ${now}${then}. ${HABITS}]`;
   }
 
   /** The known contacts of `pt`, as its databases have them. */
@@ -644,12 +739,13 @@ export function createWorld(deps: {
     const plan = planOf(pt, contactId);
     const clock = clockOf(pt);
     const left = pt.parted?.[contactId];
-    const seenDb = runtimeOf(contactId)?.db;
-    const seen = (mark: SeenMark) => seenDb?.setMeta(planSeenKey(pt.player), markSeen(seenDb.getMeta(planSeenKey(pt.player)), plan!.from, mark, clock));
+    const seen = (mark: SeenMark) => markPlan(pt, contactId, plan!, mark, clock);
     // Joining her where she went, while she's there: her going is done (final review M3).
     if (plan?.going && !plan.joined && clock < plan.going.until && sceneId === plan.going.place) seen('joined');
     if (plan?.meet && !plan.met && clock >= plan.meet.at && clock < plan.meet.at + MEET_WAIT) seen('met');
     else if (plan?.meet && !plan.met && !plan.missed && clock >= plan.meet.at + MEET_WAIT && left !== undefined && left <= plan.meet.at) seen('missed');
+    // Anyone else's meeting in this room counts too, even if you leave before a turn (shared plans spec §8).
+    markMeetings(pt, contactId, sceneId);
     // You leave whoever you were with: she stays there until her next scheduled change.
     const parted = { ...(pt.parted ?? {}) };
     const prev = pt.location?.contactId;
@@ -1185,17 +1281,37 @@ export function createWorld(deps: {
       const pt = playthroughs.active();
       return pt ? scheduleLineOf(pt, contactId, clock) : null;
     },
-    planNote(contactId, mode, raw) {
+    planNote(contactId, mode, raw, rawSeen) {
       const pt = playthroughs.active();
       if (!pt || pt.solo || pt.location?.contactId !== contactId || mode === 'ooc') return null;
-      const plan = planOf(pt, contactId, raw);
-      if (!plan) return null;
+      if (mode !== 'text' && withHer(pt, contactId)) markMeetings(pt, contactId, runtimeOf(contactId)?.room.state.sceneId);
       const clock = clockOf(pt);
-      const hm = (m: number) => hhmmOf(minuteOfDay(m));
-      if (plan.meet && plan.met && mode === 'greet' && clock < plan.meet.at + MEET_WAIT) return { line: `[plan: you said you'd meet them here at ${hm(plan.meet.at)}]`, spend: false };
-      if (!planOver(plan, clock)) return null;
-      if (plan.meet && plan.missed) return { line: `[you waited at ${deps.placeName(plan.meet.place)} from ${hm(plan.meet.at)} to ${hm(plan.meet.at + MEET_WAIT)}; they never came]`, spend: true };
-      return { line: null, spend: true };
+      const guest = guestLine(pt, contactId, clock);
+      const own = ((): { line: string | null; spend: boolean } | null => {
+        const plan = planOf(pt, contactId, raw, rawSeen !== undefined ? { rawSeen } : {});
+        if (!plan) return null;
+        const hm = (m: number) => hhmmOf(minuteOfDay(m));
+        const others = guestWords(plan.meet?.with ?? [], deps.contactName);
+        if (plan.meet && plan.met && mode === 'greet' && clock < plan.meet.at + MEET_WAIT) return { line: `[plan: you said you'd meet them here at ${hm(plan.meet.at)}${others}]`, spend: false };
+        if (!planOver(plan, clock)) return null;
+        if (plan.meet && plan.missed) return { line: `[you waited at ${deps.placeName(plan.meet.place)} from ${hm(plan.meet.at)} to ${hm(plan.meet.at + MEET_WAIT)}; they never came]`, spend: true };
+        // The scene is in the other one's history (spec §8): she's told it happened.
+        if (plan.meet && plan.metWith) return { line: `[you met them at ${deps.placeName(plan.meet.place)} at ${hm(plan.meet.at)}, with ${deps.contactName(plan.metWith)} there]`, spend: true };
+        return { line: null, spend: true };
+      })();
+      if (!guest) return own;
+      return { line: [own?.line, guest].filter(Boolean).join('\n'), spend: own?.spend === true };
+    },
+    planPeople(contactId) {
+      const pt = playthroughs.active();
+      return pt ? deps.roster().flatMap((c) => (c.id === contactId || c.id === pt.player ? [] : [{ id: c.id, name: c.name }])) : [];
+    },
+    planHeld(id, from, to, place) {
+      const pt = playthroughs.active();
+      const fixed = fixedBlockDuring((deps.schedule?.(id) ?? []).filter((b) => b.room !== place), from, to);
+      if (fixed) return deps.placeName(fixed.room);
+      const own = pt ? planOf(pt, id)?.meet : null;
+      return own && own.place !== place && own.at < to && own.at + MEET_WAIT > from ? deps.placeName(own.place) : null;
     },
     planLeave(contactId) {
       const pt = playthroughs.active();

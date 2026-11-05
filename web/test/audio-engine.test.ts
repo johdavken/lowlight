@@ -120,6 +120,21 @@ describe('AudioEngine: voices and glides', () => {
     expect(viaMaster(burst)).toBe(false);
   });
 
+  it('a room move sinks the master to the swap under swelling static, then brings it back', () => {
+    const { engine, ctx, p } = setup();
+    engine.unlock();
+    engine.apply(rainMix(0.5), 0);
+    const sourcesBefore = ctx.of('buffer-source').length;
+    ctx.currentTime = 5;
+    engine.apply(rainMix(0.6), 1, 'glitch', 0.5);
+    expect(p(engine.debug().master).events.slice(-3)).toEqual([
+      { type: 'set', value: 0.6, time: 5 },
+      { type: 'ramp', value: 0, time: 5.5 },
+      { type: 'ramp', value: 0.6, time: 6 },
+    ]);
+    expect(ctx.of('buffer-source').length).toBe(sourcesBefore + 1);
+  });
+
   it('burst() plays a static burst without changing the mix', () => {
     const { engine, ctx, p } = setup();
     engine.unlock();

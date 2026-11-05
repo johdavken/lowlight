@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { Transitions } from '../src/renderer/transitions';
 
 function setup() {
-  const log = { fade: [] as number[], glitch: [] as number[] };
-  const tr = new Transitions({ setFade: (a) => log.fade.push(a), setGlitch: (a) => log.glitch.push(a) });
+  const log = { fade: [] as number[], glitch: [] as number[], signal: [] as number[] };
+  const tr = new Transitions({ setFade: (a) => log.fade.push(a), setGlitch: (a) => log.glitch.push(a), setSignal: (a) => log.signal.push(a) });
   return { tr, log };
 }
 
@@ -54,6 +54,29 @@ describe('Transitions', () => {
     expect(done).toBe(true);
     expect(log.glitch[log.glitch.length - 1]).toBe(0);
     expect(Math.max(...log.fade)).toBe(0);
+  });
+
+  it('signal goes out, swaps on black, holds there, and opens again over 1.3 s', async () => {
+    const { tr, log } = setup();
+    let signalAtSwap = -1;
+    let done = false;
+    void tr
+      .playTransition('signal', async () => {
+        signalAtSwap = log.signal[log.signal.length - 1];
+      })
+      .then(() => (done = true));
+    await advance(tr, 0.45);
+    expect(signalAtSwap).toBe(-1);
+    await advance(tr, 0.1);
+    expect(signalAtSwap).toBe(1);
+    await advance(tr, 0.15);
+    expect(log.signal[log.signal.length - 1]).toBe(1);
+    await advance(tr, 0.55);
+    expect(done).toBe(false);
+    await advance(tr, 0.1);
+    expect(done).toBe(true);
+    expect(log.signal[log.signal.length - 1]).toBe(0);
+    expect(Math.max(...log.fade, ...log.glitch)).toBe(0);
   });
 
   it('runs back-to-back transitions one at a time', async () => {

@@ -84,4 +84,20 @@ describe('the JOB column (a job’s text beside the subtitles)', () => {
     col.clear();
     expect(jc.classList.contains('jc-new')).toBe(false);
   });
+  it('the words on the line stand on their own, in CRT, under who said them', () => {
+    const c = mountJobColumn(feed, game);
+    c.setOnLine('Silas', ['"Oh."']);
+    c.show('Job', '*On the line, Silas says, "Oh."*\n\n*Nothing else.*');
+    const said = col().querySelectorAll<HTMLElement>('.jc-body .jc-line');
+    expect(said).toHaveLength(1);
+    expect(said[0].textContent).toBe('"Oh."');
+    expect(said[0].dataset.who).toBe('Silas (ON COMMS)');
+  });
+  it('a new line on the same text redraws it', () => {
+    const c = mountJobColumn(feed, game);
+    c.show('Job', 'He says "Oh."');
+    expect(col().querySelector('.jc-line')).toBeNull();
+    c.setOnLine('Silas', ['"Oh."']);
+    expect(col().querySelector('.jc-line')?.textContent).toBe('"Oh."');
+  });
 });

@@ -11,6 +11,9 @@ describe('the nightly board', () => {
   it('boardPlaces: every place a mission starts at', () => {
     expect(boardPlaces(BOOK)).toEqual(['second-socket', 'the-tilt']);
   });
+  it('a job for one player is never drawn', () => {
+    for (let d = 0; d < 10; d++) expect(posted(2, d, [...BOOK, { ...job('own', 1), for: 'soren' } as QuestEntry])).not.toContain('own');
+  });
   it('deterministic', () => {
     expect(posted(2, 5)).toEqual(posted(2, 5));
   });

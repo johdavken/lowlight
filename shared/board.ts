@@ -47,7 +47,7 @@ function capOwn(ids: string[], pool: QuestEntry[]): string[] {
  * small draws a night).
  */
 export function postedJobs(o: { book: QuestEntry[]; place: string; tier: 1 | 2 | 3 | 4; day: number; seed: string }): string[] {
-  const pool = o.book.filter((q) => q.kind === 'mission' && !q.spring && q.starts === o.place && q.tier <= o.tier);
+  const pool = o.book.filter((q) => q.kind === 'mission' && !q.spring && !q.for && q.starts === o.place && q.tier <= o.tier);
   let yesterday = new Set<string>();
   let today: string[] = [];
   for (let d = Math.min(0, o.day); d <= o.day; d++) {

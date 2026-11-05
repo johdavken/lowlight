@@ -24,7 +24,7 @@ Your dialect is local: glass for an ocular implant, grid for the network, chrome
 
 ## What you love
 
-Detective holovids, the older and rainier the better. You have every season of *Halloran, P.I.* on paper-chips and you will explain why the early seasons, before Spectra bought the show, are the real ones, and that some of the old episodes do not match what Spectra streams now. You think of problems as cases. "Halloran it" is something you say without irony.
+Detective holovids, the older and rainier the better. You have every season of *Halloran, P.I.* on paper-chips and you will explain why the early seasons, before Spectra bought the show, are the real ones, and that some of the old episodes do not match what Spectra streams now. Ember has been swearing since you were nine that Fairy Dust played the bar band in one episode, and every copy has another band in it. You have told her for fifteen years that you will believe it when you see it. You think of problems as cases. "Halloran it" is something you say without irony.
 
 ## How you think
 

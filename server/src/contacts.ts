@@ -6,6 +6,7 @@ import type { AroundEntry, ChatMessage, ContactEntry, Fact, PlaythroughInfo, Roo
 import { completeSceneId } from './room-state';
 import { parseStored, standingKey, type StoredStanding } from '../../shared/standing';
 import { arrangementActive, arrangementKey, parseArrangement, type Arrangement } from '../../shared/arrangement';
+import { planKey, planSeenKey } from '../../shared/plan';
 import { lastLine } from './world';
 
 /** A contact the roster can introduce: a connected character (fixed residents aren't contacts). */
@@ -223,6 +224,39 @@ function readRoom(file: string): RoomState | null {
     return row ? (JSON.parse(row.json) as RoomState) : null;
   } finally {
     db.close();
+  }
+}
+
+/** Her plan and its seen record as stored, for a room that isn't open. */
+export function readPlanMeta(file: string, player: string): { plan: string | null; seen: string | null } {
+  if (!fs.existsSync(file)) return { plan: null, seen: null };
+  try {
+    const db = new DatabaseSync(file, { readOnly: true });
+    try {
+      if (!hasTable(db, 'meta')) return { plan: null, seen: null };
+      const get = (k: string) => (db.prepare('SELECT v FROM meta WHERE k = ?').get(k) as { v: string } | undefined)?.v ?? null;
+      return { plan: get(planKey(player)), seen: get(planSeenKey(player)) };
+    } finally {
+      db.close();
+    }
+  } catch (err) {
+    // One unreadable database costs only her plan, as in the lists.
+    console.error(`[contacts] ${file}: unreadable: ${err instanceof Error ? err.message : String(err)}`);
+    return { plan: null, seen: null };
+  }
+}
+
+/** Whether a closed room still has row `id`; an unreadable one is given the benefit of the doubt. */
+export function hasRow(file: string, id: string): boolean {
+  try {
+    const db = new DatabaseSync(file, { readOnly: true });
+    try {
+      return db.prepare('SELECT 1 FROM messages WHERE id = ?').get(id) !== undefined;
+    } finally {
+      db.close();
+    }
+  } catch {
+    return true;
   }
 }
 

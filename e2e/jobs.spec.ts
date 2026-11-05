@@ -67,6 +67,12 @@ test('a job with a drawn complication, a red check and a crack ends in a debrief
   // The line's keys step out for the report: its rolls run down where they stand.
   await expect(page.locator('.line-keys')).toBeHidden();
   await page.screenshot({ path: 'test-results/jobs-debrief.png' });
+  // Coming back to the room: that report was read, it doesn't deal again.
+  await page.reload();
+  await expect(replies).toHaveCount(before + 2, { timeout: 10_000 });
+  await expect(page.locator('.hud-quest')).toBeVisible();
+  await page.waitForTimeout(800);
+  await expect(page.locator('.db')).toHaveCount(0);
   expect(errors).toEqual([]);
   await send(page, { type: 'rewind', messageId: greetingId });
   await expect(replies).toHaveCount(before, { timeout: 10_000 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DAY } from './clock';
-import { GOING_DEFAULT, MEET_WAIT, parsePlan, planKey, planOver, planPlaceAt, planTail, resolvePlan, type Plan } from './plan';
+import { GOING_DEFAULT, markSeen, MEET_WAIT, parseLoose, parsePlan, parseSay, planKey, planOver, planPlaceAt, planTail, resolvePlan, withSeen, type Plan } from './plan';
 
 /** Day 2 at HH:MM (Day 1 starts at 20:00, minute 1200). */
 const at = (h: number, m = 0) => DAY + h * 60 + m;
@@ -77,5 +77,48 @@ describe('storage', () => {
     expect(parsePlan('{')).toBeNull();
     expect(parsePlan('{"going":null,"meet":null,"from":"m"}')).toBeNull();
     expect(parsePlan('{"going":{"place":"x"},"meet":null,"from":"m"}')).toBeNull();
+  });
+});
+
+describe('shared plans (spec 2026-11-05)', () => {
+  const at = (hh: number, day = 2) => day * DAY + hh * 60;
+
+  it('keeps who else is coming, and reads junk as nobody', () => {
+    const p = resolvePlan({ going: null, meet: { place: 'haes', at: '09:00', with: ['silas'] } }, at(3), 'r1')!;
+    expect(p.meet?.with).toEqual(['silas']);
+    expect(parsePlan(JSON.stringify(p))?.meet?.with).toEqual(['silas']);
+    expect(parsePlan(JSON.stringify({ ...p, meet: { place: 'haes', at: 1, with: [3] } }))?.meet).toEqual({ place: 'haes', at: 1 });
+  });
+
+  it('makes no meeting without a time, and keeps a going leg', () => {
+    expect(resolvePlan({ going: null, meet: { place: 'haes', at: null } }, at(3), 'r1')).toBeNull();
+    const p = resolvePlan({ going: { place: 'home', until: null }, meet: { place: 'haes', at: null } }, at(3), 'r1')!;
+    expect(p.meet).toBeNull();
+    expect(p.going?.until).toBe(at(3) + GOING_DEFAULT);
+  });
+
+  it('reads tomorrow as the next day, or as the coming day before 06:00', () => {
+    const meet = { place: 'haes', at: '22:00', tomorrow: true };
+    expect(resolvePlan({ going: null, meet }, at(20), 'r1')!.meet!.at).toBe(at(22, 3));
+    expect(resolvePlan({ going: null, meet }, at(3), 'r1')!.meet!.at).toBe(at(22));
+    expect(resolvePlan({ going: null, meet: { ...meet, at: '00:30' } }, at(20), 'r1')!.meet!.at).toBe(3 * DAY + 30);
+  });
+
+  it('carries who you came with on the met mark', () => {
+    const plan = resolvePlan({ going: null, meet: { place: 'haes', at: '09:00' } }, at(3), 'r1')!;
+    const raw = markSeen(null, 'r1', 'met', at(9), { with: 'silas', row: 'm7' });
+    expect(withSeen(plan, raw, at(9))).toMatchObject({ metWith: 'silas', metRow: 'm7' });
+    expect(withSeen(plan, raw, at(8)).metWith).toBeUndefined();
+    // Met again on her own: who you came with goes.
+    expect(withSeen(plan, markSeen(raw, 'r1', 'met', at(9)), at(9)).metWith).toBeUndefined();
+    // Another mark leaves it.
+    expect(withSeen(plan, markSeen(raw, 'r1', 'missed', at(10)), at(10)).metWith).toBe('silas');
+  });
+
+  it('parses a loose date and one-time lines', () => {
+    expect(parseLoose(JSON.stringify({ place: 'haes', with: ['silas'], at: 5, from: 'r1' }))).toEqual({ place: 'haes', with: ['silas'], at: 5, from: 'r1' });
+    expect(parseLoose('{"place":"haes"}')).toBeNull();
+    expect(parseSay(JSON.stringify({ from: 'r1', lines: ['[x]'] }))).toEqual({ from: 'r1', lines: ['[x]'] });
+    expect(parseSay('nope')).toBeNull();
   });
 });

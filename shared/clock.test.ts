@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blocksOverlap, blockStartedBetween, DAY, formatClock, nextBlockStart, parseDays, weekdayOf, WEEKDAYS, minuteOfDay, nextBlock, nextOccurrence, parseHhmm, promptClock, scheduledRoom, START, TURN_COST, type Block } from './clock';
+import { blocksOverlap, fixedBlockDuring, blockStartedBetween, DAY, formatClock, nextBlockStart, parseDays, weekdayOf, WEEKDAYS, minuteOfDay, nextBlock, nextOccurrence, parseHhmm, promptClock, scheduledRoom, START, TURN_COST, type Block } from './clock';
 
 describe('the story clock', () => {
   it('formats as Day N · Ddd HH:MM, and as her prompt line', () => {
@@ -110,5 +110,21 @@ describe('blocks on days of the week (spec 2026-10-20 weekdays)', () => {
     expect(parseDays([3])).toEqual({ bad: '3' });
     expect(parseDays([])).toEqual({ days: [] });
     expect(parseDays([...WEEKDAYS])).toEqual({});
+  });
+});
+
+describe('fixedBlockDuring', () => {
+  const shift = { from: 18 * 60, to: 22 * 60, room: 'socket', fixed: true };
+  const day = 2 * DAY; // a Saturday: Day 1 is Thursday
+  it('finds a fixed block touching the hour, and ignores habits', () => {
+    expect(fixedBlockDuring([shift], day + 17 * 60 + 30, day + 18 * 60 + 30)).toBe(shift);
+    expect(fixedBlockDuring([shift], day + 17 * 60, day + 18 * 60)).toBeNull();
+    expect(fixedBlockDuring([{ ...shift, fixed: false }], day + 19 * 60, day + 20 * 60)).toBeNull();
+  });
+  it('keeps to its days, and runs past midnight', () => {
+    const today = weekdayOf(day);
+    expect(fixedBlockDuring([{ ...shift, days: [(today + 1) % 7] }], day + 19 * 60, day + 20 * 60)).toBeNull();
+    const night = { from: 22 * 60, to: 2 * 60, room: 'socket', fixed: true };
+    expect(fixedBlockDuring([night], day + 60, day + 120)).toBe(night);
   });
 });

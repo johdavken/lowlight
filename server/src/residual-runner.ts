@@ -10,8 +10,8 @@ import { RESIDUAL_RUNS_KEPT, type Db } from './db';
 import { HISTORY_WINDOW, toCompletion } from './history';
 import type { Journal } from './journal';
 import type { Result } from './room-state';
-import { applyResidual, parseResidualAnswer, residualMessages, type ResidualKind } from './residual';
-import { parsePlan, planKey, planOver, planSeenKey, type Plan } from '../../shared/plan';
+import { applyResidual, guestWords, parseResidualAnswer, residualMessages, type ResidualKind } from './residual';
+import { LOOSE_KEEP, parseLoose, parsePlan, planKey, planLooseKey, planOver, planSayKey, planSeenKey, type Loose, type Plan } from '../../shared/plan';
 import { parsePromise, promiseKey, promiseSpentKey, promiseTriesKey, type TextPromise } from '../../shared/promise';
 import { hhmmOf, minuteOfDay } from '../../shared/clock';
 import { readSummary, summaryDue, summaryMessages, writeSummary } from './summary';
@@ -60,13 +60,23 @@ export interface ResidualRunnerDeps {
   around?: <T>(player: string, messageId: string, fn: () => T) => T;
   /** Her standing word for `player` changed: the shift line ("Nix · now: warm"). */
   standingShifted?: (player: string, word: string) => void;
+  /** Leads this turn offered `player` and she hasn't given, how to record one on her reply, and who hears of it. Absent: never. */
+  leads?: (player: string, reply: { id: string; take: number }) => { offered: { id: string; title: string; knows: string }[]; give(id: string, details: string, messageId: string): boolean; recorded(title: string): void } | null;
   /** Time backstop (spec 2026-10-20): moves `player`'s finished reply on by `minutes` (the relay's residualPass). Absent: time doesn't apply. */
   passTime?: (player: string, reply: { id: string; take: number }, minutes: number) => Result;
   /**
    * Her plans (spec 2026-10-21 §4): the places she can name for `player`'s reply, and who hears a new one
    * (the card). Null: plans don't apply to this reply (OOC, comms, no story clock). Absent: never.
    */
-  plan?: (player: string, reply: { id: string; take: number }) => { places: { id: string; name: string }[]; here?: string; onSet(plan: Plan | null, replyId: string): void } | null;
+  plan?: (player: string, reply: { id: string; take: number }) => {
+    places: { id: string; name: string }[];
+    here?: string;
+    onSet(plan: Plan | null, replyId: string): void;
+    /** Who a meeting can name (shared plans spec §2). */
+    people?: { id: string; name: string }[];
+    /** Where something holds `id` during `[from, to)`, or null (spec §4). */
+    held?(id: string, from: number, to: number, place: string): string | null;
+  } | null;
   /** Promised texts (spec 2026-10-23 §4): the places she can name for `player`'s reply. Null: not for this reply. Absent: never. */
   promise?: (player: string, reply: { id: string; take: number }) => { places: { id: string; name: string }[] } | null;
   /** Her schedule in words for the `[her day: …]` line (deck controls spec §1); null without one. */
@@ -111,7 +121,7 @@ function promiseWords(p: TextPromise, you: string, placeName: (id: string) => st
 /** A standing plan in words for the Residual's `[her plan: …]` line. */
 function planWords(p: Plan, name: (id: string) => string): string {
   const hm = (m: number) => hhmmOf(minuteOfDay(m));
-  return [p.going ? `going ${name(p.going.place)} until ${hm(p.going.until)}` : null, p.meet ? `meeting at ${name(p.meet.place)} ${hm(p.meet.at)}` : null].filter(Boolean).join('; ');
+  return [p.going ? `going ${name(p.going.place)} until ${hm(p.going.until)}` : null, p.meet ? `meeting at ${name(p.meet.place)} ${hm(p.meet.at)}${guestWords(p.meet.with ?? [], name)}` : null].filter(Boolean).join('; ');
 }
 
 interface Job {
@@ -553,12 +563,16 @@ export class ResidualRunner {
     const stored = planned ? parsePlan(db.getMeta(planKey(job.player))) : null;
     // An ended plan isn't hers any more (final review I3): it would invite a cancel, or read as current.
     const standingPlan = stored && clock !== null && !planOver(stored, clock) ? stored : null;
+    // A date with no time (shared plans spec §5), while it's still worth settling.
+    const freshLoose = (l: Loose | null) => (l && clock !== null && clock - l.at < LOOSE_KEEP ? l : null);
+    const loose = planned ? freshLoose(parseLoose(db.getMeta(planLooseKey(job.player)))) : null;
     const promising = this.d.promise?.(job.player, job.reply) ?? null;
     const standingPromise = promising ? parsePromise(db.getMeta(promiseKey(job.player))) : null;
     // Plans name map places; promises also the rooms of her day (her home is often off the map): both lists, once.
     const places = planned || promising ? [...(planned?.places ?? []), ...(promising?.places ?? []).filter((p) => !planned?.places.some((q) => q.id === p.id))] : undefined;
-    const placeName = (id: string) => places?.find((p) => p.id === id)?.name ?? id;
+    const placeName = (id: string) => places?.find((p) => p.id === id)?.name ?? planned?.people?.find((p) => p.id === id)?.name ?? id;
     // Cipher (spec §2.3): the open truths as T1…, mapped back to their ids when the answer names them.
+    const leads = job.kind === 'turn' ? (this.d.leads?.(job.player, job.reply) ?? null) : null;
     const cipher = this.d.cipher?.(job.player) ?? null;
     const openTruths = cipher?.truths.filter((t) => t.state === 'open') ?? [];
     const labels = new Map(openTruths.map((t, i) => [`T${i + 1}`, t.id]));
@@ -573,7 +587,9 @@ export class ResidualRunner {
       exchanges: ex.lines,
       recap: journal.recap(job.player).text,
       page: journal.page(job.player).text,
-      ...(planned ? { places: places!, planLine: standingPlan ? planWords(standingPlan, placeName) : null } : {}),
+      ...(planned
+        ? { places: places!, planLine: standingPlan ? planWords(standingPlan, placeName) : null, people: planned.people ?? [], looseLine: loose ? `${placeName(loose.place)}${guestWords(loose.with, placeName)}${loose.tomorrow ? ', tomorrow' : ''}` : null }
+        : {}),
       ...(promising
         ? {
             places: places!,
@@ -584,6 +600,7 @@ export class ResidualRunner {
           }
         : {}),
       ...(openTruths.length > 0 ? { cipher: openTruths.map((t, i) => ({ label: `T${i + 1}`, truth: t.truth, comesOutWhen: t.comesOutWhen })) } : {}),
+      ...(leads?.offered.length ? { leads: leads.offered } : {}),
     });
     let answer: { text: string; tokensIn?: number; tokensOut?: number };
     try {
@@ -646,8 +663,23 @@ export class ResidualRunner {
                     else db.deleteMeta(planKey(job.player));
                     // The old plan's marks go with it (final review M2).
                     db.deleteMeta(planSeenKey(job.player));
+                    // A time pinned, or the date dropped: nothing is loose any more (shared plans spec §5).
+                    if (!p || p.meet) db.deleteMeta(planLooseKey(job.player));
                     planned.onSet(p, job.reply.id);
                   },
+                  people: new Set((planned.people ?? []).map((p) => p.id)),
+                  name: placeName,
+                  ...(planned.held ? { held: planned.held } : {}),
+                  ...(standingPlan?.meet ? { meeting: standingPlan.meet } : {}),
+                  loose: {
+                    same: (place: string, people: string[]) => {
+                      const l = freshLoose(parseLoose(db.getMeta(planLooseKey(job.player))));
+                      return l !== null && l.place === place && [...l.with].sort().join() === [...people].sort().join();
+                    },
+                    set: (l: Loose) => db.setMeta(planLooseKey(job.player), JSON.stringify(l)),
+                    get: () => freshLoose(parseLoose(db.getMeta(planLooseKey(job.player)))),
+                  },
+                  say: (lines: string[]) => db.setMeta(planSayKey(job.player), JSON.stringify({ from: job.reply.id, lines })),
                 },
               }
             : {}),
@@ -667,6 +699,9 @@ export class ResidualRunner {
               }
             : {}),
           names: [this.d.selfName, this.d.playerName(job.player)],
+          ...(leads?.offered.length
+            ? { leads: { offered: new Map(leads.offered.map((l) => [l.id, l.title])), give: (id: string, details: string) => leads.give(id, details, job.reply.id), recorded: leads.recorded } }
+            : {}),
           ...(cipher
             ? {
                 cipher: {

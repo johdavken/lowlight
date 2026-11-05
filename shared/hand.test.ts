@@ -76,6 +76,9 @@ describe('favourFor', () => {
 });
 
 describe('jobShares', () => {
+  it("passes over a guest: no share, so no wage, clean run, hurt or held (guest crew spec §2)", () => {
+    expect(jobShares({ setup: setup(['guest-ember']), calls: [], tier: 'blown', seed: 's', recruits: [] })).toEqual([]);
+  });
   const rs = [
     { id: 'dez', spec: 'runner' as const, traits: [], goneUsed: false },
     { id: 'koji', spec: 'muscle' as const, traits: [], goneUsed: false },

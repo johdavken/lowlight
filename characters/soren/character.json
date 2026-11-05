@@ -83,6 +83,7 @@
       "from": "15:00",
       "to": "17:00",
       "room": "nexus/sdg-floor",
+      "fixed": true,
       "days": [
         "mon"
       ]
@@ -99,6 +100,7 @@
       "from": "15:00",
       "to": "18:00",
       "room": "spine/listening-post",
+      "fixed": true,
       "days": [
         "tue",
         "wed",

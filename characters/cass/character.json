@@ -51,7 +51,8 @@
     {
       "from": "20:00",
       "to": "04:00",
-      "room": "karasu/the-tilt"
+      "room": "karasu/the-tilt",
+      "fixed": true
     },
     {
       "from": "04:00",

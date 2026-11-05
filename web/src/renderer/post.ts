@@ -1,5 +1,7 @@
 import { ColorMatrixFilter, Container, Graphics, Rectangle, Sprite, Texture, type Filter } from 'pixi.js';
 import { AdvancedBloomFilter, CRTFilter, GlitchFilter, GodrayFilter, RGBSplitFilter } from 'pixi-filters';
+import { SignalFilter } from './signal';
+import { signalShape } from './signal-shape';
 import { splitPx } from './split';
 import { lerpOklab, parseHex } from '../../../shared/color';
 import type { Atmosphere, Hex, Weather } from '../../../shared/types';
@@ -139,6 +141,7 @@ export class WeatherLayer {
 /**
  * Final grade on the upscaled view: CRT scanlines + vignette and a hairline RGB split.
  * `glitch(amount)` (0..1) ramps the split toward ±6 art px and adds GlitchFilter slice tearing.
+ * `signal(amount)` (0..1) collapses the picture to a line and out, under the scanlines.
  */
 export class Grade {
   private readonly crt = new CRTFilter({
@@ -152,8 +155,10 @@ export class Grade {
   });
   private readonly split = new RGBSplitFilter();
   private readonly glitchFx = new GlitchFilter({ slices: 12, offset: 0, fillMode: 2, average: false });
+  private readonly signalFx = new SignalFilter();
   private scale = 1;
   private amount = 0;
+  private signalAmount = 0;
 
   constructor(private readonly target: { filters: Filter | readonly Filter[] | null | undefined }) {
     this.apply();
@@ -175,6 +180,14 @@ export class Grade {
     this.apply();
   }
 
+  signal(amount: number): void {
+    const a = Math.max(0, Math.min(1, amount));
+    if (a === 0 && this.signalAmount === 0) return;
+    this.signalAmount = a;
+    this.signalFx.set(signalShape(a));
+    this.apply();
+  }
+
   private apply(): void {
     const a = this.amount;
     const px = splitPx(a, this.scale);
@@ -188,6 +201,8 @@ export class Grade {
       this.glitchFx.slices = 6 + Math.floor(Math.random() * 10);
       this.glitchFx.refresh();
       this.target.filters = [this.glitchFx, this.split, this.crt];
+    } else if (this.signalAmount > 0) {
+      this.target.filters = [this.signalFx, this.split, this.crt];
     } else {
       this.target.filters = [this.split, this.crt];
     }

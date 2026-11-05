@@ -20,7 +20,7 @@ import { LORE_HEADER, loreBlock, selectLore, type LoreEntry, type LoreSelection 
 import { herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, othersBlock, type OtherVoice, ENCOUNTER_INSTRUCTIONS, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, strangerBlock, beatLine, RP_HEADING } from '../src/instructions';
 import { gigActionLine, gigText } from '../../shared/gig/brief';
 import { EMPTY_QUEST_STATE, type ChatMessage } from '../../shared/types';
-import { parsePlan, planKey, planSeenKey } from '../../shared/plan';
+import { parsePlan, planKey, planSayKey, planSeenKey } from '../../shared/plan';
 import type { LeadEntry as LeadEntry_ } from '../../shared/leads';
 
 const RP_SYSTEM = `${RP_HEADING}\n\n${ROOM_INSTRUCTIONS}\n\n${ROLEPLAY_GUIDE}`;
@@ -1010,6 +1010,22 @@ describe('ChatRelay end scene mode', () => {
       expect(db.writes().filter((w) => w.key === planKey('hicks')).at(-1)?.messageId).toBe(reply.id);
     });
 
+    it('a one-time plan line goes to the turn after its reply and no further; a regenerate hears it too (shared plans spec §5)', async () => {
+      const stub = await makeStub([okStream('sess1'), okStream('sess1'), okStream('sess1')]);
+      const db = makeDb();
+      db.insertMessage('hicks', { id: 'r0', role: 'agent', text: 'Tomorrow. Hae\'s.', toolLines: [], ts: 1, status: 'ok' });
+      db.setMeta(planSayKey('hicks'), JSON.stringify({ from: 'r0', lines: ['[settle a time]'] }));
+      const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend(stub.url), db, room: makeRoom(), emit: () => {} });
+      const turns = () => stub.requests.filter((r) => r.url === '/v1/chat/completions').map((r) => asTurn(r.bodyJson).message);
+      await relay.send('hicks', 'Sounds good.');
+      expect(turns()[0]).toContain('[settle a time]');
+      const reply = db.recentMessages('hicks').filter((m) => m.role === 'agent').at(-1)!;
+      await relay.regenerate('hicks', reply.id);
+      expect(turns()[1]).toContain('[settle a time]');
+      await relay.send('hicks', 'And then?');
+      expect(turns()[2]).not.toContain('[settle a time]');
+    });
+
     it('a regenerate of the reply that spent the plan keeps the line, and the new take spends it (final review M-a)', async () => {
       const stub = await makeStub([okStream('sess1'), okStream('sess1')]);
       const db = makeDb();
@@ -1019,11 +1035,13 @@ describe('ChatRelay end scene mode', () => {
         db.setMeta(planSeenKey('hicks'), JSON.stringify({ from: 'r1', missed: 1 }));
       });
       const notes: (string | undefined)[] = [];
+      const seens: (string | null | undefined)[] = [];
       const relay = new ChatRelay({
         players: fakePlayers(), backend: wireBackend(stub.url), db, room: makeRoom(), emit: () => {},
-        planNote: (_mode, raw) => {
+        planNote: (_mode, raw, rawSeen) => {
           const plan = raw !== undefined ? raw : db.getMeta(planKey('hicks'));
           notes.push(plan ?? undefined);
+          seens.push(rawSeen);
           return plan ? { line: '[you waited]', spend: true } : null;
         },
       });
@@ -1034,6 +1052,7 @@ describe('ChatRelay end scene mode', () => {
       await relay.regenerate('hicks', reply.id);
       const second = asTurn(stub.requests.filter((r) => r.url === '/v1/chat/completions')[1].bodyJson);
       expect(second.message).toContain('[you waited]');
+      expect(seens.at(-1)).toBe(JSON.stringify({ from: 'r1', missed: 1 }));
       expect(db.getMeta(planKey('hicks'))).toBeNull();
     });
 
@@ -2912,6 +2931,8 @@ describe('ChatRelay leads', () => {
     await relay.send('hicks', 'teo');
     expect(during).toEqual(['teo-debt']);
     expect(relay.offeredLeads()).toEqual([]);
+    // The Residual runs after the turn, and reads what it offered (live check 2026-11-05).
+    expect(relay.lastOffer().map((l) => l.id)).toEqual(['teo-debt']);
   });
 
   it('a turn at the receiver whose text names a key marks the lead followed, and rewinding that line unmarks it', async () => {

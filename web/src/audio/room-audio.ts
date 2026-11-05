@@ -152,7 +152,7 @@ export function createRoomAudio(deps: {
       refresh();
     },
 
-    room(state: RoomState, scene: SceneDef, base: string, duration: number, transition?: Transition): void {
+    room(state: RoomState, scene: SceneDef, base: string, duration: number, transition?: Transition, swapIn?: number): void {
       // Thunder belongs to its room: a room change cancels what's still waiting.
       if (placed?.id !== scene.id) {
         if (placed && unlocked) engine.cancelThunder();
@@ -173,7 +173,7 @@ export function createRoomAudio(deps: {
         else if (walkedIn) walkedIn = { ...walkedIn, scene, base };
       }
       const mix = soundMix(state, scene, base);
-      if (unlocked) engine.apply(mix, duration, transition);
+      if (unlocked) engine.apply(mix, duration, transition, swapIn);
       else pending = mix;
     },
 

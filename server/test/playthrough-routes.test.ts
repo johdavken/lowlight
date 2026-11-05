@@ -8,7 +8,7 @@ import { makeFixture } from './fixtures/agents';
 import { openDb } from '../src/db';
 import { pageLine } from '../src/journal';
 import { commsKey } from '../../shared/comms';
-import { planKey, parsePlan, planSeenKey } from '../../shared/plan';
+import { planKey, parsePlan, planLooseKey, planSayKey, planSeenKey } from '../../shared/plan';
 import { chunk, startStubOpenRouter } from './fixtures/stub-openrouter';
 
 const TOKEN = 'test-token-123456789';
@@ -943,8 +943,8 @@ describe('the story clock', () => {
 describe('schedules', () => {
   // Nix: Noodle Stall 20:00–04:00, The Roof 04:00–08:00; free in the day. Cass has none. (The fixture has three rooms: the Intake stands in for the Public Landing, the place you leave her.)
   const SCHEDULE = [
-    { from: '20:00', to: '04:00', room: 'karasu/noodle-stall' },
-    { from: '04:00', to: '08:00', room: 'karasu/ribbon-rooftop' },
+    { from: '20:00', to: '04:00', room: 'karasu/noodle-stall', fixed: true },
+    { from: '04:00', to: '08:00', room: 'karasu/ribbon-rooftop', fixed: true },
   ];
   const prepare = (c: Config) => {
     const file = path.join(c.charactersDir, 'nix', 'character.json');
@@ -1201,6 +1201,32 @@ describe('schedules', () => {
     expect(s.built.world.scheduleLine('cass')).toBeNull();
   });
 
+  it('a block with no fixed tick is a habit she can skip, with its why', async () => {
+    const habits = (blocks: object[]) => start({
+      others: ['cass'],
+      prepare: (c) => {
+        prepare(c);
+        const file = path.join(c.charactersDir, 'nix', 'character.json');
+        fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), schedule: blocks }));
+      },
+    });
+    const stall = { from: '20:00', to: '04:00', room: 'karasu/noodle-stall', why: 'a bowl, as a customer' };
+    const roof = { from: '04:00', to: '08:00', room: 'karasu/ribbon-rooftop' };
+    const s = await habits([stall, roof]);
+    await s.api('POST', '/api/playthroughs', { player: s.built.world.active()!.player, startContact: 'cass' });
+    const w = s.built.world;
+    const place = (id: string) => w.placeName(id);
+    const skip = 'Habits, not appointments: skip them if you like';
+    expect(w.scheduleLine('nix', 1260)).toBe(`[your usual day: ${place('karasu/noodle-stall')} around now (a bowl, as a customer); then ${place('karasu/ribbon-rooftop')} around 04:00. ${skip}]`);
+    expect(w.scheduleLine('nix', 1440 + 600)).toBe(`[your usual day: free; ${place('karasu/noodle-stall')} around 20:00 (a bowl, as a customer). ${skip}]`);
+    // Beside a commitment, the line stays her schedule and says which part isn't one.
+    const t = await habits([stall, { ...roof, fixed: true, why: 'the night watch' }]);
+    await t.api('POST', '/api/playthroughs', { player: t.built.world.active()!.player, startContact: 'cass' });
+    const v = t.built.world;
+    expect(v.scheduleLine('nix', 1260)).toBe(`[your schedule: usually ${place('karasu/noodle-stall')} around now (a bowl, as a customer), a habit you can skip; then ${place('karasu/ribbon-rooftop')} 04:00–08:00 (the night watch)]`);
+    expect(v.scheduleLine('nix', 1440 + 300)).toBe(`[your schedule: ${place('karasu/ribbon-rooftop')} until 08:00 (the night watch); then usually ${place('karasu/noodle-stall')} around 20:00 (a bowl, as a customer), a habit you can skip]`);
+  });
+
   it('weekdays (spec 2026-10-20): a weeknights block leaves her free on Saturday, and her line names Monday', async () => {
     const s = await start({
       others: ['cass'],
@@ -1208,7 +1234,7 @@ describe('schedules', () => {
         prepare(c);
         const file = path.join(c.charactersDir, 'nix', 'character.json');
         const was = JSON.parse(fs.readFileSync(file, 'utf8'));
-        fs.writeFileSync(file, JSON.stringify({ ...was, schedule: [{ from: '20:00', to: '04:00', room: 'karasu/noodle-stall', days: ['mon', 'tue', 'wed', 'thu', 'fri'] }] }));
+        fs.writeFileSync(file, JSON.stringify({ ...was, schedule: [{ from: '20:00', to: '04:00', room: 'karasu/noodle-stall', days: ['mon', 'tue', 'wed', 'thu', 'fri'], fixed: true }] }));
       },
     });
     await s.api('POST', '/api/playthroughs', { player: s.built.world.active()!.player, startContact: 'cass' });
@@ -1295,8 +1321,8 @@ describe('schedules', () => {
 describe('her plans (spec 2026-10-21 §3)', () => {
   // Nix: Noodle Stall 20:00–04:00, The Roof 04:00–08:00. Cass has no schedule. The clock starts at Day 1 20:00 (1200).
   const SCHEDULE = [
-    { from: '20:00', to: '04:00', room: 'karasu/noodle-stall' },
-    { from: '04:00', to: '08:00', room: 'karasu/ribbon-rooftop' },
+    { from: '20:00', to: '04:00', room: 'karasu/noodle-stall', fixed: true },
+    { from: '04:00', to: '08:00', room: 'karasu/ribbon-rooftop', fixed: true },
   ];
   const prepare = (c: Config) => {
     const file = path.join(c.charactersDir, 'nix', 'character.json');
@@ -1434,9 +1460,10 @@ describe('her plans (spec 2026-10-21 §3)', () => {
     w.setLocation('nix');
     expect(w.planNote('nix', 'greet')?.line).toBe("[plan: you said you'd meet them here at 20:30]");
     expect(JSON.parse(rt.db.getMeta(planSeenKey(player))!)).toMatchObject({ from: 'r1', met: 1240 });
-    // Another plan's mark: not this one's.
+    // Another plan's mark isn't this one's: you're in the room, so this plan gets its own (shared plans spec §8).
     rt.db.setMeta(planSeenKey(player), JSON.stringify({ from: 'r0', met: 1240 }));
-    expect(w.planNote('nix', 'greet')).toBeNull();
+    expect(w.planNote('nix', 'greet')?.line).toBe("[plan: you said you'd meet them here at 20:30]");
+    expect(JSON.parse(rt.db.getMeta(planSeenKey(player))!)).toMatchObject({ from: 'r1' });
     // The plan itself is never rewritten by walking in.
     expect(parsePlan(rt.db.getMeta(planKey(player)))).toEqual({ going: null, meet: { place: INTAKE, at: 1230 }, from: 'r1' });
   });
@@ -1461,6 +1488,167 @@ describe('her plans (spec 2026-10-21 §3)', () => {
     rt.room.setScene({ id: STALL }, 'user');
     s.built.playthroughs.touch(w.active()!.id, { contactId: 'nix', sceneId: STALL });
     expect(w.planCard('nix')).toBeNull();
+  });
+
+  describe('shared plans (spec 2026-11-05)', () => {
+    const seenOf = (rt: { db: { getMeta(k: string): string | null } }, player: string) => JSON.parse(rt.db.getMeta(planSeenKey(player)) ?? 'null');
+
+    it('a named person is at the meeting for the hour, over her schedule, then back on it', async () => {
+      const s = await world();
+      const w = s.built.world;
+      const before = whereIs(s, 'nix');
+      await setPlan(s, 'cass', { going: null, meet: { place: ROOF, at: 1230, with: ['nix'] } });
+      expect(whereIs(s, 'nix')).toBe(before);
+      expect(w.around().find((e) => e.contactId === 'nix')?.planTail).toBe(`${w.placeName(ROOF)} 20:30`);
+      await wait(s, { until: '20:40' });
+      expect(whereIs(s, 'nix')).toBe(ROOF);
+      await wait(s, { until: '21:40' });
+      expect(whereIs(s, 'nix')).not.toBe(ROOF);
+    });
+
+    it('with you when the hour starts, she stays with you', async () => {
+      const s = await world();
+      const w = s.built.world;
+      w.setLocation('nix');
+      await setPlan(s, 'cass', { going: null, meet: { place: ROOF, at: 1230, with: ['nix'] } });
+      const room = (await s.built.runtime('nix'))!.room.state.sceneId;
+      await wait(s, { until: '20:40' });
+      expect(w.contacts().concat().find((c) => c.id === 'nix')?.sceneId ?? whereIs(s, 'nix')).toBe(room);
+    });
+
+    it('a rewind past the reply sends her back at once', async () => {
+      const s = await world();
+      const player = s.built.world.active()!.player;
+      const { db } = (await s.built.runtime('cass'))!;
+      db.insertMessage(player, { id: 'asked', role: 'agent', text: 'Noon.', toolLines: [], ts: Date.now(), status: 'ok' });
+      db.withStamp({ messageId: 'asked', take: 0 }, () => {
+        db.setMeta(planKey(player), JSON.stringify({ from: 'asked', going: null, meet: { place: ROOF, at: 1230, with: ['nix'] } }));
+        db.setMeta(planLooseKey(player), JSON.stringify({ place: ROOF, with: [], at: 1200, from: 'asked' }));
+        db.setMeta(planSayKey(player), JSON.stringify({ from: 'asked', lines: ['[x]'] }));
+      });
+      await wait(s, { until: '20:40' });
+      expect(whereIs(s, 'nix')).toBe(ROOF);
+      db.pruneWrites(db.deleteFrom(db.getMessage(player, 'asked')!.ts - 1));
+      db.rebuild();
+      expect(whereIs(s, 'nix')).not.toBe(ROOF);
+      expect([planKey, planLooseKey, planSayKey].map((k) => db.getMeta(k(player)))).toEqual([null, null, null]);
+    });
+
+    it('coming in with someone else keeps the meeting: no stood-up line, she hears it happened', async () => {
+      const s = await world();
+      const w = s.built.world;
+      const player = w.active()!.player;
+      w.setLocation('nix');
+      w.setLocation('cass'); // parted at 20:00, before the meeting
+      const cassRoom = (await s.built.runtime('cass'))!.room.state.sceneId;
+      const nix = await setPlan(s, 'nix', { going: null, meet: { place: cassRoom, at: 1230 } });
+      await wait(s, { until: '20:40' });
+      w.planNote('cass', 'rp');
+      expect(seenOf(nix, player)).toMatchObject({ from: 'r1', with: 'cass' });
+      await wait(s, { until: '22:00' });
+      w.setLocation('nix');
+      expect(w.planNote('nix', 'greet')).toEqual({ line: `[you met them at ${w.placeName(cassRoom)} at 20:30, with ${w.contacts().find((c) => c.id === 'cass')?.name} there]`, spend: true });
+    });
+
+    it('a visit taken back in the other room is no meeting: the stood-up line comes instead', async () => {
+      const s = await world();
+      const w = s.built.world;
+      const player = w.active()!.player;
+      w.setLocation('nix');
+      w.setLocation('cass');
+      const cass = (await s.built.runtime('cass'))!;
+      cass.db.insertMessage(player, { id: 'visit', role: 'user', text: 'Hello.', toolLines: [], ts: Date.now(), status: 'ok' });
+      const nix = await setPlan(s, 'nix', { going: null, meet: { place: cass.room.state.sceneId, at: 1230 } });
+      await wait(s, { until: '20:40' });
+      w.planNote('cass', 'rp');
+      expect(seenOf(nix, player)).toMatchObject({ with: 'cass', row: 'visit' });
+      cass.db.deleteFrom(cass.db.getMessage(player, 'visit')!.ts - 1);
+      expect(cass.db.getMessage(player, 'visit')).toBeUndefined();
+      await wait(s, { until: '22:00' });
+      w.setLocation('nix');
+      expect(w.planNote('nix', 'greet')?.line).toMatch(/they never came/);
+    });
+
+    it('walking in on a guest counts, with no turn taken', async () => {
+      const s = await world();
+      const w = s.built.world;
+      const player = w.active()!.player;
+      w.setLocation('nix');
+      w.goSolo();
+      const nix = await setPlan(s, 'nix', { going: null, meet: { place: STALL, at: 1230, with: ['cass'] } });
+      await wait(s, { until: '20:40' });
+      w.setLocation('cass');
+      expect(seenOf(nix, player)).toMatchObject({ with: 'cass' });
+    });
+
+    it('a window that opens while you sit there counts; a turn before it does not', async () => {
+      const s = await world();
+      const w = s.built.world;
+      const player = w.active()!.player;
+      w.setLocation('cass');
+      const cassRoom = (await s.built.runtime('cass'))!.room.state.sceneId;
+      const nix = await setPlan(s, 'nix', { going: null, meet: { place: cassRoom, at: 1230 } });
+      w.planNote('cass', 'rp');
+      expect(seenOf(nix, player)).toBeNull();
+      await wait(s, { until: '20:30' });
+      w.planNote('cass', 'rp');
+      expect(seenOf(nix, player)).toMatchObject({ with: 'cass' });
+    });
+
+    it('on comms you are not in the room: nothing is marked', async () => {
+      const s = await world();
+      const w = s.built.world;
+      const player = w.active()!.player;
+      w.setLocation('cass');
+      const cass = (await s.built.runtime('cass'))!;
+      const nix = await setPlan(s, 'nix', { going: null, meet: { place: cass.room.state.sceneId, at: 1230 } });
+      cass.db.setMeta(commsKey(player), JSON.stringify({ on: true, at: INTAKE }));
+      await wait(s, { until: '20:40' });
+      w.planNote('cass', 'rp');
+      expect(seenOf(nix, player)).toBeNull();
+    });
+
+    it('a guest who is your contact is told who asked her', async () => {
+      const s = await world();
+      const w = s.built.world;
+      w.setLocation('cass');
+      await setPlan(s, 'nix', { going: null, meet: { place: STALL, at: 1230, with: ['cass'] } });
+      expect(w.planNote('cass', 'rp')?.line).toMatch(/^\[Nix asked you to .+ at 20:30, with .+\]$/);
+      expect(w.planNote('cass', 'rp')?.spend).toBe(false);
+      await wait(s, { until: '21:40' });
+      expect(w.planNote('cass', 'rp')).toBeNull();
+    });
+
+    it('a closed room\'s plan still places her guest', async () => {
+      const s = await start({ others: ['cass'], prepare });
+      const w = s.built.world;
+      await s.api('POST', '/api/playthroughs', { player: w.active()!.player, startContact: 'nix' });
+      const pt = w.active()!;
+      const file = path.join(s.cfg.dataDir, 'playthroughs', pt.id, 'chars', 'cass', 'room.db');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      const db = openDb(file, { defaultPlayer: pt.player });
+      db.setMeta(planKey(pt.player), JSON.stringify({ from: 'r1', going: null, meet: { place: ROOF, at: 1230, with: ['nix'] } }));
+      db.close();
+      expect(w.planPeople('cass').map((p) => p.id)).toContain('nix');
+      w.goSolo();
+      await wait(s, { until: '20:40' });
+      expect(whereIs(s, 'nix')).toBe(ROOF);
+      // Coming in on her marks the closed room's meeting too.
+      w.setLocation('nix');
+      const back = openDb(file, { defaultPlayer: pt.player });
+      expect(JSON.parse(back.getMeta(planSeenKey(pt.player))!)).toMatchObject({ from: 'r1', with: 'nix' });
+      back.close();
+    });
+
+    it('held: a FIXED block or her own meeting, by name', async () => {
+      const s = await world();
+      const w = s.built.world;
+      expect(w.planHeld('nix', 1440 + 5 * 60, 1440 + 6 * 60, STALL)).toBe(w.placeName(ROOF));
+      expect(w.planHeld('nix', 1440 + 5 * 60, 1440 + 6 * 60, ROOF)).toBeNull();
+      expect(w.planHeld('nix', 1440 + 9 * 60, 1440 + 10 * 60, STALL)).toBeNull();
+      await setPlan(s, 'nix', { going: null, meet: { place: STALL, at: 1440 + 9 * 60 + 30 } });
+      expect(w.planHeld('nix', 1440 + 9 * 60, 1440 + 10 * 60, ROOF)).toBe(w.placeName(STALL));
+    });
   });
 
   it("her contact row carries the plan's tail", async () => {

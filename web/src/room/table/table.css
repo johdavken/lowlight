@@ -481,6 +481,50 @@
 .tb-hand .tbc-note, .tb-load-tray .tbc-note { font-size: 15px; }
 .tb-hand .tbc-spec, .tb-hand .tbc-grade, .tb-load-tray .tbc-spec, .tb-load-tray .tbc-grade { font-size: 14px; }
 .tb-hand .tbc-tr, .tb-hand .tbc-ab { font-size: 13px; }
+/* Crew and program cards print in a black border catching the room's light: warm from the lamps, cool from the neon.
+   The band sits somewhere else on each card (--lx), so a row doesn't look stamped. */
+.tb-slot:has(> .tbc-print) {
+  position: relative;
+  border: 0;
+  border-radius: 11px;
+  clip-path: none;
+  background: #09080b linear-gradient(125deg, #2c1d10 0%, #15131a 30%, #3f3c47 46%, #14161c 60%, #10242e 100%) var(--lx, 27%) 30% / 240% 240%;
+}
+/* The same light over the whole card, faintly: a glossy print catching the room. */
+.tb-slot:has(> .tbc-print)::before { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; mix-blend-mode: screen; opacity: 0.4; background: linear-gradient(125deg, rgba(240, 170, 95, 0.5) 0%, rgba(240, 170, 95, 0) 30%, rgba(255, 250, 240, 0.32) 46%, rgba(120, 190, 225, 0) 60%, rgba(90, 170, 215, 0.5) 100%) var(--lx, 27%) 30% / 240% 240%; }
+.tb-slot > .tbc-print { position: absolute; inset: var(--print, 8px); width: auto; height: auto; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px #57525e; }
+.tb-hand .g-deck .tb-slot.on:has(> .tbc-print)::after { inset: var(--print, 8px); border-radius: 3px; }
+.ts-ready { --print: 5px; }
+/* Their words, centred on the fade: a serif name, then the card's lines, the first in its colour and the rest quieter. */
+.tb-slot > .tbc-print .tbc-body { align-items: center; gap: 2px; padding-bottom: 8px; text-align: center; }
+.tb-slot > .tbc-print .tbc-name { font: 700 19px/1.15 'Libre Baskerville', Georgia, serif; letter-spacing: 0.04em; color: #ecd9a8; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); white-space: nowrap; }
+.tb-slot > .tbc-print .tbc-name.wrap { white-space: normal; line-height: 1.1; }
+.tb-slot > .tbc-print .tbc-name.long { font-size: 14px; line-height: 1.55; }
+.tb-slot > .tbc-print .tbc-note { font-size: 14px; line-height: 1.05; letter-spacing: 0.1em; opacity: 1; white-space: nowrap; }
+.tb-slot > .tbc-print .tbc-note.long { font-size: 12px; letter-spacing: 0.04em; }
+.tb-slot > .tbc-print .tbc-note + .tbc-note { color: #ecd9a8; opacity: 0.75; }
+.ts-ready .tb-slot > .tbc-print .tbc-name { font-size: 14px; }
+.ts-ready .tb-slot > .tbc-print .tbc-name.long { font-size: 12px; }
+.ts-ready .tb-slot > .tbc-print .tbc-note { font-size: 12px; letter-spacing: 0.04em; }
+/* Trade or stat top left, rank top right: printed on the picture, no backing (marks.ts). */
+.tbc-mark { position: absolute; z-index: 1; top: 6px; display: block; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.75)); }
+.tbc-mark svg { display: block; width: 100%; height: auto; }
+.tbc-symbol { left: 7px; width: 21px; }
+/* A program's stat in the name's brass: its amber would sink into the art's lamp glow. */
+.tbc-prog .tbc-symbol { color: #ecd9a8; }
+.tbc-rank { right: 7px; width: 18px; }
+.ts-ready .tbc-mark { top: 4px; }
+.ts-ready .tbc-symbol { left: 5px; width: 16px; }
+.ts-ready .tbc-rank { right: 5px; width: 14px; }
+/* A first card lifted stands over its group's label; the round corner would show a sliver of it. */
+.tb-group:has(.tb-slots > :first-child.lifted, .tb-slots > :first-child .tb-slot.lifted) .tb-group-label { opacity: 0; }
+.tb-slots > :nth-child(1) { --lx: 12%; }
+.tb-slots > :nth-child(2) { --lx: 27%; }
+.tb-slots > :nth-child(3) { --lx: 42%; }
+.tb-slots > :nth-child(4) { --lx: 57%; }
+.g-deck .tb-slots > :nth-child(1) { --lx: 72%; }
+.g-deck .tb-slots > :nth-child(2) { --lx: 87%; }
+.g-deck .tb-slots > :nth-child(3) { --lx: 35%; }
 /* A full hand of six tucks in a little, to clear the line keys and her subtitle (hand.ts). */
 .tb-hand.tuck .tb-slots > * + * { margin-left: -15px; }
 .tb-hand.tuck:not(.scroll-x) { position: relative; left: 14px; }
@@ -801,3 +845,22 @@
 .tb.hud:not(.phone) .tb-deal > .tb-costs { gap: 6px; }
 .tb.hud:not(.phone) .tb-costs-row.focus .tb-cost-panel { width: 144px; padding: 10px; }
 .tb.hud:not(.phone) .tb-costs-row.focus .tb-cost-panel small { letter-spacing: 0.08em; }
+
+/* A guest's foil (guest crew spec §4): a slow sheen over the bust, the card's only animation at rest. */
+.tb-foil .tbc-pic { overflow: hidden; }
+.tb-foil .tbc-pic::after {
+  content: '';
+  position: absolute;
+  inset: -40%;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 240, 200, 0.28) 46%, rgba(160, 230, 255, 0.34) 52%, rgba(255, 170, 230, 0.26) 58%, transparent 66%);
+  mix-blend-mode: screen;
+  animation: tb-foil 5.5s ease-in-out infinite;
+}
+@keyframes tb-foil {
+  from { transform: translateX(-45%); }
+  to { transform: translateX(45%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-foil .tbc-pic::after { animation: none; }
+}

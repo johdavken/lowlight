@@ -116,6 +116,7 @@ const ABILITIES = parseCrewBook({
     'calm · Calm Voice · any · PRO · inside-info · Talks low.',
     'firm · Stand Firm · any · VET · stand-firm · Doesn’t go down.',
     'twice · Run It Twice · any · PRO · rerun · Goes back.',
+    'run-it-twice · Run It Twice · runner · PRO · rerun · Goes back.',
     'exit · Clean Exit · any · VET · hold-alarm · Never a trace.',
     'deal · Cut a Deal · any · PRO · sell-part · Sells him his silence.',
     'paid · Paid Off · any · VET · pay-off · Somebody owes them.',
@@ -125,7 +126,7 @@ const ABILITIES = parseCrewBook({
   ].join('\n'),
 }).book.abilities;
 
-function relayWith(o: { gamble?: number; rerun?: number[]; deck?: string; rolls?: number[]; nerve?: number; heat?: number; gm?: GmComplete; book?: QuestEntry[]; stats?: Stats; clock?: () => number; burner?: number; rep?: number; sol?: number; crew?: Partial<CrewState>; contacts?: () => ContactCard[]; onLiveClock?: (relay: ChatRelay) => void } = {}) {
+function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?: number[]; deck?: string; rolls?: number[]; nerve?: number; heat?: number; gm?: GmComplete; book?: QuestEntry[]; stats?: Stats; clock?: () => number; burner?: number; rep?: number; sol?: number; crew?: Partial<CrewState>; contacts?: () => ContactCard[]; onLiveClock?: (relay: ChatRelay) => void } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const events: ServerEvent[] = [];
@@ -156,6 +157,7 @@ function relayWith(o: { gamble?: number; rerun?: number[]; deck?: string; rolls?
       { districtOf: () => 'karasu' },
     );
   const quests: NonNullable<ChatRelayDeps['quests']> = {
+    heldLeads: () => o.leads ?? [],
     contact,
     book: () => o.book ?? [BACK],
     status,
@@ -178,6 +180,7 @@ function relayWith(o: { gamble?: number; rerun?: number[]; deck?: string; rolls?
     ...(o.contacts ? { contactCards: o.contacts } : {}),
   };
   const relay: ChatRelay = new ChatRelay({
+    ...(o.tie ? { tie: () => o.tie! } : {}),
     ...(o.gm ? { gm: o.gm } : {}),
     ...(o.onLiveClock ? { onLiveClock: () => o.onLiveClock!(relay) } : {}),
     players: fakePlayers(),
@@ -3961,6 +3964,165 @@ describe('a contract (tier 3 contracts spec §2)', () => {
   };
   const go = { approach: 'quiet' as const, people: [], favour: false };
 
+  describe('a guest (guest crew spec §2)', () => {
+    const EMBER: ContactCard = { id: 'ember', name: 'Ember Zhou', accent: '#ff4f8b', portrait: null, spec: 'runner' };
+    const GUEST = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('posts-at: 45', 'lead: teo-debt\nguest: ember VET\nposts-at: 45'), 'the-contract');
+    const withEmber = { book: [GUEST, BACK], leads: ['teo-debt'], contacts: () => [EMBER] };
+    const offerFor = (t: Awaited<ReturnType<typeof start>>) => t.relay.questState('hicks').open.find((q) => q.id === 'the-contract')?.setup;
+    it('is offered at SETUP on its contract', async () => {
+      const t = await start(withEmber);
+      await toNight(t);
+      expect(offerFor(t)?.crew).toEqual([expect.objectContaining({ id: 'guest-ember', name: 'Ember Zhou', spec: 'runner', grade: 3, guest: true, art: '/contacts/ember.webp' })]);
+    });
+    it('not on a contract with no guest', async () => {
+      const t = await start({ contacts: () => [EMBER] });
+      await toNight(t);
+      expect(offerFor(t)?.crew).toEqual([]);
+    });
+    it('no card, no guest', async () => {
+      const t = await start({ ...withEmber, contacts: () => [] });
+      await toNight(t);
+      expect(offerFor(t)?.crew).toEqual([]);
+    });
+    it('no abilities for the trade, no guest', async () => {
+      const t = await start({ ...withEmber, contacts: () => [{ ...EMBER, spec: 'fence' }] });
+      await toNight(t);
+      expect(offerFor(t)?.crew).toEqual([]);
+    });
+    it('goes in with her abilities and the flag', async () => {
+      const t = await start(withEmber);
+      await toNight(t);
+      expect(await t.relay.startQuest('hicks', 'the-contract', { ...go, people: ['guest-ember'] })).toMatchObject({ ok: true });
+      expect(t.run().setup).toMatchObject({ people: ['guest-ember'], guest: { id: 'ember', grade: 3, abilities: ['clean-exit', 'run-it-twice'] }, abilities: { 'guest-ember': ['clean-exit', 'run-it-twice'] } });
+      expect(t.run().flags['guest.ember']).toBe('yes');
+    });
+    it('no flag without her', async () => {
+      const t = await start(withEmber);
+      await toNight(t);
+      await t.relay.startQuest('hicks', 'the-contract', go);
+      expect(t.run().flags['guest.ember']).toBeUndefined();
+      expect(t.run().setup?.guest).toBeUndefined();
+    });
+    it('takes a slot', async () => {
+      const t = await start(withEmber);
+      await toNight(t);
+      expect(await t.relay.startQuest('hicks', 'the-contract', { ...go, people: ['a', 'b', 'c', 'guest-ember'] })).toBe('at most 3 people');
+    });
+    const inWithHer = async (o: Parameters<typeof relayWith>[0] = {}) => {
+      const t = await start({ ...withEmber, ...o });
+      await toNight(t);
+      await t.relay.startQuest('hicks', 'the-contract', { ...go, people: ['guest-ember'] });
+      const play = (beat: string, card: string) => t.relay.chooseQuest('hicks', { id: 'the-contract', beat, choice: 'x', card });
+      const hand = () => t.relay.questState('hicks').active!.hand!;
+      return { ...t, play, hand };
+    };
+    it('is in the hand, called as a VET', async () => {
+      const t = await inWithHer();
+      expect(t.hand().people[0]).toMatchObject({ id: 'guest-ember', name: 'Ember Zhou', grade: 3, free: 1, risk: null, guest: true, art: '/contacts/ember.webp' });
+      expect(t.hand().people[0].abilities.map((a) => a.id)).toEqual(['clean-exit', 'run-it-twice']);
+    });
+    it('covers the tier cut', async () => {
+      const t = await inWithHer();
+      const x = t.relay.questState('hicks').active!.choices.find((c) => c.id === 'x')!;
+      expect(x.plays!['guest-ember']).toMatchObject({ tier: { label: 'EMBER · VET', lifted: true } });
+    });
+    it('refuses a second call', async () => {
+      const t = await inWithHer({ rolls: [6, 6, 6] });
+      expect(await t.play('night', 'guest-ember')).toMatchObject({ ok: true });
+      expect(t.hand().people[0]).toMatchObject({ free: 0, risk: null });
+      expect(await t.play('n1', 'guest-ember')).toBe('EMBER IS SPENT');
+    });
+    const after = (t: Awaited<ReturnType<typeof inWithHer>>, beat: string) => t.relay.chooseQuest('hicks', { id: 'the-contract', beat, choice: '!after', card: 'guest-ember/run-it-twice' });
+    it('Run It Twice lights on a waiting roll and the second result stands', async () => {
+      const t = await inWithHer({ rolls: [4], rerun: [2] });
+      await t.pick('night', 'x');
+      expect(t.hand().people[0].abilities.find((a) => a.id === 'run-it-twice')).toMatchObject({ playable: true, used: false });
+      expect(await after(t, 'night')).toMatchObject({ ok: true });
+      expect((t.run().pending as { roll: { rerun?: true; faces: number[] } }).roll).toMatchObject({ rerun: true, faces: [2] });
+    });
+    it('Run It Twice plays once, and leaves her call', async () => {
+      const t = await inWithHer({ rolls: [4, 4], rerun: [6, 6] });
+      await t.pick('night', 'x');
+      await after(t, 'night');
+      expect(t.hand().people[0]).toMatchObject({ free: 1 });
+      expect(t.hand().people[0].abilities.find((a) => a.id === 'run-it-twice')).toMatchObject({ used: true, playable: false });
+    });
+    it('stays on the job when the lead is rewound', async () => {
+      let cards = [EMBER];
+      const t = await inWithHer({ contacts: () => cards });
+      cards = [];
+      expect(t.hand().people.map((p) => p.id)).toEqual(['guest-ember']);
+    });
+    it('the debrief names her, with no stray id', async () => {
+      const t = await inWithHer({ rolls: [6, 6, 6, 6, 6, 6, 6] });
+      await t.play('night', 'guest-ember');
+      for (const b of ['n1', 'n2', 'n3', 'n4', 'n5', 'n6']) await t.pick(b, 'x');
+      const debrief = questRows(t.db).findLast((r) => r.quest?.debrief)!.quest!.debrief!;
+      expect(debrief.people).toContainEqual(expect.objectContaining({ name: 'EMBER', art: '/contacts/ember.webp' }));
+      expect(JSON.stringify(debrief)).not.toContain('guest-ember');
+    });
+    it('a beat with a song says so while the run is on it', async () => {
+      const SONG = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('# offer\n\n*He turns', '# offer\nsong: Spectra Says\n\n*He turns'), 'the-contract');
+      const t = await start({ book: [SONG, BACK] });
+      expect(t.relay.questState('hicks').active?.song).toBe('Spectra Says');
+      await t.pick('offer', 'take');
+      expect(t.relay.questState('hicks').active?.song).toBeUndefined();
+    });
+    it('a running contract keeps its art on ELSEWHERE', async () => {
+      const ART = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('kind: contract', 'kind: contract\nart: the-contract.webp'), 'the-contract');
+      const t = await start({ book: [ART, BACK] });
+      await t.pick('offer', 'take');
+      expect(t.relay.questState('hicks').arc?.art).toBe('/api/quests/art/the-contract.webp');
+    });
+    it('a beat with a room says so while the run is on it, with the guest brought', async () => {
+      const ROOM = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('posts-at: 45', 'lead: teo-debt\nguest: ember VET\nposts-at: 45').replace('# n1\n', '# n1\nroom: nexus/spectra-archive\n'), 'the-contract');
+      const t = await inWithHer({ book: [ROOM, BACK], rolls: [6, 6, 6] });
+      expect(t.relay.questState('hicks').active?.room).toBeUndefined();
+      await t.pick('night', 'x');
+      expect(t.relay.questState('hicks').active).toMatchObject({ room: 'nexus/spectra-archive', roomGuest: 'ember' });
+      await t.pick('n1', 'x');
+      expect(t.relay.questState('hicks').active?.room).toBeUndefined();
+    });
+    it('a song with a condition plays only when it holds', async () => {
+      const SONG = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('# offer\n\n*He turns', '# offer\nsong: Spectra Says if played=yes\n\n*He turns'), 'the-contract');
+      const t = await start({ book: [SONG, BACK] });
+      expect(t.relay.questState('hicks').active?.song).toBeUndefined();
+      t.db.setMeta(questKey('hicks', t.id), JSON.stringify({ ...t.run(), flags: { played: 'yes' } }));
+      expect(t.relay.questState('hicks').active?.song).toBe('Spectra Says');
+    });
+    it('the debrief names what she played (final review M2)', async () => {
+      const t = await inWithHer({ rolls: [4, 6, 6, 6, 6, 6, 6], rerun: [6] });
+      await t.pick('night', 'x');
+      await after(t, 'night');
+      await t.pick('night', '!take');
+      for (const b of ['n1', 'n2', 'n3', 'n4', 'n5', 'n6']) await t.pick(b, 'x');
+      const debrief = questRows(t.db).findLast((r) => r.quest?.debrief)!.quest!.debrief!;
+      expect(JSON.stringify(debrief)).toContain('EMBER TOOK THE WIRE · RUN IT TWICE');
+    });
+    it('someone tied to the contact gets met=yes with no rows in their room (final review M6)', async () => {
+      const r = relayWith({ book: [CON], rep: 50, tie: 'Lives down the hall.' });
+      await r.relay.startQuest('hicks', 'the-contract');
+      const key = r.db.metaWithPrefix('quest.hicks.the-contract@')[0].k;
+      expect(parseRun(r.db.getMeta(key))!.flags.met).toBe('yes');
+    });
+    it('a recruit given at the fallout is announced (final review M3)', async () => {
+      const GIFT = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace("*That's that.*\n→ end", "*That's that.*\ngives: recruit face HAND\n→ end"), 'the-contract');
+      const t = await start({ book: [GIFT, BACK], rolls: [6, 6, 6, 6, 6, 6, 6] });
+      await toNight(t);
+      await t.relay.startQuest('hicks', 'the-contract', go);
+      for (const b of ['night', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6']) await t.pick(b, 'x');
+      t.later(49);
+      await t.relay.playDueQuest('hicks');
+      await t.pick('fallout', 'nod');
+      expect(t.events.some((e) => e.type === 'notice' && e.text.includes('CREW → HIRE'))).toBe(true);
+    });
+    it('a run from before guests still parses', async () => {
+      const t = await start(withEmber);
+      await toNight(t);
+      await t.relay.startQuest('hicks', 'the-contract', go);
+      expect(parseRun(JSON.stringify(t.run()))?.setup?.guest).toBeUndefined();
+    });
+  });
   it('a stored run gone from the book, with an old big job state, loads and shows no row', () => {
     const r = relayWith({ book: [BACK], rep: 50 });
     const big = { section: 'legwork', started: 0, marks: [], visited: [], clues: [] };
@@ -4137,6 +4299,28 @@ describe('a contract (tier 3 contracts spec §2)', () => {
   describe('RUMORS (tier 3 contracts spec §5)', () => {
     const other = () => job(CONTRACT, 'the-contract');
     const rumors = (r: ReturnType<typeof relayWith>) => r.relay.questState('hicks').rumors ?? [];
+    describe('opened by a lead', () => {
+      const CON_LED = job(CONTRACT.replace('posts-at: 45', 'lead: teo-debt\nposts-at: 45'), 'the-contract');
+      const HERE_LED = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('posts-at: 45', 'lead: teo-debt\nposts-at: 45'), 'the-contract');
+      it('nothing without the lead, whatever your rep', () => {
+        expect(rumors(relayWith({ book: [CON_LED], rep: 90 }))).toEqual([]);
+      });
+      it('with the lead and short of rep: listed with the rep it needs, and not on the board', () => {
+        const r = relayWith({ book: [HERE_LED], rep: 30, leads: ['teo-debt'] });
+        expect(rumors(r)).toHaveLength(1);
+        expect(rumors(r)[0]).toMatchObject({ id: 'the-contract', needs: 45 });
+        expect(r.relay.questState('hicks').open.map((q) => q.id)).not.toContain('the-contract');
+      });
+      it('with the lead and the rep: nothing owed, and it starts', async () => {
+        const r = relayWith({ book: [HERE_LED], rep: 45, leads: ['teo-debt'] });
+        expect(rumors(r)[0].needs).toBeUndefined();
+        expect(await r.relay.startQuest('hicks', 'the-contract')).toMatchObject({ ok: true });
+      });
+      it("the rep alone doesn't start it", async () => {
+        const r = relayWith({ book: [HERE_LED], rep: 90 });
+        expect(await r.relay.startQuest('hicks', 'the-contract')).not.toMatchObject({ ok: true });
+      });
+    });
     it('none under its rep; at it, the rumor and not the pitch', () => {
       expect(rumors(relayWith({ book: [other()], rep: 44 }))).toEqual([]);
       const [row] = rumors(relayWith({ book: [other()], rep: 45 }));

@@ -76,13 +76,19 @@ export function nextOccurrence(m: number, at: number): number {
  * A schedule block: `from` inclusive, `to` exclusive (minutes of day); `to < from` runs past midnight.
  * `days` (weekday indices, sorted, unique, non-empty) limits it to those days; none means every day.
  * An overnight block belongs to the day it starts: Friday 20:00–04:00 holds into Saturday morning.
+ * `why` is what she's there for, in her prompt; `fixed` is a commitment. Without it the block is a habit she can skip.
  */
 export interface Block {
   from: number;
   to: number;
   room: string;
   days?: number[];
+  why?: string;
+  fixed?: boolean;
 }
+
+/** The longest `why` on a block; it rides in her prompt line each turn. */
+export const BLOCK_WHY_MAX = 80;
 
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const daysOf = (b: Block) => b.days ?? ALL_DAYS;
@@ -118,6 +124,15 @@ export function parseDays(raw: unknown): { days?: number[]; bad?: string } {
 export function scheduledRoom(blocks: Block[], m: number): string | null {
   const x = weekMinute(m);
   return blocks.find((b) => coversWeek(b, x))?.room ?? null;
+}
+
+/** A `fixed` block holding any minute of `[from, to)`, or null (shared plans spec §4). */
+export function fixedBlockDuring(blocks: Block[], from: number, to: number): Block | null {
+  for (let m = from; m < to; m++) {
+    const held = blocks.find((b) => b.fixed && coversWeek(b, weekMinute(m)));
+    if (held) return held;
+  }
+  return null;
 }
 
 /** Whether two blocks share any minute of the week. */

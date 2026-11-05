@@ -12,7 +12,7 @@ import { createFrameTexture, setSmooth } from './frame-texture';
 import { Atmospherics, bloomBlur, createBloom, FRAME, Grade, WeatherLayer } from './post';
 import { BACKDROP_BRIGHTNESS, backdropBlurStrength, backdropView, devicePixels, parallaxTarget, RENDER_H, RENDER_W, screenToRender, stageView } from './stage';
 import type { StageRect } from '../ui/game-stage';
-import { Transitions } from './transitions';
+import { Transitions, type SceneTransition } from './transitions';
 import { TweenedState } from './tween';
 import { WeatherSystem } from './weather';
 import { weatherBoundsFor, weatherLightsFor } from './weather-frame';
@@ -27,8 +27,8 @@ export interface Renderer {
   /** Seconds on the renderer's own clock (what the flicker uses), so sound can crackle in sync. */
   time(): number;
   onWarn(fn: (msg: string) => void): void;
-  /** Runs a scene transition around `swap` (which loads the new scene): fade 1.2 s, glitch 0.6 s. */
-  playTransition(kind: Transition, swap: () => Promise<void>): Promise<void>;
+  /** Runs a scene transition around `swap` (which loads the new scene): fade 1.2 s, glitch 0.6 s, signal 1.3 s. */
+  playTransition(kind: SceneTransition, swap: () => Promise<void>): Promise<void>;
   /** True if more than 5% of the scene render texture's pixels are not black (test hook). */
   nonBlank(): boolean;
   /** Stops/resumes drawing (the landing preview pauses while the tab is hidden). */
@@ -156,6 +156,8 @@ export class PixiRenderer implements Renderer {
     private readonly stage?: StageSource,
     /** Whether a blurred copy of the room fills the bars (the game and the landing; not Studio). */
     private readonly backdropOn = stage !== undefined,
+    /** A signal drop's amount each frame, for what's drawn outside the canvas (the figures and the UI). */
+    private readonly onSignal?: (amount: number) => void,
   ) {
     this.renderTexture = createFrameTexture(RENDER_W, RENDER_H);
     this.view = new Sprite(this.renderTexture);
@@ -186,6 +188,11 @@ export class PixiRenderer implements Renderer {
         this.fade.visible = a > 0;
       },
       setGlitch: (a) => this.grade.glitch(a),
+      setSignal: (a) => {
+        this.grade.signal(a);
+        this.backdrop.alpha = 1 - a;
+        this.onSignal?.(a);
+      },
     });
 
     this.resize();
@@ -344,7 +351,7 @@ export class PixiRenderer implements Renderer {
     this.warnFns.push(fn);
   }
 
-  playTransition(kind: Transition, swap: () => Promise<void>): Promise<void> {
+  playTransition(kind: SceneTransition, swap: () => Promise<void>): Promise<void> {
     return this.transitions.playTransition(kind, swap);
   }
 
@@ -495,7 +502,7 @@ export class PixiRenderer implements Renderer {
 }
 
 /** `backdrop`: fill the bars with a blurred copy of the room (default: when there's a stage). */
-export async function createRenderer(host: HTMLElement, stage?: StageSource, o: { backdrop?: boolean } = {}): Promise<Renderer> {
+export async function createRenderer(host: HTMLElement, stage?: StageSource, o: { backdrop?: boolean; onSignal?: (amount: number) => void } = {}): Promise<Renderer> {
   TextureStyle.defaultOptions.scaleMode = 'nearest';
   const app = new Application();
   await app.init({
@@ -513,7 +520,7 @@ export async function createRenderer(host: HTMLElement, stage?: StageSource, o: 
   app.canvas.style.height = '100%';
   app.canvas.style.imageRendering = 'pixelated';
   host.appendChild(app.canvas);
-  return new PixiRenderer(app, host, stage, o.backdrop ?? stage !== undefined);
+  return new PixiRenderer(app, host, stage, o.backdrop ?? stage !== undefined, o.onSignal);
 }
 
 /** The room layer's own pixels (art + glow), read back from the canvases its textures were made from. */

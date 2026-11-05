@@ -4,7 +4,7 @@ import { mountDeal, type TableCard } from '../src/room/table/deal';
 import { mountHand } from '../src/room/table/hand';
 import { DEAL_STAGGER_MS, FLIP_AT_MS, FLIP_CUE_URL } from '../src/room/table/el';
 import { previewText } from '../src/room/table/preview';
-import { artFace, crewFace } from '../src/room/table/faces';
+import { artFace, crewFace, programFace, slotFace } from '../src/room/table/faces';
 
 const game = () => {
   const g = document.createElement('div');
@@ -219,14 +219,34 @@ describe('previewText', () => {
 describe('card faces', () => {
   it('a recruit: portrait panel (specialty, grade, face), name, state line and shown traits', () => {
     const f = crewFace({ name: 'Dez Vance', spec: 'runner', grade: 1, face: 'crew-07', traits: [{ label: 'Knows the Trains', good: true }, { label: 'Talks Too Much', good: false }] }, '1 FREE');
-    expect(f.querySelector('.tbc-pic .tbc-spec')!.textContent).toBe('RUNNER');
-    expect(f.querySelector('.tbc-pic .tbc-grade')!.textContent).toBe('HAND');
+    expect(f.querySelector('.tbc-pic .tbc-symbol')!.getAttribute('aria-label')).toBe('RUNNER');
+    expect(f.querySelector('.tbc-pic .tbc-rank')!.getAttribute('aria-label')).toBe('HAND');
+    expect(f.querySelectorAll('.tbc-rank path')).toHaveLength(2);
     expect(f.querySelector<HTMLImageElement>('.tbc-pic img')!.src).toContain('/api/extras/crew-07');
     expect(f.querySelector('.tbc-name')!.textContent).toBe('DEZ');
     expect(f.querySelector('.tbc-note')!.textContent).toBe('1 FREE');
     expect([...f.querySelectorAll('.tbc-tr')].map((t) => [t.textContent, t.classList.contains('bad')])).toEqual([['+ KNOWS THE TRAINS', false], ['− TALKS TOO MUCH', true]]);
     // No face: the crew panel's initial disc.
     expect(crewFace({ name: 'Moss Ade', spec: 'fence', grade: 0, face: null, traits: [] }).querySelector('.tbc-pic .cr-mono')!.textContent).toBe('M');
+  });
+  it('a recruit\'s state and growth share a line unless it runs long', () => {
+    const r = { name: 'Dez Vance', spec: 'runner' as const, grade: 1 as const, toNext: 3, face: 'crew-07', traits: [] };
+    expect([...crewFace(r, '1 FREE').querySelectorAll('.tbc-note')].map((n) => n.textContent)).toEqual(['1 FREE · 3 TO PRO']);
+    expect([...crewFace(r, 'AGAIN · RISK 1 IN 3').querySelectorAll('.tbc-note')].map((n) => n.textContent)).toEqual(['AGAIN · RISK 1 IN 3', '3 TO PRO']);
+  });
+  it('a long name wraps at its space, or sets smaller with none', () => {
+    const name = (n: string) => programFace({ id: 'x', name: n, stat: 'reflex', kind: 'position' }).querySelector('.tbc-name')!.className;
+    expect(name('SKELETON KEY')).toContain('wrap');
+    expect(name('COUNTERMEASURE')).toContain('long');
+    expect(name('LEECH')).toBe('tbc-name');
+  });
+  it('a long line sets smaller', () => {
+    const lines = [...slotFace('LOAD').querySelectorAll('.tbc-note')];
+    expect(lines[0].textContent).toBe('TAP TO SLOT A PROGRAM');
+    expect(lines[0].classList.contains('long')).toBe(true);
+  });
+  it('a trade with no symbol keeps its word', () => {
+    expect(crewFace({ name: 'Moss Ade', spec: 'wheel', grade: 0, face: null, traits: [] }).querySelector('.tbc-spec')!.textContent).toBe('WHEEL');
   });
   it('a picture card: its art, label, chip and lines', () => {
     const f = artFace('quiet', 'QUIET', ['REFLEX · TECH +1d'], '+1d');

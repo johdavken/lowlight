@@ -230,6 +230,7 @@ view mother-rot: You're on the line from the Counting House, and you can't go wh
 → floor
 
 # floor
+room: drownworks/pump-house-nine
 
 *The pump house floor is a cathedral with the sound turned up. A crew on shift, four of them, ear defenders, not looking up. They look up for one thing, and that's you.*
 
@@ -248,6 +249,7 @@ take: part
 → find
 
 # find
+room: drownworks/old-intake
 
 *The old intake. Dead pipe, a work lamp, a bedroll. Somebody's been sleeping under the Works in a borrowed set of coveralls with another name on the pocket.*
 
@@ -270,6 +272,7 @@ take: part
 
 stranger: Neve Oda — late thirties, a diver's shoulders, somebody else's name on her coveralls
 face: neve-oda
+room: drownworks/old-intake
 
 *"Four hundred," she says. "Is that what he told you?"*
 
@@ -298,6 +301,7 @@ view mother-rot: They are standing in front of her and she has just said it, and
 → out
 
 # out
+room: drownworks/old-intake
 
 *The horn goes for the shift change, an hour early. They've found something, or someone's said something. Boots on the iron above you.*
 
@@ -319,7 +323,7 @@ take: part
 
 # last if turn=go
 
-*The gate of the flats, and two men in brotherhood coveralls between you and the water. They don't know what you did tonight. They only know you're here. The line clicks. "Did you find her, child?"*
+*The gate of the flats, and two men in brotherhood coveralls between you and the water. They don't know what you did tonight. They only know you're here. The line clicks. {{"Did you find her, child?"}}*
 
 view mother-rot: You already know the answer, or you know enough. Ask anyway, gently.
 
@@ -328,7 +332,7 @@ view mother-rot: You already know the answer, or you know enough. Ask anyway, ge
 
 # last if turn=keep
 
-*The gate of the flats, and two men in brotherhood coveralls between you and the water. The line clicks. "Well, child?"*
+*The gate of the flats, and two men in brotherhood coveralls between you and the water. The line clicks. {{"Well, child?"}}*
 
 view mother-rot: You heard them go quiet down there. You want to know what you've bought.
 
@@ -337,7 +341,7 @@ view mother-rot: You heard them go quiet down there. You want to know what you'v
 
 # last
 
-*The gate of the flats, and two men in brotherhood coveralls between you and the water. She's stopped walking. She's looking at them, and they haven't seen her yet. All she has to do is shout. The line clicks. "Nearly home, child."*
+*The gate of the flats, and two men in brotherhood coveralls between you and the water. She's stopped walking. She's looking at them, and they haven't seen her yet. All she has to do is shout. The line clicks. {{"Nearly home, child."}}*
 
 view mother-rot: You can't see any of this. You can hear their breathing.
 

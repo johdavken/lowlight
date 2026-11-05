@@ -226,11 +226,13 @@ export interface SetupOffer {
   heat: number;
   favour: string | null;
   /** `abilities`: the slotted abilities' labels (crew abilities spec §4). */
-  crew: { id: string; name: string; spec: Specialty; grade: Grade; /** Clean runs to the next grade; 0 at VET. Absent from older servers. */ toNext?: number; face: string | null; traits: { label: string; good: boolean }[]; abilities: string[] }[];
+  crew: { id: string; name: string; spec: Specialty; grade: Grade; /** Clean runs to the next grade; 0 at VET. Absent from older servers. */ toNext?: number; /** A contract's guest, on a foil card (guest crew spec §4), and their bust. */ guest?: true; art?: string; face: string | null; traits: { label: string; good: boolean }[]; abilities: string[] }[];
   /** Contact cards you can bring (contact cards spec §2), never the job's own contact. */
   contacts: ContactCard[];
   /** The deck you carry and its program slots (programs spec §2.4); null: none. Absent from older servers. */
   deck?: { name: string; quality: number; slots: number } | null;
+  /** The deck you hold, when this job bars it (`bars:`). */
+  barred?: string;
   /** The programs SETUP can load (programs spec §1.2a), with a deck; absent without one. */
   programs?: { id: string; name: string; stat: string; kind: ProgramKind; line: string }[];
   /** The stats the job's checks lean on, most used first, at most three: `LEANS TECH · COOL`. */
@@ -244,6 +246,9 @@ export interface HandView {
   approach: Approach;
   people: {
     id: string;
+    /** A contract's guest, on a foil card (guest crew spec §4), and their bust. */
+    guest?: true;
+    art?: string;
     name: string;
     spec: Specialty;
     grade: Grade;
@@ -285,6 +290,13 @@ export interface QuestState {
   open: { id: string; title: string; pitch: string | null; timed: boolean; checks?: ChairCheck[]; /** Its quest art (the file's banner). */ art?: string; /** Why a job can't start now (NERVE GONE). */ locked?: string; mission?: { pay: number | null; tier?: number; range?: [number, number]; scouted?: { draws: Record<string, string>; pay: number | null }; cased?: true; /** A contact's own job (Intake board spec §3): her display name. */ own?: string; /** Its stake is trust, not rep. */ trust?: true; /** The arrangement's nights are used up tonight (spec 2026-10-20 §2): her name. */ capped?: string; /** A desk job (comms spec §3): the place it's played at, on comms. */ comms?: string }; /** A job's SETUP card (spec 2026-10-29-the-hand §1). */ setup?: SetupOffer; /** A one-off job (once: true): it never posts again after it ends. */ once?: true }[];
   /** A checked choice's card carries its odds (missions spec §3); during a reroll the cards are `!reroll` and `!take`. */
   active: {
+    /** The beat's song (guest crew spec §3b), by title: it takes over the music while the run is here. */
+    song?: string;
+    /** The beat's room, view only, and the guest who stands in it (`room:` on a beat). */
+    room?: string;
+    roomGuest?: string;
+    /** Words in the beat's text that are the contact on the line (`{{ }}`). */
+    onLine?: string[];
     id: string;
     title: string;
     beat: string;
@@ -328,12 +340,12 @@ export interface QuestState {
   /** The quest here waiting for its next beat (quest waits spec §4): the line to show, where, from and by when (story-clock minutes); `here`: you're where it waits (or it waits anywhere). */
   waiting: { id: string; title: string; next: string; at: string | null; from: number | null; by: number | null; ready: boolean; here: boolean; /** A desk job's wait (comms spec §3): due only on comms. */ comms?: true } | null;
   /** Quests at a beat or waiting in another contact's room, for this player. */
-  elsewhere: { id: string; title: string; contact: string; contactName: string; next: string | null }[];
+  elsewhere: { id: string; title: string; art?: string; contact: string; contactName: string; next: string | null }[];
   /** ELSEWHERE's boards (2026-11-01): tonight's missions posted at other places; `with` names whose job it is when it isn't yours, `opens` the hour it posts. */
   /** A contract under way with this contact (tier 3 contracts spec §2). */
-  arc?: { id: string; title: string; next: string; stage: 'waiting' | 'night' | 'fallout'; walk: boolean; pieces: { id: string; spec: string; state: 'open' | 'out' | 'back' }[] };
+  arc?: { id: string; title: string; art?: string; next: string; stage: 'waiting' | 'night' | 'fallout'; walk: boolean; pieces: { id: string; spec: string; state: 'open' | 'out' | 'back' }[] };
   /** RUMORS (tier 3 contracts spec §5): contracts come looking for you. `leaving`: who you'd leave to go; null if you're with them. */
-  rumors?: { id: string; line: string; place: string; placeName: string; contact: string; contactName: string; here: boolean; leaving: string | null }[];
+  rumors?: { id: string; line: string; place: string; placeName: string; contact: string; contactName: string; here: boolean; leaving: string | null; /** A lead's contract you can't take yet: the rep it needs. */ needs?: number }[];
   boards?: { place: string; name: string; jobs: { id: string; title: string; pitch: string | null; art?: string; tier?: number; pay: number | null; range?: [number, number]; with?: string; opens?: string; comms?: string; once?: true }[] }[];
   /** The fixer at a board (small jobs spec §5): its stock, each item buyable, above your tier there, or more than your sol. */
   fixer?: { place: string; items: { id: string; name: string; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: number; state: 'ok' | 'locked' | 'short' | 'owned' }[] };

@@ -15,6 +15,7 @@ import type { CostId } from './costs';
 import type { DiceResult, Effect, NextRoll, Position } from './dice';
 import type { Call, Setup } from './hand';
 import { DEFAULT_STATS, STAT_KEYS, type StatKey, type Stats } from './stats';
+import { GUEST_NOTE_MAX } from './contract';
 import { GRADES, HIREABLE, normalSpec, SPECIALTIES, type Grade, type Specialty } from './crew-book';
 
 export const QUEST_TEXT_MAX = 1800;
@@ -80,6 +81,14 @@ export interface Beat {
   when: Condition[] | null;
   /** Someone the beat brings in, voiced by the contact until the quest moves on; `face`: an extra, or any with a tag (stranger faces spec §4). */
   stranger: { name: string; voice: string; face: { id: string } | { tag: string } | null; temper?: string | null } | null;
+  /** Guest crew spec §3b: `song: <title>`, a pack's song that takes over the music while the run is on this beat. */
+  song?: string;
+  /** `song: <title> if <condition>`: it plays only while the condition holds. */
+  songWhen?: Condition[];
+  /** `room: <scene id>`: the picture while the run is on this beat. View only: the contact stays where they are. */
+  room?: string;
+  /** Words marked `{{ }}` in the text: the contact on the line. They read as plain text everywhere but the JOB column. */
+  onLine?: string[];
   text: string;
   /** The beat's text lines in order, passive lines (small jobs spec §3) with their condition and label; plain lines with none. */
   segments: { when: Condition[] | null; label: string | null; text: string }[];
@@ -116,7 +125,20 @@ export interface Effects {
   arrangement?: { cut: number; nights: 1 | 2 | 3 } | { retainer: number; nights: 1 | 2 };
   /** Crew spec §5: `gives: recruit <specialty> <grade>`, a free hire card at the job's place until the next 06:00. */
   recruit?: { spec: Specialty; grade: Grade };
+  /** Guest crew spec §3: `guest-note: <text>`, what a brought guest knows now, written to their journal. */
+  guestNote?: string;
+  /** `settles: <contact id>: <text>`: what this ending settles for that contact, a line in every turn of theirs while the ending stands. */
+  settles?: Settled[];
 }
+
+/** One `settles:` line: who it's for and what's settled. */
+export interface Settled {
+  who: string;
+  text: string;
+}
+
+/** A `settles:` line's text, at most. */
+export const SETTLES_MAX = 300;
 
 /** A wait as written: `until 06:00 · at <place> · by 12:00 else <id>` (spec §2). */
 export interface Wait {
@@ -142,7 +164,7 @@ export interface QuestEntry {
   /** A mission (spec 2026-10-18): checked choices, effects, and the contact only at the start and the end. */
   kind: 'quest' | 'mission' | 'contract';
   /** A contract's arc (tier 3 contracts spec §2): the two waits in minutes, its groundwork, when it's offered, its rumor. */
-  contract?: { night: number; fallout: number; pieces: { id: string; spec: Specialty; line: string }[]; postsAt: number; rumor: string };
+  contract?: { night: number; fallout: number; pieces: { id: string; spec: Specialty; line: string }[]; postsAt: number; rumor: string; /** The lead you must hold before it's listed (world/leads id). */ lead?: string; /** Who comes as a guest (guest crew spec §2): a contact and a grade. */ guest?: { id: string; grade: Grade } };
   /** What the QUEST list says a mission pays (null: not said). */
   pay: number | null;
   /** Small jobs spec §1: the rep tier needed in the job's district (default 1). */
@@ -183,6 +205,10 @@ export interface QuestEntry {
   trust: [number, number] | null;
   /** Jobs: a story that happens once (`once: true`): it never posts again in the playthrough after it ended. */
   once?: true;
+  /** Jobs: `for: <character id>`, the one player it's for. It's theirs, so it's never drawn: it lists whenever it holds. */
+  for?: string;
+  /** Jobs: `bars: <deck id>`, a deck that stays home: with it on you, you go in with none. */
+  bars?: string;
   /** A rescue (crew spec §5): no `starts:`, `{recruit}` in its text, posted by SPRING THEM. */
   spring?: true;
   /** Rebuilt to its tier's template (tier template spec §4): the parse warns where it's off, and a no-roll pick fills no TAKE. */
@@ -317,6 +343,10 @@ const frontSchema = z.strictObject({
   /** Contracts: the rep in the district that offers it, and the line RUMORS shows. */
   'posts-at': z.string().regex(/^\d{1,3}$/, 'posts-at is a rep, like 45').nullish(),
   rumor: oneLine(QUEST_PITCH_MAX).nullish(),
+  /** Contracts: the lead that opens it, the only way in; with none, rep alone does. */
+  lead: oneLine(LORE_ID_MAX).nullish(),
+  /** Contracts: the lead's giver as a foil crew card, `<contact id> <grade>`, like ember VET. */
+  guest: oneLine(LORE_ID_MAX + 8).nullish(),
   /** A desk job (comms spec §3): the map place it's played at, on comms. */
   comms: oneLine(LORE_ID_MAX).nullish(),
   /** Jobs: when it lists, HH:MM-HH:MM (may cross midnight; the end is exclusive). */
@@ -324,6 +354,8 @@ const frontSchema = z.strictObject({
   /** Jobs: trust gained on CLEAN / lost on BLOWN with the contact you ran it with, like 1 / 1 (rep then doesn't move). */
   trust: z.string().regex(/^[0-3]\s*\/\s*[0-3]$/, 'trust is gained / lost, 0–3 each, like 1 / 1').nullish(),
   once: z.boolean().nullish(),
+  for: oneLine(LORE_ID_MAX).nullish(),
+  bars: oneLine(LORE_ID_MAX).nullish(),
   spring: z.boolean().nullish(),
   template: z.boolean().nullish(),
   /** The panel's picture (spec 2026-10-19 quest art): a file in world/quests/art/. */
@@ -428,6 +460,11 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
   const choices: Choice[] = [];
   const segments: Beat['segments'] = [];
   let stranger: Beat['stranger'] = null;
+  let song: string | undefined;
+  let songWhen: Condition[] | undefined;
+  let room: string | undefined;
+  const onLine: string[] = [];
+  const spoken = (l: string) => l.replace(/\{\{(.+?)\}\}/g, (_, q: string) => (onLine.push(q), q));
   let first = true;
   /** The line before was `stranger:` (where `face:` goes). */
   let afterStranger = false;
@@ -441,6 +478,19 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
         afterStranger = true;
         continue;
       }
+    }
+    const roomLine = /^room:\s*(\S+)$/.exec(t);
+    if (roomLine) {
+      room = roomLine[1];
+      continue;
+    }
+    const sung = /^song:\s*(.+?)(?:\s+if\s+(.+))?$/.exec(t);
+    if (sung) {
+      song = sung[1];
+      const when = sung[2] ? parseCondition(sung[2]) : undefined;
+      if (when && !Array.isArray(when)) p(`song: ${when.message}`);
+      else songWhen = when;
+      continue;
     }
     if (/^face:/.test(t)) {
       const f = /^face:\s*(?:any\s+(\S+)|(\S+))$/.exec(t);
@@ -484,10 +534,11 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
     } else if ((m = /^\[(.+?)\]\s+(.+)$/.exec(t)) && passive(m[1])) {
       const pc = passive(m[1])!;
       if ('message' in pc) p(`passive line: ${pc.message}`);
-      else segments.push({ when: pc.when, label: pc.label, text: m[2] });
+      else segments.push({ when: pc.when, label: pc.label, text: spoken(m[2]) });
     } else {
-      text.push(line);
-      segments.push({ when: null, label: null, text: line });
+      const said = spoken(line);
+      text.push(said);
+      segments.push({ when: null, label: null, text: said });
     }
   }
   const body = tidy(text);
@@ -496,7 +547,7 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
   if (choices.length < QUEST_CHOICES_MIN || choices.length > QUEST_CHOICES_MAX) p(`needs ${QUEST_CHOICES_MIN}–${QUEST_CHOICES_MAX} choices (this has ${choices.length})`);
   const seen = new Set<string>();
   for (const c of choices) if (seen.has(c.id) || !seen.add(c.id)) p(`choice ${c.id} appears twice`);
-  return { id, when, stranger, text: body, segments, views, choices };
+  return { id, when, stranger, ...(song ? { song, ...(songWhen ? { songWhen } : {}) } : {}), ...(room ? { room } : {}), ...(onLine.length ? { onLine } : {}), text: body, segments, views, choices };
 }
 
 const span = (s: string): number | null => {
@@ -568,6 +619,8 @@ function parseOutcome(id: string, lines: string[], problems: QuestProblem[]): Ou
     else if (t === 'lost' && effects.lost === undefined) effects.lost = true;
     else if ((e = /^heat:\s*([+-]\d+)$/.exec(t)) && effects.heat === undefined) effects.heat = Number(e[1]);
     else if ((e = /^gives:\s*deck\s+([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(t)) && effects.deck === undefined) effects.deck = e[1];
+    else if ((e = /^guest-note:\s*(.+)$/.exec(t)) && effects.guestNote === undefined) effects.guestNote = e[1];
+    else if ((e = /^settles:\s*([a-z0-9]+(?:-[a-z0-9]+)*):\s*(.+)$/.exec(t))) (effects.settles ??= []).unshift({ who: e[1], text: e[2] });
     else if (/^takes:\s*deck$/.test(t) && effects.deck === undefined) effects.deck = null;
     else if ((e = /^gives:\s*recruit\s+([a-z]+)\s+([a-z]+)$/i.exec(t)) && effects.recruit === undefined && (HIREABLE as string[]).includes(normalSpec(e[1].toLowerCase())) && GRADES.includes(e[2].toUpperCase() as (typeof GRADES)[number]))
       effects.recruit = { spec: normalSpec(e[1].toLowerCase()) as Specialty, grade: GRADES.indexOf(e[2].toUpperCase() as (typeof GRADES)[number]) as Grade };
@@ -682,6 +735,9 @@ export function parseQuestFile(
   const payRange: [number, number] | null = f.pay != null ? (f.pay.split('-').map(Number).concat(f.pay.includes('-') ? [] : [Number(f.pay)]).slice(0, 2) as [number, number]) : null;
   /** A job, a mission or a contract: checks, cracks, ALARM and effects are allowed (the messages name missions, as they always have). */
   const contracted = f.kind === 'contract';
+  const guestParts = f.guest?.split(/\s+/) ?? [];
+  const guestGrade = GRADES.indexOf((guestParts[1] ?? '') as (typeof GRADES)[number]);
+  const guest = guestParts.length === 2 && guestGrade >= 0 ? { id: guestParts[0], grade: guestGrade as Grade } : null;
   const mission = f.kind === 'mission' || contracted;
   /** The beats with a red check: each version of a beat counts once, since only one plays. */
   const reds = new Set<string>();
@@ -730,6 +786,10 @@ export function parseQuestFile(
   if (!contracted && pieceLines.size > 0) problems.push({ field: 'groundwork', message: 'piece lines go only in a contract' });
   if (!mission && f.trust != null) problems.push({ field: 'trust', message: 'trust: goes only on a job (kind: mission or contract)' });
   if (!mission && f.once != null) problems.push({ field: 'once', message: 'once: goes only on a job (kind: mission or contract)' });
+  if (!mission && f.for != null) problems.push({ field: 'for', message: 'for: goes only on a job (kind: mission or contract)' });
+  if (!mission && f.bars != null) problems.push({ field: 'bars', message: 'bars: goes only on a job (kind: mission or contract)' });
+  if (f.bars != null && known.decks && !known.decks.has(f.bars)) problems.push({ field: 'bars', message: `no deck '${f.bars}' in world/gear` });
+  if (f.for != null && known.roster && !known.roster.has(f.for)) problems.push({ field: 'for', message: `no character '${f.for}'` });
   if (!mission && f['take-size'] != null) problems.push({ field: 'take-size', message: 'take-size goes only on a job (kind: mission or contract)' });
   if (f.loot && f.loot.trim().length > LOOT_MAX) warnings.push(`loot: at most ${LOOT_MAX} characters (this is ${f.loot.trim().length})`);
   if (reds.size > 1) warnings.push(`${reds.size} red checks: keep to one per job, at its peak`);
@@ -755,6 +815,16 @@ export function parseQuestFile(
     const { arrangement, ...jobEffects } = o.effects;
     if (arrangement && missedTargets.has(o.id)) problems.push({ field: o.id, message: "arrangement: can't be reached by a wait's else (a deal is struck by a pick)" });
     if (!mission && Object.keys(jobEffects).length > 0) problems.push({ field: o.id, message: 'pay:, heat:, gives: and takes: go only in a mission (kind: mission)' });
+    for (const s of o.effects.settles ?? []) {
+      if (o.to !== 'end') problems.push({ field: o.id, message: 'settles: goes on an outcome that ends (→ end)' });
+      if (s.text.length > SETTLES_MAX) problems.push({ field: o.id, message: `settles: at most ${SETTLES_MAX} characters (this is ${s.text.length})` });
+      if (known.roster && !known.roster.has(s.who)) problems.push({ field: o.id, message: `settles: no contact '${s.who}'` });
+    }
+    if (o.effects.guestNote !== undefined) {
+      if (f.guest == null) problems.push({ field: o.id, message: 'guest-note: needs a guest: on the contract' });
+      if (o.to !== 'end') problems.push({ field: o.id, message: 'guest-note: goes on an outcome that ends (→ end)' });
+      if (o.effects.guestNote.length > GUEST_NOTE_MAX) problems.push({ field: o.id, message: `guest-note: at most ${GUEST_NOTE_MAX} characters (this is ${o.effects.guestNote.length})` });
+    }
     // The arrangement (spec 2026-10-20): a quest with one contact strikes that contact's deal.
     if (arrangement && (mission || ownedBy({ with: withIds }) === null)) problems.push({ field: o.id, message: 'arrangement: goes only in a quest with one contact (not a job)' });
     if (o.to === 'back' && !contracted) problems.push({ field: o.id, message: "'→ back' goes only in a contract" });
@@ -820,6 +890,11 @@ export function parseQuestFile(
     for (const b of arcBeats) if (!beats.has(b)) problems.push({ field: b, message: `a contract needs a # ${b} beat` });
     if (ownedBy({ with: withIds }) === null) problems.push({ field: 'with', message: 'a contract belongs to one contact (with: one id)' });
     for (const k of ['night', 'fallout', 'rumor', 'posts-at'] as const) if (f[k] == null) problems.push({ field: k, message: `a contract needs ${k}:` });
+    if (f.guest != null && !guest) problems.push({ field: 'guest', message: 'guest: is a contact and a grade, like ember VET' });
+    if (f.guest != null && f.lead == null) problems.push({ field: 'guest', message: 'a guest needs a lead:' });
+  } else {
+    if (f.lead != null) problems.push({ field: 'lead', message: 'only a contract is opened by a lead' });
+    if (f.guest != null) problems.push({ field: 'guest', message: 'only a contract has a guest' });
   }
   const roots = [first, ...arcBeats.filter((b) => beats.has(b)), ...pushBeats, ...(beats.has('getaway') ? ['getaway'] : [])];
   const reached = new Set<string>(roots);
@@ -837,7 +912,7 @@ export function parseQuestFile(
 
   if (problems.length > 0) return { ok: false, problems };
   const timed = [...outcomes.values()].some((o) => o.wait?.by != null);
-  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor! } } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}) };
+  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor!, ...(f.lead ? { lead: f.lead } : {}), ...(guest ? { guest } : {}) } } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.for ? { for: f.for } : {}), ...(f.bars ? { bars: f.bars } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}) };
   if (entry.template) warnings.push(...offTemplate(entry));
   return { ok: true, warnings, entry };
 }
@@ -903,6 +978,10 @@ export interface QuestRun {
   spring?: { recruit: string; place: string; tier: 1 | 2 | 3 | 4 };
   /** Crew spec §5: the `gives: recruit` its ending outcome had; its free card shows at the job's place until the next 06:00. */
   recruit?: { spec: Specialty; grade: Grade };
+  /** Guest crew spec §3: the `guest-note:` its ending had; a brought guest's next turn writes it down. */
+  guestNote?: string;
+  /** The `settles:` lines its ending had; each contact named reads theirs on every turn while this run stands. */
+  settles?: Settled[];
   /** The hand (spec 2026-10-29-the-hand §1): the SETUP card GO IN took; absent on runs from before it, or sent without one. */
   setup?: Setup;
   /** Each card played on a roll, in order (§2). */
@@ -1142,6 +1221,8 @@ const setupSchema = z.object({
   fencedBy: z.string().optional(),
   // Contact cards (spec 2026-10-31-contact-cards §2), as they were at GO IN.
   contacts: z.array(z.object({ id: z.string(), name: z.string(), accent: z.string(), portrait: z.string().nullable(), spec: z.preprocess(normalSpec, z.enum(SPECIALTIES)) })).max(2).optional(),
+  // A contract's guest (spec 2026-11-05-guest-crew §2), as they were at GO IN.
+  guest: z.object({ id: z.string(), name: z.string(), accent: z.string(), portrait: z.string().nullable(), spec: z.preprocess(normalSpec, z.enum(SPECIALTIES)), grade: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), abilities: z.array(z.string()) }).optional(),
   // Crew abilities (spec 2026-11-01): the loadout at GO IN, and what played at the end.
   abilities: z.record(z.string(), z.array(z.string())).optional(),
   ended: z.array(z.string()).optional(),
@@ -1215,6 +1296,8 @@ const runSchema = z.object({
   startDeck: z.string().nullable().optional(),
   spring: z.object({ recruit: z.string(), place: z.string(), tier: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]) }).optional(),
   recruit: z.object({ spec: z.preprocess(normalSpec, z.enum(HIREABLE as [Specialty, ...Specialty[]])), grade: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]) }).optional(),
+  guestNote: z.string().optional(),
+  settles: z.array(z.object({ who: z.string(), text: z.string() })).optional(),
   pendingCover: z.object({ outcome: z.string(), text: z.string(), pick: z.object({ choice: z.string(), line: z.string(), roll: rollSchema.optional() }).optional(), minutes: z.number() }).nullable().optional(),
   at: z.number(),
   faces: z.record(z.string(), z.string()).optional(),

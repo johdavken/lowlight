@@ -1,3 +1,4 @@
+import { LEAD_DETAILS_MAX } from '../../shared/leads';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +15,7 @@ import type { ChatMessage } from '../../shared/types';
 import { cipherKey, foldCipher, parseCipherEvents, type CipherState } from '../../shared/cipher';
 
 const P = 'hicks';
+const DAY_MIN = 1440;
 let db: Db;
 let journal: Journal;
 let calls: { messages: CompletionMessage[]; maxTokens: number; signal: AbortSignal }[];
@@ -453,6 +455,56 @@ describe('ResidualRunner', () => {
   });
 });
 
+describe('a lead told and not given (live check 2026-11-05)', () => {
+  const lead = { id: 'silas-file', title: 'What Silas found', knows: 'He has gone deep on the grid and shuts his deck when you walk in.' };
+  const rig = (offered = [lead]) => {
+    const given: { id: string; details: string; messageId: string }[] = [];
+    const heard: string[] = [];
+    const leads: ResidualRunnerDeps['leads'] = () => ({ offered, give: (id, details, messageId) => (given.push({ id, details, messageId }), true), recorded: (title) => heard.push(title) });
+    return { given, heard, r: runner({ leads }) };
+  };
+  it('tells the Residual what it could record, and only then', async () => {
+    const t = rig();
+    const a = exchange('What is up with Silas?', 'He shuts his deck when I walk in.');
+    t.r.afterTurn(P, { id: a.id, take: 0 }, 'turn');
+    await t.r.wait();
+    const sys = calls[0].messages[0].content as string;
+    expect(sys).toContain('LEADS');
+    expect(sys).toContain('silas-file');
+    expect(sys).toContain('He has gone deep on the grid');
+    const none = rig([]);
+    const b = exchange('Hi.', 'Hey.');
+    none.r.afterTurn(P, { id: b.id, take: 0 }, 'turn');
+    await none.r.wait();
+    expect(calls[1].messages[0].content as string).not.toContain('LEADS');
+  });
+  it('records one she told, on her reply, and says so', async () => {
+    const t = rig();
+    const a = exchange('What is up with Silas?', 'He shuts his deck when I walk in.');
+    answers.push(answer({ notes: [], leads: [{ id: 'silas-file', details: 'Every night this week, a Spectra watermark.' }] }));
+    t.r.afterTurn(P, { id: a.id, take: 0 }, 'turn');
+    await t.r.wait();
+    expect(t.given).toEqual([{ id: 'silas-file', details: 'Every night this week, a Spectra watermark.', messageId: a.id }]);
+    expect(t.heard).toEqual(['What Silas found']);
+  });
+  it('refuses a lead that was not on offer', async () => {
+    const t = rig();
+    const a = exchange('Hi.', 'Hey.');
+    answers.push(answer({ notes: [], leads: [{ id: 'made-up', details: 'x' }] }));
+    t.r.afterTurn(P, { id: a.id, take: 0 }, 'turn');
+    await t.r.wait();
+    expect(t.given).toEqual([]);
+  });
+  it('cuts long details to the lead limit', async () => {
+    const t = rig();
+    const a = exchange('Hi.', 'Hey.');
+    answers.push(answer({ notes: [], leads: [{ id: 'silas-file', details: 'x'.repeat(2000) }] }));
+    t.r.afterTurn(P, { id: a.id, take: 0 }, 'turn');
+    await t.r.wait();
+    expect(t.given[0].details.length).toBe(LEAD_DETAILS_MAX);
+  });
+});
+
 describe('time backstop (spec 2026-10-20)', () => {
   /** Her line and reply stamped at `clock` (playtest c7f7d4ac: Day 3, 19:10). */
   const stamped = (clock: number) => {
@@ -571,6 +623,32 @@ describe('her plan (her plans spec §4)', () => {
     r.afterTurn(P, { id: a2.id, take: 0 }, 'turn');
     await r.wait();
     expect(calls[0].messages[1].content).toContain("[her day: Nix's flat 05:00–18:00]");
+  });
+
+  it('a loose date is stored under the reply, cleared by a time, and hidden once stale (shared plans spec §5)', async () => {
+    const r = runner({ plan: () => ({ places, onSet: () => {}, people: [{ id: 'silas', name: 'Silas' }] }) });
+    const a1 = stamped(1440 + 3 * 60);
+    answers.push(answer({ notes: [], plan: { going: null, meet: { place: HAES, at: null, with: ['silas'] } } }));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.wait();
+    expect(db.getMeta('plan.hicks')).toBeNull();
+    expect(JSON.parse(db.getMeta('plan.hicks.loose')!)).toMatchObject({ place: HAES, with: ['silas'], from: a1.id });
+    expect(JSON.parse(db.getMeta('plan.hicks.say')!)).toEqual({ from: a1.id, lines: ["[you asked them to Hae's Noodles with Silas but named no time: settle one in your own words]"] });
+    expect(db.writes().find((w) => w.key === 'plan.hicks.loose')?.messageId).toBe(a1.id);
+    const a2 = stamped(1440 + 3 * 60 + 5);
+    answers.push(answer({ notes: [], plan: { going: null, meet: { place: HAES, at: '09:00', with: ['silas'] } } }));
+    r.afterTurn(P, { id: a2.id, take: 0 }, 'turn');
+    await r.wait();
+    expect(calls.at(-1)!.messages[1].content).toContain("[loose date: Hae's Noodles with Silas, no time yet]");
+    expect(db.getMeta('plan.hicks.loose')).toBeNull();
+    expect(JSON.parse(db.getMeta('plan.hicks')!).meet.with).toEqual(['silas']);
+    db.deleteMeta('plan.hicks');
+    db.setMeta('plan.hicks.loose', JSON.stringify({ place: HAES, with: [], at: 1440, from: a1.id }));
+    const a3 = stamped(1440 + 3 * DAY_MIN);
+    answers.push(answer({ notes: [] }));
+    r.afterTurn(P, { id: a3.id, take: 0 }, 'turn');
+    await r.wait();
+    expect(calls.at(-1)!.messages[1].content).not.toContain('[loose date:');
   });
 
   it("a text reply's meet plan is set (deck spec §3)", async () => {

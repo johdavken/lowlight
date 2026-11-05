@@ -5,7 +5,7 @@ import crypto from 'node:crypto';
 import { DEFAULT_CREW_DIR, loadCrewBook } from './crew-book-load';
 import { crewView, freeDraw } from './crew-view';
 import { jobRecruitCard, rescueOpen } from '../../shared/crew';
-import { fillRecruit, questKey } from '../../shared/quests';
+import { fillRecruit, flagsOf, questKey } from '../../shared/quests';
 import { bookId } from './mission-run';
 import { boardPlaces, postedJobs, storyDay } from '../../shared/board';
 import { registerScenarioRoutes } from './scenario-routes';
@@ -224,6 +224,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     cfg.questsDir ?? DEFAULT_QUESTS_DIR,
     { roster: new Set(records.filter(isConnected).map((r) => r.info.id)), places: places.placeIds(), extras: extrasKnown(extras), decks: new Set(decks.map((d) => d.id)) },
     (m) => console.warn(m),
+    leadBook,
   );
   const lore = (sceneId: string, recent: string[], force?: readonly string[]) => selectLore(loreBook, { ...places.locate(sceneId), recent, ...(force ? { force } : {}) });
   /** What a room's art shows: its art prompt's narration (art/scenes/<folder>.md, see artNarration), else its scene description. */
@@ -498,6 +499,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
           crewTraits: () => crewBook.traits,
           crewAbilities: () => crewBook.abilities,
           gmWritten: () => gmWritten,
+          heldLeads: (player) => (world.heldLeads(player) ?? []).map((h) => h.id),
           contactCards: () => {
             const pt = world.active();
             return pt ? world.contactCards(pt.player) : [];
@@ -520,7 +522,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         leads: (contactId, player, recent, replaced) => {
           const held = world.heldLeads(player);
           if (held === null) return { onMind: [], offer: [], receive: [] };
-          return leadsFor(leadBook, contactId, new Map(held.filter((h) => !replaced.includes(h.id)).map((h) => [h.id, h.details])), recent);
+          return leadsFor(leadBook, contactId, new Map(held.filter((h) => !replaced.includes(h.id)).map((h) => [h.id, h.details])), recent, { player, flags: flagsOf(world.questStatus(player) ?? []) });
         },
         checkpoints: world,
         contacts: {

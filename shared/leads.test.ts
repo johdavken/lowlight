@@ -128,6 +128,13 @@ describe('checkChains', () => {
   });
 });
 
+describe('for: and needs:', () => {
+  it('for: and needs: survive the file', () => {
+    const r = parseLeadFile('teo-debt', TEO.replace('fill:', 'for: soren\nneeds: rue_two\nfill:'), ROSTER);
+    expect(r.ok && leadFile(r.entry)).toContain('for: soren\nneeds: "rue_two"\n');
+  });
+});
+
 describe('leadsFor', () => {
   const base = (over: Partial<LeadEntry>): LeadEntry => ({
     id: 'teo-debt',
@@ -146,6 +153,14 @@ describe('leadsFor', () => {
   const TEO = base({});
   const PRICE = base({ id: 'rot-price', title: "Rot's price", from: 'hicks', to: 'cass', after: 'teo-debt', keys: ['price'], onMind: 'You have a price in mind.' });
   const BOOK = [TEO, PRICE];
+  it('for: and needs: hold a lead back from everyone else, and until its flag', () => {
+    const FOR = base({ for: 'soren', needs: 'rue_two' });
+    const none = new Map<string, string>();
+    expect(leadsFor([FOR], 'cass', none, []).onMind).toEqual([]);
+    expect(leadsFor([FOR], 'cass', none, [], { player: 'hicks', flags: { rue_two: 'yes' } }).onMind).toEqual([]);
+    expect(leadsFor([FOR], 'cass', none, [], { player: 'soren', flags: {} }).onMind).toEqual([]);
+    expect(leadsFor([FOR], 'cass', none, [], { player: 'soren', flags: { rue_two: 'yes' } }).onMind).toEqual([FOR]);
+  });
   const none = new Map<string, string>();
 
   it('live leads sit on her mind and are offered only once mentioned', () => {

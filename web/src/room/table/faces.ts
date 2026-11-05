@@ -1,5 +1,5 @@
 /**
- * The table's card faces (the hand spec §5): a recruit with the specialty and grade over their face, then the name, the
+ * The table's card faces (the hand spec §5): a recruit with the specialty and grade marks over their face, then the name, the
  * card's state and shown traits; the other cards as their picture from `web/public/cards/` in the same frame. In the
  * hand the picture fills the card and the words sit on a fade at its foot (table.css). A card that's out lies face down.
  */
@@ -7,11 +7,22 @@ import { GRADES, type Grade, type Specialty, type Timing } from '../../../../sha
 import type { ProgramKind } from '../../../../shared/programs';
 import type { ContactCard } from '../../../../shared/types';
 import { face } from '../crew-ui';
+import { rankMark, symbolMark } from './marks';
 import { el } from './el';
 
 /** A card picture's file (web/public/cards/<name>.webp). */
 export type CardArt = 'quiet' | 'smooth' | 'hard' | 'favour' | 'lead' | 'tip' | 'empty' | 'back' | 'steady' | 'take';
 const artUrl = (a: CardArt) => `/cards/${a}.webp`;
+
+/** A printed card: the black border and centred serif of a crew or program card (table.css). A long name wraps at its space, or sets smaller if it has none; a long line sets smaller. */
+const printed = (f: HTMLElement): HTMLElement => {
+  f.classList.add('tbc-print');
+  const name = f.querySelector('.tbc-name');
+  const text = name?.textContent ?? '';
+  if (text.length > 9) name!.classList.add(text.includes(' ') ? 'wrap' : 'long');
+  for (const n of f.querySelectorAll('.tbc-note')) if ((n.textContent?.length ?? 0) > 20) n.classList.add('long');
+  return f;
+};
 
 function frame(pic: HTMLElement, name: string, lines: string[], traits: { label: string; good: boolean }[] = [], abilities: string[] = []): HTMLElement {
   const f = el('span', 'tbc');
@@ -24,12 +35,25 @@ function frame(pic: HTMLElement, name: string, lines: string[], traits: { label:
   return f;
 }
 
+/** A contact's bust as a card's picture. */
+function bust(src: string): HTMLElement {
+  const img = el('img', 'tbc-face');
+  img.src = src;
+  img.alt = '';
+  return img;
+}
+
 /** A recruit's card: the hire card's portrait panel and name, the card's state line (`1 FREE`), shown traits and slotted abilities' labels (SETUP). */
-export function crewFace(r: { name: string; spec: Specialty; grade: Grade; toNext?: number; face: string | null; traits: { label: string; good: boolean }[]; abilities?: string[] }, note?: string): HTMLElement {
+export function crewFace(r: { name: string; spec: Specialty; grade: Grade; toNext?: number; face: string | null; traits: { label: string; good: boolean }[]; abilities?: string[]; guest?: true; art?: string }, note?: string): HTMLElement {
   const pic = el('span', 'tbc-pic');
-  pic.append(el('span', 'tbc-spec', r.spec.toUpperCase()), el('span', 'tbc-grade', GRADES[r.grade]), face(r, 'tbc-face'));
+  pic.append(symbolMark(r.spec), rankMark(r.grade), r.art ? bust(r.art) : face(r, 'tbc-face'));
   const growth = r.toNext ? `${Math.ceil(r.toNext)} TO ${GRADES[r.grade + 1]}` : null;
-  return frame(pic, r.name.split(' ')[0].toUpperCase(), [...(note ? [note] : []), ...(growth ? [growth] : [])], r.traits, r.abilities);
+  const lines = [note, growth].filter((l): l is string => !!l);
+  const state = lines.join(' · ');
+  const card = printed(frame(pic, r.name.split(' ')[0].toUpperCase(), [...(r.guest ? ['GUEST'] : []), ...(state.length <= 20 ? [state] : lines)], r.traits, r.abilities));
+  // A guest's foil (guest crew spec §4).
+  if (r.guest) card.classList.add('tb-foil');
+  return card;
 }
 
 const TIMING_WORD = { roll: 'ON A ROLL', after: 'AFTER A ROLL', end: 'AT THE END', auto: 'WHEN IT COMES' } as const;
@@ -113,8 +137,8 @@ function programPic(src: string): HTMLElement {
 /** A program's card (programs spec §2.1): its picture, its stat, its name, what it does and the card's state. */
 export function programFace(p: { id: string; name: string; stat: string; kind: ProgramKind }, note?: string): HTMLElement {
   const pic = programPic(`/programs/${p.id}.webp`);
-  pic.append(el('span', 'tbc-spec', p.stat.toUpperCase()));
-  return frame(pic, p.name, [PROGRAM_WORDS[p.kind], ...(note ? [note] : [])]);
+  pic.append(symbolMark(p.stat));
+  return printed(frame(pic, p.name, [PROGRAM_WORDS[p.kind], ...(note ? [note] : [])]));
 }
 
 /** The DECK group's label (programs spec §2.1): the deck carried and its quality, or none. */
@@ -122,5 +146,5 @@ export const deckLabel = (deck: { name: string; quality: number } | null): strin
 
 /** An empty slot: EMPTY, or LOAD when a program fits a check here (`note` its price mid-job: programs spec §1.2a). */
 export function slotFace(word: 'EMPTY' | 'LOAD', note = 'TAP TO SLOT A PROGRAM'): HTMLElement {
-  return frame(programPic('/programs/empty.webp'), word, word === 'LOAD' ? [note] : []);
+  return printed(frame(programPic('/programs/empty.webp'), word, word === 'LOAD' ? [note] : []));
 }

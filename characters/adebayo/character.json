@@ -69,6 +69,7 @@
       "from": "09:00",
       "to": "21:00",
       "room": "nexus/sdg-floor",
+      "fixed": true,
       "days": [
         "mon",
         "tue",

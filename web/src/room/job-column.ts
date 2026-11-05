@@ -13,6 +13,20 @@ export interface JobColumn {
   /** The job's title, its text and a line under the head (SETUP's district, tier and heat); none of either: the column goes. `extra` stands under the text (a debrief's rolls). */
   show(title: string, text: string | null | undefined, sub?: string, extra?: HTMLElement | null): void;
   clear(): void;
+  /** The contact's words on the line in the text shown (`{{ }}` on a beat), and who says them: they stand apart, in CRT. */
+  setOnLine(who: string, words: string[]): void;
+}
+
+/** `text` with each of `words` lifted out into a CRT line, under `who`. */
+function lineNodes(text: string, who: string, words: string[]): Node[] {
+  const at = words.map((w) => ({ w, i: text.indexOf(w) })).filter((x) => x.i >= 0).sort((a, b) => a.i - b.i)[0];
+  if (!at) return [document.createTextNode(text)];
+  const said = document.createElement('span');
+  said.className = 'jc-line';
+  said.dataset.who = `${who} (ON COMMS)`;
+  said.textContent = at.w;
+  const before = text.slice(0, at.i);
+  return [...(before ? [document.createTextNode(before)] : []), said, ...lineNodes(text.slice(at.i + at.w.length), who, words)];
 }
 
 /**
@@ -39,6 +53,18 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
   let shown = '';
   let shownText = '';
   let shownExtra: HTMLElement | null = null;
+  let line = { who: '', words: [] as string[] };
+  /** The text's nodes, with the words on the line drawn apart. */
+  const draw = () => {
+    const nodes = proseNodes(shownText).flatMap((n) => {
+      if (n instanceof Text) return lineNodes(n.data, line.who, line.words);
+      (n as HTMLElement).replaceChildren(...lineNodes(n.textContent ?? '', line.who, line.words));
+      return [n];
+    });
+    body.replaceChildren(...nodes, ...(shownExtra ? [shownExtra] : []));
+    passiveLabels(body);
+    markLore(body);
+  };
   // New words in a column already up: it pulses and says so (playtest: easy to miss). The pulse is on a
   // pseudo-element, so `jc-in` doesn't replay when the class goes.
   const pulse = () => {
@@ -62,9 +88,9 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
     split(false);
   };
   return {
-    show(title, text, line, extra = null) {
-      if (!text && !line && !extra) return clear();
-      const key = `${title}\n${line ?? ''}\n${text}`;
+    show(title, text, subLine, extra = null) {
+      if (!text && !subLine && !extra) return clear();
+      const key = `${title}\n${subLine ?? ''}\n${text}`;
       // The same text again (a quest_state that changed something else) keeps where you'd scrolled to.
       if (key === shown && extra === shownExtra && !col.hidden) return;
       if (!col.hidden && text && text !== shownText) pulse();
@@ -72,16 +98,19 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
       shownText = text ?? '';
       shownExtra = extra;
       head.textContent = `◆ JOB · ${title.toUpperCase()}`;
-      sub.textContent = line ?? '';
-      sub.hidden = !line;
-      body.replaceChildren(...proseNodes(text ?? ''), ...(extra ? [extra] : []));
-      passiveLabels(body);
-      markLore(body);
+      sub.textContent = subLine ?? '';
+      sub.hidden = !subLine;
+      draw();
       body.scrollTop = 0;
       col.classList.remove('jc-more');
       col.hidden = false;
       split(true);
     },
     clear,
+    setOnLine(who, words) {
+      if (who === line.who && words.join('\n') === line.words.join('\n')) return;
+      line = { who, words };
+      if (!col.hidden) draw();
+    },
   };
 }

@@ -1,0 +1,239 @@
+{
+  "id": "old-intake",
+  "name": "The Old Intake",
+  "description": "The old intake under Pump House Nine, below where the shift goes: a low vault of stained concrete and rusted iron under sweating live mains, cold teal coming down through a ceiling grating from the settling water. A heavy steel door stands ajar on the left beside a yellow bulkhead lamp and a junction box. In the middle, the huge round mouth of the dead intake pipe, its gate hanging open, green marker lamps running away into the dark. On the right, a hatch seized with rust, and on an old pump plinth a bedroll, boots, a water bottle and a few tins under a caged work lamp.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissiveLights": {
+        "grating": "room_e_grating.png",
+        "work_lamp": "room_e_work_lamp.png",
+        "bulkhead": "room_e_bulkhead.png",
+        "markers": "room_e_markers.png",
+        "junction": "room_e_junction.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "grating",
+      "label": "the teal glow of the settling water through the ceiling grating",
+      "pos": [
+        765,
+        60
+      ],
+      "color": "#5fe8d8",
+      "intensity": 0.55,
+      "radius": 420,
+      "flicker": 0
+    },
+    {
+      "id": "work_lamp",
+      "label": "the caged work lamp hanging over the bedroll",
+      "pos": [
+        1252,
+        292
+      ],
+      "color": "#ff9a3c",
+      "intensity": 0.7,
+      "radius": 330,
+      "flicker": 0
+    },
+    {
+      "id": "bulkhead",
+      "label": "the yellow bulkhead lamp by the steel door",
+      "pos": [
+        250,
+        222
+      ],
+      "color": "#ffd27a",
+      "intensity": 0.5,
+      "radius": 260,
+      "flicker": 0
+    },
+    {
+      "id": "markers",
+      "label": "the green marker lamps down the dead pipe",
+      "pos": [
+        850,
+        340
+      ],
+      "color": "#50ff80",
+      "intensity": 0.35,
+      "radius": 170,
+      "flicker": 0
+    },
+    {
+      "id": "junction",
+      "label": "the red light on the junction box",
+      "pos": [
+        338,
+        385
+      ],
+      "color": "#ff3030",
+      "intensity": 0.3,
+      "radius": 90,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#1a1226",
+    "ambientLevel": 0.36,
+    "weather": "none",
+    "weatherLevel": 0,
+    "fog": 0.06,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#16101f",
+      "ambientLevel": 0.3,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.06,
+      "timeOfDay": "late-night",
+      "lights": {
+        "grating": {
+          "color": "#5fe8d8",
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "work_lamp": {
+          "color": "#ff9a3c",
+          "intensity": 0.6,
+          "flicker": 0
+        },
+        "bulkhead": {
+          "color": "#ffd27a",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "markers": {
+          "color": "#50ff80",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#0e0a18",
+      "ambientLevel": 0.16,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.04,
+      "timeOfDay": "late-night",
+      "lights": {
+        "grating": {
+          "color": "#5fe8d8",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "work_lamp": {
+          "color": "#ff9a3c",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "bulkhead": {
+          "color": "#ffd27a",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "markers": {
+          "color": "#50ff80",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.25,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#160e20",
+      "ambientLevel": 0.26,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "grating": {
+          "color": "#5fe8d8",
+          "intensity": 0.6,
+          "flicker": 0
+        },
+        "work_lamp": {
+          "color": "#ff9a3c",
+          "intensity": 0.8,
+          "flicker": 0.1
+        },
+        "bulkhead": {
+          "color": "#ffd27a",
+          "intensity": 0.6,
+          "flicker": 0.12
+        },
+        "markers": {
+          "color": "#50ff80",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "junction": {
+          "color": "#ff3030",
+          "intensity": 0.5,
+          "flicker": 0
+        }
+      }
+    },
+    "lockdown": {
+      "ambient": "#1e0a14",
+      "ambientLevel": 0.2,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.12,
+      "timeOfDay": "night",
+      "lights": {
+        "grating": {
+          "color": "#5fe8d8",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "work_lamp": {
+          "color": "#ff9a3c",
+          "intensity": 0.45,
+          "flicker": 0.25
+        },
+        "bulkhead": {
+          "color": "#ff5030",
+          "intensity": 0.75,
+          "flicker": 0.3
+        },
+        "markers": {
+          "color": "#ff3040",
+          "intensity": 0.4,
+          "flicker": 0.15
+        },
+        "junction": {
+          "color": "#ff2020",
+          "intensity": 0.8,
+          "flicker": 0.2
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": true,
+    "hum": 0.4
+  }
+}

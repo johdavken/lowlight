@@ -38,6 +38,83 @@ describe('contact cards: the cost', () => {
     }
   });
 
+  const guested = (o: { blown?: boolean } = {}): QuestStatus => {
+    const base = elsewhere({ played: false, ...o });
+    return { ...base, run: { ...base.run, setup: { ...base.run.setup!, contacts: undefined, people: ['guest-cass'], guest: { ...CASS, grade: 3, abilities: [] } } } };
+  };
+  it('a guest brought on a blown job, never called: trust −1 on her next turn, once', async () => {
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [guested()] });
+    await t.relay.send('hicks', 'hey');
+    expect(t.trustNow()).toBe(-1);
+    await t.relay.send('hicks', 'still here');
+    expect(t.trustNow()).toBe(-1);
+  });
+  it('a blown contract waiting on its fallout costs her trust now, not after it plays (review I1)', async () => {
+    const base = guested();
+    const waiting = { ...base, run: { ...base.run, done: false, setup: { ...base.run.setup!, endAt: 5 }, contract: { stage: 'fallout' as const, wait: null, results: {}, reported: [] } } };
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [waiting] });
+    await t.relay.send('hicks', 'hey');
+    expect(t.trustNow()).toBe(-1);
+    expect(lastUser(t.backend.reqs.at(-1)!)).toContain('you lent a hand');
+  });
+  it('a contract still on its night costs nothing yet', async () => {
+    const base = guested();
+    const going = { ...base, run: { ...base.run, done: false, contract: { stage: 'night' as const, wait: null, results: {}, reported: [] } } };
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [going] });
+    await t.relay.send('hicks', 'hey');
+    expect(t.trustNow()).toBe(0);
+  });
+  it('a guest on a clean job costs nothing, and a blown one costs nobody else', async () => {
+    const clean = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [guested({ blown: false })] });
+    await clean.relay.send('hicks', 'hey');
+    expect(clean.trustNow()).toBe(0);
+    const other = intakeRelay({ contact: 'hicks-other', clock: at(23, 0), others: () => [guested()] });
+    await other.relay.send('hicks', 'hey');
+    expect(other.trustNow()).toBe(0);
+  });
+
+  const noted = (o: { brought?: boolean } = {}): QuestStatus => {
+    const base = guested({ blown: false });
+    return { ...base, run: { ...base.run, guestNote: 'You were right about the band.', setup: { ...base.run.setup!, ...(o.brought === false ? { guest: undefined, people: [] } : {}) } } };
+  };
+  const notes = (t: ReturnType<typeof intakeRelay>) => t.db.listNotes('hicks').map((n) => n.text);
+  it('a guest-note reaches her journal on her next turn, once (guest crew spec §3)', async () => {
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [noted()] });
+    await t.relay.send('hicks', 'hey');
+    expect(notes(t)).toEqual(['You were right about the band.']);
+    await t.relay.send('hicks', 'still here');
+    expect(notes(t)).toEqual(['You were right about the band.']);
+  });
+  it('a guest-note goes in her own journal, not her dossier on the player (final review I1)', async () => {
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [noted()] });
+    await t.relay.send('hicks', 'hey');
+    expect(t.db.listNotes('hicks')[0]).toMatchObject({ about: 'me', pinned: true });
+  });
+  it('with the pins full it still has keys, so it can come up (final review I1)', async () => {
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [{ ...noted(), run: { ...noted().run, guestNote: 'I was right about Fairy Dust.' } }] });
+    for (let i = 0; i < 8; i++) t.db.insertNote(null, { id: `n${i + 101}`, text: `pin ${i}`, pinned: true, keys: [], about: 'me', createdAt: 1, updatedAt: 1, editedBy: 'agent' } as never);
+    await t.relay.send('hicks', 'hey');
+    const note = t.db.listNotes('hicks').find((n) => n.text.startsWith('I was right'))!;
+    expect(note).toMatchObject({ pinned: false });
+    expect(note.keys).toEqual(expect.arrayContaining(['Fairy', 'Dust']));
+  });
+  it('a replay to another ending writes its own note (final review M8)', async () => {
+    let run = noted();
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [run] });
+    await t.relay.send('hicks', 'hey');
+    run = { ...run, run: { ...run.run, guestNote: 'It all went wrong.' } };
+    await t.relay.send('hicks', 'still here');
+    expect(notes(t)).toContain('It all went wrong.');
+  });
+  it('no guest-note for a guest left behind, or in anyone else\'s room', async () => {
+    const left = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [noted({ brought: false })] });
+    await left.relay.send('hicks', 'hey');
+    expect(notes(left)).toEqual([]);
+    const other = intakeRelay({ contact: 'hicks-other', clock: at(23, 0), others: () => [noted()] });
+    await other.relay.send('hicks', 'hey');
+    expect(notes(other)).toEqual([]);
+  });
+
   it('rewinding her line takes the move back; the next turn applies it once', async () => {
     let job: QuestStatus[] = [];
     const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => job });

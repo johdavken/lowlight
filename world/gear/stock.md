@@ -3,7 +3,7 @@ place: second-socket
 items:
   - dock-slate · 300 · 1
   - pocket-deck · 600 · 2
-  - deaf-meridian · 1400 · 3
+  - deaf-meridian · 4200 · 3
 ---
 ---
 place: the-tilt
@@ -21,6 +21,6 @@ place: deck-market
 items:
   - dock-slate · 280 · 1
   - burner · 550 · 1
-  - field-deck · 1300 · 2
-  - chrome-deck · 1700 · 3
+  - field-deck · 3900 · 2
+  - chrome-deck · 5950 · 3
 ---

@@ -37,6 +37,24 @@
   scrollbar-color: rgba(255, 197, 107, 0.4) transparent;
 }
 .jc-body em { color: #b9a7d6; }
+/* The contact on the line (`{{ }}` on a beat): their words apart from the text, in the chat line's CRT cyan (comms-inset.css). */
+.jc-line {
+  display: block;
+  margin: 6px 0;
+  font-style: normal;
+  color: #9ff4e8;
+  text-shadow: 0 0 6px rgba(127, 233, 255, 0.55);
+  -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.62) 2px 3px);
+  mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.62) 2px 3px);
+}
+.jc-line::before {
+  content: attr(data-who);
+  display: block;
+  font: 13px var(--pixel);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #7fe9ff;
+}
 /* Scrolled down: the top fades, so the cut reads as more above. */
 .jc.jc-more .jc-body { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px); mask-image: linear-gradient(180deg, transparent 0, #000 28px); }
 @keyframes jc-in { from { opacity: 0; transform: translateX(14px); } }

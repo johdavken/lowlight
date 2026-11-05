@@ -9,11 +9,11 @@ describe('fixer stock', () => {
   it('parses the starting stock', () => {
     const r = parseStock(fs.readFileSync('world/gear/stock.md', 'utf8'), DECKS);
     expect(r.problems).toEqual([]);
-    expect(r.byPlace['second-socket']).toEqual([item('dock-slate', 300, 1), item('pocket-deck', 600, 2), item('deaf-meridian', 1400, 3)]);
+    expect(r.byPlace['second-socket']).toEqual([item('dock-slate', 300, 1), item('pocket-deck', 600, 2), item('deaf-meridian', 4200, 3)]);
     expect(r.byPlace['the-tilt']).toEqual([item('burner', 500, 2, 'cover')]);
     expect(r.byPlace['under-the-cat']).toEqual([item('burner', 600, 1, 'cover'), item('fall-guy', 1000, 3, 'cover')]);
     // The Spine's fixer at the deck market.
-    expect(r.byPlace['deck-market']).toEqual([item('dock-slate', 280, 1), item('burner', 550, 1, 'cover'), item('field-deck', 1300, 2), item('chrome-deck', 1700, 3)]);
+    expect(r.byPlace['deck-market']).toEqual([item('dock-slate', 280, 1), item('burner', 550, 1, 'cover'), item('field-deck', 3900, 2), item('chrome-deck', 5950, 3)]);
   });
   it('an unknown id, a bad price or a bad tier is a problem, and that line is skipped', () => {
     for (const bad of ['golden-deck · 300 · 1', 'burner · lots · 1', 'burner · 300 · 7']) {

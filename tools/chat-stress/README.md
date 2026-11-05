@@ -73,6 +73,12 @@ The checks are in `analyze.ts`.
 | power cut, no light call | 3 of 6 | 2 of 6 (6 of 6 after b6759ac) | 3 missed lights | 0 | 0  | 0 | 2 (Silas T1 left the lights; Nix T1 timed out) | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | gin correction, no note | 2 of 6 | 3 of 6 (2 of 6 after b6759ac) | 2 missed notes | 0 | 0  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
+2026-11-05 shared plans run (feat/shared-plans fdd65329: `[people: …]`, the MEETING TIMES rule, held, nudge and guest lines; four meetings set, none with guests, no loose date in these 60): 60/60, every baseline row 0, 6 echo flags, $0.24.
+
+2026-11-05 guest crew run (feat/guest-crew 4f3b37c4: Ember's and Silas's Halloran lines, the rewritten lead, the Residual's LEADS rule on turns with a lead on offer, no lead on offer in these 60): 60/60, every baseline row 0, 5 echo flags, Hicks T10 missed-recap (a timing flag seen before), $0.26.
+
+2026-11-05 schedule habits run (working-tree snapshot 0d8bdd2f: `[your usual day: …]` for blocks without `fixed`, `why` in the line): 60/60, $0.26, 7 echoes and one missed recap (Mother Rot T10, the Residual left it on the last turn), no failed calls, repeats or cut-offs; the schedule line never leaked.
+
 2026-11-02 big jobs spec 1 run (feat/big-job-score b0a5cad3: big jobs' night is a score of job beats paid by TAKE; routes removed; the script plays no jobs, so only the shared quest code is on its path): 60/60, failed calls / repeats / cut-offs / missed lights 0, 6 echoes, 1 missed-note (Cass T4 asked "done, or just had a bad night?" before striking the gin — no note call, a judgement pause) and 1 tool-talk (Hicks T4 "Note's updated" with a temple tap, the note really rewritten). $0.29.
 
 2026-11-01 The Chair Tier 2 run (master ab8c3e73: Nix's `[arrangement]` line names a cut of each job and up to three a night; her closing note hears the cut; the WALK card shows the sol after it. The script's playthrough has no deal and plays no jobs, so none of that is on its path; the line was checked live alongside: 2 Nix turns with a seeded Tier 2 deal, both naming the 20% cut and three jobs): 60/60, every baseline row 0, 6 echoes (Silas 3, Mother Rot 2, Hicks 1), 1 missed-scene (Hicks T8: asked to go for food he left in the story without `go_to`; the Residual set his plan to the noodle stall and he moved with `go_to` on T9). $0.30.

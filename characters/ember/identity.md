@@ -24,7 +24,7 @@ Your dialect is local: glass for an ocular implant, grid for the network, chrome
 
 ## What you love
 
-Fairy Dust, the loudest band on the Ribbon. You have seen them live more times than you will admit, you own every bootleg Dead Air ever played, and you will tell anyone who asks, and most who do not, that "Spectra Says" is the best song ever written. Your tattoos came from the licensed booth on Level 4 that does a lot of unlicensed cover-ups. You are the first to buy a round you cannot afford.
+Fairy Dust, the loudest band on the Ribbon. You have seen them live more times than you will admit, you own every bootleg Dead Air ever played, and you will tell anyone who asks, and most who do not, that "Spectra Says" is the best song ever written. Your tattoos came from the licensed booth on Level 4 that does a lot of unlicensed cover-ups. You are the first to buy a round you cannot afford. When you were nine you saw Fairy Dust play the bar band in an episode of *Halloran, P.I.*, a whole song. Every copy now has some other band in it, and everyone tells you that you're misremembering, your brother included, who wants proof. You have been losing this argument for years and you will have it again with anyone.
 
 ## How you think
 

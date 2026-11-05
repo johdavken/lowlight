@@ -1,0 +1,238 @@
+{
+  "id": "spectra-archive",
+  "name": "Spectra Archive",
+  "description": "Spectra's archive floors in Nexus: windowless aisles of steel bays packed with film tins, running away into the dark, a hooded inspection lamp on a ceiling rail, blue guide lights along the floor. On the right, the wire cage for the raw reels, a card reader and an old brass padlock, and a bench with a film viewer, cotton gloves and a dented flask.",
+  "resolution": [
+    1536,
+    864
+  ],
+  "layers": [
+    {
+      "id": "room",
+      "src": "room.png",
+      "parallax": 0,
+      "emissiveLights": {
+        "guide_lights": "room_e_guide_lights.png",
+        "status_panel": "room_e_status_panel.png",
+        "card_reader": "room_e_card_reader.png",
+        "viewer": "room_e_viewer.png"
+      }
+    }
+  ],
+  "lights": [
+    {
+      "id": "inspection_lamp",
+      "label": "the inspection lamp on its rail over the aisle",
+      "pos": [
+        678,
+        185
+      ],
+      "color": "#dfe8ff",
+      "intensity": 0.7,
+      "radius": 460,
+      "flicker": 0
+    },
+    {
+      "id": "guide_lights",
+      "label": "the blue guide lights along the aisle floor",
+      "pos": [
+        610,
+        620
+      ],
+      "color": "#4aa8ff",
+      "intensity": 0.35,
+      "radius": 300,
+      "flicker": 0
+    },
+    {
+      "id": "status_panel",
+      "label": "the amber status panel on the end of the bay",
+      "pos": [
+        113,
+        335
+      ],
+      "color": "#ffae40",
+      "intensity": 0.45,
+      "radius": 240,
+      "flicker": 0
+    },
+    {
+      "id": "card_reader",
+      "label": "the red light on the cage door card reader",
+      "pos": [
+        1007,
+        417
+      ],
+      "color": "#ff3030",
+      "intensity": 0.3,
+      "radius": 110,
+      "flicker": 0
+    },
+    {
+      "id": "viewer",
+      "label": "the pale green screen of the film viewer",
+      "pos": [
+        1190,
+        525
+      ],
+      "color": "#b4ffb0",
+      "intensity": 0.45,
+      "radius": 260,
+      "flicker": 0
+    }
+  ],
+  "defaults": {
+    "ambient": "#141a2c",
+    "ambientLevel": 0.3,
+    "weather": "none",
+    "weatherLevel": 0,
+    "fog": 0.06,
+    "timeOfDay": "night"
+  },
+  "presets": {
+    "late": {
+      "ambient": "#10162a",
+      "ambientLevel": 0.24,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.06,
+      "timeOfDay": "late-night",
+      "lights": {
+        "inspection_lamp": {
+          "color": "#dfe8ff",
+          "intensity": 0.6,
+          "flicker": 0
+        },
+        "guide_lights": {
+          "color": "#4aa8ff",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "status_panel": {
+          "color": "#ffae40",
+          "intensity": 0.35,
+          "flicker": 0
+        },
+        "card_reader": {
+          "color": "#ff3030",
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "viewer": {
+          "color": "#b4ffb0",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    },
+    "quiet": {
+      "ambient": "#0c1020",
+      "ambientLevel": 0.16,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.04,
+      "timeOfDay": "late-night",
+      "lights": {
+        "inspection_lamp": {
+          "color": "#dfe8ff",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "guide_lights": {
+          "color": "#4aa8ff",
+          "intensity": 0.2,
+          "flicker": 0
+        },
+        "status_panel": {
+          "color": "#ffae40",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "card_reader": {
+          "color": "#ff3030",
+          "intensity": 0.25,
+          "flicker": 0
+        },
+        "viewer": {
+          "color": "#b4ffb0",
+          "intensity": 0.2,
+          "flicker": 0
+        }
+      }
+    },
+    "tense": {
+      "ambient": "#141024",
+      "ambientLevel": 0.2,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.1,
+      "timeOfDay": "night",
+      "lights": {
+        "inspection_lamp": {
+          "color": "#ffffff",
+          "intensity": 0.85,
+          "flicker": 0.08
+        },
+        "guide_lights": {
+          "color": "#4aa8ff",
+          "intensity": 0.4,
+          "flicker": 0
+        },
+        "status_panel": {
+          "color": "#ff8a30",
+          "intensity": 0.6,
+          "flicker": 0.1
+        },
+        "card_reader": {
+          "color": "#ff3030",
+          "intensity": 0.5,
+          "flicker": 0
+        },
+        "viewer": {
+          "color": "#b4ffb0",
+          "intensity": 0.35,
+          "flicker": 0
+        }
+      }
+    },
+    "lockdown": {
+      "ambient": "#1e0a14",
+      "ambientLevel": 0.2,
+      "weather": "none",
+      "weatherLevel": 0,
+      "fog": 0.12,
+      "timeOfDay": "night",
+      "lights": {
+        "inspection_lamp": {
+          "color": "#ff5040",
+          "intensity": 0.15,
+          "flicker": 0.2
+        },
+        "guide_lights": {
+          "color": "#ff3040",
+          "intensity": 0.45,
+          "flicker": 0.15
+        },
+        "status_panel": {
+          "color": "#ff4030",
+          "intensity": 0.8,
+          "flicker": 0.3
+        },
+        "card_reader": {
+          "color": "#ff2020",
+          "intensity": 0.8,
+          "flicker": 0.2
+        },
+        "viewer": {
+          "color": "#b4ffb0",
+          "intensity": 0.3,
+          "flicker": 0
+        }
+      }
+    }
+  },
+  "sound": {
+    "indoor": true,
+    "hum": 0.25
+  }
+}

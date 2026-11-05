@@ -262,12 +262,17 @@ export function bedVoice(ctx: BaseAudioContext, out: AudioNode, buffer: AudioBuf
   return { level: level.gain, stop: (when) => src.stop(when) };
 }
 
-/** A short burst of filtered static (glitch transitions). */
-export function staticBurst(ctx: BaseAudioContext, out: AudioNode, seconds = 0.15): void {
+/** A short burst of filtered static (glitch transitions); with `swell`, it climbs for that long and tails off to `seconds`. */
+export function staticBurst(ctx: BaseAudioContext, out: AudioNode, seconds = 0.15, swell = 0): void {
   const src = ctx.createBufferSource();
   src.buffer = noise(ctx).white;
   const band = filter(ctx, 'bandpass', 2200, 0.8);
   const g = gain(ctx, 0.35);
+  if (swell > 0) {
+    g.gain.setValueAtTime(0, ctx.currentTime);
+    g.gain.linearRampToValueAtTime(0.35, ctx.currentTime + swell);
+    g.gain.linearRampToValueAtTime(0, ctx.currentTime + seconds);
+  }
   src.connect(band).connect(g).connect(out);
   src.start();
   src.stop(ctx.currentTime + seconds);

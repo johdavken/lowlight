@@ -8,7 +8,8 @@ import { JOBS_APART } from './instructions';
 import { z } from 'zod';
 import type { Note } from '../../shared/types';
 import { formatClock, hhmmOf, minuteOfDay, nextOccurrence, parseHhmm } from '../../shared/clock';
-import { resolvePlan, type Plan, type PlanAnswer } from '../../shared/plan';
+import { LEAD_DETAILS_MAX } from '../../shared/leads';
+import { MEET_WAIT, resolvePlan, type Loose, type Plan, type PlanAnswer } from '../../shared/plan';
 import type { TextPromise } from '../../shared/promise';
 import { CIPHER, clueOnPage, type CipherEvent } from '../../shared/cipher';
 
@@ -54,10 +55,16 @@ export interface ResidualInput {
   /** Read only on an end turn. */
   recap: string | null;
   page: string | null;
+  /** Leads on offer this turn that she hasn't given: what the Residual could record if she told one. */
+  leads?: { id: string; title: string; knows: string }[];
   /** The city's places she can make a plan for (her plans spec §4); absent: plans don't apply. */
   places?: { id: string; name: string }[];
   /** Her standing plan in words, for the `[her plan: …]` line. */
   planLine?: string | null;
+  /** Who a meeting can name (shared plans spec §7): the roster, without her or the player. */
+  people?: { id: string; name: string }[];
+  /** A date she made with no time yet, in words, for the `[loose date: …]` line. */
+  looseLine?: string | null;
   /** Plans don't apply to this reply (on comms) though `places` is sent for promises. */
   noPlans?: boolean;
   /** Promised texts (spec 2026-10-23 §4) apply to this reply. */
@@ -110,7 +117,7 @@ const PlanShape = z.union([
   z.object({ cancel: z.literal(true) }).strict(),
   z.object({
     going: z.object({ place: z.string().min(1), until: hhmm.nullable().default(null) }).nullable().default(null),
-    meet: z.object({ place: z.string().min(1), at: hhmm }).nullable().default(null),
+    meet: z.object({ place: z.string().min(1), at: hhmm.nullable().default(null), tomorrow: z.boolean().optional(), with: z.array(z.string()).optional() }).nullable().default(null),
   }),
 ]);
 
@@ -172,6 +179,8 @@ export interface ResidualAnswer {
   promise?: PromiseAnswer | null;
   /** What the page showed of the Cipher (cipher spec §2.3); absent or null: nothing. */
   cipher?: CipherAnswer | null;
+  /** Leads her reply told without give_lead (live check 2026-11-05); absent: none. */
+  leads?: { id: string; details: string }[];
   recap: string | null;
   dossier: string | null;
 }
@@ -287,6 +296,7 @@ export function parseResidualAnswer(raw: string): {
       plan: one('plan', PlanShape),
       ...((promise) => (promise ? { promise } : {}))(one('promise', PromiseShape)),
       ...((cipher) => (cipher ? { cipher } : {}))(readCipher(o.cipher, refused)),
+      ...((leads) => (leads.length > 0 ? { leads } : {}))(list('leads', z.object({ id: z.string().trim().min(1), details: z.string().trim().min(1) }))),
       recap: one('recap', text),
       dossier: one('dossier', text),
     },
@@ -309,9 +319,28 @@ export interface ApplyDeps {
   /** Moves her reply's clock on by `minutes` (the relay's residualPass); absent: time doesn't apply. */
   passTime?: (minutes: number) => Result;
   /** Her plan (her plans spec §4): the scene ids she can name, and where it's stored; absent: plans don't apply. */
-  plan?: { places: ReadonlySet<string>; /** Her room's scene after the reply. */ here?: string; set(p: Plan | null): void };
+  plan?: {
+    places: ReadonlySet<string>;
+    /** Her room's scene after the reply. */
+    here?: string;
+    set(p: Plan | null): void;
+    /** Who a meeting can name (shared plans spec §2); absent: nobody. */
+    people?: ReadonlySet<string>;
+    /** A place's or a person's name. */
+    name?(id: string): string;
+    /** Where something holds `id` during `[from, to)`, or null (spec §4). */
+    held?(id: string, from: number, to: number, place: string): string | null;
+    /** Her standing meeting: a time-less mention of its place isn't a new date. */
+    meeting?: Plan['meet'];
+    /** A date with no time (spec §5): `same` says she's been nudged about it already. */
+    loose?: { same(place: string, people: string[]): boolean; set(l: Loose): void; get(): Loose | null };
+    /** One-time lines for her next reply. */
+    say?(lines: string[]): void;
+  };
   /** A promise to text (promised texts spec §4): the place ids she can name, and where it's stored; absent: promises don't apply. */
   promise?: { places: ReadonlySet<string>; set(p: TextPromise | null): void };
+  /** Leads on offer this turn, by id, and recording one on her reply (the give_lead she skipped); absent: leads don't apply. */
+  leads?: { offered: ReadonlyMap<string, string>; give(id: string, details: string): boolean; recorded(title: string): void };
   /**
    * Cipher (spec §2.3): the labels the prompt gave (T1 → truth id), which truths are open, the page the clues are
    * checked against, where and when the reply happened, and where an event goes; absent: Cipher doesn't apply.
@@ -440,25 +469,74 @@ export function applyResidual(d: ApplyDeps, a: ResidualAnswer, at: { messageId: 
       }
     }
 
+    // A lead she told and didn't give (live check 2026-11-05: 1 give_lead in 4 tellings).
+    for (const l of a.leads ?? []) {
+      const title = d.leads?.offered.get(l.id);
+      if (title === undefined) refused.push(`lead refused: ${l.id} isn't on offer`);
+      else if (d.leads!.give(l.id, l.details.slice(0, LEAD_DETAILS_MAX))) {
+        d.leads!.recorded(title);
+        applied.push(`lead ${l.id}`);
+      }
+    }
     // Her plan (her plans spec §4), on the clock as her reply left it.
     if (a.plan && clock !== null && d.plan) {
       if ('cancel' in a.plan) {
         d.plan.set(null);
         applied.push('plan cancelled');
       } else {
-        const bad = [a.plan.going?.place, a.plan.meet?.place].find((id) => id !== undefined && !d.plan!.places.has(id));
+        const plan = d.plan;
+        const name = (id: string) => plan.name?.(id) ?? id;
+        const bad = [a.plan.going?.place, a.plan.meet?.place].find((id) => id !== undefined && !plan.places.has(id));
+        const named = (a.plan.meet?.with ?? []).filter((id, i, all) => {
+          const ok = plan.people?.has(id) === true && all.indexOf(id) === i;
+          if (!ok) refused.push(`plan with ${id} dropped: not someone she can name`);
+          return ok;
+        });
         // Going where she already is: she walked you both there (go_to), it's not her leaving (chat-stress 2026-10-22).
         const there = a.plan.going !== null && a.plan.going.place === d.plan.here;
         if (there) refused.push(`plan going ignored: she's at ${a.plan.going!.place} already`);
-        const answer = there ? { ...a.plan, going: null } : a.plan;
+        // A time pinned on a loose date at the same place keeps its day and its people: "Eight." says neither (final review).
+        const settled = a.plan.meet && a.plan.meet.at !== null ? plan.loose?.get() : null;
+        const date = settled?.place === a.plan.meet?.place ? settled : null;
+        const meet = a.plan.meet ? { ...a.plan.meet, with: [...new Set([...named, ...(date?.with ?? [])])], ...(date?.tomorrow ? { tomorrow: true } : {}) } : null;
+        const answer = { going: there ? null : a.plan.going, meet };
         const p = bad === undefined ? resolvePlan(answer, clock + moved, at.messageId) : null;
+        const lines: string[] = [];
         if (bad !== undefined) refused.push(`plan refused: ${bad} isn't a map place`);
-        else if (p) {
-          d.plan.set(p);
+        else if (answer.meet?.at === null && plan.meeting?.place === answer.meet.place) {
+          // "See you at Hae's, then": she already has the time.
+          refused.push(`loose date ignored: already meeting at ${answer.meet.place}`);
+          if (p) {
+            p.meet = plan.meeting!;
+            if (p.going) p.going.until = Math.min(p.going.until, p.meet.at);
+          }
+        } else if (answer.meet?.at === null && plan.loose) {
+          // No time said (shared plans spec §5): a loose date, and she's asked once to settle it.
+          const { place } = answer.meet;
+          if (!plan.loose.same(place, named)) lines.push(`[you asked them to ${name(place)}${guestWords(named, name)} but named no time: settle one in your own words]`);
+          plan.loose.set({ place, with: named, ...(answer.meet.tomorrow ? { tomorrow: true } : {}), at: clock + moved, from: at.messageId });
+          applied.push(`loose date: ${place}`);
+        }
+        if (p?.meet?.with) {
+          // Held (spec §4): a FIXED block or her own meeting keeps someone away, and the inviter is told.
+          const { at: from, place } = p.meet;
+          const free = p.meet.with.filter((id) => {
+            const where = plan.held?.(id, from, from + MEET_WAIT, place) ?? null;
+            if (where === null) return true;
+            refused.push(`plan with ${id} dropped: held at ${where}`);
+            lines.push(`[${name(id)} can't make it: at ${where} then. Tell them so now, in your own words]`);
+            return false;
+          });
+          const { with: _all, ...meet } = p.meet;
+          p.meet = free.length > 0 ? { ...meet, with: free } : meet;
+        }
+        if (p) {
+          plan.set(p);
           const hm = (m: number) => hhmmOf(minuteOfDay(m));
-          const legs = [p.going ? `going ${p.going.place} until ${hm(p.going.until)}` : null, p.meet ? `meet ${p.meet.place} ${hm(p.meet.at)}` : null].filter(Boolean);
+          const legs = [p.going ? `going ${p.going.place} until ${hm(p.going.until)}` : null, p.meet ? `meet ${p.meet.place} ${hm(p.meet.at)}${p.meet.with ? ` with ${p.meet.with.join(', ')}` : ''}` : null].filter(Boolean);
           applied.push(`plan set: ${legs.join('; ')}`);
         }
+        if (lines.length > 0) plan.say?.(lines);
       }
     }
 
@@ -534,6 +612,12 @@ export function applyResidual(d: ApplyDeps, a: ResidualAnswer, at: { messageId: 
 const flat = (t: string) => t.replace(/\s*\n\s*/g, ' ');
 const noteLine = (n: Note) => `${n.id} (${n.about})${n.pinned ? ' [pinned]' : ''}${(n.keys?.length ?? 0) > 0 ? ` {${n.keys!.join(', ')}}` : ''} ${flat(n.text)}`;
 
+/** ` with Silas and Rue`, or nothing. */
+export function guestWords(ids: string[], name: (id: string) => string): string {
+  const names = ids.map(name);
+  return names.length === 0 ? '' : ` with ${names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`}`;
+}
+
 /** The Residual's system message and its one user message (spec §3). */
 export function residualMessages(i: ResidualInput): CompletionMessage[] {
   const her = i.self.name;
@@ -543,6 +627,7 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
   const promising = timed && (i.places?.length ?? 0) > 0 && i.promises === true;
   const placed = planned || promising;
   const ciphered = (i.cipher?.length ?? 0) > 0;
+  const offered = i.leads ?? [];
   const standing = i.standing !== false;
   const system = [
     `You keep the records for a roleplay between ${her} (${i.self.pronoun}) and ${you}. You never write story: you read what just happened and answer with one JSON object.`,
@@ -556,6 +641,7 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
           ...(planned
             ? [
                 `PLAN: only when ${her}'s reply commits ${her} to going somewhere now, or to being somewhere at a time — "I'm going home to shower", "meet me at Hae's at nine". Not a place or time only mentioned, wished for or asked about, and not a plan the two of them carry out together right now. Use the place ids from the [places: …] line. "going" is where ${her} heads now without ${you}, and until when — never somewhere they go together; "meet" is where and when ${her} said ${i.self.pronoun}'ll be. If ${her} drops a plan already listed, answer {"cancel":true}. Otherwise null; most turns have none.`,
+                `MEETING TIMES: "at" must be a time said in these lines. If none was said, "at" is null, however likely a time seems: never work one out from the meal, the place or anyone's habits. "Tomorrow. Hae's." is {"place":id,"at":null,"tomorrow":true}. The words morning, midday, afternoon, evening and night count as said: 09:00, 12:00, 15:00, 19:00, 22:00. "tomorrow" is true when ${her} said tomorrow.${(i.people?.length ?? 0) > 0 ? ` "with" lists anyone else ${her} said would be there, from the [people: …] line; leave out ${you}. Someone only mentioned isn't coming.` : ''}`,
               ]
             : []),
           ...(promising
@@ -565,6 +651,7 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
             : []),
         ]
       : []),
+    ...(offered.length > 0 ? [`LEADS: ${her} could tell ${you} one of these this turn. Only when ${her}'s reply actually told ${you} what it says, in ${her}'s own words: not a hint that something's wrong, not a promise to say more. ${offered.map((l) => `"${l.id}" (${l.title}): ${l.knows}`).join(' ')}`] : []),
     ...(i.kind === 'recap'
       ? [
           `RECAP: where things stand between ${her} and ${you} so far, for when the chat runs long (up to ${RECAP_MAX} characters), carrying over what still holds from the recap now.`,
@@ -596,8 +683,9 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
       (standing ? ' "standing" is null or {"reason":"a few words","trust":n,"warmth":n}.' : '') +
       ' "lights" holds {"id":a light id from the [room: …] line,"intensity":0 to 1}.' +
       (timed ? ' "time" is null or {"until":"HH:MM"}.' : '') +
-      (planned ? ' "plan" is null, {"cancel":true}, or {"going":{"place":id,"until":"HH:MM" or null} or null,"meet":{"place":id,"at":"HH:MM"} or null}.' : '') +
+      (planned ? ' "plan" is null, {"cancel":true}, or {"going":{"place":id,"until":"HH:MM" or null} or null,"meet":{"place":id,"at":"HH:MM" or null,"tomorrow":true (only if said),"with":[ids] (only if named)} or null}.' : '') +
       (promising ? ' "promise" is null, {"cancel":true}, {"at":"HH:MM","about":"…"}, or {"place":id,"about":"…"}.' : '') +
+      (offered.length > 0 ? ' If a lead was told, add "leads":[{"id":its id,"details":what she said of it, one line}].' : '') +
       (ciphered ? ' "cipher" is null or {"clues":[{"id":a label from the [cipher: …] line,"text":"what was shown"}],"learned":[labels]}.' : ''),
   ].join('\n\n');
 
@@ -606,7 +694,9 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
     i.roomLine,
     timed ? `[clock: ${clockWords(i.clock!)}]` : null,
     placed ? `[places: ${i.places!.map((p) => `${p.id} "${p.name}"`).join(', ')}]` : null,
+    planned && (i.people?.length ?? 0) > 0 ? `[people: ${i.people!.map((p) => `${p.id} "${p.name}"`).join(', ')}]` : null,
     planned && i.planLine ? `[her plan: ${i.planLine}]` : null,
+    planned && i.looseLine ? `[loose date: ${i.looseLine}, no time yet]` : null,
     promising && i.promiseLine ? `[your promise: ${i.promiseLine}]` : null,
     promising && i.herDay ? `[her day: ${i.herDay}]` : null,
     i.standing ? `[standing: ${i.standing}]` : null,

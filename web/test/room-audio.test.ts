@@ -219,8 +219,8 @@ describe('createRoomAudio', () => {
   it('after unlock, room changes glide over their duration with their transition', () => {
     const { engine, audio } = setup();
     audio.gesture();
-    audio.room(state({ fog: 0.4 }), scene, '/scenes/p/', 1.5, 'glitch');
-    expect(engine.apply).toHaveBeenLastCalledWith(soundMix(state({ fog: 0.4 }), scene, '/scenes/p/'), 1.5, 'glitch');
+    audio.room(state({ fog: 0.4 }), scene, '/scenes/p/', 1.5, 'glitch', 0.75);
+    expect(engine.apply).toHaveBeenLastCalledWith(soundMix(state({ fog: 0.4 }), scene, '/scenes/p/'), 1.5, 'glitch', 0.75);
   });
 
   it('no Web Audio: the speaker hides', () => {

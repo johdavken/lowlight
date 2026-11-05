@@ -17,6 +17,10 @@ export interface LeadEntry {
   title: string;
   /** The giver's roster id. */
   from: string;
+  /** The one player it's for; absent: anyone. */
+  for?: string;
+  /** A story flag it waits for; absent: none. */
+  needs?: string;
   /** The receiver's roster id. */
   to: string;
   keys: string[];
@@ -45,6 +49,10 @@ const frontSchema = z.strictObject({
   to: oneLine(LORE_ID_MAX),
   keys: z.array(oneLine(LORE_KEY_MAX, LORE_KEY_MIN)).min(1, 'needs at least one key').max(LORE_KEYS_MAX),
   after: oneLine(LORE_ID_MAX).nullish(),
+  /** The one player it's for; absent: anyone. */
+  for: oneLine(LORE_ID_MAX).nullish(),
+  /** A story flag it waits for; absent: none. */
+  needs: oneLine(LORE_ID_MAX).nullish(),
   fill: oneLine(LEAD_FILL_MAX),
   place: oneLine(LORE_TITLE_MAX).nullish(),
 });
@@ -110,6 +118,8 @@ export function parseLeadFile(id: string, text: string, roster: ReadonlySet<stri
       to: f.to,
       keys,
       after: f.after ?? null,
+      ...(f.for ? { for: f.for } : {}),
+      ...(f.needs ? { needs: f.needs } : {}),
       fill: f.fill,
       place: f.place ?? null,
       onMind: found.onMind!,
@@ -145,6 +155,8 @@ const list = (xs: string[]) => `[${xs.map((x) => yamlScalar(x, true)).join(', ')
 export function leadFile(e: LeadEntry): string {
   const lines = [`title: ${yamlScalar(e.title)}`, `from: ${yamlScalar(e.from)}`, `to: ${yamlScalar(e.to)}`, `keys: ${list(e.keys)}`];
   if (e.after !== null) lines.push(`after: ${yamlScalar(e.after)}`);
+  if (e.for) lines.push(`for: ${yamlScalar(e.for)}`);
+  if (e.needs) lines.push(`needs: ${yamlScalar(e.needs)}`);
   lines.push(`fill: ${yamlScalar(e.fill)}`);
   if (e.place !== null) lines.push(`place: ${yamlScalar(e.place)}`);
   return `---\n${lines.join('\n')}\n---\n\n## On their mind\n${e.onMind}\n\n## Giver knows\n${e.giverKnows}\n\n## Receiver knows\n${e.receiverKnows}\n`;
@@ -162,8 +174,8 @@ export interface LeadsForTurn {
  * any) is held. Every live lead is on her mind; one is offered once its keys appear in `recent`
  * (lore's window, this turn's text first). Every held lead that points to her is hers to receive.
  */
-export function leadsFor(book: LeadEntry[], contactId: string, held: ReadonlyMap<string, string>, recent: string[]): LeadsForTurn {
-  const live = book.filter((e) => e.from === contactId && !held.has(e.id) && (e.after === null || held.has(e.after)));
+export function leadsFor(book: LeadEntry[], contactId: string, held: ReadonlyMap<string, string>, recent: string[], who?: { player: string; flags: Record<string, string> }): LeadsForTurn {
+  const live = book.filter((e) => e.from === contactId && !held.has(e.id) && (e.after === null || held.has(e.after)) && (!e.for || e.for === who?.player) && (!e.needs || who?.flags[e.needs] !== undefined));
   const text = recent.join('\n');
   return {
     onMind: live,

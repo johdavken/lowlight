@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { openDb, type Db } from '../src/db';
 import { Journal } from '../src/journal';
-import { applyResidual, parseResidualAnswer, residualMessages, type ResidualAnswer, type ResidualInput } from '../src/residual';
-import type { Plan } from '../../shared/plan';
+import { applyResidual, guestWords, parseResidualAnswer, residualMessages, type ResidualAnswer, type ResidualInput } from '../src/residual';
+import type { Loose, Plan } from '../../shared/plan';
 
 // Her plans spec §4: the Residual reads where she's going and where she'll be.
 const P = 'hicks';
@@ -117,5 +117,123 @@ describe('apply', () => {
     const r2 = applyResidual(deps((p) => got.push(p)), a, { ...at, clock: null });
     expect([...r2.applied, ...r2.refused].filter((x) => x.startsWith('plan'))).toEqual([]);
     expect(got).toEqual([]);
+  });
+});
+
+// Shared plans spec §2, §4, §5, §7: who else is coming, and a time someone actually said.
+describe('shared plans', () => {
+  const at = { messageId: 'r1', take: 0, kind: 'turn' as const, clock: 1440 + 3 * 60 };
+  const names: Record<string, string> = { silas: 'Silas', [HAES]: "Hae's Noodles" };
+  const deps = (o: { held?: (id: string) => string | null; same?: boolean; date?: Loose } = {}) => {
+    const set: (Plan | null)[] = [];
+    const loose: Loose[] = [];
+    const said: string[][] = [];
+    return {
+      set,
+      loose,
+      said,
+      d: {
+        journal,
+        player: P,
+        standing: null,
+        setLight: () => ({ ok: true as const, text: '' }),
+        db,
+        plan: {
+          places: new Set([HOME, HAES]),
+          set: (p: Plan | null) => set.push(p),
+          people: new Set(['silas']),
+          name: (id: string) => names[id] ?? id,
+          held: (id: string) => o.held?.(id) ?? null,
+          loose: { same: () => o.same === true, set: (l: Loose) => loose.push(l), get: () => o.date ?? null },
+          say: (l: string[]) => said.push(l),
+        },
+      },
+    };
+  };
+  const meet = (m: object) => ({ ...empty, plan: { going: null, meet: { place: HAES, ...m } } }) as ResidualAnswer;
+
+  it('reads at null, tomorrow and with', () => {
+    expect(parseResidualAnswer('{"plan":{"meet":{"place":"b","at":null,"with":["silas"]}}}').answer!.plan).toEqual({ going: null, meet: { place: 'b', at: null, with: ['silas'] } });
+    expect(parseResidualAnswer('{"plan":{"meet":{"place":"b"}}}').answer!.plan).toEqual({ going: null, meet: { place: 'b', at: null } });
+    expect(parseResidualAnswer('{"plan":{"meet":{"place":"b","at":"09:00","tomorrow":true}}}').answer!.plan).toEqual({ going: null, meet: { place: 'b', at: '09:00', tomorrow: true } });
+  });
+
+  it('the prompt lists people, the loose date, and never picks a time', () => {
+    const [sys, user] = residualMessages(input({ clock: 1440, places: [{ id: HAES, name: "Hae's Noodles" }], people: [{ id: 'silas', name: 'Silas' }], looseLine: "Hae's Noodles with Silas" }));
+    expect(sys.content).toContain('If none was said, "at" is null, however likely a time seems');
+    expect(sys.content).toContain('"with" lists anyone else Nix said would be there');
+    expect(user.content).toContain('[people: silas "Silas"]');
+    expect(user.content).toContain("[loose date: Hae's Noodles with Silas, no time yet]");
+  });
+
+  it('keeps a named person on the meeting', () => {
+    const t = deps();
+    const r = applyResidual(t.d, meet({ at: '09:00', with: ['silas'] }), at);
+    expect(t.set[0]?.meet).toEqual({ place: HAES, at: 1440 + 9 * 60, with: ['silas'] });
+    expect(r.applied).toContain(`plan set: meet ${HAES} 09:00 with silas`);
+  });
+
+  it('drops anyone she can\'t name, or named twice, and the plan stands', () => {
+    const t = deps();
+    const r = applyResidual(t.d, meet({ at: '09:00', with: ['hicks', 'Silas', 'silas', 'silas'] }), at);
+    expect(t.set[0]?.meet?.with).toEqual(['silas']);
+    expect(r.refused.filter((x) => x.startsWith('plan with'))).toHaveLength(3);
+  });
+
+  it('a held person stays away, and the inviter is told', () => {
+    const t = deps({ held: () => 'Second Socket' });
+    const r = applyResidual(t.d, meet({ at: '19:00', with: ['silas'] }), at);
+    expect(t.set[0]?.meet).toEqual({ place: HAES, at: 1440 + 19 * 60 });
+    expect(t.said).toEqual([["[Silas can't make it: at Second Socket then. Tell them so now, in your own words]"]]);
+    expect(r.refused).toContain('plan with silas dropped: held at Second Socket');
+  });
+
+  it('no time makes a loose date and a nudge, not a plan', () => {
+    const t = deps();
+    applyResidual(t.d, meet({ at: null, with: ['silas'] }), at);
+    expect(t.set).toEqual([]);
+    expect(t.loose).toEqual([{ place: HAES, with: ['silas'], at: at.clock, from: 'r1' }]);
+    expect(t.said).toEqual([["[you asked them to Hae's Noodles with Silas but named no time: settle one in your own words]"]]);
+  });
+
+  it('no time at the place she\'s already meeting is no new date, and a going leg keeps the meeting', () => {
+    const t = deps();
+    const standing = { place: HAES, at: at.clock + 60 };
+    const d = { ...t.d, plan: { ...t.d.plan, meeting: standing } };
+    expect(applyResidual(d, meet({ at: null }), at).refused).toContain(`loose date ignored: already meeting at ${HAES}`);
+    expect(t.loose).toEqual([]);
+    expect(t.said).toEqual([]);
+    applyResidual(d, { ...empty, plan: { going: { place: HOME, until: null }, meet: { place: HAES, at: null } } }, at);
+    expect(t.set[0]?.meet).toEqual(standing);
+    expect(t.set[0]?.going?.until).toBe(standing.at);
+  });
+
+  it('a time pinned on a loose date keeps its tomorrow and its people', () => {
+    const afternoon = { ...at, clock: 1440 + 16 * 60 };
+    const t = deps({ date: { place: HAES, with: ['silas'], tomorrow: true, at: afternoon.clock, from: 'r0' } });
+    applyResidual(t.d, meet({ at: '20:00' }), afternoon);
+    expect(t.set[0]?.meet).toEqual({ place: HAES, at: 2 * 1440 + 20 * 60, with: ['silas'] });
+  });
+
+  it('a time at another place owes the loose date nothing', () => {
+    const t = deps({ date: { place: HOME, with: ['silas'], tomorrow: true, at: at.clock, from: 'r0' } });
+    applyResidual(t.d, meet({ at: '20:00' }), at);
+    expect(t.set[0]?.meet).toEqual({ place: HAES, at: 1440 + 20 * 60 });
+  });
+
+  it('the same loose date nudges once', () => {
+    const t = deps({ same: true });
+    applyResidual(t.d, meet({ at: null }), at);
+    expect(t.loose).toHaveLength(1);
+    expect(t.said).toEqual([]);
+  });
+});
+
+describe('guestWords', () => {
+  it('names one, two and three', () => {
+    const n = (id: string) => id.toUpperCase();
+    expect(guestWords([], n)).toBe('');
+    expect(guestWords(['a'], n)).toBe(' with A');
+    expect(guestWords(['a', 'b', 'c'], n)).toBe(' with A, B and C');
   });
 });

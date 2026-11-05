@@ -5,6 +5,16 @@ const rooms = new Set(['ribbon/lowlight-intake', 'ribbon/noodle-stall']);
 const has = (r: string) => rooms.has(r);
 
 describe('resolveSchedule', () => {
+  it('keeps a why and a fixed tick; a bad why costs only the why', () => {
+    const warns: string[] = [];
+    const block = { from: '20:00', to: '04:00', room: 'ribbon/lowlight-intake' };
+    expect(resolveSchedule([{ ...block, why: '  her shift ', fixed: true }], has, (m) => warns.push(m))).toEqual([{ from: 1200, to: 240, room: 'ribbon/lowlight-intake', why: 'her shift', fixed: true }]);
+    expect(warns).toEqual([]);
+    expect(resolveSchedule([{ ...block, why: 'a [bad] line', fixed: 'yes' }], has, (m) => warns.push(m))).toEqual([{ from: 1200, to: 240, room: 'ribbon/lowlight-intake' }]);
+    expect(resolveSchedule([{ ...block, why: 'x'.repeat(81) }], has, (m) => warns.push(m))).toEqual([{ from: 1200, to: 240, room: 'ribbon/lowlight-intake' }]);
+    expect(warns).toHaveLength(2);
+  });
+
   it('keeps good blocks (past midnight too) as minutes', () => {
     const warns: string[] = [];
     expect(resolveSchedule([{ from: '20:00', to: '04:00', room: 'ribbon/lowlight-intake' }, { from: '04:00', to: '08:00', room: 'ribbon/noodle-stall' }], has, (m) => warns.push(m))).toEqual([

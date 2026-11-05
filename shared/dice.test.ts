@@ -1,3 +1,4 @@
+import { rerunRoll } from './dice';
 import { describe, expect, it } from 'vitest';
 import { afterEffect, gambleDie, gambleFaces, gambleResult, deckNotes, effectPushRefusal, facesFor, fragileDies, kindResult, poolOf, positionOf, POOL_MAX, resultOf, rollPool, statDice, takeSize, tierCut, tradeRefusal, type Effect, type Position } from './dice';
 import type { Deck } from './gear';
@@ -455,5 +456,14 @@ describe('PRO and VET in the pool (tier 3 beat play spec §2)', () => {
     const p = poolOf(check, { ...who, deck, tier: 3, next: { noCut: true } });
     expect(p.tier).toEqual({ label: 'INSIDE INFORMATION', lifted: true });
     expect(p.effectParts!.map((x) => x.label)).toContain('OUTCLASSED');
+  });
+});
+
+describe('rerunRoll after a save (final review M4)', () => {
+  it('a rerun to a miss is a plain miss, not still saved', () => {
+    const roll = { faces: [5], keep: 'high', position: 'dark', kind: 'cost', pass: true, saved: true } as unknown as Parameters<typeof rerunRoll>[0]['roll'];
+    const again = rerunRoll({ seed: 's', roll, faces: [2] });
+    expect(again.kind).toBe('miss');
+    expect(again.saved).toBeUndefined();
   });
 });

@@ -70,7 +70,8 @@
     {
       "from": "20:00",
       "to": "06:00",
-      "room": "drownworks/pump-house-nine"
+      "room": "drownworks/pump-house-nine",
+      "fixed": true
     },
     {
       "from": "06:00",

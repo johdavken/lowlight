@@ -2,7 +2,7 @@
  * The marks on crew and program cards: a trade or stat symbol and the rank's chevrons, in place of the words. The hover
  * panel still spells each out. The symbols are Phosphor Icons, fill weight (MIT, see docs/LICENSING.md).
  */
-import { GRADES, type Grade } from '../../../../shared/crew-book';
+import { GRADES, type Grade, type Timing } from '../../../../shared/crew-book';
 import { el } from './el';
 
 const SYMBOLS: Record<string, string> = {
@@ -33,6 +33,19 @@ const mark = (cls: string, label: string, art: string): HTMLElement => {
 export function symbolMark(key: string): HTMLElement {
   const d = SYMBOLS[key];
   return d ? mark('tbc-symbol', key.toUpperCase(), svg('0 0 256 256', `<path fill="currentColor" d="${d}"/>`)) : el('span', 'tbc-spec', key.toUpperCase());
+}
+
+/** When an ability plays, as the crew cards' top-left mark: a die, onward, the flag, the hourglass. Drawn for these cards. */
+const TIMING_SYMBOLS: Record<Timing, string> = {
+  roll: 'M48 32h160a16 16 0 0 1 16 16v160a16 16 0 0 1-16 16H48a16 16 0 0 1-16-16V48a16 16 0 0 1 16-16Zm36 36a16 16 0 1 0 0 32a16 16 0 0 0 0-32Zm88 88a16 16 0 1 0 0 32a16 16 0 0 0 0-32Zm-44-44a16 16 0 1 0 0 32a16 16 0 0 0 0-32Z',
+  after: 'M36 48l92 80l-92 80Zm92 0l92 80l-92 80Z',
+  end: 'M56 24a8 8 0 0 1 8 8v8h136a8 8 0 0 1 6 13l-38 43l38 43a8 8 0 0 1-6 13H64v72a8 8 0 0 1-16 0V32a8 8 0 0 1 8-8Z',
+  auto: 'M60 28h136v44l-48 56l48 56v44H60v-44l48-56l-48-56Z',
+};
+
+/** An ability's top-left mark, in its timing's colour (table.css); the hover panel and its label say it in words. */
+export function timingMark(t: Timing, label: string): HTMLElement {
+  return mark(`tbc-symbol t-${t}`, label, svg('0 0 256 256', `<path fill="currentColor" fill-rule="evenodd" d="${TIMING_SYMBOLS[t]}"/>`));
 }
 
 /** The top-right mark: one chevron for GREEN up to four for VET. */

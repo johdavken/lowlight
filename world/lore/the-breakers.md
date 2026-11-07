@@ -1,6 +1,7 @@
 ---
 title: The Breakers
 category: Factions
+section: Gangs
 keys: [Breakers, Spine gang, under the Spine, dark stretch, power taps]
 districts: [spine]
 places: []

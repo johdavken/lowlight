@@ -1,6 +1,7 @@
 ---
 title: Velvet
 category: City
+section: Districts
 keys: [Velvet, red-light quarter, the quarter, the Cat, neon cat, the Cat's up]
 districts: [velvet]
 places: []

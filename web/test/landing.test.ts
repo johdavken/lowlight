@@ -42,7 +42,7 @@ const linkApi = () => ({
   link: vi.fn(async (): Promise<LinkStatus> => ({ state: 'ok', openrouter: { linked: true, last4: '3f9a', credit: 4.12, state: 'ok' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } })),
   putLink: vi.fn(async (): Promise<LinkInfo | { error: LinkError }> => ({ linked: true, last4: '3f9a', credit: 4.12, state: 'ok' })),
   deleteLink: vi.fn(async () => {}),
-  searchModels: vi.fn(async () => ({ picks: catalog.choices!, recent: [], results: [] })),
+  browseModels: vi.fn(async () => ({ picks: catalog.choices!, recent: [], all: catalog.choices! })),
 });
 const preview = () => ({ show: vi.fn(async () => {}), showSplash: vi.fn(async () => true), nonBlank: vi.fn(() => true), frameSize: vi.fn((): [number, number] => [480, 270]), glitch: vi.fn(async () => {}), dispose: vi.fn() });
 const key = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, cancelable: true }));
@@ -143,9 +143,11 @@ async function mount(o: MountOpts = {}) {
 const phase = () => document.querySelector<HTMLElement>('[data-phase]')?.dataset.phase;
 const tileIds = () => [...document.querySelectorAll<HTMLElement>('.tile[data-id]')].map((t) => t.dataset.id);
 const hot = () => [...document.querySelectorAll<HTMLElement>('.tile.hot')].map((t) => t.dataset.id);
-/** The model panel's rows (model step), or the strip's confirmed model (ready). */
-const modelRows = () => [...document.querySelectorAll('.model-panel .mp-row .mp-label')].map((m) => m.textContent);
-const modelOn = () => document.querySelector('.model-panel .mp-row.on .mp-label')?.textContent;
+/** KEYS on the band. */
+const openKeys = () => document.querySelector<HTMLButtonElement>('.mb-tab[data-tab="keys"]')!.click();
+/** The band's rows (model step), or the strip's confirmed model (ready). */
+const modelRows = () => [...document.querySelectorAll('.model-band .mp-row .mp-label')].map((m) => m.textContent);
+const modelOn = () => document.querySelector('.model-band .mp-row.on .mp-label')?.textContent;
 const confirmedModel = () => [...document.querySelectorAll('.fighter.p2 .models .m')].map((m) => m.textContent);
 const name = (side: 'p1' | 'p2') => document.querySelector(`.fighter.${side} .name`)?.textContent;
 const storedMatch = () => JSON.parse(localStorage.getItem('lowlight.lastMatch') ?? 'null');
@@ -313,7 +315,7 @@ describe('character select', () => {
     await pick();
     expect(api.setModel).toHaveBeenCalledExactlyOnceWith('nix', 'moonshot/kimi-k3');
     expect(phase()).toBe('ready');
-    expect(document.querySelector('.model-panel')).toBeNull();
+    expect(document.querySelector('.model-band')).toBeNull();
     expect(document.querySelector('.jack-in')!.textContent).toBe(COPY.jackIn);
     expect(confirmedModel()).toEqual(['Kimi K3']);
     expect(document.querySelector('.select-hints')!.textContent).toBe(COPY.hintReady);
@@ -426,7 +428,7 @@ describe('character select', () => {
     expect(phase()).toBe('model');
     key('Escape');
     expect(phase()).toBe('p2');
-    expect(document.querySelector('.model-panel')).toBeNull();
+    expect(document.querySelector('.model-band')).toBeNull();
     expect(document.querySelector('.fighter.p2 .file-strip.wide')).toBeNull();
   });
 
@@ -1104,17 +1106,19 @@ describe('the in-game link (spec 2026-10-08)', () => {
     expect(document.querySelector('.fighter.p2 .extra')!.textContent).toBe(COPY.link.stripExtra('she'));
   });
 
-  it('model phase with no key mounts the link panel in a wide p2 strip, titled LINK A MIND', async () => {
+  it('model phase with no key opens the band on KEYS with the field up, titled LINK A MIND; her file stays', async () => {
     const { api } = await mount({ data: unlinked, api: { link: noLink } });
     await toModel();
     expect(phase()).toBe('model');
-    expect(document.querySelector('.fighter.p2 .file-strip.wide .link-panel')).not.toBeNull();
+    expect(document.querySelector('.model-band .lp-field')).not.toBeNull();
+    expect(document.querySelector('.fighter.p2 .file-strip.wide')).toBeNull();
+    expect(document.querySelector('.fighter.p2 .fighter-file')).not.toBeNull();
     expect(document.querySelector('.select-title')!.textContent).toBe(COPY.link.titleLink);
     expect(document.querySelector('.select-hints')!.textContent).toBe(COPY.link.hintLink);
     expect(api.models).not.toHaveBeenCalled();
   });
 
-  it('after linking the model panel replaces it, titled CHOOSE HER MIND; the roster refreshes', async () => {
+  it('after linking the band moves to her list, titled CHOOSE HER MIND; the roster refreshes', async () => {
     const agents = vi.fn(async () => unlinked);
     const { api } = await mount({ data: unlinked, agents, api: { link: noLink } });
     await toModel();
@@ -1124,20 +1128,20 @@ describe('the in-game link (spec 2026-10-08)', () => {
     key('Enter');
     await tick(800);
     expect(api.putLink).toHaveBeenCalledExactlyOnceWith('sk-or-v1-abc', 'openrouter');
-    expect(document.querySelector('.link-panel')).toBeNull();
-    expect(document.querySelector('.model-panel')).not.toBeNull();
+    expect(document.querySelector('.lp-field')).toBeNull();
+    expect(document.querySelector<HTMLElement>('.model-band')!.dataset.tab).toBe('her');
     expect(document.querySelector('.select-title')!.textContent).toBe(COPY.link.titleModel('she'));
     expect(agents.mock.calls.length).toBeGreaterThan(before);
     await pick();
     expect(phase()).toBe('ready');
   });
 
-  it('Esc in the link panel returns to p2', async () => {
+  it('Esc with no key returns to p2', async () => {
     await mount({ data: unlinked, api: { link: noLink } });
     await toModel();
     key('Escape');
     expect(phase()).toBe('p2');
-    expect(document.querySelector('.link-panel')).toBeNull();
+    expect(document.querySelector('.model-band')).toBeNull();
   });
 
   it('keys in the model phase go to the panel, not the grid', async () => {
@@ -1149,26 +1153,32 @@ describe('the in-game link (spec 2026-10-08)', () => {
     expect(document.querySelector<HTMLInputElement>('.mp-search input')!.value).toBe('h');
   });
 
-  it('CHANGE KEY shows the link panel; Esc there goes back to the list', async () => {
+  it('CHANGE KEY opens the field on KEYS; Esc closes it, the step stays', async () => {
     await mount();
     await toModel();
+    openKeys();
+    expect(document.querySelector('.select-title')!.textContent).toBe(COPY.link.titleKeys);
     document.querySelector<HTMLButtonElement>('.mp-change')!.click();
-    expect(document.querySelector('.link-panel')).not.toBeNull();
+    expect(document.querySelector('.lp-field')).not.toBeNull();
+    expect(document.querySelector('.select-hints')!.textContent).toBe(COPY.link.hintLink);
     key('Escape');
     await tick();
     expect(phase()).toBe('model');
-    expect(document.querySelector('.model-panel')).not.toBeNull();
+    expect(document.querySelector('.lp-field')).toBeNull();
+    expect(document.querySelector('.select-hints')!.textContent).toBe(COPY.link.hintKeys);
   });
 
-  it('UNLINK deletes the key and shows the link panel', async () => {
+  it('UNLINK deletes the key and the band asks for one', async () => {
     const { api } = await mount();
     await toModel();
+    openKeys();
     const unlink = document.querySelector<HTMLButtonElement>('.mp-unlink')!;
     unlink.click();
     unlink.click();
     await tick();
     expect(api.deleteLink).toHaveBeenCalledTimes(1);
-    expect(document.querySelector('.link-panel')).not.toBeNull();
+    expect(document.querySelector('.lp-field')).not.toBeNull();
+    expect(document.querySelector('.select-title')!.textContent).toBe(COPY.link.titleLink);
   });
 });
 
@@ -1184,12 +1194,12 @@ describe('the in-game link: stale answers (review fixes)', () => {
     expect(phase()).toBe('p2');
     resolve({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } });
     await tick();
-    expect(document.querySelector('.link-panel')).toBeNull();
-    expect(document.querySelector('.model-panel')).toBeNull();
+    expect(document.querySelector('.lp-field')).toBeNull();
+    expect(document.querySelector('.model-band')).toBeNull();
     link.mockImplementation(async () => ({ state: 'no-link' as const, openrouter: { linked: false, last4: null, credit: null, state: 'no-link' as const }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' as const } }));
     key('Enter');
     await tick();
-    expect(document.querySelector('.link-panel')).not.toBeNull();
+    expect(document.querySelector('.lp-field')).not.toBeNull();
     expect(document.activeElement).toBe(document.querySelector('.lp-key'));
   });
 
@@ -1198,6 +1208,7 @@ describe('the in-game link: stale answers (review fixes)', () => {
     const deleteLink = vi.fn(() => new Promise<void>((r) => (done = r)));
     await mount({ api: { deleteLink } });
     await toModel();
+    openKeys();
     const unlink = document.querySelector<HTMLButtonElement>('.mp-unlink')!;
     unlink.click();
     unlink.click();
@@ -1205,13 +1216,14 @@ describe('the in-game link: stale answers (review fixes)', () => {
     expect(phase()).toBe('p2');
     done();
     await tick();
-    expect(document.querySelector('.link-panel')).toBeNull();
+    expect(document.querySelector('.lp-field')).toBeNull();
     expect(phase()).toBe('p2');
   });
 
   it("a failed unlink says so, not \"couldn't set the model\"", async () => {
     await mount({ api: { deleteLink: vi.fn(async () => Promise.reject(new Error('origin'))) } });
     await toModel();
+    openKeys();
     const unlink = document.querySelector<HTMLButtonElement>('.mp-unlink')!;
     unlink.click();
     unlink.click();
@@ -1222,9 +1234,9 @@ describe('the in-game link: stale answers (review fixes)', () => {
   it('dispose destroys an open panel', async () => {
     const { handle } = await mount();
     await toModel();
-    expect(document.querySelector('.model-panel')).not.toBeNull();
+    expect(document.querySelector('.model-band')).not.toBeNull();
     handle.dispose();
-    expect(document.querySelector('.model-panel')).toBeNull();
+    expect(document.querySelector('.model-band')).toBeNull();
   });
 });
 
@@ -1234,8 +1246,8 @@ describe('the in-game link: her own link decides (final review)', () => {
     const link = vi.fn(async (): Promise<LinkStatus> => ({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } }));
     await mount({ api: { link } }); // nix: link 'ok' in the roster (a local endpoint, say)
     await toModel();
-    expect(document.querySelector('.link-panel')).toBeNull();
-    expect(document.querySelector('.model-panel')).not.toBeNull();
+    expect(document.querySelector('.lp-field')).toBeNull();
+    expect(document.querySelector('.model-band')).not.toBeNull();
   });
 });
 

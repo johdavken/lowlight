@@ -67,6 +67,32 @@ describe('Graft tips', () => {
     expect(shown()).toBeNull();
   });
 
+  it('TWO VOICES points at the JOB column on the stage, outside the table, before the roll', () => {
+    const col = document.createElement('section');
+    col.className = 'jc';
+    col.getBoundingClientRect = () => rect(30, 160, 230, 400);
+    game.append(col);
+    inner(target('tb-card'), 'tb-odds');
+    mount().offer(['roll', 'job'], root);
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect(title()).toBe('TWO VOICES');
+    // Beside the column, not over the job's title above it.
+    expect(shown()!.dataset.side).toBe('right');
+    ok();
+    expect(title()).toBe('THE ROLL');
+  });
+
+  it('TWO VOICES waits while the JOB column is hidden (a phone keeps the table prose)', () => {
+    const col = document.createElement('section');
+    col.className = 'jc';
+    col.getBoundingClientRect = () => rect(0, 0, 0, 0);
+    game.append(col);
+    mount().offer(['job'], root);
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect(shown()).toBeNull();
+    expect(stored().seen).not.toContain('job');
+  });
+
   it('one at a time, in order', () => {
     target('tb-take');
     target('tb-alarm');
@@ -125,7 +151,7 @@ describe('Graft tips', () => {
 
   it('clear drops the queue, not the seen list', () => {
     inner(target('tb-card'), 'tb-odds');
-    inner(root.querySelector<HTMLElement>('.tb-card')!, 'tb-pos', 'img');
+    inner(root.querySelector<HTMLElement>('.tb-card')!, 'tb-side-word');
     const t = mount();
     t.offer(['roll', 'position'], root);
     vi.advanceTimersByTime(SETTLE_MS);

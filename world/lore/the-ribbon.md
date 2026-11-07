@@ -1,6 +1,7 @@
 ---
 title: The Ribbon
-category: City
+category: Places
+section: Karasu
 keys: [the Ribbon, Ribbon, the stack, levels, upstack, downstack, Level 4]
 districts: [karasu]
 places: []

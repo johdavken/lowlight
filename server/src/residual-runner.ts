@@ -5,7 +5,7 @@
  */
 import { photoForModel } from '../../shared/photos';
 import { appendFileSync } from 'node:fs';
-import type { ChatMessage, ResidualRunInfo } from '../../shared/types';
+import type { ChatMessage, Present, ResidualRunInfo } from '../../shared/types';
 import { RESIDUAL_RUNS_KEPT, type Db } from './db';
 import { HISTORY_WINDOW, toCompletion } from './history';
 import type { Journal } from './journal';
@@ -14,6 +14,8 @@ import { applyResidual, guestWords, parseResidualAnswer, residualMessages, type 
 import { LOOSE_KEEP, parseLoose, parsePlan, planKey, planLooseKey, planOver, planSayKey, planSeenKey, type Loose, type Plan } from '../../shared/plan';
 import { parsePromise, promiseKey, promiseSpentKey, promiseTriesKey, type TextPromise } from '../../shared/promise';
 import { hhmmOf, minuteOfDay } from '../../shared/clock';
+import { storyDay } from '../../shared/board';
+import { addWitness, parseWitness, witnessKey } from '../../shared/witness';
 import { readSummary, summaryDue, summaryMessages, writeSummary } from './summary';
 import type { StandingControl } from './standing';
 import type { CompletionMessage } from './turn';
@@ -62,6 +64,8 @@ export interface ResidualRunnerDeps {
   standingShifted?: (player: string, word: string) => void;
   /** Leads this turn offered `player` and she hasn't given, how to record one on her reply, and who hears of it. Absent: never. */
   leads?: (player: string, reply: { id: string; take: number }) => { offered: { id: string; title: string; knows: string }[]; give(id: string, details: string, messageId: string): boolean; recorded(title: string): void } | null;
+  /** Her `[you were there: …]` line for `player` (witness lines spec §3); null with nothing. Absent: never. */
+  remembered?: (player: string) => string | null;
   /** Time backstop (spec 2026-10-20): moves `player`'s finished reply on by `minutes` (the relay's residualPass). Absent: time doesn't apply. */
   passTime?: (player: string, reply: { id: string; take: number }, minutes: number) => Result;
   /**
@@ -106,6 +110,58 @@ export function plansApply(reply: ChatMessage | undefined, line: ChatMessage | u
 }
 
 /**
+ * Whether the Residual may name witnesses to `reply` (witness lines spec §2): a stamped in-character reply in the room,
+ * mid-job too. Not a text or comms: nobody's beside her for those.
+ */
+export function witnessesApply(reply: ChatMessage | undefined, line: ChatMessage | undefined, comms: boolean): boolean {
+  return reply?.clock !== undefined && line?.mode !== 'ooc' && line?.mode !== 'text' && !comms;
+}
+
+/** Who was in the room for a reply, taken as the turn ends: a queued job starts later, maybe after you've walked out. */
+export interface WitnessScene {
+  clock: number;
+  scene: string;
+  others: { id: string; name: string }[];
+}
+
+/** A turn with witnesses asks for more: live, its answers ran past the plain cap and the whole run was lost, notes and all. */
+export const RESIDUAL_WITNESS_TOKENS = 600;
+
+/**
+ * Who was in the scene: contacts the clock puts here, and contacts who spoke in the reply. A job's text can write someone
+ * in while the clock has them elsewhere (playtest: Ember at the flat, left at the Tilt). A resident has no room to remember in.
+ */
+export function sceneOthers(text: string, present: Present[], voices: Present[]): { id: string; name: string }[] {
+  const contacts = voices.filter((v) => v.kind === 'contact');
+  // Looser than the feed's paragraph markers: this only offers them to the Residual, and GLM runs lines on.
+  const spoke = (name: string) => new RegExp(`(?:^|[\\s*])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\*{0,2}:`).test(text);
+  const here = [...present.filter((p) => p.kind === 'contact'), ...contacts.filter((c) => spoke(c.name))];
+  return [...new Map(here.map((p) => [p.id, { id: p.id, name: p.name }])).values()];
+}
+
+/** The scene a reply happened in, as the turn ends; null when nobody else was in it. A `room:` beat is elsewhere, the contact on the line: comms in all but name. */
+export function witnessSceneFor(o: { reply: ChatMessage | undefined; line: ChatMessage | undefined; comms: boolean; beatRoom: string | undefined; beatComms?: boolean; scene: string; present: Present[]; voices: Present[] }): WitnessScene | null {
+  if (o.beatRoom !== undefined || o.beatComms === true || !witnessesApply(o.reply, o.line, o.comms)) return null;
+  const others = sceneOthers(o.reply!.text, o.present, o.voices);
+  return others.length > 0 ? { clock: o.reply!.clock!, scene: o.scene, others } : null;
+}
+
+/** Who could witness a reply, with what they carry from today, and writing what one saw. */
+export interface WitnessesHere {
+  here: { id: string; name: string; carried: string | null }[];
+  set(id: string, text: string): void;
+}
+
+/** The entries sit in this room, one per witness per story day: a later turn adds to today's (witness lines spec §2). */
+export function witnessesHere(db: Pick<Db, 'getMeta' | 'setMeta'>, player: string, { clock, scene, others }: WitnessScene): WitnessesHere {
+  const key = (id: string) => witnessKey(player, id, storyDay(clock));
+  return {
+    here: others.map((o) => ({ id: o.id, name: o.name, carried: parseWitness(db.getMeta(key(o.id)))?.text ?? null })),
+    set: (id, text) => db.setMeta(key(id), JSON.stringify({ text: addWitness(parseWitness(db.getMeta(key(id)))?.text ?? null, text), at: clock, scene })),
+  };
+}
+
+/**
  * Whether the Residual may record a promise to text from `reply` (promised texts spec §4): a stamped in-character
  * reply — on comms too — but not her own goodbye as she leaves.
  */
@@ -125,6 +181,8 @@ function planWords(p: Plan, name: (id: string) => string): string {
 }
 
 interface Job {
+  /** Who was in the room for the reply (witness lines spec §2); absent: nobody to witness it. */
+  scene?: WitnessScene;
   player: string;
   reply: { id: string; take: number };
   kind: ResidualKind;
@@ -194,8 +252,8 @@ export class ResidualRunner {
   }
 
   /** Starts the Residual on `reply` (fire and forget); while one runs, the newest request waits its turn. */
-  afterTurn(player: string, reply: { id: string; take: number }, kind: ResidualKind, here?: string): void {
-    const job: Job = { player, reply: { ...reply }, kind, ...(here ? { here } : {}) };
+  afterTurn(player: string, reply: { id: string; take: number }, kind: ResidualKind, here?: string, scene?: WitnessScene | null): void {
+    const job: Job = { player, reply: { ...reply }, kind, ...(here ? { here } : {}), ...(scene ? { scene } : {}) };
     this.openWriting();
     if (this.running) {
       // One waiting job per player covers everything up to its reply; an end stays an end (its recap and dossier).
@@ -301,11 +359,11 @@ export class ResidualRunner {
       slice = slice.slice(replies[skipped - 1] + 1);
     }
     const lines = slice
-      .map((m) => ({ m, c: toCompletion(m) }))
+      .map((m) => ({ m, c: toCompletion(m, this.d.playerName(job.player)) }))
       .filter((x): x is { m: ChatMessage; c: CompletionMessage } => x.c !== null)
       .map(({ m, c }) => ({
-        // An event card isn't the player's line (cipher spec §2.7): the narrator wrote it.
-        speaker: m.mode === 'encounter' ? 'Narrator' : m.role === 'user' ? this.d.playerName(job.player) : this.d.selfName,
+        // An event card isn't the player's line (cipher spec §2.7): the narrator wrote it. Nor is a job's: signed by the player, its "she" and "you" came out as his notes.
+        speaker: m.mode === 'encounter' || m.mode === 'quest' ? 'Narrator' : m.role === 'user' ? this.d.playerName(job.player) : this.d.selfName,
         // Texts (deck spec §3) read as texts: what was typed, not what happened in a room.
         text: m.mode === 'text' ? `(by text) ${m.role === 'agent' ? photoForModel(c.content, this.caption) : c.content}` : c.content,
       }));
@@ -451,7 +509,7 @@ export class ResidualRunner {
       let n = 0;
       for (const tr of parsed.truths) {
         const id = `${self}-${job.reply.id}.${job.reply.take}-${++n}`;
-        out.push({ t: 'truth', id, ...tr, seq: Date.now() });
+        out.push({ t: 'truth', id, ...tr, replies: state.replies, seq: Date.now() });
         row.applied.push(`truth ${id} (${tr.kind})`);
       }
       db.setMeta(key, JSON.stringify(out));
@@ -573,6 +631,7 @@ export class ResidualRunner {
     const placeName = (id: string) => places?.find((p) => p.id === id)?.name ?? planned?.people?.find((p) => p.id === id)?.name ?? id;
     // Cipher (spec §2.3): the open truths as T1…, mapped back to their ids when the answer names them.
     const leads = job.kind === 'turn' ? (this.d.leads?.(job.player, job.reply) ?? null) : null;
+    const witness = job.kind === 'turn' && job.scene ? witnessesHere(db, job.player, job.scene) : null;
     const cipher = this.d.cipher?.(job.player) ?? null;
     const openTruths = cipher?.truths.filter((t) => t.state === 'open') ?? [];
     const labels = new Map(openTruths.map((t, i) => [`T${i + 1}`, t.id]));
@@ -601,10 +660,12 @@ export class ResidualRunner {
         : {}),
       ...(openTruths.length > 0 ? { cipher: openTruths.map((t, i) => ({ label: `T${i + 1}`, truth: t.truth, comesOutWhen: t.comesOutWhen })) } : {}),
       ...(leads?.offered.length ? { leads: leads.offered } : {}),
+      ...(witness?.here.length ? { here: witness.here } : {}),
+      ...((remembered) => (remembered ? { remembered } : {}))(job.kind === 'turn' ? (this.d.remembered?.(job.player) ?? null) : null),
     });
     let answer: { text: string; tokensIn?: number; tokensOut?: number };
     try {
-      answer = await this.call(messages, RESIDUAL_MAX_TOKENS[job.kind], signal);
+      answer = await this.call(messages, RESIDUAL_MAX_TOKENS[job.kind] + (witness?.here.length ? RESIDUAL_WITNESS_TOKENS : 0), signal);
     } catch (err) {
       row.error = signal.aborted ? 'dropped: take replaced' : `call failed: ${err instanceof Error ? err.message : String(err)}`;
       return finish(`residual · ${row.error}`);
@@ -702,6 +763,7 @@ export class ResidualRunner {
           ...(leads?.offered.length
             ? { leads: { offered: new Map(leads.offered.map((l) => [l.id, l.title])), give: (id: string, details: string) => leads.give(id, details, job.reply.id), recorded: leads.recorded } }
             : {}),
+          ...(witness ? { witness: { here: new Set(witness.here.map((w) => w.id)), set: witness.set } } : {}),
           ...(cipher
             ? {
                 cipher: {
@@ -711,6 +773,7 @@ export class ResidualRunner {
                   prose: storyProse(ex.lines.filter((l) => l.speaker !== this.d.playerName(job.player)).map((l) => l.text).join('\n')),
                   place: job.here ?? this.d.sceneId?.() ?? '',
                   clock: clock ?? 0,
+                  replies: cipher.replies,
                   append: (e: CipherEvent) => db.setMeta(cipherKey(job.player), JSON.stringify([...parseCipherEvents(db.getMeta(cipherKey(job.player))), e])),
                 },
               }

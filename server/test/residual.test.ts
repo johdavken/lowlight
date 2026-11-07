@@ -87,6 +87,11 @@ describe('parseResidualAnswer', () => {
       expect(r.answer!.time).toEqual({ until: '02:00' });
       expect(r.refused).toEqual(['answer: JSON repaired (trailing comma)']);
     });
+    it('a list closed with } instead of ] is closed (GLM, cipher runs 2026-10-29)', () => {
+      const r = parseResidualAnswer('{"notes": [{"op": "add", "about": "you", "text": "Paid in scrip.", "keys": ["scrip", "paid"}],\n"recap": null, "dossier": null}');
+      expect(r.answer!.notes).toEqual([{ op: 'add', about: 'you', text: 'Paid in scrip.', keys: ['scrip', 'paid'], pin: false }]);
+      expect(r.refused).toEqual(['answer: JSON repaired (unclosed list)']);
+    });
     it('text inside a string is never changed', () => {
       const r = parseResidualAnswer('{"recap": "she said \\"wait\\"\\n\\"go\\": ,}"\n"dossier": "a,]"}');
       expect(r.answer).toMatchObject({ recap: 'she said "wait"\n"go": ,}', dossier: 'a,]' });
@@ -365,6 +370,7 @@ describe('cipher (cipher spec §2.3)', () => {
     prose: '*She slides a thick envelope under the register.*',
     place: 'karasu/noodle-stall',
     clock: 1300,
+    replies: 42,
     append: (e: CipherEvent) => void evs.push(e),
   });
   beforeEach(() => void evs.splice(0));
@@ -389,7 +395,7 @@ describe('cipher (cipher spec §2.3)', () => {
   it('a clue is written for the truth its label maps to, checked against the page, under the reply', () => {
     const r = applyResidual({ ...deps(), cipher: cipherDeps() }, { ...empty, cipher: { clues: [{ id: 'T1', text: 'a thick envelope' }], learned: [] } }, { messageId: 'a1', take: 0, kind: 'turn' });
     expect(evs).toHaveLength(1);
-    expect(evs[0]).toMatchObject({ t: 'clue', id: 'nix-1', text: 'a thick envelope', messageId: 'a1', at: 1300, place: 'karasu/noodle-stall', onPage: true });
+    expect(evs[0]).toMatchObject({ t: 'clue', id: 'nix-1', text: 'a thick envelope', messageId: 'a1', at: 1300, place: 'karasu/noodle-stall', onPage: true, replies: 42 });
     expect(r.applied).toContain('clue T1');
   });
 

@@ -1,6 +1,7 @@
 ---
 title: The Lazarus Net
 category: Factions
+section: Runners
 keys: [Lazarus Net, Lazarus, pirated script, bootleg script, script market, cracked edits]
 districts: []
 places: []

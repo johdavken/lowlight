@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadLoreBook } from '../src/lore';
+import { bookPage, loadLoreBook, withArt } from '../src/lore';
 import { LORE_TEST_MAP as MAP } from '../../shared/lore.fixture';
 import { tempDir } from './fixtures/temp-dir';
 import { buildApp } from '../src/app';
@@ -110,6 +110,34 @@ describe('lore can name an exit place (final review I2)', () => {
   });
 });
 
+describe('lore pictures (corp logos)', () => {
+  const entry0 = { keys: ['x-key'], districts: [], places: [], always: false };
+  it('withArt marks the entries with a <id>.webp beside them, read each time', () => {
+    const dir = book({});
+    const page = bookPage([{ ...entry0, id: 'soma', title: 'Soma', body: 'Food.' }, { ...entry0, id: 'titan', title: 'Titan', body: 'Ore.' }], [], () => ({ placeId: null, districtId: null }));
+    expect(withArt(page, dir).entries.map((e) => e.art)).toEqual([undefined, undefined]);
+    fs.writeFileSync(path.join(dir, 'titan.webp'), 'x');
+    expect(withArt(page, dir).entries.map((e) => [e.id, e.art])).toEqual([['soma', undefined], ['titan', true]]);
+  });
+
+  it('GET /api/lore/art/:id serves a book entry\'s picture, and nothing else', async () => {
+    const { cfg } = await makeFixture([{ id: 'nix', pack: 'karasu' }]);
+    fs.mkdirSync(cfg.loreDir, { recursive: true });
+    fs.writeFileSync(path.join(cfg.loreDir, 'soma.md'), entry('Soma', 'keys: [soma]'));
+    fs.writeFileSync(path.join(cfg.loreDir, 'soma.webp'), 'RIFF');
+    fs.writeFileSync(path.join(cfg.loreDir, 'stray.webp'), 'RIFF');
+    const built = await buildApp(cfg);
+    cleanups.push(() => built.close());
+    const ok = await built.app.inject({ method: 'GET', url: '/api/lore/art/soma' });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.headers['content-type']).toBe('image/webp');
+    expect(ok.body).toBe('RIFF');
+    const page = JSON.parse((await built.app.inject({ method: 'GET', url: '/api/lore/book' })).body) as { entries: { id: string; art?: true }[] };
+    expect(page.entries.find((e) => e.id === 'soma')?.art).toBe(true);
+    for (const bad of ['stray', '..%2Fsoma', 'nope']) expect((await built.app.inject({ method: 'GET', url: `/api/lore/art/${bad}` })).statusCode).toBe(404);
+  });
+});
+
 describe('GET /api/lore/glossary', () => {
   it('serves the hover cards: street versions where there are some', async () => {
     const { cfg } = await makeFixture([{ id: 'nix', pack: 'karasu' }]);
@@ -120,5 +148,21 @@ describe('GET /api/lore/glossary', () => {
     cleanups.push(() => built.close());
     const res = await built.app.inject({ method: 'GET', url: '/api/lore/glossary' });
     expect(JSON.parse(res.body)).toEqual({ glossary: [{ id: 'velvet-orchid', title: 'Velvet Orchid', keys: ['velvet orchid', 'the Orchid'], text: 'Velvet Orchid on the street body.' }] });
+  });
+});
+
+describe('bookPage', () => {
+  it('holds the player’s book and each room’s place and district', () => {
+    const entry = { keys: ['x-key'], districts: [], places: [], always: false };
+    const page = bookPage(
+      [
+        { ...entry, id: 'orchid', title: 'Orchid', body: 'Insider.' },
+        { ...entry, id: 'orchid-on-the-street', title: 'Street', body: 'Street.' },
+      ],
+      ['the-tilt', 'nowhere'],
+      (id) => (id === 'the-tilt' ? { placeId: 'the-tilt', districtId: 'karasu' } : { placeId: null, districtId: null }),
+    );
+    expect(page.entries.map((e) => [e.id, e.body])).toEqual([['orchid', 'Insider.\n\nStreet.']]);
+    expect(page.rooms).toEqual({ 'the-tilt': { placeId: 'the-tilt', districtId: 'karasu' }, nowhere: { placeId: null, districtId: null } });
   });
 });

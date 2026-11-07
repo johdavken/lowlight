@@ -235,7 +235,8 @@ export class WhosHere {
 
   private readonly onKey = (e: KeyboardEvent): void => {
     if (e.key !== 'Escape' || !this.card) return;
-    e.stopPropagation();
+    // Immediate: one Esc closes the card, not the lore drawer listening on the same window too.
+    e.stopImmediatePropagation();
     this.closeCard();
   };
 

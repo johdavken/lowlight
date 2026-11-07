@@ -4,6 +4,7 @@ node_modules/
 !.env.example
 .claude/*
 !.claude/skills/
+!.claude/settings.json
 .playwright-mcp/
 *.db
 *.db-*

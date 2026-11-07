@@ -1,6 +1,7 @@
 ---
 title: Lowlight Intake
 category: Places
+section: Karasu
 keys: [Lowlight Intake, the Intake, Intake, counseling, night counselor]
 districts: []
 places: [lowlight-intake]

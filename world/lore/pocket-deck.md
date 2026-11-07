@@ -1,6 +1,7 @@
 ---
 title: Pocket Decks
 category: Tech
+section: Decks
 keys: [pocket deck, pocket decks, thumb deck, strip deck]
 districts: []
 places: []

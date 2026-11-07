@@ -1,6 +1,7 @@
 ---
 title: The Sentinel Tower
 category: Places
+section: Elsewhere
 keys: [Sentinel Tower, SDG HQ, SDG headquarters, the sixty-first]
 districts: [nexus]
 places: [sdg-floor]

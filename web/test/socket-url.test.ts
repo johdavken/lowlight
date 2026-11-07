@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { connectSocket, socketUrl } from '../src/net/socket';
+import { connectSocket, serverUp, socketUrl } from '../src/net/socket';
 
 describe('socketUrl', () => {
   it("says enter=1 on the page's first connect only (a reconnect is not the player walking in)", () => {
@@ -37,5 +37,28 @@ describe('connectSocket enter=1', () => {
     expect(urls[2]).not.toContain('enter=1');
     vi.unstubAllGlobals();
     vi.useRealTimers();
+  });
+});
+
+describe('serverUp', () => {
+  const answers = (...statuses: (number | 'refused')[]) => {
+    const asked = vi.fn(async () => {
+      const s = statuses.shift();
+      if (s === undefined || s === 'refused') throw new TypeError('fetch failed');
+      return { status: s };
+    });
+    return asked;
+  };
+
+  it('keeps asking through a booting server: the dev proxy says 502, or nothing answers at all', async () => {
+    const ask = answers(502, 'refused', 502, 200);
+    await serverUp(ask, async () => {});
+    expect(ask).toHaveBeenCalledTimes(4);
+  });
+
+  it('a refusal is still a server: the room opens and says why itself', async () => {
+    const ask = answers(403);
+    await serverUp(ask, async () => {});
+    expect(ask).toHaveBeenCalledTimes(1);
   });
 });

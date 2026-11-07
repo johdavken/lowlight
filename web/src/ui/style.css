@@ -490,18 +490,18 @@
 .map-root.map-closing { animation: map-backdrop-out 0.6s ease-in forwards; }
 .map-root.map-closing .map-head { opacity: 0; transition: opacity 0.2s; }
 @keyframes map-backdrop-out { to { background-color: rgba(2, 1, 6, 0); } }
-/* The map fills the stage; its heading floats under the keys bar, over the picture. */
+/* The map fills the stage; its hint lies along the foot, between the list and the card. */
 .map-frame { position: absolute; inset: 0; }
 .map-head {
   position: absolute;
   z-index: 5;
-  top: calc(21.6px + 60px);
-  left: var(--edge-x);
-  right: var(--edge-x);
+  bottom: 12px;
+  left: 340px;
+  right: 380px;
   display: flex;
   align-items: baseline;
+  justify-content: center;
   gap: 1.2em;
-  padding-bottom: 8px;
   font-family: var(--pixel);
   font-size: 20px;
   letter-spacing: 0.24em;
@@ -509,7 +509,7 @@
   text-shadow: 0 0 4px #000, 0 0 10px #000;
   pointer-events: none;
 }
-.map-hint { margin-left: auto; color: rgba(255, 217, 230, 0.4); }
+.map-hint { font-size: 16px; color: rgba(255, 217, 230, 0.4); }
 /* Missing or broken map data: the picture stays, with one line saying what's wrong. */
 .map-screen > .map-notice {
   inset: auto 0 0 0;
@@ -554,15 +554,16 @@
 /* The camera's layer (the picture and the city's borders, names and pins) zooms into the open district; --inv keeps pins one size.
    The band, heading and file strip sit over it, unzoomed. MapPanel eases it in script, so --inv moves with it. */
 .map-screen > .map-world { z-index: 1; transform-origin: 0 0; }
-.map-screen > .map-overlay-host { z-index: 2; top: calc(21.6px + 60px + 34px); }
+.map-screen > .map-overlay-host { z-index: 2; }
 .map-screen.map-dragging { cursor: grabbing; }
 /* The ambience canvas: inside the camera layer (under the pins) but carrying the camera's inverse, so it lies on the screen. */
 .map-world > .map-amb { position: absolute; left: 0; top: 0; transform-origin: 0 0; pointer-events: none; }
-/* The CRT is drawn over the city map, its band and strip (z 1–2), under the data notice (z 4), as over the old panel. */
+/* The CRT is drawn over the city map, its list and card (z 1–2), under the data notice (z 4), as over the old panel.
+   The vignette goes under the list and card: it would dim them, out at the edges. */
 .map-screen > .map-fuzz,
 .map-screen > .map-scan,
-.map-screen > .map-roll,
-.map-screen > .map-vignette { z-index: 3; }
+.map-screen > .map-roll { z-index: 3; }
+.map-screen > .map-vignette { z-index: 1; }
 /* Fuzz: an SVG noise tile, jumped around a few times a second. */
 .map-fuzz {
   inset: -50% !important;
@@ -652,15 +653,16 @@
 
 /* ───────────────────────── Journal ───────────────────────── */
 
-.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-map {
+.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-map, .hud-book {
   pointer-events: auto;
   cursor: pointer;
   margin-left: 1.1em;
   color: #e9def9;
 }
 /* The Alt letter: underlined in her colour, only while Alt is held (plain words the rest of the time). */
-:is(.hud-you, .hud-people, .hud-tx, .hud-crew) u { text-decoration: none; }
-.hud-bar.alt-held :is(.hud-you, .hud-people, .hud-tx, .hud-crew) u {
+/* The letter never takes the click itself: the labels are rebuilt under the mouse, and a press on a letter that's gone clicks nothing (the X of TEXTS). */
+:is(.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-book) u { text-decoration: none; pointer-events: none; }
+.hud-bar.alt-held :is(.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-book) u {
   text-decoration: underline;
   text-decoration-color: var(--agent);
   text-decoration-thickness: 2px;
@@ -670,7 +672,7 @@
 .hud-map:hover, .hud-map:focus-visible,
 .hud-people:hover, .hud-people:focus-visible,
 .hud-tx:hover, .hud-tx:focus-visible,
-.hud-crew:hover, .hud-crew:focus-visible { outline: none; color: #fff; }
+.hud-crew:hover, .hud-crew:focus-visible, .hud-book:hover, .hud-book:focus-visible { outline: none; color: #fff; }
 /* Texts you haven't seen on the deck (promised texts spec §6): NIX · 1 TEXT in her pink, opens TEXTS. */
 .hud-power { color: #ffb347; text-shadow: 0 0 8px rgba(255, 179, 71, 0.5); }
 .hud-texts { pointer-events: auto; cursor: pointer; color: #ff4f8b; text-shadow: 0 0 8px rgba(255, 79, 139, 0.6); }
@@ -687,6 +689,12 @@
 :is(.hud-you, .hud-people, .hud-tx, .hud-quest, .hud-crew).open u { text-decoration-color: #05020c; }
 /* CREW's word in its panel's red. */
 .hud-crew.open, .hud-crew.open:hover { background: #ff4d4d; box-shadow: 0 0 0 4px #ff4d4d; }
+/* BOOK (lore drawer): lit in the drawer's lilac, and the count a small raised number that never moves anything. */
+.hud-book.open, .hud-book.open:hover { color: #05020c; background: #c9a8ff; box-shadow: 0 0 0 4px #c9a8ff; text-shadow: none; }
+.hud-book.open u { text-decoration-color: #05020c; }
+.hud-book { position: relative; }
+.hud-book[data-count]::after { content: attr(data-count); position: absolute; right: -0.75em; top: -0.45em; font-size: 0.7em; letter-spacing: 0; color: #c9a8ff; }
+.hud-book.open[data-count]::after { color: #fff; text-shadow: 0 0 4px #05020c; }
 /* The SAVE row of SYS while her reply streams: WAIT FOR <HER>, dimmed, and it doesn't open. */
 .sys-row[data-row='save'].busy { cursor: default; }
 .sys-row[data-row='save'].busy .sys-value { color: var(--hud-dim); }
@@ -950,8 +958,7 @@
 }
 .feed-root.expanded ~ .stage { display: none; }
 .stage-figure {
-  /* Her own height (--fig-height, 0.5–1, from her sprite): the figure shrinks from its bottom edge. */
-  --fig-hh: calc(var(--fig-h) * var(--fig-height, 1));
+  --fig-hh: var(--fig-h);
   position: absolute;
   bottom: calc(var(--feed-bottom) + var(--box-h) - 13.5px);
   height: var(--fig-hh);
@@ -966,13 +973,14 @@
 .stage-left { left: var(--edge-x); }
 .stage-right { right: var(--edge-x); }
 /* Classic visual novel: you and your contact stand up from the floor, the whole sprite (not the crop's
-   band) --fig-full tall, cut off below the screen, the box laid over your waists. A shorter one
-   (--fig-height) scales down from the floor. Portraits, monograms and silhouettes still stand on the box. */
+   band) --fig-full tall, cut off below the screen, the box laid over your waists. Everyone is the same
+   size: --fig-drop (stage.ts, figureDrop) stands her lower or higher so her waist meets the shared line.
+   Portraits, monograms and silhouettes still stand on the box. */
 :root { --fig-full: 1035px; --fig-floor: -270px; --fig-x: 112px; }
 .stage-left[data-kind='sprite'],
 .stage-right[data-kind='sprite'] {
-  --fig-hh: calc(var(--fig-full) * var(--fig-height, 1));
-  bottom: var(--fig-floor);
+  --fig-hh: var(--fig-full);
+  bottom: calc(var(--fig-floor) - var(--fig-drop, 0) * var(--fig-full));
   width: calc(var(--fig-hh) * var(--fig-aspect, 0.667));
   -webkit-mask-image: none;
   mask-image: none;
@@ -1800,7 +1808,7 @@ body.ui-hidden > #devpanel {
 
 /* Quest lines (spec 2026-10-16 §3): cyan is the written story. The cards dock under the HUD (the subtitle box owns the space over the prompt). */
 .hud-quest { pointer-events: auto; cursor: pointer; margin-left: 1.1em; color: #e9def9; }
-.hud-quest u { text-decoration: none; }
+.hud-quest u { text-decoration: none; pointer-events: none; }
 .hud-bar.alt-held .hud-quest u { text-decoration: underline; text-decoration-color: var(--agent); text-decoration-thickness: 2px; text-underline-offset: 3px; }
 .hud-quest:hover, .hud-quest:focus-visible { outline: none; color: #fff; }
 .qc-host {
@@ -1993,6 +2001,10 @@ body.ui-hidden > #devpanel {
 .db-totals { display: flex; flex-wrap: wrap; gap: 4px 18px; margin-top: 8px; font: 15px var(--pixel); letter-spacing: 0.16em; color: #e3f6fb; }
 .db-sol { color: #ffc56b; font-variant-numeric: tabular-nums; }
 .db-heat { color: #ffb36b; }
+.db-heat-why,
+.db-heat-now { flex-basis: 100%; font-size: 13px; line-height: 1.4; letter-spacing: 0.1em; }
+.db-heat-why { color: #ffd9b0; }
+.db-heat-now { color: #ff8f6b; }
 .db-cross,
 .db-trust { color: #7fe9ff; }
 .db-cover { color: #ffc56b; }
@@ -2025,6 +2037,7 @@ body.ui-hidden > #devpanel {
 .dp-cipher-none { color: rgba(127, 233, 255, 0.55); }
 .dp-cipher-truth { padding: 4px 6px; border-left: 2px solid rgba(255, 197, 107, 0.6); }
 .dp-cipher-truth.out { opacity: 0.55; }
+.dp-cipher-truth.cold { opacity: 0.4; border-left-color: rgba(160, 160, 160, 0.5); }
 .dp-cipher-head { color: rgba(127, 233, 255, 0.85); }
 .dp-cipher-text { color: #ffe1ea; }
 .dp-cipher-meta { white-space: pre-wrap; color: rgba(255, 217, 230, 0.6); }

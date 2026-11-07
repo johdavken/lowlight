@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkNewTruth, cipherBlock, cipherDue, cipherNarratorBlock, clueOnPage, foldCipher, looseEnds, parseCipherEvents, storyProse, type CipherEvent, type NewTruth, type TruthKind } from './cipher';
+import { CIPHER, checkNewTruth, cipherBlock, cipherDue, cipherNarratorBlock, clueOnPage, foldCipher, looseEnds, parseCipherEvents, storyProse, type CipherEvent, type NewTruth, type TruthKind } from './cipher';
 
 let seq = 0;
 const truth = (id: string, kind: TruthKind, knownBy: string[], over: Partial<NewTruth> = {}): CipherEvent => ({
@@ -57,6 +57,54 @@ describe('foldCipher', () => {
 
   it('nothing at all: no truths, no last run', () => {
     expect(foldCipher([], 7)).toEqual({ truths: [], replies: 7, lastRun: null });
+  });
+});
+
+describe('cold truths', () => {
+  // A truth born at `at` replies; a clue seen at `at` replies (events from before 2026-11-07 carry neither).
+  const born = (id: string, kind: TruthKind, knownBy: string[], at: number): CipherEvent => ({ ...(truth(id, kind, knownBy) as Extract<CipherEvent, { t: 'truth' }>), replies: at });
+  const seen = (id: string, at: number, text = 'a clue'): CipherEvent => ({ ...(clue(id, text) as Extract<CipherEvent, { t: 'clue' }>), messageId: `m${at}`, replies: at });
+  const states = (s: ReturnType<typeof foldCipher>) => s.truths.map((t) => [t.id, t.state]);
+
+  it(`an open truth with no clue for ${CIPHER.coldAfter} replies goes cold`, () => {
+    expect(states(foldCipher([[born('a-1', 'self', ['nix'], 10)]], 10 + CIPHER.coldAfter - 1))).toEqual([['a-1', 'open']]);
+    expect(states(foldCipher([[born('a-1', 'self', ['nix'], 10)]], 10 + CIPHER.coldAfter))).toEqual([['a-1', 'cold']]);
+  });
+
+  it('a clue keeps it warm: the count starts again from the clue', () => {
+    const s = foldCipher([[born('a-1', 'self', ['nix'], 10), seen('a-1', 50)]], 50 + CIPHER.coldAfter - 1);
+    expect(states(s)).toEqual([['a-1', 'open']]);
+  });
+
+  it('a learned truth stays out, never cold', () => {
+    expect(states(foldCipher([[born('a-1', 'self', ['nix'], 0), learned('a-1')]], 500))).toEqual([['a-1', 'out']]);
+  });
+
+  it('a cold truth frees its kind and its keeper for the run that replaces it', () => {
+    const later = 10 + CIPHER.coldAfter;
+    const s = foldCipher([[born('a-1', 'self', ['nix'], 10), run(later), born('b-1', 'self', ['nix'], later)]], later + 5);
+    expect(states(s)).toEqual([['a-1', 'cold'], ['b-1', 'open']]);
+  });
+
+  it('a clue written after it went cold (another contact racing) neither attaches nor warms it', () => {
+    const s = foldCipher([[born('a-1', 'self', ['nix'], 0), seen('a-1', CIPHER.coldAfter + 1)]], CIPHER.coldAfter + 2);
+    expect(states(s)).toEqual([['a-1', 'cold']]);
+    expect(s.truths[0].clues).toEqual([]);
+  });
+
+  it("a truth from before replies were stored is dated by the run before it in its list; old clues don't warm", () => {
+    const s = foldCipher([[run(26), truth('a-1', 'place', ['cass']), clue('a-1'), truth('a-2', 'city', [])]], 26 + CIPHER.coldAfter);
+    expect(states(s)).toEqual([['a-1', 'cold'], ['a-2', 'cold']]);
+    expect(cipherDue(s)).toBe(true);
+  });
+
+  it('cold truths leave her block and the narrator\'s, and their seen clues stay loose ends', () => {
+    const s = foldCipher([[born('a-1', 'self', ['nix'], 0), seen('a-1', 5, 'a burned receipt')]], 5 + CIPHER.coldAfter);
+    expect(cipherBlock(s.truths, 'nix', 'Hicks')).toBeNull();
+    expect(cipherNarratorBlock(s.truths)).toBeNull();
+    const v = looseEnds(s, (id) => id);
+    expect(v.open).toEqual([[{ text: 'a burned receipt', place: 'karasu/noodle-stall', at: 100 }]]);
+    expect(v.solved).toEqual([]);
   });
 });
 

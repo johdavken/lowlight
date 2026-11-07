@@ -8,6 +8,8 @@ with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A collector is sitting on the Intake's stairs, waiting for a client to come out. He bought her debt this week.
+posted-by: Nix, for a client stuck in the quiet room.
+brief: Marek, a debt collector, is sitting on the Intake's stairs waiting for her to come out. He bought her debt this week. Get him off the stairs.
 pay: 90-110
 minutes: 20
 posts: 20:00-02:00

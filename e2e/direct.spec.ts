@@ -38,10 +38,10 @@ test('nix-direct: a reply on GLM, a tool call, switching model, regenerate, a cr
   await expect(page.locator('.fighter.p2 .fighter-file')).toContainText('GLM 5.2');
   await page.locator(`.tile[data-id="${DIRECT.id}"]`).click();
   await expect(phase(page)).toHaveAttribute('data-phase', 'model');
-  await expect(page.locator('.model-panel .mp-row.on .mp-label')).toHaveText('GLM 5.2');
+  await expect(page.locator('.model-band .mp-row.on .mp-label')).toHaveText('GLM 5.2');
   // Her current model, then the recent ones (the shipped picks aren't in the fake catalog, so they hide).
-  await expect(page.locator('.model-panel .mp-row')).toHaveCount(DIRECT.models.length);
-  await expect(page.locator('.model-panel .mp-link[data-provider="openrouter"]')).toContainText('$9.50');
+  await expect(page.locator('.model-band .mp-row')).toHaveCount(DIRECT.models.length);
+  await expect(page.locator('.model-band .mb-summary')).toContainText('$9.50');
   await page.keyboard.press('Enter'); // keep GLM
   await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
   await page.keyboard.press('Enter');
@@ -409,7 +409,7 @@ test('dice: DICE opens the tray, Esc closes it', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('YOU, PEOPLE, TEXTS, QUEST, CREW and MAP: a bar word switches between them, and Tab cycles YOU → PEOPLE → TEXTS → QUEST → CREW → MAP', async ({ page }) => {
+test('YOU, PEOPLE, TEXTS, QUEST, CREW and MAP: a bar word switches between them, and Tab cycles YOU → PEOPLE → TEXTS → QUEST → CREW → MAP → BOOK', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await skipSplash(page);
   await page.goto(`/room/${DIRECT.id}?as=hicks`);
@@ -449,8 +449,13 @@ test('YOU, PEOPLE, TEXTS, QUEST, CREW and MAP: a bar word switches between them,
   await page.keyboard.press('Tab');
   await expect(page.locator('#map')).toBeVisible();
   await page.keyboard.press('Tab');
-  await expect(page.locator('.character-sheet')).toBeVisible();
+  await expect(page.locator('.lb-root')).toBeVisible();
   await expect(page.locator('#map')).toBeHidden();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.character-sheet')).toBeVisible();
+  await expect(page.locator('.lb-root')).toBeHidden();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.locator('.lb-root')).toBeVisible();
   await page.keyboard.press('Shift+Tab');
   await expect(page.locator('#map')).toBeVisible();
   // The map opens on the whole city with no card once its data loads (map pins spec §1), so one Esc closes it.

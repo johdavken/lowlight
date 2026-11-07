@@ -1,6 +1,7 @@
 ---
 title: Nix's Walk-up
 category: Places
+section: Karasu
 keys: [Nix's place, Nix's apartment, Nix's walk-up, the walk-up]
 districts: []
 places: [nix-walk-up]

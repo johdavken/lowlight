@@ -60,6 +60,8 @@ interface Entry {
   tools: HTMLElement;
   /** The row under the text: the tool lines, then the controls and [CONTINUE] (side by side in the box). */
   foot: HTMLElement;
+  /** Tool lines shown here that came with no reply in progress: the server doesn't save them, so a redraw adds them back. */
+  looseLines: string[];
   /** Roleplay messages split out *actions* as they stream; null out of character. */
   markup: Markup | null;
   /** The whole text so far, split for rendering (out of character: plain). */
@@ -721,7 +723,9 @@ export class Feed {
       // text the stream never produced (a regenerate that failed before any: the old reply restored).
       const unstreamed = existing.msg.status === 'streaming' && existing.msg.text === '' && m.status !== 'streaming';
       if (this.typing?.id === m.id && (unstreamed || !m.text.startsWith(existing.msg.text))) this.finishTyping();
-      const fresh = this.build(m, false);
+      // The server's copy never had the lines that came after its turn.
+      const fresh = this.build({ ...m, toolLines: [...m.toolLines, ...existing.looseLines] }, false);
+      fresh.looseLines = existing.looseLines;
       existing.node.replaceWith(fresh.node);
       this.entries.set(m.id, fresh);
     } else {
@@ -775,10 +779,13 @@ export class Feed {
   }
 
   toolLine(id: string | null, text: string): void {
-    const entry = id === null ? undefined : this.entries.get(id);
+    // No reply in progress (a mood landing after the turn): in the box it joins the line showing. In the
+    // flow it would take height the page has already spent, pushing the name off the top and sitting on the footer (playtest).
+    const entry = id === null ? this.shownEntry() : this.entries.get(id);
     if (id !== null && !entry) return this.warnUnknown('tool_line', id);
     if (entry) {
       entry.msg = { ...entry.msg, toolLines: [...entry.msg.toolLines, text] };
+      if (id === null) entry.looseLines.push(text);
       const row = toolRow(text);
       row.classList.add('live');
       entry.tools.append(row);
@@ -788,6 +795,13 @@ export class Feed {
       this.list.append(row);
     }
     this.refresh();
+  }
+
+  /** Stage mode: the line the box shows, if there is one. */
+  private shownEntry(): Entry | undefined {
+    if (!this.stage) return undefined;
+    const all = [...this.list.children] as HTMLElement[];
+    return this.entries.get(all[this.currentIndex(all)]?.dataset.id ?? '');
   }
 
   expand(): void {
@@ -946,7 +960,7 @@ export class Feed {
     const tools = el('div', 'tools');
     const foot = el('div', 'foot');
     node.append(head, text, foot);
-    return { msg: m, node, text, tools, foot, markup: null, segments: [], beats: [], stranger: null, beatMargins: null };
+    return { msg: m, node, text, tools, foot, looseLines: [], markup: null, segments: [], beats: [], stranger: null, beatMargins: null };
   }
 
   private build(m: ChatMessage, live: boolean): Entry {
@@ -981,7 +995,7 @@ export class Feed {
     let shown = m.text;
     if (m.mode === 'quest' && m.role === 'user' && m.quest) {
       node.classList.add('quest-row');
-      node.append(el('div', 'qr-head', `◆ QUEST · ${m.quest.title.toUpperCase()}`));
+      node.append(el('div', 'qr-head', `◆ ${m.quest.run ? 'JOB' : 'QUEST'} · ${m.quest.title.toUpperCase()}`));
       const pick = m.quest.pick?.line;
       if (pick && shown.startsWith(pick)) {
         node.append(el('div', 'qr-pick', pick));
@@ -1025,7 +1039,7 @@ export class Feed {
       node.append(status);
     }
 
-    return { msg: m, node, text, tools, foot, markup, segments, beats, stranger, beatMargins: null };
+    return { msg: m, node, text, tools, foot, looseLines: [], markup, segments, beats, stranger, beatMargins: null };
   }
 
   /** Re-applies the collapsed window (and paging) and keeps the view pinned to the newest entry. */
@@ -1038,7 +1052,7 @@ export class Feed {
     const paged = this.applyPaging(all, current);
     if (!this._expanded) {
       const cut = this.stage ? current : paged ? all.length - 1 : all.length - COLLAPSED_VISIBLE;
-      // In the box, only standalone tool lines may follow the current message (an empty reply waits).
+      // In the box nothing shows after the current message (an empty reply waits).
       // The opening scene's card is the banner's while collapsed: the archive shows it in its place.
       all.forEach((n, i) => n.classList.toggle('hidden-collapsed', i < cut || (this.stage && i > cut && n.classList.contains('msg')) || n.classList.contains('scene-entry') || n.classList.contains('encounter-entry') || n.classList.contains('quest-row')));
     }
@@ -1056,10 +1070,8 @@ export class Feed {
 
     const nearBottom = this.list.scrollHeight - this.list.scrollTop - this.list.clientHeight < 80;
     if (this.stage && !this._expanded) {
-      // The box shows its line from the top, where the nameplate sits. (Measured now, the box may
-      // still be growing to fit.) Tool lines after the line scroll it up to show them.
-      const trailing = current >= 0 && current < all.length - 1;
-      this.list.scrollTop = trailing ? this.list.scrollHeight : 0;
+      // The box shows its line from the top, where the nameplate sits.
+      this.list.scrollTop = 0;
     } else if (forceBottom || nearBottom || !this._expanded) this.list.scrollTop = this.list.scrollHeight;
   }
 

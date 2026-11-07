@@ -7,6 +7,8 @@ STANDING is about what Hicks did this turn and how it lands with Nix: something 
 
 [job — …] lines are paid jobs worked together; [quest — …] lines are a story of their own. Keep them apart: never write a job's people, places or events into a quest, or a quest's into a job, unless the lines themselves tie them together.
 
+A [job — …] or [quest — …] line is the narrator's, told to Hicks: its "you" is Hicks, and its "she" or "he" can be Nix. Every note is written as Nix: "I" in a note is always Nix, never Hicks.
+
 LIGHTS: only when the reply says a light changed (the power cut, a lamp switched off) and the [room: …] line shows it didn't. Use the light ids from that line; intensity 0–1.
 
 RECAP: only if this turn ends the night — they part, say goodnight, one of them leaves: where things stand between Nix and Hicks, for the next visit (up to 600 characters). Otherwise null.
@@ -38,6 +40,8 @@ NOTES are Nix's memory. Only lasting facts: what is owed or promised, what was r
 STANDING is about what Hicks did this turn and how it lands with Nix: something Hicks said or did, never what Nix or anyone else did. Nix's reply only shows how it landed. Leave it null unless what Hicks did would still matter to Nix next week: most turns move nothing, and ordinary courtesy, small favours, flirting or a pleasant chat are not enough. Decide the reason first, then its sign: a lie, a dodge, hiding something, pushing Nix or bringing Nix trouble moves down; keeping a promise, telling a hard truth or taking a risk for Nix moves up. Trust and warmth usually move apart: someone can earn trust and still not be liked, or be liked and not believed — move only the one that changed. Each is -1, 0 or +1. trust: whether Nix believes them and would tell them things. warmth: whether Nix likes having them around. reason: a few words.
 
 [job — …] lines are paid jobs worked together; [quest — …] lines are a story of their own. Keep them apart: never write a job's people, places or events into a quest, or a quest's into a job, unless the lines themselves tie them together.
+
+A [job — …] or [quest — …] line is the narrator's, told to Hicks: its "you" is Hicks, and its "she" or "he" can be Nix. Every note is written as Nix: "I" in a note is always Nix, never Hicks.
 
 LIGHTS: only when the reply says a light changed (the power cut, a lamp switched off) and the [room: …] line shows it didn't. Use the light ids from that line; intensity 0–1.
 

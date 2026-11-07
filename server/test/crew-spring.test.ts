@@ -209,7 +209,19 @@ describe('gives: recruit at a job end (crew spec §5)', () => {
     expect(run.done).toBe(true);
     expect(run.recruit).toEqual({ spec: 'muscle', grade: 1 });
     const debrief = t.db.recentMessages('hicks', 20).flatMap((m) => (m.quest?.debrief ? [m.quest.debrief as Debrief] : [])).at(-1)!;
-    expect(debrief.recruit).toBe('RECRUIT · SAIDA RAHM WANTS IN');
+    expect(debrief.recruit).toBe('RECRUIT · SAIDA RAHM · FREE AT HAES-NOODLES UNTIL 06:00');
+  });
+
+  it('{hire} in the ending is the name on the card, and the draw gets what the job wrote', async () => {
+    const gift = entry('night-shift', MISSION.replace('*Clean.*\npay: 400\n', '*{hire} is at the door.*\npay: 400\ngives: recruit muscle hand man\nhire-pitch: I lift.\n'));
+    const t = relayWith({ book: [gift], dezEvents: [], rolls: [6, 6] });
+    await t.relay.startQuest('hicks', 'night-shift');
+    await t.relay.chooseQuest('hicks', { id: 'night-shift', beat: 'door', choice: 'roof' });
+    await t.relay.chooseQuest('hicks', { id: 'night-shift', beat: 'desk', choice: 'wipe' });
+    const rows = t.db.recentMessages('hicks', 20).map((m) => m.text).join('\n');
+    expect(rows).toContain('Saida Rahm is at the door.');
+    expect(rows).not.toContain('{hire}');
+    expect(parseRun(t.db.getMeta(questKey('hicks', 'night-shift@0')))!.recruit).toEqual({ spec: 'muscle', grade: 1, sex: 'man', pitch: 'I lift.' });
   });
 
   it('on a full roster the line says so (deferred minor)', async () => {
@@ -218,7 +230,7 @@ describe('gives: recruit at a job end (crew spec §5)', () => {
     await t.relay.chooseQuest('hicks', { id: 'night-shift', beat: 'door', choice: 'roof' });
     await t.relay.chooseQuest('hicks', { id: 'night-shift', beat: 'desk', choice: 'wipe' });
     const debrief = t.db.recentMessages('hicks', 20).flatMap((m) => (m.quest?.debrief ? [m.quest.debrief as Debrief] : [])).at(-1)!;
-    expect(debrief.recruit).toBe('RECRUIT · SAIDA RAHM WANTS IN · NO FREE SLOT');
+    expect(debrief.recruit).toBe('RECRUIT · SAIDA RAHM · AT HAES-NOODLES UNTIL 06:00 · NO FREE SLOT');
   });
 });
 

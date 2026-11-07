@@ -15,7 +15,7 @@ export interface Player {
   line: string | null;
   /** The "who's here" block (system message), or null for 'you' without a persona. */
   whosHere: string | null;
-  sprite: { file: string; crop: Crop; height?: number; pixel?: true } | null;
+  sprite: { file: string; crop: Crop; waist?: number; pixel?: true } | null;
   /** The character's tagline; absent under a playthrough persona (her file isn't theirs). */
   tagline?: string;
 }
@@ -52,7 +52,7 @@ function fromRecord(rec: AgentRecord): Player {
     whosHere: whosHereBlock(info.name, info.pronoun, { tagline: info.tagline, bio: info.bio, facts: info.facts }),
     ...(info.tagline ? { tagline: info.tagline } : {}),
     sprite: rec.sprite
-      ? { file: rec.sprite.file, crop: rec.sprite.crop, ...(rec.sprite.height !== undefined ? { height: rec.sprite.height } : {}), ...(rec.sprite.pixel ? { pixel: true as const } : {}) }
+      ? { file: rec.sprite.file, crop: rec.sprite.crop, ...(rec.sprite.waist !== undefined ? { waist: rec.sprite.waist } : {}), ...(rec.sprite.pixel ? { pixel: true as const } : {}) }
       : null,
   };
 }

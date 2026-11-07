@@ -262,6 +262,22 @@ describe('playthroughs', () => {
     expect('outfit' in file).toBe(false);
   });
 
+  it('setContactOutfit picks per contact and clears to none; a save and its branch keep the picks', () => {
+    const { root, pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    pts.setContactOutfit(pt.id, 'ember', 'home');
+    pts.setContactOutfit(pt.id, 'nix', 'coat');
+    expect(pts.get(pt.id)!.contactOutfits).toEqual({ ember: 'home', nix: 'coat' });
+    const saved = pts.save(pt.id, req({ kind: 'manual' }), fakeDbs({ nix: [1, 1] }));
+    if (saved === 'unchanged') throw new Error('expected a save');
+    expect(pts.fork(saved.id).contactOutfits).toEqual({ ember: 'home', nix: 'coat' });
+    pts.setContactOutfit(pt.id, 'ember', null);
+    expect(pts.get(pt.id)!.contactOutfits).toEqual({ nix: 'coat' });
+    pts.setContactOutfit(pt.id, 'nix', null);
+    const file = JSON.parse(fs.readFileSync(path.join(root, pt.id, 'playthrough.json'), 'utf8'));
+    expect('contactOutfits' in file).toBe(false);
+  });
+
   it('a checkpoint with the same fingerprint but a different solo is written (final review 3)', () => {
     const { pts } = make();
     const pt = pts.create({ player: 'hicks', startContact: 'nix' });

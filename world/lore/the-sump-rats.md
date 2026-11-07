@@ -1,6 +1,7 @@
 ---
 title: The Sump-Rats
 category: Factions
+section: Gangs
 keys: [Sump-Rats, Sump Rats, sump rat, boat crews, Marsh gang, salvage, tide lines]
 districts: [marsh]
 places: []

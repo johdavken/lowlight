@@ -85,3 +85,20 @@ describe('Paid Off and the grade (tier 3 beat play spec §2)', () => {
   it('a part take stays messy', () => expect(outcomeTier({ take: 'part', blown: false, alarm: 3, paidOff: true })).toBe('messy'));
   it('blown stays blown', () => expect(outcomeTier({ take: 'full', blown: true, alarm: 3, paidOff: true })).toBe('blown'));
 });
+
+describe('the pocket deck everyone owns', () => {
+  const start = { nerveMax: 3, from: 0, pocket: 'pocket-deck' };
+  it('sits beside the deck you start with, which stays carried', () => {
+    const k = foldKit({ ...start, deck: 'field-deck' }, [], 0);
+    expect(k.deck).toBe('field-deck');
+    expect(k.owned).toEqual(['field-deck', 'pocket-deck']);
+  });
+  it('is carried by someone who starts with nothing else, and listed once by someone who starts with it', () => {
+    expect(foldKit({ ...start, deck: null }, [], 0)).toMatchObject({ deck: 'pocket-deck', owned: ['pocket-deck'] });
+    expect(foldKit({ ...start, deck: 'pocket-deck' }, [], 0).owned).toEqual(['pocket-deck']);
+  });
+  it('CARRY swaps to it, and losing the other deck leaves it', () => {
+    expect(foldKit({ ...start, deck: 'field-deck' }, [{ at: 0, deck: 'pocket-deck', carry: true }], 0).deck).toBe('pocket-deck');
+    expect(foldKit({ ...start, deck: 'field-deck' }, [{ at: 0, deck: null }], 0)).toMatchObject({ deck: null, owned: ['pocket-deck'] });
+  });
+});

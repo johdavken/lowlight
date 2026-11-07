@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { LORE_TEST_MAP } from './lore.fixture';
-import { categoryFile, categoryId, findRepeat, looseEntry, LORE_DRAFT_INSTRUCTION, loreDraftPrompt, parseDraft, splitDrafts, LORE_HEADER, locate, loreBlock, loreFile, loreId, loreLogLine, mapIds, parseCategoryFile, parseLoreFile, selectLore, LORE_BUDGET, type LoreEntry } from './lore';
+import { categoryFile, categoryId, findRepeat, looseEntry, LORE_DRAFT_INSTRUCTION, loreDraftPrompt, parseDraft, splitDrafts, LORE_HEADER, locate, loreBlock, loreFile, loreId, loreLogLine, mapIds, parseCategoryFile, parseLoreFile, selectLore, LORE_BUDGET, loreKeyMatches, loreShort, LORE_SCORE, type LoreEntry } from './lore';
 
 const MAP = LORE_TEST_MAP;
 const IDS = mapIds(MAP);
@@ -44,7 +44,7 @@ describe('parseLoreFile', () => {
   it('loreFile round-trips', () => {
     const entries: LoreEntry[] = [
       { id: 'a', title: 'A: colon', keys: ['x y', "o'brien"], districts: [], places: [], always: false, body: 'Line one.\n\nLine "two".' },
-      { id: 'lowlight', title: 'Lowlight', category: 'City', keys: [], districts: ['karasu'], places: ['haes-noodles'], always: true, body: 'The city.' },
+      { id: 'lowlight', title: 'Lowlight', category: 'City', section: 'Basics', keys: [], districts: ['karasu'], places: ['haes-noodles'], always: true, body: 'The city.' },
     ];
     for (const e of entries) expect(parseLoreFile(e.id, loreFile(e), IDS)).toEqual({ ok: true, entry: e });
   });
@@ -92,6 +92,61 @@ describe('parseLoreFile', () => {
 
   it('accepts Windows line endings', () => {
     expect(parseLoreFile('glass-orchid', ORCHID.replace(/\n/g, '\r\n'), IDS).ok).toBe(true);
+  });
+});
+
+describe('only: who reads an entry', () => {
+  const file = (front: string) => `---\ntitle: T\n${front}\n---\nBody.\n`;
+
+  it('round-trips, after section, and stays off the file when it is both', () => {
+    const r = parseLoreFile('t', file('category: City\nsection: Slang\nonly: book\nkeys: [kk]'), null);
+    expect(r.ok && r.entry.only).toBe('book');
+    expect(r.ok && loreFile(r.entry)).toContain('section: Slang\nonly: book\nkeys:');
+    const plain = parseLoreFile('t', file('keys: [kk]'), null);
+    expect(plain.ok && 'only' in plain.entry).toBe(false);
+    expect(plain.ok && loreFile(plain.entry)).not.toContain('only:');
+  });
+
+  it('refuses any other reader', () => {
+    const r = parseLoreFile('t', file('only: everyone\nkeys: [kk]'), null);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.problems.map((p) => p.field)).toContain('only');
+  });
+
+  it('a book-only entry needs nothing to bring it in; any other still does', () => {
+    expect(parseLoreFile('t', file('only: book'), null).ok).toBe(true);
+    expect(parseLoreFile('t', file('only: model'), null).ok).toBe(false);
+    expect(parseLoreFile('t', file('category: City'), null).ok).toBe(false);
+  });
+
+  it('a book-only entry cannot be always', () => {
+    const r = parseLoreFile('t', file('only: book\nalways: true'), null);
+    expect(!r.ok && r.problems.map((p) => p.field)).toEqual(['only']);
+  });
+
+  it('a file the game would skip keeps its reader in the form', () => {
+    expect(looseEntry('t', file('only: model\nplaces: [nowhere]\nbad: 1'), null).only).toBe('model');
+    expect(looseEntry('t', file('only: everyone\nbad: 1'), null).only).toBeUndefined();
+  });
+
+  it('the model never reads a book-only entry, by any road', () => {
+    const word = { id: 'w', title: 'W', only: 'book' as const, keys: ['hum'], districts: ['d'], places: ['p'], always: false, body: 'x' };
+    const sel = selectLore([word], { placeId: 'p', districtId: 'd', recent: ['the hum'], force: ['w'] });
+    expect(sel.picks).toEqual([]);
+    expect(sel.dropped).toEqual([]);
+  });
+
+  it('the model reads its own entries', () => {
+    const own = { id: 'm', title: 'M', only: 'model' as const, keys: [], districts: [], places: [], always: true, body: 'x' };
+    expect(selectLore([own], { placeId: null, districtId: null, recent: [] }).picks.map((p) => p.entry.id)).toEqual(['m']);
+  });
+
+  it('COPY FOR OPUS shows every entry, and shapes its example on one both read', () => {
+    const e = (id: string, title: string, only?: 'book') => ({ id, title, category: 'City', ...(only ? { only } : {}), keys: ['k'], districts: [], places: [], always: false, body: `${title} text.` });
+    const out = loreDraftPrompt({ book: [e('a', 'Aardvark', 'book'), e('b', 'Basics')], map: null, category: 'City', template: null });
+    expect(out).toContain('Aardvark: Aardvark text.');
+    expect(out).toContain('title: Basics');
+    expect(out).not.toContain('only: book');
   });
 });
 
@@ -354,6 +409,18 @@ describe('the drafting prompt asks for one fenced block', () => {
   });
 });
 
+describe('loreDraftPrompt asks for the sections a category has', () => {
+  const e = (id: string, section?: string): LoreEntry => ({ id, title: id, category: 'City', ...(section ? { section } : {}), keys: ['key'], districts: [], places: [], always: false, body: 'x' });
+
+  it('names them, sorted, once each', () => {
+    expect(loreDraftPrompt({ book: [e('a', 'Slang'), e('b', 'Corps'), e('c', 'Corps'), e('d')], map: null, category: 'City', template: null })).toContain('Give each entry a section line, after category: Corps, Slang.');
+  });
+
+  it('says nothing of them in a category without any', () => {
+    expect(loreDraftPrompt({ book: [e('a')], map: null, category: 'City', template: null })).not.toContain('section');
+  });
+});
+
 describe('loreDraftPrompt keeps drafts true to what exists', () => {
   const book = [
     E('lowlight', { title: 'Lowlight', always: true, body: 'A coastal sprawl.' }),
@@ -470,5 +537,119 @@ describe('mentionsKeys', () => {
     expect(mentionsKeys('How is your BROTHER doing?', ['brother', 'teo'])).toBe(true);
     expect(mentionsKeys('brotherhood of the marsh', ['brother'])).toBe(false);
     expect(mentionsKeys('nothing here', [])).toBe(false);
+  });
+});
+
+describe('lore picking (spec 2026-11-07)', () => {
+  const e = (id: string, o: Partial<LoreEntry> = {}): LoreEntry => ({ id, title: id, keys: [], districts: [], places: [], always: false, body: `${id.toUpperCase()} one. ${id.toUpperCase()} two. ${id.toUpperCase()} three.`, ...o });
+  const at = (recent: Parameters<typeof selectLore>[1]['recent'], o: Partial<Parameters<typeof selectLore>[1]> = {}) => ({ placeId: null, districtId: null, recent, ...o });
+  const ids = (sel: ReturnType<typeof selectLore>) => sel.picks.map((p) => p.entry.id);
+  const her = (text: string) => ({ text, by: 'them' as const });
+  const you = (text: string) => ({ text, by: 'you' as const });
+
+  describe('§1 case in her lines', () => {
+    it('a capitalised key keeps its capitals in her line, not in yours', () => {
+      expect(loreKeyMatches('Shelf', 'a shelf of binders', true)).toBe(false);
+      expect(loreKeyMatches('Shelf', 'up on the Shelf', true)).toBe(true);
+      expect(loreKeyMatches('Shelf', 'a shelf of binders', false)).toBe(true);
+    });
+    it('a lowercase key matches any case; a leading "the" either case; its lowercase words any case', () => {
+      expect(loreKeyMatches('the tide', 'The tide is in.', true)).toBe(true);
+      expect(loreKeyMatches('The Tilt', 'down at the Tilt', true)).toBe(true);
+      expect(loreKeyMatches('The Tilt', 'the tilt of her head', true)).toBe(false);
+      expect(loreKeyMatches("the Cat's up", 'THE Cat’s Up', true)).toBe(true);
+      expect(loreKeyMatches('the Wheel', 'behind the wheel', true)).toBe(false);
+    });
+    it('selectLore checks case only on her lines', () => {
+      const shelf = e('shelf', { keys: ['the Shelf'] });
+      expect(ids(selectLore([shelf], at([her('it was on the shelf')])))).toEqual([]);
+      expect(ids(selectLore([shelf], at([you('it was on the shelf')])))).toEqual(['shelf']);
+    });
+  });
+
+  describe('§2 people in the scene', () => {
+    const twins = e('the-zhou-twins', { keys: ['Silas', 'Ember', 'Gumshoe'] });
+    it("a name of someone present is no way in; another key is", () => {
+      expect(ids(selectLore([twins], at(['Silas, look at this'], { present: ['Silas Zhou'] })))).toEqual([]);
+      expect(ids(selectLore([twins], at(['where is Ember?'], { present: ['Silas Zhou'] })))).toEqual(['the-zhou-twins']);
+      expect(ids(selectLore([twins], at(["Silas's counter"], { present: ['Nix'] })))).toEqual(['the-zhou-twins']);
+    });
+    it('a present name still leaves the place and district ways in', () => {
+      const hae = e('haes-noodles', { keys: ['Hae'], places: ['stall'] });
+      expect(ids(selectLore([hae], at(['Hae, a bowl'], { present: ['Hae'], placeId: 'stall' })))).toEqual(['haes-noodles']);
+    });
+  });
+
+  describe('§3 who said it', () => {
+    const tide = e('tide', { keys: ['the tide'] });
+    it('her newest line brings an entry in; her older lines do not', () => {
+      expect(ids(selectLore([tide], at([you('ok'), her('the tide is in')])))).toEqual(['tide']);
+      expect(ids(selectLore([tide], at([you('ok'), her('right'), you('and?'), her('the tide is in')])))).toEqual([]);
+    });
+    it('her newest reply split by speaker counts whole; a line of hers past one of yours does not', () => {
+      expect(ids(selectLore([tide], at([her('Silas: whatever'), her('Hae: the tide is in'), you('what is going on?')])))).toEqual(['tide']);
+      expect(ids(selectLore([tide], at([her('Silas: whatever'), you('hm'), her('Hae: the tide is in')])))).toEqual([]);
+    });
+    it('your older lines still do, scored lower with each line back', () => {
+      const s = selectLore([tide], at([you('ok'), her('right'), you('the tide is in')]));
+      expect(s.picks[0].score).toBe(LORE_SCORE.yourOlder);
+      const s2 = selectLore([tide], at([you('ok'), you('hm'), you('the tide is in')]));
+      expect(s2.picks[0].score).toBe(LORE_SCORE.yourOlder - LORE_SCORE.olderStep);
+    });
+  });
+
+  describe('§4 scores', () => {
+    it('your newest beats her newest; a one-word lowercase key counts less; the best way in wins', () => {
+      const a = e('a', { keys: ['the tide'] });
+      const b = e('b', { keys: ['carts'] });
+      const s = selectLore([a, b], at([you('carts'), her('the tide')]));
+      expect(s.picks.map((p) => [p.entry.id, p.score, p.size])).toEqual([
+        ['a', LORE_SCORE.herNewest, 'full'],
+        ['b', Math.round(LORE_SCORE.yourNewest * 0.6), 'full'],
+      ]);
+      const placed = e('p', { keys: ['the tide'], places: ['x'] });
+      expect(selectLore([placed], at([you('the tide')], { placeId: 'x' })).picks[0]).toMatchObject({ why: 'place', score: LORE_SCORE.place });
+    });
+    it('a gig, then the place, then your newest, then district', () => {
+      const g = e('g'), p = e('p', { places: ['x'] }), k = e('k', { keys: ['Venn'] }), d = e('d', { districts: ['y'] });
+      expect(ids(selectLore([d, k, p, g], at(['Venn'], { placeId: 'x', districtId: 'y', force: ['g'] })))).toEqual(['g', 'p', 'k', 'd']);
+    });
+  });
+
+  describe('§5 sizes', () => {
+    it('loreShort is the first two sentences, or null when that is all', () => {
+      expect(loreShort('One. Two! Three?')).toBe('One. Two!');
+      expect(loreShort('One. Two.')).toBeNull();
+    });
+    it('loreShort always starts at the start: initials, decimals and quotes are not sentence ends (review)', () => {
+      expect(loreShort('Halloran, P.I. is a holovid. It has run for decades. Fans quote it.')).toBe('Halloran, P.I. is a holovid. It has run for decades.');
+      expect(loreShort('It costs 3.5 creds. She sells it. Nobody asks.')).toBe('It costs 3.5 creds. She sells it.');
+      expect(loreShort('She told him "run." He ran. Later he came back.')).toBe('She told him "run." He ran.');
+    });
+    it('district background goes in short; always entries and high scores whole', () => {
+      const always = e('always', { always: true });
+      const d = e('d', { districts: ['y'] });
+      const p = e('p', { places: ['x'] });
+      const s = selectLore([always, d, p], at([], { placeId: 'x', districtId: 'y' }));
+      expect(s.picks.map((pk) => [pk.entry.id, pk.size, pk.entry.body])).toEqual([
+        ['always', 'full', 'ALWAYS one. ALWAYS two. ALWAYS three.'],
+        ['p', 'full', 'P one. P two. P three.'],
+        ['d', 'short', 'D one. D two.'],
+      ]);
+    });
+    it('a whole entry that will not fit goes short; a short one that will not fit is dropped', () => {
+      const big = (id: string, o: Partial<LoreEntry>) => e(id, { body: `${id.toUpperCase()} first. ${id.toUpperCase()} second. X${'x'.repeat(1100)}.`, ...o });
+      const book = [1, 2, 3, 4, 5, 6].map((n) => big(`p${n}`, { places: ['x'] }));
+      const s = selectLore(book, at([], { placeId: 'x' }));
+      expect(s.picks.filter((p) => p.size === 'full')).toHaveLength(5);
+      expect(s.picks.filter((p) => p.size === 'short').map((p) => p.entry.id)).toEqual(['p6']);
+      expect(s.chars).toBeLessThanOrEqual(LORE_BUDGET);
+      const tight = selectLore([big('a', { places: ['x'], body: 'y'.repeat(LORE_BUDGET - LORE_HEADER.length - 10) }), big('b', { places: ['x'] })], at([], { placeId: 'x' }));
+      expect(tight.dropped.map((d) => d.id)).toEqual(['b']);
+    });
+    it('the log line marks short picks', () => {
+      const s = selectLore([e('d', { districts: ['y'] })], at([], { districtId: 'y' }));
+      expect(loreLogLine(s)).toMatch(/^lore: d~ /);
+    });
   });
 });

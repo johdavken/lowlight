@@ -6,6 +6,28 @@ const BACKOFF_MAX_MS = 8000;
 const REFUSED_CODES = [4404, 4409, 4410] as const;
 export type RefusedCode = (typeof REFUSED_CODES)[number];
 
+const SERVER_POLL_MS = 500;
+
+/**
+ * Resolves once the game server answers. Vite serves the page while the server is still booting,
+ * and the room's load-time fetches (persona, kit, glossary) are asked once: lost to a restart, the
+ * room would stand without your figure until the next refresh. A 5xx is the dev proxy with nothing
+ * behind it; anything lower is the server, even a refusal.
+ */
+export async function serverUp(
+  ask: () => Promise<{ status: number }> = () => fetch('/api/bootstrap'),
+  wait: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
+): Promise<void> {
+  for (;;) {
+    try {
+      if ((await ask()).status < 500) return;
+    } catch {
+      // Nothing listening yet.
+    }
+    await wait(SERVER_POLL_MS);
+  }
+}
+
 /** The room socket's URL; `first` (the page's first connect) adds enter=1. */
 export function socketUrl(o: { proto: string; host: string; agentId: string; token: string; player: string | null; first: boolean }): string {
   const asParam = o.player !== null ? `&as=${encodeURIComponent(o.player)}` : '';

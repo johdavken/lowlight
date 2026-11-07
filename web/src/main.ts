@@ -16,7 +16,7 @@ import '@fontsource/libre-baskerville/700.css';
 import '@fontsource/share-tech-mono';
 import './ui/style.css';
 import type { Atmosphere, ChatMessage, ChatMode, ClientEvent, Crop, KitView, LinkStatus, OtherInfo, PersonaInfo, QuestState, ResidentInfo, RoomState, SceneDef, ServerEvent, SpriteRef } from '../../shared/types';
-import { connectSocket } from './net/socket';
+import { connectSocket, serverUp } from './net/socket';
 import { createRenderer, type Renderer } from './renderer';
 import type { EffectsState } from './renderer/effects';
 import { signalShape } from './renderer/signal-shape';
@@ -28,6 +28,8 @@ import { loadTextSpeed, saveTextSpeed, stepTextSpeed, textSpeedScale, type TextS
 import { applyTextSize, loadTextSize, saveTextSize, stepTextSize, type TextSize } from './ui/text-size';
 import { applyChatFont, loadChatFont, saveChatFont, stepChatFont, type ChatFont } from './ui/chat-font';
 import { loadMirror, saveMirror } from './ui/stage-mirror';
+import { loadFrameRate, maxFps, saveFrameRate, type FrameRate } from './ui/frame-rate';
+import { paceCssLoops, setFramePace } from './ui/frame-clock';
 import { applyChatKeys, loadChatKeys, saveChatKeys, type ChatKeys } from './ui/chat-keys';
 import type { ControlAction } from './ui/message-controls';
 import { Hud } from './ui/hud';
@@ -40,6 +42,7 @@ import { mapWho } from './ui/map/who';
 import { ModelMenu } from './ui/model-menu';
 import { modelLabel } from '../../shared/model-label';
 import { stageFaces } from './ui/stage-faces';
+import { WAIST_PULL } from './ui/figure';
 import { Stage, outfitFor, type FigureSource } from './ui/stage';
 import { StageLight } from './ui/stage-light';
 import { AudioEngine } from './audio/engine';
@@ -57,10 +60,11 @@ import { suggestLine, suggestLines, type SuggestDraft } from './net/suggest';
 import { openSuggestPanel } from './room/suggest-panel';
 import type { CardsPanel } from './room/cards-panel';
 import { EncounterPanel, ENCOUNTER_COPY, hereLine } from './room/encounter-panel';
-import { latestQuestStory, mountQuestCards } from './room/quest-cards';
+import { latestQuestStory, mountQuestCards, backToWait } from './room/quest-cards';
 import { mountJobTable, tableAction } from './room/table/job-table';
 import { mountSetup, setupLine, type SetupCard } from './room/table/setup';
 import { mountJobColumn } from './room/job-column';
+import { bookLines, mountBookDrawer, type BookFile } from './room/book-drawer';
 import { watchTables } from './room/table/shell';
 import { mountTips } from './room/table/tips';
 import { FLIP_CUE_URL, type TableCue } from './room/table/el';
@@ -77,7 +81,7 @@ import { encounterOptions } from './net/encounter';
 import { getNarratorThinking, putNarratorThinking } from './net/link';
 import { createDealer } from './room/encounter-dealer';
 import { TurnTracker } from './ui/turn-state';
-import { lastAgent, listenChromeKeys, markSkipIntro, reloadOnRestore, playerFromSearch, rememberAgent, routeFromPath, shouldPause, setFlash, showRoomNotice, takeFlash, takeSkipIntro, worldChangedPath } from './room/identity';
+import { chromeKey, lastAgent, listenChromeKeys, markSkipIntro, reloadOnRestore, playerFromSearch, rememberAgent, routeFromPath, shouldPause, setFlash, showRoomNotice, takeFlash, takeSkipIntro, worldChangedPath } from './room/identity';
 import { openSavePrompt, saveFailure } from './room/save-prompt';
 import { sceneDir } from './scene-paths';
 import { listenScreenCycle, type CycleScreen } from './room/screen-cycle';
@@ -88,7 +92,7 @@ import { openTexts, textsDeck, textsOwnsTab, type TextsDeck, type TextsHandle } 
 import { newDeckMemory } from './deck/deck-client';
 import { openCharacterSheet, type SheetPage, type SheetPlayer } from './room/character-sheet';
 import { fetchKit } from './net/kit';
-import { ApiError, branchFrom, contacts, goSolo, leads, listPlaythroughs, looseEnds, saveNow, setLocation, setOutfit, wait } from './net/playthroughs';
+import { ApiError, branchFrom, contactOutfits, contacts, goSolo, leads, listPlaythroughs, looseEnds, saveNow, setContactOutfit, setLocation, setOutfit, wait } from './net/playthroughs';
 import * as playthroughApi from './net/playthroughs';
 import { mountLoad } from './landing/load';
 import type { LandingAgent } from './landing/landing';
@@ -113,6 +117,7 @@ import { checkToPlay, type Shown } from './room/job-moment';
 import { openTerminal } from './ui/crack/terminal';
 import { crackCuePlayer } from './ui/crack/sound';
 import { installLoreCard, markLore, setGlossary } from './ui/lore-hover';
+import type { BookPage } from '../../shared/lore';
 import type { GlossaryEntry } from '../../shared/lore';
 import { missionCuePlayer, MISSION_CUE_URL } from './ui/mission-sound';
 
@@ -140,6 +145,8 @@ export interface NixRoomTestHook {
   /** One pixel of the room's frame (frame px), `[r, g, b]`. */
   pixelAt(x: number, y: number): [number, number, number];
   fps(): number;
+  /** The renderer's frame cap: 0 for none, -1 before it has loaded. */
+  maxFps(): number;
   warnings: string[];
   send(e: ClientEvent): void;
   /** The sound engine's state (Playwright can't listen). */
@@ -298,7 +305,8 @@ function startRoom(agentId: string): void {
   let comms: { on: boolean; can: boolean; where: string | null; herAt: string | null } = { on: false, can: false, where: null, herAt: null };
   const crops: { left: Crop; right: Crop } = { left: { top: 0, bottom: 0.5 }, right: { top: 0, bottom: 0.5 } };
   // Both callers run asynchronously (persona fetch, portrait event), after the dev panel below exists.
-  const showCrops = () => devPanel.setStageCrops(crops, (side, crop) => stage.setCrop(side, crop));
+  const waistPull = { value: WAIST_PULL, onChange: (v: number) => stage.setPull(v) };
+  const showCrops = () => devPanel.setStageCrops(crops, (side, crop) => stage.setCrop(side, crop), waistPull);
   stage.setLeft([{ kind: 'silhouette' }], 'YOU', '#7fe9ff');
   /** Liar's dice owns her face while its tray is up (set once the dice room exists, below). */
   let diceOpen = () => false;
@@ -329,6 +337,10 @@ function startRoom(agentId: string): void {
     initialMode: loadMode(),
     onModeChange: saveMode,
     onDraw: () => openEncounter(),
+    onDraft: () => {
+      if (bookDraftWait !== null) clearTimeout(bookDraftWait);
+      bookDraftWait = setTimeout(bookUpdate, BOOK_DRAFT_MS);
+    },
     onDice: () => openDice(),
     suggest: (steer) => openSuggest(steer),
     onWalkOut: () => void walkOut(),
@@ -397,13 +409,17 @@ function startRoom(agentId: string): void {
     const setup = now && now.id === at.id && now.beat === at.beat ? now.crack?.[choice] : undefined;
     if (setup) {
       const job = { id: at.id, beat: at.beat };
+      cracking = true;
       openTerminal(gameRoot(), {
         setup,
         title: now!.title,
         cue: crackCue,
         alarm: now!.alarm ?? 0,
         reduced: reducedMotion(),
-        onDone: ({ moves }) => socket?.send({ type: 'quest_choose', id: job.id, beat: job.beat, choice, moves }),
+        onDone: ({ moves }) => {
+          cracking = false;
+          socket?.send({ type: 'quest_choose', id: job.id, beat: job.beat, choice, moves });
+        },
       });
       return;
     }
@@ -453,6 +469,8 @@ function startRoom(agentId: string): void {
   let tableUp = false;
   /** The room a quest beat shows (view only): the contact stays home, on the inset; `null`: the real room. */
   let beatRoom: string | null = null;
+  /** The contact's on the line on this beat, with no room to bring it (`comms: yes`): the figure stays. */
+  let beatComms = false;
   /** The contact's figure, kept while a guest stands in the slot, and the room as the server has it. */
   let contactFigure: { chain: FigureSource[]; name: string; accent: string } | null = null;
   let realRoom: RoomState | null = null;
@@ -471,7 +489,7 @@ function startRoom(agentId: string): void {
       if (!gigWindow) roomAudio.overrideMusic(tableUp ? TABLE_MUSIC_URL : null, GIG_MUSIC_LEVEL);
       return;
     }
-    songList ??= fetch('/api/songs').then((r) => r.json() as Promise<{ songs: { title: string; url: string }[] }>).then((j) => j.songs).catch(() => {
+    songList ??= fetch('/api/songs').then((r) => r.json() as Promise<{ songs: { title: string; url: string }[]; beats: { title: string; url: string }[] }>).then((j) => [...j.beats, ...j.songs]).catch(() => {
       songList = null;
       return [];
     });
@@ -485,14 +503,44 @@ function startRoom(agentId: string): void {
   let tableDown: ReturnType<typeof setTimeout> | null = null;
   // The job's written text beside the subtitles while a table is up (the JOB column, 2026-11-02); the last table closing takes it.
   const jobColumn = mountJobColumn(byId('feed'), gameRoot(), () => feed.relayout());
+  /** The crack terminal is up: it isn't on the stage's modal list, and Esc is its to walk away with. */
+  let cracking = false;
+  /** Hears the draft a moment after the last key, not on each one. */
+  const BOOK_DRAFT_MS = 200;
+  let bookDraftWait: ReturnType<typeof setTimeout> | null = null;
+  /** Tells the drawer what's going on: it keeps the bar's count whether it's open or not. */
+  const bookUpdate = () =>
+    book.update({
+      lines: bookLines(feed.messages()),
+      draft: input.draft(),
+      sceneId: currentSceneId,
+      present: [partyYou.name, ...(partyContact ? [partyContact.name] : []), ...others.map((o) => o.name)],
+    });
+  // The lore drawer (spec 2026-11-06). Mounted here so its Esc comes ahead of SETUP's; the rest of its wiring is by the screens.
+  const book = mountBookDrawer(gameRoot(), {
+    files: () => bookFiles(),
+    onCount: (n) => hud.setBookCount(n),
+    onOpenChange: (on) => {
+      if (on) roomAudio.cue(MAP_CUE_URL, MAP_CUE_LEVEL);
+      byId('feed').classList.toggle('book-col', on);
+      hud.setBookOpen(on);
+      feed.relayout();
+    },
+    chatBox: () => document.querySelector<HTMLElement>('#input textarea'),
+    over: () => bookBlocked(),
+  });
   /** What the job table last put in the column: a SETUP card closing over its debrief hands the column back to it. */
-  let tableText: { title: string; text: string | undefined; rolls?: HTMLElement | null } | null = null;
-  const showTableText = (title: string, text: string | undefined, rolls?: HTMLElement | null) => {
-    tableText = { title, text, rolls };
-    jobColumn.show(title, text, undefined, rolls);
+  let tableText: { title: string; text: string | undefined; sub?: string; rolls?: HTMLElement | null } | null = null;
+  const showTableText = (title: string, text: string | undefined, sub?: string, rolls?: HTMLElement | null) => {
+    tableText = { title, text, sub, rolls };
+    jobColumn.show(title, text, sub, rolls);
   };
+  const postedLine = (who: string | undefined) => (who ? `POSTED BY ${who}` : undefined);
+  /** SETUP's column: the pitch and what's involved, with who posted it under the district line. */
+  const showSetupColumn = (open: QuestState['open'][number], offer: NonNullable<QuestState['open'][number]['setup']>) =>
+    jobColumn.show(open.title, [open.pitch, open.brief].filter(Boolean).join('\n\n') || null, [setupLine(offer), postedLine(open.postedBy)].filter(Boolean).join('\n'));
   const setupGone = () => {
-    if (jobTable.isOpen() && tableText) jobColumn.show(tableText.title, tableText.text, undefined, tableText.rolls);
+    if (jobTable.isOpen() && tableText) jobColumn.show(tableText.title, tableText.text, tableText.sub, tableText.rolls);
     else jobColumn.clear();
   };
   watchTables((on) => {
@@ -528,7 +576,7 @@ function startRoom(agentId: string): void {
       tips,
     });
     setupCard = { id, card, offer: JSON.stringify(open.setup) };
-    jobColumn.show(open.title, open.pitch, setupLine(open.setup));
+    showSetupColumn(open, open.setup);
   };
   // The stranger present, with a face: a framed bust beside the subtitles while they're in the scene (speaker portrait, 2026-10-17).
   const speakerPortrait = mountSpeakerPortrait(byId('feed'), gameRoot());
@@ -541,9 +589,9 @@ function startRoom(agentId: string): void {
   const applyComms = () => {
     byId('stage-figures').classList.toggle('on-comms', comms.on || (beatRoom !== null && !beatGuest));
     document.querySelector('.feed-root')?.classList.toggle('comms', comms.on);
-    document.querySelector('.feed-root')?.classList.toggle('on-line', beatRoom !== null);
+    document.querySelector('.feed-root')?.classList.toggle('on-line', beatRoom !== null || beatComms);
     commsSlot.setComms(comms.on && partyContact ? { name: partyContact.name, face: `/api/agents/${encodeURIComponent(agentId)}/sprite`, where: comms.where ?? '', accent: partyContact.accent } : null);
-    whosHere.setParty(partyYou, partyContact, { comms: comms.on || beatRoom !== null });
+    whosHere.setParty(partyYou, partyContact, { comms: comms.on || beatRoom !== null || beatComms });
     input.setComms(comms.on);
   };
   feed.onStranger((st) => {
@@ -650,6 +698,21 @@ function startRoom(agentId: string): void {
 
   // The dev panel and the socket don't depend on the renderer: if WebGL init fails, chat still works.
   let renderer: Renderer | null = null;
+  // SYS → FRAME RATE: the room redraws at most this often; rendererReady applies it to a renderer still loading.
+  let frameRate = loadFrameRate();
+  /** The map covers the room: it keeps ticking (its weather, its thunder) but needn't draw often. */
+  let mapUp = false;
+  const capRoom = () => renderer?.setMaxFps(mapUp ? ROOM_FPS_UNDER_MAP : maxFps(frameRate));
+  const showFrameRate = (next: FrameRate) => {
+    frameRate = next;
+    saveFrameRate(next);
+    setFramePace(maxFps(next));
+    capRoom();
+    hud.showFrameRate(next);
+  };
+  hud.setFrameRateControl(showFrameRate);
+  showFrameRate(frameRate);
+  paceCssLoops();
   const devPanel = new DevPanel(byId('devpanel'), (e) => socket?.send(e), () => renderer?.fps() ?? 0);
   const warnings: string[] = [];
   // The figures and the UI are DOM over the canvas: they go down the same line as the room.
@@ -664,6 +727,7 @@ function startRoom(agentId: string): void {
   const rendererReady: Promise<Renderer | null> = createRenderer(host, gameStage, { onSignal: signalGame }).then(
     (r) => {
       renderer = r;
+      capRoom();
       // The room's light on you, your contact and whoever in the strip is speaking (no renderer, no light: they stay as drawn).
       new StageLight(r, () => [...document.querySelectorAll<HTMLElement>('#stage-figures .stage-figure')]);
       // Each lightning strike's thunder (roomAudio exists by the time a strike can happen).
@@ -767,6 +831,7 @@ function startRoom(agentId: string): void {
     effects: () => renderer?.effectsState() ?? null,
     pixelAt: (x, y) => renderer?.pixelAt(x, y) ?? [0, 0, 0],
     fps: () => renderer?.fps() ?? 0,
+    maxFps: () => renderer?.maxFps() ?? -1,
     warnings,
     send: (e) => socket?.send(e),
     viewScene: () => loadedSceneId,
@@ -880,6 +945,8 @@ function startRoom(agentId: string): void {
     onOpen: () => {
       roomAudio.cue(MAP_CUE_URL, MAP_CUE_LEVEL);
       hud.setOpen('map');
+      mapUp = true;
+      capRoom();
     },
     reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
     load: () =>
@@ -906,6 +973,8 @@ function startRoom(agentId: string): void {
     onGigs: openGig,
     escapeFirst: () => gigWindow?.handleEscape() ?? false,
     onClose: () => {
+      mapUp = false;
+      capRoom();
       closeGig();
       hud.setOpen(null);
     },
@@ -997,6 +1066,7 @@ function startRoom(agentId: string): void {
     if (people && !people.requestClose()) return;
     map.close();
     for (const url of Object.values(DICE_CUE_URL)) roomAudio.preloadCue(url);
+    book.close();
     dice.start();
   };
   if (new URLSearchParams(location.search).has('diceSeed')) window.__nixRoom!.dice = { state: () => dice.state() };
@@ -1015,6 +1085,7 @@ function startRoom(agentId: string): void {
     if (paused || chromeOpen || currentScreen() !== null || feed.expanded || devPanel.open || people !== null || dice.open || questList.isOpen) return false;
     // Typing in a field: Enter is its own (the prompt sends); an empty prompt passes it on. A reply's next page keeps Enter.
     const t = e.target as HTMLElement | null;
+    if (t?.closest('.lb-root')) return false; // The book's search: its keys are its own.
     const field = t?.closest('input, textarea, [contenteditable="true"]') as HTMLInputElement | HTMLTextAreaElement | null;
     if (field && e.key === 'Enter' && (field.value ?? field.textContent ?? '').trim() !== '') return false;
     if (e.key === 'Enter' && feed.pageWaiting()) return false;
@@ -1069,6 +1140,13 @@ function startRoom(agentId: string): void {
   refreshKit();
   // Lore words (feedback 2026-10-19): the glossary once, the card over the stage, and the lines already up marked.
   installLoreCard(gameRoot());
+  void fetch('/api/lore/book')
+    .then((r) => (r.ok ? (r.json() as Promise<BookPage>) : null))
+    .catch(() => null)
+    .then((page) => {
+      book.load(page);
+      bookUpdate();
+    });
   void fetch('/api/lore/glossary')
     .then((r) => (r.ok ? (r.json() as Promise<{ glossary: GlossaryEntry[] }>) : null))
     .then((b) => {
@@ -1179,6 +1257,22 @@ function startRoom(agentId: string): void {
       persona: personaName,
       dev: devPanel.open,
       pick: (id) => (people?.requestClose() ?? true) && void goToContact(id),
+      // PEOPLE's wardrobe: kept in the playthrough; the one you're with changes on stage at once.
+      onOutfit: async (id, outfit) => {
+        const before = Object.hasOwn(outfitPicks, id) ? outfitPicks[id] : null;
+        const wear = (o: string | null) => {
+          const { [id]: _, ...rest } = outfitPicks;
+          outfitPicks = o === null ? rest : { ...rest, [id]: o };
+          if (id === agentId) stage.setOutfit('right', herOutfit(loadedSceneId ?? currentSceneId));
+        };
+        wear(outfit);
+        try {
+          await setContactOutfit(id, outfit);
+        } catch (e) {
+          wear(before);
+          throw e;
+        }
+      },
       toQuest: (t) => (people?.requestClose(true) ?? true) && questList.openOn(t),
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
       onClose: () => {
@@ -1200,7 +1294,8 @@ function startRoom(agentId: string): void {
     crew = openCrew(gameRoot(), {
       load: fetchCrew,
       act: (action) => socket?.send({ type: 'crew', action }),
-      ...(tab ? { tab } : {}),
+      // A job's free hire opens on them; the word's dot brought you here for that.
+      ...(tab ? { tab } : lastKit?.crewFree ? { tab: 'hire' as const } : {}),
       playthrough: crewPt,
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
       onClose: () => {
@@ -1285,18 +1380,46 @@ function startRoom(agentId: string): void {
     hud.setOpen('you');
   };
   /** Which of YOU, PEOPLE, TEXTS, QUEST, CREW and MAP is up (one at a time), or null. */
-  const currentScreen = (): CycleScreen | null => (sheet ? 'you' : people ? 'people' : texts ? 'texts' : questList.isOpen ? 'quest' : crew ? 'crew' : map.isOpen ? 'map' : null);
-  /** From the open one of the three to `s`: the old one goes at once (unsaved journal work refuses), the new one glitches in. */
-  /** `dir` -1 (Shift+Tab on the cycle) comes into YOU at its last page, KIT, so the ring runs the same both ways. */
-  const switchTo = (s: CycleScreen, dir: 1 | -1 = 1) => {
-    const cur = currentScreen();
-    if (cur === s || dice.open) return;
-    if (cur === 'people' && !people?.requestClose(true)) return;
+  const currentScreen = (): Exclude<CycleScreen, 'book'> | null => (sheet ? 'you' : people ? 'people' : texts ? 'texts' : questList.isOpen ? 'quest' : crew ? 'crew' : map.isOpen ? 'map' : null);
+  /** The open one goes at once; false when it refuses (unsaved journal work). */
+  const closeScreen = (cur: Exclude<CycleScreen, 'book'> | null): boolean => {
+    if (cur === 'people' && !people?.requestClose(true)) return false;
     if (cur === 'you') sheet?.close(true);
     if (cur === 'texts') texts?.close(true);
     if (cur === 'quest') questList.close();
     if (cur === 'crew') crew?.close(true);
     if (cur === 'map') map.close(true);
+    return true;
+  };
+  /** Something modal owns the keys, so the drawer neither opens nor takes Esc. A full screen isn't one: BOOK replaces it. */
+  const bookBlocked = () => (chromeOpen && currentScreen() === null) || cracking || paused !== null || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigWindow !== null || modelMenu.isOpen || bugReportOpen();
+  const toggleBook = () => {
+    if (book.isOpen) return book.close();
+    if (bookBlocked() || !closeScreen(currentScreen())) return;
+    bookUpdate();
+    book.open();
+  };
+  /** Who's on the page: your file, the contact's, then anyone else here with one. A fetch that fails leaves its files out. */
+  const bookFiles = async (): Promise<BookFile[]> => {
+    const [me, known] = await Promise.allSettled([playthroughApi.persona(), contacts()]);
+    const you = me.status === 'fulfilled' ? me.value : null;
+    const contact = partyContact && known.status === 'fulfilled' ? known.value.find((c) => c.id === agentId) : undefined;
+    const files: BookFile[] = [
+      ...(you ? [{ id: you.id, name: you.name, tag: 'YOUR FILE' as const, bio: you.bio ?? [], facts: you.facts ?? [], ...(you.secret ? { secret: you.secret } : {}) }] : []),
+      ...(contact ? [{ id: contact.id, name: contact.name, tag: 'THEIR FILE' as const, bio: contact.bio ?? [], facts: contact.facts ?? [] }] : []),
+      ...others.filter((o) => o.kind === 'contact' && o.id !== agentId).map((o) => ({ id: o.id, name: o.name, tag: 'THEIR FILE' as const, bio: o.bio, facts: o.facts })),
+    ];
+    return files.filter((f) => f.bio.length > 0 || f.facts.length > 0);
+  };
+  hud.setBook(toggleBook);
+  hud.onScreenOpen(() => book.close());
+  /** From the open one of the three to `s`: the old one goes at once (unsaved journal work refuses), the new one glitches in. */
+  /** `dir` -1 (Shift+Tab on the cycle) comes into YOU at its last page, KIT, so the ring runs the same both ways. */
+  const switchTo = (s: CycleScreen, dir: 1 | -1 = 1) => {
+    const cur = currentScreen();
+    if (cur === s || dice.open) return;
+    if (s === 'book') return toggleBook(); // It closes the open one itself, and only if it can open.
+    if (!closeScreen(cur)) return;
     if (s === 'you') toggleSheet(dir < 0 ? 'kit' : 'file');
     else if (s === 'people') openPeopleOn(dir < 0 ? 'journal' : 'file');
     else if (s === 'texts') openTextsOn();
@@ -1304,12 +1427,16 @@ function startRoom(agentId: string): void {
     else if (s === 'crew') openCrewOn();
     else map.open();
   };
-  // Tab cycles YOU → PEOPLE → TEXTS → QUEST → CREW → MAP while one is up (Shift+Tab back), unless a field of its own or something over it has the keys.
+  // Tab opens YOU and cycles YOU → PEOPLE → TEXTS → QUEST → CREW → MAP → BOOK (Shift+Tab back), unless a field of its own or something over it has the keys.
   listenScreenCycle(window, {
-    current: currentScreen,
+    current: () => currentScreen() ?? (book.isOpen && !bookBlocked() ? 'book' : null),
+    canStart: () => !book.isOpen && !bookBlocked() && !hud.sysOpen && !hideUi.hidden,
     inField: () => {
       const a = document.activeElement;
-      return ((a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement) && a.closest('.scr-root, #map') !== null) || textsOwnsTab(a);
+      const field = a instanceof HTMLInputElement || a instanceof HTMLTextAreaElement || a instanceof HTMLSelectElement || (a instanceof HTMLElement && a.isContentEditable);
+      // A screen's reply box isn't one (TEXTS keeps the cursor in its own); with none up, only the chat box isn't.
+      const owns = currentScreen() === null ? a?.closest('#input') === null : a?.closest('.scr-root, #map') != null;
+      return (field && owns) || a?.closest('.devpanel') != null || textsOwnsTab(a);
     },
     blocked: () => gigWindow !== null || modelMenu.isOpen || bugReportOpen() || dice.open || recap.visible || cardsOpen(),
     go: switchTo,
@@ -1343,6 +1470,7 @@ function startRoom(agentId: string): void {
   const openPause = () => {
     if (paused || chromeOpen || currentScreen() !== null || dice.open || recap.visible || cardsOpen() || (intro?.open ?? false) || (travelScreen?.screen.open ?? false)) return;
     chromeOpen = true;
+    book.close();
     roomAudio.cue(PAUSE_IN_CUE_URL, MAP_CUE_LEVEL);
     paused = openPauseMenu(gameRoot(), {
       where: [hud.where(), agentName ? `WITH ${agentName.toUpperCase()}` : null].filter(Boolean).join(' · '),
@@ -1398,6 +1526,17 @@ function startRoom(agentId: string): void {
       .catch(() => {});
   };
   const hideUi = listenHideUi(window, document.body);
+  // Alt+B over a full screen: the other chrome keys stand down there (modalOpen), but BOOK replaces it. First, so it's only heard once.
+  window.addEventListener(
+    'keydown',
+    (e) => {
+      if (chromeKey(e, false) !== 'book' || currentScreen() === null) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      toggleBook();
+    },
+    true,
+  );
   listenChromeKeys(window, {
     modalOpen: () => chromeOpen || map.isOpen || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false),
     run: (k) => {
@@ -1410,7 +1549,11 @@ function startRoom(agentId: string): void {
       else if (k === 'quest') (currentScreen() ?? 'quest') === 'quest' ? questList.toggle() : switchTo('quest');
       else if (k === 'crew') openCrewOn();
       else if (k === 'texts') openTextsOn();
-      else if (k === 'hide') hideUi.toggle();
+      else if (k === 'book') toggleBook();
+      else if (k === 'hide') {
+        book.close();
+        hideUi.toggle();
+      }
       else leave('/');
     },
   });
@@ -1418,7 +1561,7 @@ function startRoom(agentId: string): void {
   // Doors (clickable doors spec §3): click one to go through its exit; inert while a panel is open.
   const doors = new DoorLayer(byId('doors'), {
     send: (to) => socket?.send({ type: 'exit', to }),
-    blocked: () => chromeOpen || map.isOpen || whosHere.cardOpen || questList.isOpen || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigWindow !== null,
+    blocked: () => chromeOpen || map.isOpen || book.isOpen || whosHere.cardOpen || questList.isOpen || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigWindow !== null,
     roomRect: () => renderer?.roomRect() ?? { left: 0, top: 0, width: 0, height: 0 },
     stage: () => gameStage.rect(),
   });
@@ -1426,6 +1569,10 @@ function startRoom(agentId: string): void {
   // Her outfit follows the room's scene: her scene → outfit map (from her sprite) and the scene she's in now.
   let outfitByScene: Record<string, string> | undefined;
   let currentSceneId: string | null = null;
+  /** Outfits picked on PEOPLE (contact id → outfit), worn everywhere over her room's. */
+  let outfitPicks: Record<string, string> = {};
+  /** What she wears in `sceneId`: PEOPLE's pick, else her room's, else her plain sprite. */
+  const herOutfit = (sceneId: string | null) => (Object.hasOwn(outfitPicks, agentId) ? outfitPicks[agentId] : outfitFor(outfitByScene, sceneId));
 
   // Encounter cards: ◆ DRAW deals three events for this moment; playing one sends it, and she reacts.
   let encounterPanel: EncounterPanel | null = null;
@@ -1543,6 +1690,7 @@ function startRoom(agentId: string): void {
     switch (e.type) {
       case 'history':
         feed.setHistory(e.messages);
+        bookUpdate();
         // An ending in the history was played when it happened: only one that comes in on this tab shows.
         {
           const story = latestQuestStory(feed.messages());
@@ -1565,6 +1713,7 @@ function startRoom(agentId: string): void {
         break;
       case 'message':
         feed.upsert(e.message);
+        bookUpdate();
         if (e.message.role === 'user' && e.message.mode === 'quest') freshQuestRow = e.message.id;
         if (e.message.role === 'user' && e.message.parting === 'her') letGoDraft = null;
         input.setWalkOut(walkOutDue(feed.messages(), noWalkOut()));
@@ -1593,6 +1742,7 @@ function startRoom(agentId: string): void {
         break;
       case 'messages_removed':
         feed.remove(e.ids);
+        bookUpdate();
         suggestSpent();
         input.setWalkOut(walkOutDue(feed.messages(), noWalkOut()));
         break;
@@ -1637,6 +1787,8 @@ function startRoom(agentId: string): void {
         questState = next;
         void playBeatSong(next.active?.song ?? null);
         void showBeatRoom(next.active?.room ?? null, next.active?.roomGuest ?? null);
+        beatComms = next.active?.comms === true;
+        applyComms();
         jobColumn.setOnLine(partyContact?.name ?? '', next.active?.onLine ?? []);
         refreshKit();
         questHeld = null;
@@ -1662,7 +1814,7 @@ function startRoom(agentId: string): void {
               if (open?.setup && offer !== setupCard.offer) {
                 setupCard.offer = offer;
                 setupCard.card.update(open.setup);
-                jobColumn.show(open.title, open.pitch, setupLine(open.setup));
+                showSetupColumn(open, open.setup);
               }
             }
             // A job's ending that came in since the last one shown: its debrief deals on the table.
@@ -1672,8 +1824,9 @@ function startRoom(agentId: string): void {
             const act = tableAction({ active: next.active, debrief: debrief !== undefined, tableOpen: jobTable.isOpen(), tableEnded: jobTable.ended() });
             if (act === 'show') {
               questCards.show(null);
+              // The column first: the table's tips point into it (TWO VOICES) as it shows.
+              showTableText(next.active!.title, shownStory, postedLine(next.active!.postedBy));
               jobTable.show(next.active!, shownStory);
-              showTableText(next.active!.title, shownStory);
               return;
             }
             if (act === 'close') jobTable.close();
@@ -1682,15 +1835,19 @@ function startRoom(agentId: string): void {
               const card = debriefEl(debrief, { cue: missionCue, reduced: reducedMotion() });
               jobTable.end(ending.title, ending.text, card, debrief);
               // At the HUD table the rolls read in the JOB column; a phone's table has no column and keeps them on the card.
-              showTableText(ending.title, ending.text, jobTable.root.classList.contains('phone') ? null : debriefRolls(card));
+              showTableText(ending.title, ending.text, undefined, jobTable.root.classList.contains('phone') ? null : debriefRolls(card));
             }
             if (next.active) questCards.show(next.active, shownStory);
             else if (next.waiting) questCards.waiting(next.waiting, storyClock, story?.text);
             else if (story?.ended && story.id !== questEndShown) {
               // A story quest's end stays on the panel.
               questEndShown = story.id;
-              questCards.end(story.title, story.text);
-            } else questCards.show(null);
+              questCards.end(story.title, story.text, undefined, story.rewards);
+            } else if (story && backToWait(prev, next, story, questEndShown)) {
+              questEndShown = story.id;
+              questCards.outcome(story.title, story.text);
+              // Up until closed: her answer's own state change mustn't take it.
+            } else if (story?.id !== questEndShown) questCards.show(null);
           });
         questList.show(e.state);
         hud.setQuestShown(questList.has());
@@ -1698,7 +1855,7 @@ function startRoom(agentId: string): void {
           // A quest that can now start here: say so once (unless another notice is up), and light QUEST until the list is opened.
           const fresh = newlyOpen(questsAnnounced, e.state);
           if (fresh.length > 0) {
-            feed.showNotice(`◆ ${fresh.length === 1 ? `${fresh[0].title.toUpperCase()} CAN START HERE` : `${fresh.length} QUESTS CAN START HERE`} — QUEST (ALT+Q)`, { label: 'OPEN', run: () => questList.toggle() }, { polite: true });
+            feed.showNotice(`◆ ${fresh.length === 1 ? `${fresh[0].title.toUpperCase()} CAN START HERE` : `${fresh.length} JOBS CAN START HERE`} — JOBS (ALT+Q)`, { label: 'OPEN', run: () => questList.toggle() }, { polite: true });
             hud.setQuestNew(true);
           }
           if (e.state.open.length === 0) hud.setQuestNew(false);
@@ -1777,7 +1934,7 @@ function startRoom(agentId: string): void {
       case 'portrait': {
         const chain: FigureSource[] = [];
         if (e.sprite) {
-          chain.push({ kind: 'sprite', url: e.sprite.url, crop: e.sprite.crop, height: e.sprite.height, pixel: e.sprite.pixel, expressions: e.sprite.expressions, outfits: e.sprite.outfits });
+          chain.push({ kind: 'sprite', url: e.sprite.url, crop: e.sprite.crop, waist: e.sprite.waist, pixel: e.sprite.pixel, expressions: e.sprite.expressions, outfits: e.sprite.outfits });
           crops.right = e.sprite.crop;
         }
         if (e.kind !== 'monogram') chain.push({ kind: 'portrait', url: e.url });
@@ -1787,9 +1944,18 @@ function startRoom(agentId: string): void {
         partyContact = { name: e.name, accent: e.accent, thumb: e.kind === 'monogram' ? null : `/api/agents/${encodeURIComponent(agentId)}/thumb` };
         journal.setContact({ name: e.name, accent: e.accent, face: partyContact.thumb });
         whosHere.setParty(partyYou, partyContact, { comms: comms.on });
+        bookUpdate();
         applyComms();
         outfitByScene = e.sprite?.outfitByScene;
-        stage.setOutfit('right', outfitFor(outfitByScene, loadedSceneId ?? currentSceneId));
+        stage.setOutfit('right', herOutfit(loadedSceneId ?? currentSceneId));
+        // A pick made on PEOPLE (this tab or an earlier one) dresses her once it's heard.
+        void contactOutfits().then(
+          (picks) => {
+            outfitPicks = picks;
+            stage.setOutfit('right', herOutfit(loadedSceneId ?? currentSceneId));
+          },
+          () => {},
+        );
         showCrops();
         herFaces = Object.keys(e.sprite?.expressions ?? {});
         herPronoun = e.pronoun;
@@ -1839,6 +2005,7 @@ function startRoom(agentId: string): void {
         }
         atmosphere = e.state.atmosphere;
         currentSceneId = e.state.sceneId;
+        bookUpdate();
         const scene = scenes.get(e.state.sceneId);
         hud.setScene(scene?.name ?? e.state.sceneId);
         hud.setAtmosphere(e.state.atmosphere);
@@ -1857,6 +2024,7 @@ function startRoom(agentId: string): void {
       // Her replies split by everyone who could speak in them, here or gone (a goodbye stays theirs).
       feed.setOthers(e.voices.map((o) => ({ id: o.id, name: o.name, accent: o.accent })));
       whosHere.set(others);
+      bookUpdate();
     } else if (e.type === 'scenes') {
       residents = e.residents ?? {};
       for (const s of e.scenes) scenes.set(s.id, s);
@@ -1880,7 +2048,7 @@ function startRoom(agentId: string): void {
           const renderer = await rendererReady;
           // Her outfit changes with the scene's backdrop (mid-transition); with no backdrop to wait for, at once.
           const dress = (sceneId: string) => {
-            stage.setOutfit('right', outfitFor(outfitByScene, sceneId));
+            stage.setOutfit('right', herOutfit(sceneId));
           };
           if (!renderer) {
             arrived(e.state.sceneId);
@@ -1924,7 +2092,7 @@ function startRoom(agentId: string): void {
     beatRoom = room;
     beatGuest = room !== null && guest !== null;
     const figure = beatGuest ? ((await (await fetch('/api/agents')).json()) as { agents: { id: string; name: string; accent: string; sprite: SpriteRef | null }[] }).agents.find((a) => a.id === guest) : undefined;
-    if (figure?.sprite) stage.setRight([{ kind: 'sprite', url: figure.sprite.url, crop: figure.sprite.crop, height: figure.sprite.height, pixel: figure.sprite.pixel, outfits: figure.sprite.outfits }, { kind: 'monogram', letter: figure.name.charAt(0).toUpperCase() }], figure.name, figure.accent);
+    if (figure?.sprite) stage.setRight([{ kind: 'sprite', url: figure.sprite.url, crop: figure.sprite.crop, waist: figure.sprite.waist, pixel: figure.sprite.pixel, outfits: figure.sprite.outfits }, { kind: 'monogram', letter: figure.name.charAt(0).toUpperCase() }], figure.name, figure.accent);
     else if (contactFigure) stage.setRight(contactFigure.chain, contactFigure.name, contactFigure.accent);
     applyComms();
     const target = scenes.get(room ?? realRoom?.sceneId ?? '');
@@ -1969,7 +2137,7 @@ function startRoom(agentId: string): void {
           facts: persona.facts,
         };
         const chain: FigureSource[] = persona.sprite
-          ? [{ kind: 'sprite', url: persona.sprite.url, crop: persona.sprite.crop, height: persona.sprite.height, pixel: persona.sprite.pixel, expressions: persona.expressions, outfits }]
+          ? [{ kind: 'sprite', url: persona.sprite.url, crop: persona.sprite.crop, waist: persona.sprite.waist, pixel: persona.sprite.pixel, expressions: persona.expressions, outfits }]
           : [];
         yourFaces = Object.keys(persona.expressions ?? {});
         applyFaces();
@@ -1977,6 +2145,7 @@ function startRoom(agentId: string): void {
         stage.setLeft([...chain, { kind: 'silhouette' }], persona.name, '#7fe9ff');
         partyYou = { name: persona.name, accent: persona.accent ?? '#7fe9ff', thumb: persona.sprite ? `/api/agents/${encodeURIComponent(persona.id)}/thumb` : null };
         whosHere.setParty(partyYou, partyContact, { comms: comms.on });
+        bookUpdate();
         if (persona.sprite) crops.left = persona.sprite.crop;
         showCrops();
         journal.setPlayerName(persona.name);
@@ -2057,13 +2226,16 @@ const route = routeFromPath(location.pathname, lastAgent());
 if (route.kind === 'room') {
   markSplashSeen(); // the splash opens the app; back from a room (even one opened directly) skips it
   reloadOnRestore(window);
-  startRoom(route.id);
+  void serverUp().then(() => startRoom(route.id));
 } else if (route.kind === 'solo') {
   markSplashSeen(); // between scenes: back to the title skips the splash, as from a room
   void import('./landing/solo').then((m) => m.startSolo());
 } else {
   void import('./landing/landing').then((m) => m.startLanding());
 }
+
+/** How often the room draws under the map. */
+const ROOM_FPS_UNDER_MAP = 10;
 
 const MODE_KEY = 'nix-room.mode';
 const QUEST_HINT_KEY = 'nix-room.quest-hint-done';

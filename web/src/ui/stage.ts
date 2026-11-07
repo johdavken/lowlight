@@ -1,12 +1,12 @@
 import type { Crop } from '../../../shared/types';
-import { figureBox } from './figure';
+import { WAIST_PULL, figureBox, figureDrop } from './figure';
 import { FLAT_LIGHT, lightFilter } from './stage-light';
 
 /** What a figure shows, in order of preference: a sprite, her portrait, a monogram, a silhouette. */
 export type FigureSource =
-  /** `height`: how tall she stands, as a share of the full figure height (absent: 1); the figure shrinks from its bottom edge. */
+  /** `waist`: where her waist is on the sprite, as a share of its height from the top (absent: she stands as drawn). */
   /** `pixel`: snapped art (Studio SNAP), drawn with hard pixels. */
-  | { kind: 'sprite'; url: string; crop: Crop; height?: number; pixel?: boolean; expressions?: Record<string, string>; outfits?: Record<string, string> }
+  | { kind: 'sprite'; url: string; crop: Crop; waist?: number; pixel?: boolean; expressions?: Record<string, string>; outfits?: Record<string, string> }
   | { kind: 'portrait'; url: string }
   | { kind: 'monogram'; letter: string }
   | { kind: 'silhouette' };
@@ -69,6 +69,9 @@ export class Stage {
   private readonly probe: (url: string) => Promise<Probed | null>;
   /** Each sprite's own width / height, so a live re-crop keeps it. */
   private readonly aspects: Record<Side, number> = { left: MASTER_ASPECT, right: MASTER_ASPECT };
+  /** Each sprite's waist (null: none, or not a sprite), so a live change of pull can move it. */
+  private readonly waists: Record<Side, number | null> = { left: null, right: null };
+  private pull = WAIST_PULL;
   private readonly faces: Record<Side, Faces> = {
     left: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null },
     right: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null },
@@ -125,6 +128,12 @@ export class Stage {
     this.figures[side].toggleAttribute('data-mirror', on);
   }
 
+  /** How far figures move toward the waist line, 0..1, live (the dev panel's PULL slider). */
+  setPull(pull: number): void {
+    this.pull = pull;
+    for (const s of SIDES) this.applyDrop(s);
+  }
+
   /** Re-crops a sprite figure live (the dev panel's STAGE sliders). */
   setCrop(side: Side, crop: Crop): void {
     const fig = this.figures[side];
@@ -179,7 +188,9 @@ export class Stage {
       }
       if (token !== this.tokens[side]) return;
       this.aspects[side] = aspect;
+      this.waists[side] = src.kind === 'sprite' ? (src.waist ?? null) : null;
       this.render(fig, src, aspect);
+      this.applyDrop(side);
       if (src.kind !== 'sprite') return;
       faces.sprite = src.url;
       this.applyFace(side);
@@ -225,7 +236,6 @@ export class Stage {
   private render(fig: HTMLElement, src: FigureSource, aspect: number): void {
     const art = fig.querySelector<HTMLElement>('.stage-art')!;
     fig.dataset.kind = src.kind;
-    fig.style.setProperty('--fig-height', String(src.kind === 'sprite' ? (src.height ?? 1) : 1));
     fig.style.setProperty('--fig-aspect', String(aspect));
     if (src.kind === 'sprite' && src.pixel) fig.dataset.pixel = '';
     else delete fig.dataset.pixel;
@@ -242,6 +252,10 @@ export class Stage {
       if (src.kind === 'monogram') art.textContent = src.letter;
       this.applyCrop(fig, { top: 0, bottom: 1 }, 1);
     }
+  }
+
+  private applyDrop(side: Side): void {
+    this.figures[side].style.setProperty('--fig-drop', String(figureDrop(this.waists[side], this.pull)));
   }
 
   private applyCrop(fig: HTMLElement, crop: Crop, aspect: number): void {

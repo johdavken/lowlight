@@ -5,7 +5,8 @@
   "accent": "#46e3fc",
   "sprite": {
     "src": "cass-base.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.342
   },
   "face": { "x": 0.496, "y": 0.088 },
   "tagline": "Late shift at the Tilt. Teasing by default. Remembers everything.",

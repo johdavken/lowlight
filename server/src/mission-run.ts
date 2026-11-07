@@ -9,6 +9,7 @@ import { rng } from '../../shared/rng';
 import { formLabel, withArticle } from '../../shared/kit-line';
 import { crackTries, type CoverId, type Kit, type KitEvent, type Odds, type Tier } from '../../shared/mission';
 import { jobTakeSize, POSITION_NAMES } from '../../shared/dice';
+import { heatParts } from './push-run';
 import { takeOf } from './take-run';
 import { holds, isLegacyRoll, PUSH_ID, type DiceRoll, type Roll, type CondCtx, type CrackTag, type Effects, type QuestEntry, type QuestRun } from '../../shared/quests';
 import type { Stats } from '../../shared/stats';
@@ -146,7 +147,7 @@ function rollRow(r: Roll): Omit<Debrief['checks'][number], 'line'> {
   return { stat: r.stat, dice: r.dice, position: r.position, faces: r.faces, keep: r.keep, kind: r.kind, ...(r.steadied ? { steadied: true as const } : {}), ...(r.pushed ? { pushed: true as const } : {}) };
 }
 
-export function buildDebrief(o: { q: QuestEntry; run: QuestRun; tier: Tier; district: string; before: number; delta: number; cover: CoverId | null; trust?: Debrief['trust']; trustMoved?: Debrief['trustMoved']; programs?: Program[]; deck?: Deck | null }): Debrief {
+export function buildDebrief(o: { q: QuestEntry; run: QuestRun; tier: Tier; district: string; before: number; delta: number; cover: CoverId | null; trust?: Debrief['trust']; trustMoved?: Debrief['trustMoved']; programs?: Program[]; deck?: Deck | null; heat?: { after: number; cooled: number; crew: number } }): Debrief {
   const choices = [...o.q.beats.values()].flat().flatMap((b) => b.choices.map((c) => ({ beat: b.id, c })));
   const lineOf = (beat: string, id: string) => choices.find((x) => x.beat === beat && x.c.id === id)?.c.line ?? id;
   const push = o.run.push;
@@ -168,6 +169,13 @@ export function buildDebrief(o: { q: QuestEntry; run: QuestRun; tier: Tier; dist
   const lastDeck = deckChange(o.run);
   const nerve = -ev.reduce((n, e) => n + (e.nerve ?? 0) + (e.edge ?? 0), 0);
   const programs = programLines(o.run, o.programs ?? [], o.deck ?? null, o.q.tier);
+  // Heat: the run's own, and what the crew's traits add on a messy job (those land from the crew fold, not the run).
+  const crewHeat = o.heat?.crew ?? 0;
+  const heatDelta = ev.reduce((n, e) => n + (e.heat ?? 0), 0) + crewHeat;
+  const heatPartsOf = [...heatParts(o.run, o.tier === 'blown', o.deck?.name.toUpperCase() ?? 'DECK', o.heat?.cooled ?? 0), ...(crewHeat ? [{ label: 'MESSY CREW', n: crewHeat }] : [])];
+  // Anything else the job's events carried: a mission outcome's `heat:`, a cost taken as heat.
+  const otherHeat = heatDelta - heatPartsOf.reduce((n, p) => n + p.n, 0);
+  if (otherHeat) heatPartsOf.push({ label: 'THE JOB', n: otherHeat });
   return {
     tier: o.tier,
     checks,
@@ -178,7 +186,7 @@ export function buildDebrief(o: { q: QuestEntry; run: QuestRun; tier: Tier; dist
     ...(nerve > 0 ? { nerve } : {}),
     ...(push && push.state !== 'offer' && push.state !== 'playing' ? { push: push.state } : {}),
     sol: ev.reduce((n, e) => n + (e.sol ?? 0), 0),
-    heat: { district: o.district, delta: ev.reduce((n, e) => n + (e.heat ?? 0), 0) },
+    heat: { district: o.district, delta: heatDelta, ...(o.heat ? { after: o.heat.after, parts: heatPartsOf } : {}) },
     rep: { district: o.district, before: o.before, after: Math.min(100, Math.max(0, o.before + o.delta)) },
     ...(lastDeck ? { deck: { from: o.run.startDeck ?? null, to: lastDeck.deck ?? null } } : {}),
     ...(o.cover ? { cover: o.cover } : {}),
@@ -191,6 +199,18 @@ export function buildDebrief(o: { q: QuestEntry; run: QuestRun; tier: Tier; dist
 export function contractBlock(o: { title: string; stage: 'waiting' | 'night' | 'fallout'; left: number; found: string[]; grade: Tier | null }): string {
   const when = o.stage === 'fallout' ? `${o.grade ? `${TIER_WORDS[o.grade]} ` : ''}It isn't over yet` : o.stage === 'night' ? "It's tonight" : `The night is ${o.left > 0 ? `in ${spanText(o.left)}` : 'close'}`;
   return `[job — ${o.title}: the contract they took from you. ${when}.${o.found.length ? ` Groundwork back: ${o.found.join(', ')}.` : ''}]`;
+}
+
+/**
+ * Her line while a job runs (2026-11-07): what the file says. On a job that isn't hers the player knows it and she
+ * doesn't, so she can ask, and has the real answer to hold them to instead of inventing a source. `heard`: a job she
+ * isn't on the hook for but knows from where she works (`known-by:`).
+ */
+export function boardBlock(o: { title: string; postedBy: string | null; brief: string | null; player: string; knows: 'own' | 'heard' | null }): string {
+  const said = [o.postedBy ? `Posted by: ${o.postedBy}` : '', o.brief ?? ''].filter(Boolean).join(' ');
+  if (o.knows === 'own') return `[board — ${o.title}: your own job, so you know this. ${said}]`;
+  if (o.knows === 'heard') return `[board — ${o.title}: not your job, but you heard about it at work, so you know this. ${said} If what ${o.player} tells you doesn't fit, you can say so.]`;
+  return `[board — ${o.title}: what ${o.player} knows about this job and you don't yet. ${said} All you know of it is what ${o.player} has told you. If you want to know who offered it or what's involved, ask ${o.player}. Until ${o.player} says it, don't use any of it: not who posted it, not what kind of person they are. Never name anyone else as the source. If what ${o.player} tells you doesn't fit this, doubt it without saying why.]`;
 }
 
 /** `7h`, `2h 10m`, `40m`. */
@@ -231,6 +251,7 @@ export function effectEvent(e: Effects, at: number, o: { pay?: number | null; di
     if (o.district) ev.district = o.district;
   }
   if (e.deck !== undefined) ev.deck = e.deck;
+  if (e.outfit) ev.outfit = `${e.outfit.who}/${e.outfit.name}`;
   return Object.keys(ev).length > 1 ? ev : null;
 }
 

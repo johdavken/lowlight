@@ -1,6 +1,7 @@
 ---
 title: MiraGen Pharmaceuticals
 category: City
+section: Corps
 keys: [MiraGen, MiraGen Pharmaceuticals, the script, combat drugs, neural boosters, gene therapy, the hum]
 districts: []
 places: []

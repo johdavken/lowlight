@@ -1,6 +1,7 @@
 ---
 title: Old Karasu Decks
 category: Tech
+section: Decks
 keys: [Old Karasu deck, old deck, brass deck, ghost door, ghost doors, valve deck]
 districts: []
 places: []

@@ -20,7 +20,7 @@
 }
 .jc[hidden] { display: none; }
 .jc-head { flex: none; font: 15px var(--pixel); letter-spacing: 0.22em; color: #ffc56b; text-shadow: 0 0 8px rgba(255, 197, 107, 0.45); }
-.jc-sub { flex: none; font: 13px var(--pixel); letter-spacing: 0.16em; color: rgba(255, 197, 107, 0.6); }
+.jc-sub { flex: none; font: 13px var(--pixel); letter-spacing: 0.16em; color: rgba(255, 197, 107, 0.6); white-space: pre-line; }
 .jc-sub[hidden] { display: none; }
 .jc-body {
   flex: 1;
@@ -93,6 +93,8 @@
 /* HUD (2026-11-02, mockup graft-layouts.html A): while the job table is up the column stands in its log region, left
    of the moment (job-table.ts publishes the region's place), and her line has the box back. */
 :has(> .tb.hud:not([hidden]):not(.phone)) > .jc-layer .jc { left: var(--hud-log-x); top: var(--hud-log-y); width: var(--hud-log-w); height: var(--hud-log-h); right: auto; bottom: auto; padding: 0; border-left: 0; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
+/* It ends over the line keys in the corner below it (playtest: a long contract ran under them): 232px is the stack's full five keys and arrow from the stage's floor, and a gap, so the text doesn't jump as the keys change. Folded, or stepped out for a debrief, it has the region's height back. */
+#game:has(> .tb.hud:not([hidden]):not(.phone)):not(:has(> .tb.hud .tb-debrief)):has(> .feed-root .line-keys:not(.folded)) > .jc-layer .jc { height: min(var(--hud-log-h), calc(100% - var(--hud-log-y) - 232px)); }
 /* Her line becomes a subtitle at the right, by her: the box no longer runs under the table. */
 /* It keeps to her side, near the edge now the scene's keys step out for the job (table.css), and to the box's height, paging a long reply
    instead of growing up over the cards (playtest). 320px of text, and a gutter for the pulse's edge. */
@@ -100,7 +102,28 @@
 /* A stranger's bust steps aside while the job table is up: the subtitle's head names who speaks (playtest: the photo looked out of place). */
 :has(> .tb.hud:not([hidden]):not(.phone)) > .sp-layer { display: none; }
 /* Her subtitle stands taller by her than the band did under the table, so more of a reply reads before it pages (playtest). The feed reads its rest height from here, so the paging follows. */
-:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage { --box-h: 320px; --box-max: 320px; }
+:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage { --box-h: 344px; --box-max: 344px; }
+/* The footer keeps to the text's left edge. At this width a tool line can't sit beside [CONTINUE] (it was cut off at the button), so it takes the row above when it needs to; the box's extra 24px and the padding here are that row, so a page holds as many lines as it did. The newest line only: two never fit. */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .msg { padding-bottom: 66px; }
+:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .foot { left: 12px; height: auto; flex-wrap: wrap; row-gap: 2px; }
+:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .foot .tool:not(:last-child) { display: none; }
+
+/* The archive over a table (playtest 2026-11-07: scrolling up opened it behind the cards). Over any table (SETUP's
+   too), under the tips; at the job's HUD it opens in her column, over her, under the clocks bar, and the cards, the
+   levers and the JOB column stay as they were. */
+#game:has(> .tb:not([hidden]):not(.phone)) > .feed-root.expanded { z-index: 25; }
+#game:has(> .tb.hud:not([hidden]):not(.phone)):has(> .feed-root.expanded) > :is(.stage, .jc-layer) { display: block; }
+/* Her column is the table's last track (table.css: 19% of the 1552px between its 24px sides, 295px), clear of the levers. */
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.expanded .feed-dim {
+  left: auto;
+  top: 132px;
+  width: 336px;
+  background: rgba(4, 1, 10, 0.88);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px);
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px);
+}
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.expanded .feed-head { left: auto; right: 24px; top: 146px; width: 295px; gap: 0.8em; font-size: 14px; letter-spacing: 0.18em; }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.expanded .feed { left: auto; right: 24px; top: 186px; width: 295px; padding-right: 8px; box-sizing: border-box; }
 
 /* A debrief's rolls under the ending (mockup graft-results.html D): the dice, then the line; words only for a roll with no dice. */
 .jc .db-rolls { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; white-space: normal; }

@@ -108,6 +108,8 @@
 .ql-pitch,
 .ql-line { margin: 0; font: 17px/1.5 var(--chat-font, var(--mono)); color: #e3f6fb; }
 .ql-line { color: #8fb3bd; }
+.ql-postedby { font: 16px var(--pixel); letter-spacing: 0.12em; color: #ffb347; }
+.ql-brief { margin: 0; font: 16px/1.45 var(--chat-font, var(--mono)); color: #a9cdd6; }
 .ql-scouted { font: 16px var(--pixel); letter-spacing: 0.12em; color: #7dff9b; }
 .ql-capped-note,
 .ql-locked-note { font: 16px var(--pixel); letter-spacing: 0.16em; color: #ff7fa8; }

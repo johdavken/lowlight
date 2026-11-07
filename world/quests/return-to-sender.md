@@ -6,6 +6,9 @@ tier: 1
 starts: second-socket
 after: null
 pitch: A repaired deck, a client in the Spine, and a market between you that wants it more than he does.
+posted-by: A courier in the Spine, who left his deck on Second Socket's bench.
+brief: Carry the repaired deck from Second Socket through the night market to its owner in the Spine. It has to reach him working.
+known-by: [silas]
 pay: 90-110
 draw complication: none | tail | rain-closed-the-bridge
 draw client: easy | hard

@@ -39,11 +39,16 @@ export interface RoomRegistry extends RoomNames {
   inDistrict(district: string): string[];
 }
 
-export function roomRegistry(packs: Map<string, { registry: Pick<SceneRegistry, 'list'> }>, warn: (m: string) => void = () => {}): RoomRegistry {
+/** `songs`: each district's default song. A room with songs of its own keeps them; one without plays the default. */
+export function roomRegistry(packs: Map<string, { registry: Pick<SceneRegistry, 'list'> }>, warn: (m: string) => void = () => {}, songs: Record<string, string> = {}): RoomRegistry {
   const rooms = new Map<string, SceneDef>();
   for (const [district, { registry }] of packs) {
     if (district === SPLASH_DISTRICT) continue;
-    for (const scene of registry.list()) rooms.set(`${district}/${scene.id}`, { ...scene, id: `${district}/${scene.id}`, district, folder: scene.id });
+    const song = songs[district];
+    for (const scene of registry.list()) {
+      const sound = song && !scene.sound?.music ? { sound: { ...scene.sound, music: { songs: [song] } } } : {};
+      rooms.set(`${district}/${scene.id}`, { ...scene, ...sound, id: `${district}/${scene.id}`, district, folder: scene.id });
+    }
   }
   // An exit to a room that isn't there, or to the room itself, is dropped, never a load failure (room exits spec §2).
   for (const [id, scene] of rooms) {

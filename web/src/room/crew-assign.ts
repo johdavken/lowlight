@@ -106,7 +106,10 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
     }
   };
   const plain = (e: Errand) => `${e.tag} · ${e.hours}H`;
-  group('COLLECT', rest.filter((e) => e.group === 'collect'), (e) => [up(e.goods ?? ''), `${e.hours}H`, ...(e.cost ? [`${e.cost} SOL`] : [])].join(' · '));
+  const collect = rest.filter((e) => e.group === 'collect');
+  group('COLLECT', collect, (e) => [up(e.goods ?? ''), `${e.hours}H`, ...(e.cost ? [`${e.cost} SOL`] : [])].join(' · '));
+  // Offers are only drawn where you're Known, so none means Known nowhere. A bare list has the empty line instead.
+  if (collect.length === 0 && (rows.length > 0 || rest.length > 0 || v.stash?.length)) list.append(el('div', 'cr-locked', 'COLLECT · LOCKED · REP 20 IN A DISTRICT'));
   // STASH (crew goods spec §8): one row a lot, its district picked in its file.
   if (v.stash?.length) list.append(el('div', 'cr-grp', 'STASH'));
   for (const l of v.stash ?? []) {

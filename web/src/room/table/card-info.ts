@@ -4,9 +4,9 @@
  * values the card's face draws.
  */
 import { GRADES, type Grade, type Specialty } from '../../../../shared/crew-book';
-import { picksFor } from '../../../../shared/costs';
+import { APPROACH_COSTS, COSTS, picksFor } from '../../../../shared/costs';
 import { deckNotes, EFFECT_NAMES, kindResult, POSITION_NAMES, type Effect, type Pool, type Position } from '../../../../shared/dice';
-import { SPEC_STAT } from '../../../../shared/hand';
+import { APPROACH_STATS, SPEC_STAT, type Approach } from '../../../../shared/hand';
 import { HOT_LOAD_NERVE, type ProgramKind } from '../../../../shared/programs';
 import { el } from './el';
 
@@ -92,6 +92,17 @@ export function recruitInfo(r: { name: string; spec: Specialty; grade: Grade; tr
 export const abilityInfo = (a: { label: string; words: string; nerve: number; used?: boolean }, plays?: string[]): Info => ({ title: a.label.toUpperCase(), lines: a.used ? [a.words, 'Played.'] : [a.words, ...(a.nerve ? [`A press costs ${a.nerve} NERVE.`] : []), ...here(plays)] });
 /** A contact card: their trade, played once. */
 export const contactInfo = (c: { name: string; spec: Specialty; used: boolean }, plays?: string[]): Info => ({ title: c.name.toUpperCase(), lines: [specLine(c.spec), c.used ? 'Played.' : 'Plays once, free. Blow the job after and they trust you less.', ...here(plays)] });
+export const GOES_WRONG: Record<Approach, string> = {
+  quiet: 'Nothing gets broken, but you get heard.',
+  smooth: 'The lie gets harder to hold.',
+  hard: "You're already loud. You break what you came for.",
+};
+/** An approach's card at SETUP (approach shapes spec §1). */
+export const approachInfo = (a: Approach): Info => ({
+  title: a.toUpperCase(),
+  lines: [`+1d on ${APPROACH_STATS[a].map((s) => s.toUpperCase()).join(' · ')}.`, `Never dealt ${COSTS[APPROACH_COSTS[a].never].tag}. ${COSTS[APPROACH_COSTS[a].first].tag} comes first.`, GOES_WRONG[a]],
+});
+
 export const favourInfo = (plays?: string[], used = false): Info => ({ title: 'THE FAVOUR', lines: used ? ['Used.'] : ['+1d, once.', ...here(plays)] });
 
 const KIND_WORDS: Record<ProgramKind, string> = { position: 'a step out of danger', effect: 'a step more effect', quiet: 'takes 1 off the heat you leave with', firewall: 'cancels one cost' };

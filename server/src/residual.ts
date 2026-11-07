@@ -9,6 +9,7 @@ import { z } from 'zod';
 import type { Note } from '../../shared/types';
 import { formatClock, hhmmOf, minuteOfDay, nextOccurrence, parseHhmm } from '../../shared/clock';
 import { LEAD_DETAILS_MAX } from '../../shared/leads';
+import { clipWitness, WITNESS_MAX } from '../../shared/witness';
 import { MEET_WAIT, resolvePlan, type Loose, type Plan, type PlanAnswer } from '../../shared/plan';
 import type { TextPromise } from '../../shared/promise';
 import { CIPHER, clueOnPage, type CipherEvent } from '../../shared/cipher';
@@ -57,6 +58,10 @@ export interface ResidualInput {
   page: string | null;
   /** Leads on offer this turn that she hasn't given: what the Residual could record if she told one. */
   leads?: { id: string; title: string; knows: string }[];
+  /** Other contacts in the room (witness lines spec §2), and what each carries from today so far. */
+  here?: { id: string; name: string; carried: string | null }[];
+  /** Her `[you were there: …]` line (spec §3). */
+  remembered?: string | null;
   /** The city's places she can make a plan for (her plans spec §4); absent: plans don't apply. */
   places?: { id: string; name: string }[];
   /** Her standing plan in words, for the `[her plan: …]` line. */
@@ -181,6 +186,8 @@ export interface ResidualAnswer {
   cipher?: CipherAnswer | null;
   /** Leads her reply told without give_lead (live check 2026-11-05); absent: none. */
   leads?: { id: string; details: string }[];
+  /** Who saw what (witness lines spec §2); absent: nobody. */
+  witnesses?: { id: string; saw: string }[];
   recap: string | null;
   dossier: string | null;
 }
@@ -218,12 +225,14 @@ function stringEnd(s: string, i: number): number {
 
 /**
  * GLM's small slips, outside strings only (hand-check 2026-10-20): a comma missing between a value and
- * the next `"key":` across a newline, and a trailing comma before `]` or `}`. Never adds brackets or
- * quotes, so an answer cut off by the cap stays broken.
+ * the next `"key":` across a newline, a trailing comma before `]` or `}`, and a list closed with `}` (cipher
+ * runs 2026-10-29: `"clueIdeas":["…","…"}`), which gets its `]`. Adds no bracket that isn't owed to a `}` and
+ * no quote, so an answer cut off by the cap stays broken.
  */
 function repairJson(s: string): { text: string; repaired: string[] } {
   let out = '';
   const repaired = new Set<string>();
+  const open: string[] = [];
   for (let i = 0; i < s.length; i++) {
     const c = s[i];
     if (c === '"') {
@@ -240,7 +249,19 @@ function repairJson(s: string): { text: string; repaired: string[] } {
       i = close;
     } else if (c === ',' && /^\s*[\]}]/.test(s.slice(i + 1))) {
       repaired.add('trailing comma');
-    } else out += c;
+    } else {
+      if (c === '{' || c === '[') open.push(c);
+      else if (c === ']') open.pop();
+      else if (c === '}') {
+        if (open.at(-1) === '[') {
+          out += ']';
+          open.pop();
+          repaired.add('unclosed list');
+        }
+        open.pop();
+      }
+      out += c;
+    }
   }
   return { text: out, repaired: [...repaired] };
 }
@@ -297,6 +318,7 @@ export function parseResidualAnswer(raw: string): {
       ...((promise) => (promise ? { promise } : {}))(one('promise', PromiseShape)),
       ...((cipher) => (cipher ? { cipher } : {}))(readCipher(o.cipher, refused)),
       ...((leads) => (leads.length > 0 ? { leads } : {}))(list('leads', z.object({ id: z.string().trim().min(1), details: z.string().trim().min(1) }))),
+      ...((witnesses) => (witnesses.length > 0 ? { witnesses } : {}))(list('witnesses', z.object({ id: z.string().trim().min(1), saw: z.string().trim().min(1) }))),
       recap: one('recap', text),
       dossier: one('dossier', text),
     },
@@ -341,11 +363,13 @@ export interface ApplyDeps {
   promise?: { places: ReadonlySet<string>; set(p: TextPromise | null): void };
   /** Leads on offer this turn, by id, and recording one on her reply (the give_lead she skipped); absent: leads don't apply. */
   leads?: { offered: ReadonlyMap<string, string>; give(id: string, details: string): boolean; recorded(title: string): void };
+  /** Who's here to witness, and writing what one saw (witness lines spec §2); absent: nobody. */
+  witness?: { here: ReadonlySet<string>; set(id: string, text: string): void };
   /**
    * Cipher (spec §2.3): the labels the prompt gave (T1 → truth id), which truths are open, the page the clues are
    * checked against, where and when the reply happened, and where an event goes; absent: Cipher doesn't apply.
    */
-  cipher?: { labels: ReadonlyMap<string, string>; open: ReadonlySet<string>; prose: string; place: string; clock: number; append(e: CipherEvent): void };
+  cipher?: { labels: ReadonlyMap<string, string>; open: ReadonlySet<string>; prose: string; place: string; clock: number; /** The playthrough's replies, so a clue keeps its truth warm (CIPHER.coldAfter). */ replies: number; append(e: CipherEvent): void };
 }
 
 /** The minutes from her reply's clock to `until`'s next occurrence, behind the guards (spec §4). */
@@ -478,6 +502,14 @@ export function applyResidual(d: ApplyDeps, a: ResidualAnswer, at: { messageId: 
         applied.push(`lead ${l.id}`);
       }
     }
+    // Who saw what (witness lines spec §2): today's entry for them, in this room.
+    for (const w of a.witnesses ?? []) {
+      if (!d.witness?.here.has(w.id)) refused.push(`witness refused: ${w.id} isn't here`);
+      else {
+        d.witness.set(w.id, clipWitness(w.saw));
+        applied.push(`witness ${w.id}`);
+      }
+    }
     // Her plan (her plans spec §4), on the clock as her reply left it.
     if (a.plan && clock !== null && d.plan) {
       if ('cancel' in a.plan) {
@@ -578,7 +610,7 @@ export function applyResidual(d: ApplyDeps, a: ResidualAnswer, at: { messageId: 
           }
           const id = truthOf(k.id);
           if (id === null) continue;
-          c.append({ t: 'clue', id, text, messageId: at.messageId, at: c.clock, place: c.place, onPage: clueOnPage(text, c.prose), seq: Date.now() });
+          c.append({ t: 'clue', id, text, messageId: at.messageId, at: c.clock, place: c.place, onPage: clueOnPage(text, c.prose), replies: c.replies, seq: Date.now() });
           applied.push(`clue ${k.id.trim()}`);
         }
         for (const label of a.cipher.learned) {
@@ -628,12 +660,13 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
   const placed = planned || promising;
   const ciphered = (i.cipher?.length ?? 0) > 0;
   const offered = i.leads ?? [];
+  const here = i.here ?? [];
   const standing = i.standing !== false;
   const system = [
     `You keep the records for a roleplay between ${her} (${i.self.pronoun}) and ${you}. You never write story: you read what just happened and answer with one JSON object.`,
     `NOTES are ${her}'s memory. Only lasting facts: what is owed or promised, what was revealed, what changed, where something is. Not moods, not small talk. One fact per note: a new fact is a new note, even about the same person; rewrite a note only when that same fact changed, and forget it once it stops being true. "about": "me" is ${her}'s own journal (her life, her room, her plans); "about": "you" is what ${her} learns about ${you}. Up to ${NOTE_MAX} characters each, in ${her}'s words. Give every note 1–4 keywords, written the way they would be said (\"chrome hand\", not \"chrome-hand\"): names of other people, places, objects, words that would come up again in talk — not ${her}'s or ${you}'s names, not everyday words. Pin only what should matter every scene (at most ${PIN_CAP} pins). Jobs done together are remembered already (the [done together: …] line): never note a job's run or its payout, only what it revealed about someone or changed that will matter later (a debt, an enemy, a favour owed). Most turns add nothing.`,
     ...(standing ? [`STANDING is about what ${you} did this turn and how it lands with ${her}: something ${you} said or did, never what ${her} or anyone else did. ${her}'s reply only shows how it landed. Leave it null unless what ${you} did would still matter to ${her} next week: most turns move nothing, and ordinary courtesy, small favours, flirting or a pleasant chat are not enough. Decide the reason first, then its sign: a lie, a dodge, hiding something, pushing ${her} or bringing ${her} trouble moves down; keeping a promise, telling a hard truth or taking a risk for ${her} moves up. Trust and warmth usually move apart: someone can earn trust and still not be liked, or be liked and not believed — move only the one that changed. Each is -1, 0 or +1. trust: whether ${her} believes them and would tell them things. warmth: whether ${her} likes having them around. reason: a few words.`] : []),
-    ...(i.jobs === false ? [] : [JOBS_APART]),
+    ...(i.jobs === false ? [] : [JOBS_APART, `A [job — …] or [quest — …] line is the narrator's, told to ${you}: its "you" is ${you}, and its "she" or "he" can be ${her}. Every note is written as ${her}: "I" in a note is always ${her}, never ${you}.`]),
     `LIGHTS: only when the reply says a light changed (the power cut, a lamp switched off) and the [room: …] line shows it didn't. Use the light ids from that line; intensity 0–1.`,
     ...(timed
       ? [
@@ -652,6 +685,11 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
         ]
       : []),
     ...(offered.length > 0 ? [`LEADS: ${her} could tell ${you} one of these this turn. Only when ${her}'s reply actually told ${you} what it says, in ${her}'s own words: not a hint that something's wrong, not a promise to say more. ${offered.map((l) => `"${l.id}" (${l.title}): ${l.knows}`).join(' ')}`] : []),
+    ...(here.length > 0
+      ? [
+          `WITNESSES: everyone in [here too] was in this scene, and remembers it somewhere else later, where they can't read these lines. Anyone in [here too] who speaks or is spoken to carries something: what they said, what was asked of them, a job, a promise, news. Give their id and the one new thing they'd remember: one short sentence in their own words, in the first person ("I" is them), under ${WITNESS_MAX} characters. If they said or did anything themselves, what they said or did comes first, before any news of the job. It's added to what they carry so far today: never repeat any of that. Only what they could see or hear, and what they'd still care about tomorrow, not who sleeps where or who turned off a lamp. Nothing new for them: leave them out.`,
+        ]
+      : []),
     ...(i.kind === 'recap'
       ? [
           `RECAP: where things stand between ${her} and ${you} so far, for when the chat runs long (up to ${RECAP_MAX} characters), carrying over what still holds from the recap now.`,
@@ -678,6 +716,7 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
         : '{"notes":[],"standing":null,"lights":[],"recap":null,"dossier":null}'
     )
       .replace('"recap":null', ciphered ? '"cipher":null,"recap":null' : '"recap":null')
+      .replace('"recap":null', here.length > 0 ? '"witnesses":[],"recap":null' : '"recap":null')
       .replace(standing ? '' : '"standing":null,', ''),
     'Each entry in "notes" is one of: add {"op":"add","about":"me" or "you","text":the note,"keys":[1–4 keywords],"pin":true or false}; rewrite {"op":"rewrite","id":an id from the notes listed,"text":the new text,"keys":[…],"pin":…} (any of text, keys, pin; leave out what stays); forget {"op":"forget","id":an id from the notes listed}.' +
       (standing ? ' "standing" is null or {"reason":"a few words","trust":n,"warmth":n}.' : '') +
@@ -686,6 +725,7 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
       (planned ? ' "plan" is null, {"cancel":true}, or {"going":{"place":id,"until":"HH:MM" or null} or null,"meet":{"place":id,"at":"HH:MM" or null,"tomorrow":true (only if said),"with":[ids] (only if named)} or null}.' : '') +
       (promising ? ' "promise" is null, {"cancel":true}, {"at":"HH:MM","about":"…"}, or {"place":id,"about":"…"}.' : '') +
       (offered.length > 0 ? ' If a lead was told, add "leads":[{"id":its id,"details":what she said of it, one line}].' : '') +
+      (here.length > 0 ? ' If someone witnessed something, add "witnesses":[{"id":an id from [here too],"saw":what they\'d remember}].' : '') +
       (ciphered ? ' "cipher" is null or {"clues":[{"id":a label from the [cipher: …] line,"text":"what was shown"}],"learned":[labels]}.' : ''),
   ].join('\n\n');
 
@@ -695,12 +735,14 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
     timed ? `[clock: ${clockWords(i.clock!)}]` : null,
     placed ? `[places: ${i.places!.map((p) => `${p.id} "${p.name}"`).join(', ')}]` : null,
     planned && (i.people?.length ?? 0) > 0 ? `[people: ${i.people!.map((p) => `${p.id} "${p.name}"`).join(', ')}]` : null,
+    here.length > 0 ? `[here too: ${here.map((p) => `${p.id} "${p.name}"${p.carried ? ` (so far today: ${flat(p.carried)})` : ''}`).join(', ')}]` : null,
     planned && i.planLine ? `[her plan: ${i.planLine}]` : null,
     planned && i.looseLine ? `[loose date: ${i.looseLine}, no time yet]` : null,
     promising && i.promiseLine ? `[your promise: ${i.promiseLine}]` : null,
     promising && i.herDay ? `[her day: ${i.herDay}]` : null,
     i.standing ? `[standing: ${i.standing}]` : null,
     ciphered ? `[cipher: ${i.cipher!.map((c) => `${c.label} · ${flat(c.truth)} · comes out when ${flat(c.comesOutWhen)}`).join('; ')}]` : null,
+    i.remembered ? `${i.remembered}\nWhat ${her} remembers from elsewhere: note it if it still matters when it comes up.` : null,
     i.notes.length > 0 ? `${her}'s notes:\n${i.notes.map(noteLine).join('\n')}` : `${her} has no notes yet.`,
     ...(i.kind === 'end' ? [`The recap now: ${i.recap ?? '(none)'}`, `${her}'s dossier page on ${you} now: ${i.page ?? '(empty)'}`] : []),
     ...(i.kind === 'recap' ? [`The recap now: ${i.recap ?? '(none)'}`] : []),

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { firstPlaythrough, goIn, nixAt, questRow, questTab, send, settleCostStep, skipSplash } from './fixtures';
+import { expectTableClear, firstPlaythrough, goIn, nixAt, questRow, questTab, send, settleCostStep, skipSplash } from './fixtures';
 
 test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST, TAKE IT), the pay on YOU', async ({ page }) => {
   const errors: string[] = [];
@@ -17,7 +17,7 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   const base = kit.stats.tech >= 9 ? 4 : kit.stats.tech >= 7 ? 3 : kit.stats.tech >= 4 ? 2 : 1;
   // GO IN as it stands is QUIET (the hand): +1d on TECH.
   const dice = Math.max(0, base + (kit.deck ? 1 : -1) + 1);
-  const odds = `TECH ${'●'.repeat(base)}${kit.deck ? ` +${kit.deck.name.toUpperCase()} ●` : ' −NO DECK ○'} +QUIET ● · IN THE OPEN · FAIR`;
+  const odds = `TECH ${'●'.repeat(base)}${kit.deck ? ` +${kit.deck.name.toUpperCase()} ●` : ' −NO DECK ○'} +QUIET ● · IN THE OPEN · FAIR${kit.deck ? ' · HIDDEN · NO DECK HEAT' : ''}`;
   await page.locator('.hud-quest').click();
   const row = questRow(page, 'Night Shift');
   await expect(row.locator('.ql-mission')).toHaveText('MISSION · TIER 1 · 400 SOL');
@@ -26,6 +26,10 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   const greetingId = (await replies.last().getAttribute('data-id'))!;
   await row.click();
   await page.locator('.ql-file .ql-start').click();
+  // Each approach says how it goes wrong (approach shapes spec §1).
+  for (const line of ['NO TAKE LOSS', 'ALARM FIRST', 'NEVER SMALL', 'WORSE FIRST', 'NO ALARM COSTS', 'TAKE FIRST']) await expect(page.locator('.ts-approach')).toContainText(line);
+  await page.waitForTimeout(1500);
+  await page.screenshot({ path: 'test-results/missions-setup.png' });
   await goIn(page);
   // Her one opening line, and the first beat's cards with their dice.
   await expect(replies).toHaveCount(before + 1, { timeout: 10_000 });
@@ -34,17 +38,28 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   await expect(page.locator('.tb-job .tb-top .tb-title')).toHaveText('NIGHT SHIFT');
   await expect(page.locator('.tb-job .tb-top .tb-take')).toBeVisible();
   await page.screenshot({ path: 'test-results/missions-cards.png' });
+  await expectTableClear(page, 'the deal');
 
   // The roll keeps a 2: a miss in the open deals three costs to pick two (roll lifecycle spec §1), beside the roll.
   await page.locator('.tb-card[data-choice="roof"]').click();
+  // The card slides aside for the dice, and they land with the stamp beside it, clear of everything.
+  await expect(page.locator('.tb-deal .tb-roll canvas')).toHaveAttribute('data-lit', /\d/, { timeout: 10_000 });
+  await page.screenshot({ path: 'test-results/missions-landed.png' });
+  await expectTableClear(page, 'the roll landed');
   const costs = page.locator('.tb-costs .tb-cost');
   await expect(costs).toHaveCount(3, { timeout: 10_000 });
   await expect(page.locator('.tb-costs .tb-costs-head')).toHaveText('PICK 2 · 0 PICKED');
   await expect(costs.first().locator('.tb-cost-line')).not.toBeEmpty();
+  await page.waitForTimeout(500);
   await page.screenshot({ path: 'test-results/missions-costs.png' });
-  // Pick one: it stands alone with its answers branching off it. RESIST it (EDGE's dice set the NERVE), then pick and
-  // TAKE IT on the second.
+  await expectTableClear(page, 'the costs');
+  // QUIET's own cost comes first: the only card that picks, and it says why (approach shapes spec §1).
   const free = page.locator('.tb-costs .tb-cost.pickable');
+  await expect(free).toHaveCount(1);
+  await expect(free).toHaveAttribute('data-cost', 'alarm');
+  await expect(free.locator('.tb-cost-first')).toHaveText('QUIET FIRST');
+  // Pick it: it stands alone with its answers branching off it. RESIST it (EDGE's dice set the NERVE), then pick and
+  // TAKE IT on the second.
   await free.first().click();
   await expect(page.locator('.tb-costs .tb-costs-head')).toHaveText('PICK 2 · 1 PICKED', { timeout: 10_000 });
   await expect(page.locator('.tb-costs .tb-cost')).toHaveCount(1);
@@ -53,11 +68,14 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   await expect(page.locator('.tb-costs .tb-cost-panel.take')).toBeVisible();
   await page.waitForTimeout(700);
   await page.screenshot({ path: 'test-results/missions-cost-picked.png' });
+  await expectTableClear(page, 'a cost picked');
   if (kit.nerveLeft >= 1) {
     await resist.click();
     await expect(page.locator('.tb-costs .tb-cost.settled')).toHaveCount(1, { timeout: 10_000 });
     await expect(page.locator('.tb-costs .tb-cost.settled .tb-cost-how')).toContainText('RESISTED');
     await page.screenshot({ path: 'test-results/missions-resisted.png' });
+    // The second pick is free.
+    await expect(free).toHaveCount(2);
   }
   while (await settleCostStep(page)) await page.waitForTimeout(300);
   await expect(page.locator('.tb-card[data-choice="wipe"]')).toBeVisible({ timeout: 10_000 });
@@ -168,8 +186,14 @@ test('programs: CARRY a bigger deck at SETUP, its slots show without backing out
   await questTab(page, 'fixer');
   await page.locator('.ql-fixer .ql-item', { hasText: 'Cortex Meridian' }).locator('.ql-buy').click();
   await expect.poll(deckId).toBe('meridian');
-  await page.locator('.ql-fixer .ql-item', { hasText: 'Pocket deck' }).locator('.ql-buy').click();
+  // Everyone owns a pocket deck: back to it, so the bigger one has something to replace.
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Alt+y');
+  await page.locator('.cs-page-tab[data-page="kit"]').click();
+  await page.locator('.cs-deck', { hasText: 'Pocket deck' }).locator('.cs-carry').click();
   await expect.poll(deckId).toBe('pocket-deck');
+  await page.keyboard.press('Escape');
+  await page.locator('.hud-quest').click();
   await questTab(page, 'here');
   await questRow(page, 'Night Shift').click();
   await page.locator('.ql-file .ql-start').click();

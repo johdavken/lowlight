@@ -7,6 +7,9 @@ take-size: 4
 starts: second-socket
 after: null
 pitch: Something on Second Socket's roof is broadcasting a tracking tone. Find it and kill it before the wrong people listen.
+posted-by: A tenant under Second Socket's roof. Cash in an envelope, no name.
+brief: Up through the roof hatch over Second Socket, in among the dishes and dead aerials. Find what's sending the tone and stop it reaching whoever's listening.
+known-by: [silas]
 pay: 90-110
 draw complication: none | bird-nest | someone-on-the-roof
 draw squatter: easy | hard

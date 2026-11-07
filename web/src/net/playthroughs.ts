@@ -1,5 +1,5 @@
 /** The playthrough and save routes (spec 2026-10-07 §4), one function per route. */
-import type { AroundEntry, ContactEntry, LeadView, Location, LooseEndsView, PlaythroughInfo, SaveInfo } from '../../../shared/types';
+import type { AroundEntry, ContactEntry, LeadView, Location, LooseEndsView, PersonaInfo, PlaythroughInfo, SaveInfo } from '../../../shared/types';
 import type { PlaythroughPersona } from '../../../shared/persona';
 
 /** A route answered with an error: its HTTP status, the body's `error`, and (for `busy`) the contact whose turn is streaming. */
@@ -65,8 +65,12 @@ export const around = () => call<AroundEntry[]>('GET', '/api/playthroughs/active
 export const setLocation = (contactId: string) => call<Location>('POST', '/api/playthroughs/active/location', { contactId });
 /** The YOU sheet's wardrobe: what the player wears in the active playthrough (null: the plain sprite). */
 export const setOutfit = (outfit: string | null) => call<{ outfit?: string }>('POST', '/api/persona/outfit', { outfit });
+/** PEOPLE's wardrobe: the outfit `contactId` wears everywhere in the active playthrough (null: her room dresses her). */
+export const setContactOutfit = (contactId: string, outfit: string | null) => call<{ outfit?: string }>('POST', `/api/contacts/${encodeURIComponent(contactId)}/outfit`, { outfit });
+/** Contact id → the outfit picked for her on PEOPLE, in the active playthrough. */
+export const contactOutfits = () => call<Record<string, string>>('GET', '/api/playthroughs/active/contact-outfits');
 /** The active playthrough's persona (`/api/persona` resolves to its player), or null without one. */
-export const persona = () => call<{ persona: { id: string; name: string } | null }>('GET', '/api/persona').then((b) => b.persona);
+export const persona = () => call<{ persona: (Pick<PersonaInfo, 'id' | 'name' | 'bio' | 'facts' | 'secret'>) | null }>('GET', '/api/persona').then((b) => b.persona);
 
 /** This module's routes, as the title and load screens take them (tests pass fakes). */
 export type PlaythroughApi = Omit<typeof import('./playthroughs'), 'ApiError'>;

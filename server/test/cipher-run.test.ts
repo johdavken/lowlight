@@ -61,6 +61,12 @@ describe('cipherRunMessages', () => {
     const [, u] = cipherRunMessages(input({ state: foldCipher([evs], 20), room: 2 }));
     expect(u.content).toContain('place · The stall is a drop. · kept by hae (out)');
   });
+  it("a cold truth reads as dropped but still true, and its keeper is free again", () => {
+    const evs: CipherEvent[] = [{ t: 'truth', id: 'nix-1', kind: 'place', truth: 'The stall is a drop.', knownBy: ['hae'], comesOutWhen: 'w', changes: 'c', clueIdeas: 'i', replies: 6, seq: 1 }];
+    const [, u] = cipherRunMessages(input({ state: foldCipher([evs], 200), room: 3 }));
+    expect(u.content).toContain('place · The stall is a drop. · kept by hae (dropped, still true)');
+    expect(u.content).not.toContain('keeps an open truth already');
+  });
 });
 
 describe('parseCipherAnswer', () => {
@@ -87,6 +93,12 @@ describe('parseCipherAnswer', () => {
     const r = parseCipherAnswer(JSON.stringify({ truths: [{ ...t('self', ['nix']), clueIdeas: ['a mark', 'a key'] }] }), input());
     expect(r.refused).toEqual([]);
     expect(r.truths[0].clueIdeas).toBe('a mark; a key');
+  });
+  it("a clue list GLM closes with } still reads (2 of 6 runs lost, 2026-10-29)", () => {
+    const one = (kind: string, who: string) => `{"kind":"${kind}","truth":"Something is hidden.","knownBy":["${who}"],"comesOutWhen":"w","changes":"c","clueIdeas":["a mark","a key"}`;
+    const r = parseCipherAnswer('```json\n{"truths":[' + one('self', 'nix') + ',' + one('place', 'hae') + ']}\n```\n', input());
+    expect(r.refused).toEqual([]);
+    expect(r.truths.map((x) => [x.kind, x.clueIdeas])).toEqual([['self', 'a mark; a key'], ['place', 'a mark; a key']]);
   });
 
   it('a truth that names the player is kept: it may be about others and them; never kept by them (hand-check 2026-10-29)', () => {

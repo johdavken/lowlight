@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { CityMapData } from '../../shared/map-schema';
-import { cityView, clampView, coverSize, districtFrame, frameView, pinchView, zoomAt } from '../src/ui/map/camera';
+import { cityView, clampView, coverSize, coverView, districtFrame, frameView, pinchView, zoomAt } from '../src/ui/map/camera';
 
 const map = (): CityMapData => ({
   version: 1,
@@ -52,6 +52,9 @@ describe('the cover-fit map', () => {
 
   it("drags the city's edge as far as the screen's middle (spec 2026-10-28 §2)", () => {
     expect(clampView({ scale: 1, tx: 9999, ty: 9999 }, map, screen)).toEqual({ scale: 1, tx: 800, ty: 450 });
+    // The card's moves stop sooner: the city never leaves the screen.
+    expect(coverView({ scale: 1, tx: 9999, ty: 9999 }, map, screen)).toEqual({ scale: 1, tx: 0, ty: 0 });
+    expect(coverView({ scale: 2, tx: -9999, ty: -9999 }, map, screen)).toEqual({ scale: 2, tx: 1600 - 3200, ty: 900 - map.h * 2 });
     expect(clampView({ scale: 2, tx: -9999, ty: -9999 }, map, screen)).toEqual({ scale: 2, tx: 800 - 3200, ty: 450 - map.h * 2 });
     expect(clampView({ scale: 1, tx: 300, ty: -100 }, map, screen)).toEqual({ scale: 1, tx: 300, ty: -100 });
   });

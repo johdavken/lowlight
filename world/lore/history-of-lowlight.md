@@ -1,6 +1,7 @@
 ---
 title: History of Lowlight
 category: City
+section: Basics
 keys: [founding, "1878", old name, the flood years, the 2050s]
 districts: []
 places: []

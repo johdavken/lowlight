@@ -31,7 +31,8 @@
   },
   "sprite": {
     "src": "adebayo-outfit-work.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.329
   },
   "expressions": {
     "smile": "adebayo-smile.png",

@@ -7,6 +7,9 @@ template: true
 starts: second-socket
 after: null
 pitch: A crate of cracked carts still talking to Cortex. Make them quiet before the buyer comes.
+posted-by: A card on Second Socket's board, signed with a locker number.
+brief: Forty cracked carts in foam, in Second Socket's back room. Stop their check-in chips calling home, then sell the crate to a buyer who's due inside the hour.
+known-by: [silas]
 pay: 90-110
 art: bad-batch.webp
 draw complication: none | caper-early | buyer-brought-muscle

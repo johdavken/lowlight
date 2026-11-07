@@ -6,6 +6,8 @@ tier: 1
 starts: low-roller
 after: null
 pitch: A ripper under the causeway has been lending to the Low Roller's regulars against their eyes and lungs. The bar wants his book of names gone before his collectors start their rounds.
+posted-by: The bartender at the Low Roller.
+brief: His clinic sits under the causeway behind a dead green cross, with a nurse on the desk. Get inside and take the book, the list of what each regular put up.
 pay: 90-110
 once: true
 ---

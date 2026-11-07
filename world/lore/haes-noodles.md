@@ -1,6 +1,7 @@
 ---
 title: Hae's Noodles
 category: Places
+section: Karasu
 keys: [Hae, Hae's, Hae's Noodles, noodle stall, Hae's broth]
 districts: []
 places: [haes-noodles]

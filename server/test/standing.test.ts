@@ -43,7 +43,7 @@ describe('currentStanding and moveStanding', () => {
   });
   it('a move crossing the warmth edge: the words before and after, and the values stored', () => {
     const db = openDb(':memory:', { defaultPlayer: 'hicks' });
-    expect(moveStanding(db, 'hicks', start, null, DEFAULT_SHARED_STANDING, mv(1, 2))).toEqual({ before: 'Sizing you up', after: 'Warming to you' });
+    expect(moveStanding(db, 'hicks', start, null, DEFAULT_SHARED_STANDING, mv(1, 2))).toEqual({ before: 'Sizing you up', after: 'Warming to you', peak: { before: start, after: { trust: 1, warmth: 5 } } });
     const now = currentStanding(db, 'hicks', start, null, DEFAULT_SHARED_STANDING);
     expect(now.values).toEqual({ trust: 1, warmth: 5 });
     expect(now.stored!.moves).toHaveLength(1);

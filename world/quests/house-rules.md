@@ -6,6 +6,9 @@ take-size: 4
 starts: the-tilt
 after: null
 pitch: A dealer in the back room is winning too often. The house wants the game broken, quietly.
+posted-by: The Tilt's pit boss.
+brief: The back-room table at the Tilt. The dealer has a cart feeding him the deck. Get him off the table with no scene on the floor, and let him think it was luck.
+known-by: [cass]
 pay: 90-110
 art: house-rules.webp
 draw complication: none | pit-boss-watching | dealer-has-a-friend
@@ -18,7 +21,7 @@ draw dealer: easy | hard
 
 *The pit boss sees you come in and doesn't smile. Word's got round about you. He'd rather the cheat than the heat, and he wants you to know it.*
 
-- tell: Sit in anyway and read him. → read / burned [check wits 55 · cass +15 · adebayo +10, set read=yes]
+- tell: Sit in anyway and read him. → read / burned [check wits 40 · cass +15 · adebayo +10, set read=yes]
 - jam: Lean on his cart from the bar. → jammed / burned [check tech 45 grid · ember +15 · rue +10]
 - whisper: Let Ember loop his cart from the street. → jammed [needs with=ember]
 
@@ -76,8 +79,8 @@ temper: dealer
 - let: Let him go. → gone
 
 ## walked
-*He goes, and leaves a pocket deck on the table: the thing that's been feeding his cart. He doesn't look back for it.*
-gives: deck pocket-deck
+*He goes, and leaves his stake on the table: a short stack of chips, the last of what the cart won him. He doesn't look back for it.*
+pay: 20
 take: full
 → cashout
 

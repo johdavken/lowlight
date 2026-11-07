@@ -287,14 +287,18 @@ export interface QuestState {
   /** NERVE ran out (the table spec §3): no new job until the next 06:00. */
   nerveGone?: { back: string };
   /** `checks`: a locked Tier 2 Chair's requirements (Tier 2 spec 2026-11-01 §1). */
-  open: { id: string; title: string; pitch: string | null; timed: boolean; checks?: ChairCheck[]; /** Its quest art (the file's banner). */ art?: string; /** Why a job can't start now (NERVE GONE). */ locked?: string; mission?: { pay: number | null; tier?: number; range?: [number, number]; scouted?: { draws: Record<string, string>; pay: number | null }; cased?: true; /** A contact's own job (Intake board spec §3): her display name. */ own?: string; /** Its stake is trust, not rep. */ trust?: true; /** The arrangement's nights are used up tonight (spec 2026-10-20 §2): her name. */ capped?: string; /** A desk job (comms spec §3): the place it's played at, on comms. */ comms?: string }; /** A job's SETUP card (spec 2026-10-29-the-hand §1). */ setup?: SetupOffer; /** A one-off job (once: true): it never posts again after it ends. */ once?: true }[];
+  open: { id: string; title: string; pitch: string | null; /** Who posted it and what's involved (a job's `posted-by:` and `brief:`). */ postedBy?: string; brief?: string; timed: boolean; checks?: ChairCheck[]; /** Its quest art (the file's banner). */ art?: string; /** Why a job can't start now (NERVE GONE). */ locked?: string; mission?: { pay: number | null; tier?: number; range?: [number, number]; scouted?: { draws: Record<string, string>; pay: number | null }; cased?: true; /** A contact's own job (Intake board spec §3): her display name. */ own?: string; /** Its stake is trust, not rep. */ trust?: true; /** The arrangement's nights are used up tonight (spec 2026-10-20 §2): her name. */ capped?: string; /** A desk job (comms spec §3): the place it's played at, on comms. */ comms?: string }; /** A job's SETUP card (spec 2026-10-29-the-hand §1). */ setup?: SetupOffer; /** A one-off job (once: true): it never posts again after it ends. */ once?: true }[];
   /** A checked choice's card carries its odds (missions spec §3); during a reroll the cards are `!reroll` and `!take`. */
   active: {
+    /** Who posted the job, kept in the JOB column through the run for when the contact asks. */
+    postedBy?: string;
     /** The beat's song (guest crew spec §3b), by title: it takes over the music while the run is here. */
     song?: string;
     /** The beat's room, view only, and the guest who stands in it (`room:` on a beat). */
     room?: string;
     roomGuest?: string;
+    /** The contact's on the line, with no room (`comms: yes` on a beat). */
+    comms?: true;
     /** Words in the beat's text that are the contact on the line (`{{ }}`). */
     onLine?: string[];
     id: string;
@@ -321,7 +325,9 @@ export interface QuestState {
     /** A costly roll's dealt costs while it waits (roll lifecycle spec §1.5): pick, then settle each; RESIST's dice; ARMOUR. */
     costs?: {
       pick: number;
-      dealt: { cost: CostId; tag: string; line: string; by: 'gm' | 'written'; picked: boolean; settled?: 'taken' | 'resisted' | 'armour' | 'ability'; faces?: number[]; nerve?: number }[];
+      /** The GM is writing these lines: the cards hold them back (2026-11-06, playtest). */
+      writing?: true;
+      dealt: { cost: CostId; tag: string; line: string; by: 'gm' | 'written'; picked: boolean; first?: true; settled?: 'taken' | 'resisted' | 'armour' | 'ability'; faces?: number[]; nerve?: number }[];
       resist: { dice: number; ok: boolean; why?: string };
       /** FIREWALL (programs spec §2.3): `load` when it isn't loaded but a free slot would take it. */
       armour: { ok: boolean; left: number; load?: true };
@@ -346,7 +352,7 @@ export interface QuestState {
   arc?: { id: string; title: string; art?: string; next: string; stage: 'waiting' | 'night' | 'fallout'; walk: boolean; pieces: { id: string; spec: string; state: 'open' | 'out' | 'back' }[] };
   /** RUMORS (tier 3 contracts spec §5): contracts come looking for you. `leaving`: who you'd leave to go; null if you're with them. */
   rumors?: { id: string; line: string; place: string; placeName: string; contact: string; contactName: string; here: boolean; leaving: string | null; /** A lead's contract you can't take yet: the rep it needs. */ needs?: number }[];
-  boards?: { place: string; name: string; jobs: { id: string; title: string; pitch: string | null; art?: string; tier?: number; pay: number | null; range?: [number, number]; with?: string; opens?: string; comms?: string; once?: true }[] }[];
+  boards?: { place: string; name: string; jobs: { id: string; title: string; pitch: string | null; postedBy?: string; brief?: string; art?: string; tier?: number; pay: number | null; range?: [number, number]; with?: string; opens?: string; comms?: string; once?: true }[] }[];
   /** The fixer at a board (small jobs spec §5): its stock, each item buyable, above your tier there, or more than your sol. */
   fixer?: { place: string; items: { id: string; name: string; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: number; state: 'ok' | 'locked' | 'short' | 'owned' }[] };
 }
@@ -365,17 +371,29 @@ export interface QuestRow {
   stranger?: { name: string; voice: string; face?: string };
   /** A mission beat she doesn't answer (between the first and the last): no reply follows this row. */
   silent?: true;
+  /** Shown at a `room:` or `comms:` beat: all the contact heard of it. Her history reads this, never `text`, which is what the player saw. */
+  heard?: string;
   /** A job's run key (`<id>@<day>`, small jobs plan ruling 2): which run this row belongs to. */
   run?: string;
   /** A job's ending (small jobs spec §6): the debrief card. */
   debrief?: Debrief;
+  /** An ending with no debrief (a contract's fallout): what it gave, `OUTFIT · HICKS · TIE`, shown on the end card. */
+  rewards?: string[];
 }
 
 /** A job's debrief (small jobs spec §6): the tier, every check and crack, and the totals. */
+/** One source of the heat a job left: `SENTINEL FIELD DECK`, +3. */
+export interface HeatPart {
+  label: string;
+  n: number;
+}
+
 export interface Debrief {
   tier: 'clean' | 'messy' | 'blown';
-  /** Crew spec §5: a `gives: recruit` ending's line, `RECRUIT · SAIDA RAHM WANTS IN`. */
+  /** Crew spec §5: a `gives: recruit` ending's line, `RECRUIT · SAIDA RAHM · FREE AT THE LONG HAUL UNTIL 06:00`. */
   recruit?: string;
+  /** Outfits as rewards: a `gives: outfit` ending's line, `OUTFIT · HICKS · TIE`. */
+  outfit?: string;
   /** The lot a `loot:` job dropped (crew goods spec §6); `lost`: no room in the stash. */
   loot?: { label: string; lost?: true };
   /** Each check: a d100 roll (before the table), the table's dice (spec 2026-10-29), or a crack. */
@@ -391,7 +409,8 @@ export interface Debrief {
   /** NERVE spent on the job (the table spec §4); absent when none was. */
   nerve?: number;
   sol: number;
-  heat: { district: string; delta: number };
+  /** `delta` is all the job added, the crew's share too; `after` the district's heat then; `parts` where it came from (both absent on older debriefs). */
+  heat: { district: string; delta: number; after?: number; parts?: HeatPart[] };
   rep: { district: string; before: number; after: number };
   deck?: { from: string | null; to: string | null };
   cover?: 'burner' | 'fall-guy';
@@ -556,6 +575,8 @@ export interface ModelChoice {
   label: string;
   priceIn: number | null;
   priceOut: number | null;
+  /** How many tokens it can hold, when the provider says. */
+  context?: number;
   /** A shipped pick's one-line reason. */
   why?: string;
   /** This model runs through the player's Anthropic key (Anthropic backend spec §2). */
@@ -639,8 +660,8 @@ export interface Crop {
 export interface SpriteRef {
   url: string;
   crop: Crop;
-  /** How tall she stands on stage, as a share of full figure height (0.5–1); absent: full height. */
-  height?: number;
+  /** Where her waist is on the sprite, as a share of its height from the top; absent: she stands as drawn. */
+  waist?: number;
   /** Her art is on the cast's pixel grid (Studio SNAP): draw it with hard pixels. Absent: smooth. */
   pixel?: boolean;
   /** Her other faces, name → `/api/agents/<id>/sprite/<name>`; absent when she has none. */
@@ -671,6 +692,8 @@ export interface OtherInfo extends Present {
   /** Where their face sits on their sprite (the tile's crop of an expression). */
   face: Face;
   tagline: string;
+  /** Their select-screen bio, for the lore drawer (spec 2026-11-06 §2); a resident has none. */
+  bio: string[];
   facts: Fact[];
 }
 
@@ -709,6 +732,8 @@ export interface PersonaInfo {
   bio?: string[];
   /** The select screen's facts; never under a persona (the city isn't told them). Absent when there are none. */
   facts?: Fact[];
+  /** The player character's own standing secret, for the lore drawer; never under a persona. Absent when there's none. */
+  secret?: string;
 }
 
 /** Where the player is: a contact's room and the scene it shows. */
@@ -748,6 +773,8 @@ export interface PlaythroughInfo {
   solo?: boolean;
   /** The outfit the player wears (the YOU sheet's wardrobe), one of their character's outfits. Absent: the plain sprite. */
   outfit?: string;
+  /** Contact id → the outfit picked for her on PEOPLE → FILE, worn everywhere; a contact not listed is dressed by her room (`outfitByScene`). */
+  contactOutfits?: Record<string, string>;
 }
 
 /** Someone on the roster the player hasn't met in the active playthrough (AROUND LOWLIGHT on the solo screen), where she is. */
@@ -791,6 +818,12 @@ export interface ContactEntry {
   /** Her file in CONTACTS (spec 2026-10-28 §4): the select screen's bio paragraphs and facts; absent when there are none. */
   bio?: string[];
   facts?: Fact[];
+  /** Her outfit names (PEOPLE's wardrobe); absent when she has none. */
+  outfits?: string[];
+  /** The outfit picked for her in this playthrough (worn everywhere); absent: her room dresses her. */
+  outfit?: string;
+  /** What her room (`sceneId`) puts her in when nothing is picked; absent: her plain sprite. */
+  sceneOutfit?: string;
 }
 
 export type SaveTrigger = 'manual' | 'end' | 'travel' | 'rewind';
@@ -937,6 +970,8 @@ export interface KitView {
   crewLatest: number | null;
   /** Crew abilities spec §4: a recruit has a promotion's pick waiting (the dot too). */
   crewPicks?: boolean;
+  /** Crew spec §5: a job's free hire is waiting (the dot too, until they're hired or 06:00 takes them). */
+  crewFree?: boolean;
 }
 
 /** A recruit on the CREW screen (crew spec §4): the folded member plus what the profile shows. */

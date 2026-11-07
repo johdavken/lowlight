@@ -242,7 +242,7 @@ async function main(): Promise<void> {
   // Its picture (quest art): any wide room picture stands in.
   fs.mkdirSync(path.join(questsDir, 'art'), { recursive: true });
   fs.copyFileSync('./scenes/tidal/ferry-stairs/room.png', path.join(questsDir, 'art', 'night-shift.png'));
-  process.env.NIX_TEST_ROLLS = '2,6';
+  process.env.NIX_TEST_ROLLS ??= '2,6';
   // A small job at the Intake (e2e/jobs.spec.ts): tier 1 so a Nobody sees it; its door's talk is the red check, a kick
   // blows it without a roll, and the ledger cracks. With Night Shift it makes a pool of two, so both post every night.
   fs.writeFileSync(

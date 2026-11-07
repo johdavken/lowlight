@@ -1,6 +1,7 @@
 ---
 title: Neon Strand
 category: City
+section: Districts
 keys: [the Strand, Strand, Neon Strand, boardwalk, fairgrounds, arcades, entertainment district]
 districts: [strand]
 places: []

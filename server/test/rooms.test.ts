@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import type { SceneDef } from '../../shared/types';
 import { generateScenes } from '../../tools/gen-placeholders';
 import { roomRegistry, type RoomRegistry } from '../src/rooms';
 import { loadPacks } from '../src/scenes';
@@ -19,6 +20,33 @@ beforeAll(async () => {
   rooms = roomRegistry(await loadPacks(dir));
 }, 60_000);
 afterAll(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+describe("a district's default song", () => {
+  const room = (id: string, sound?: SceneDef['sound']) => ({ id, ...(sound ? { sound } : {}) }) as SceneDef;
+  const packs = (scenes: SceneDef[]) => new Map([['spine', { registry: { list: () => scenes } }]]);
+
+  it('plays in a room with no songs, beside the sound it already has', () => {
+    const r = roomRegistry(packs([room('quiet'), room('humming', { indoor: true, hum: 0.3 })]), () => {}, { spine: 'Road.ogg' });
+    expect(r.get('spine/quiet')?.sound).toEqual({ music: { songs: ['Road.ogg'] } });
+    expect(r.get('spine/humming')?.sound).toEqual({ indoor: true, hum: 0.3, music: { songs: ['Road.ogg'] } });
+  });
+
+  it("gives way to a room's own songs, and keeps its level", () => {
+    const r = roomRegistry(packs([room('hab', { music: { songs: ['Mine.ogg'], level: 0.2 } })]), () => {}, { spine: 'Road.ogg' });
+    expect(r.get('spine/hab')?.sound?.music).toEqual({ songs: ['Mine.ogg'], level: 0.2 });
+  });
+
+  it("stays out of another district's rooms", () => {
+    const r = roomRegistry(packs([room('quiet')]), () => {}, { karasu: 'Road.ogg' });
+    expect(r.get('spine/quiet')?.sound).toBeUndefined();
+  });
+
+  it("doesn't touch the pack's own scene, which Studio reads", () => {
+    const scene = room('quiet');
+    roomRegistry(packs([scene]), () => {}, { spine: 'Road.ogg' });
+    expect(scene.sound).toBeUndefined();
+  });
+});
 
 describe('the city room registry', () => {
   it('names every room district/folder, sorted, without the splash', () => {

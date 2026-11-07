@@ -129,9 +129,9 @@ describe('createPlayers', () => {
     });
   });
 
-  it("the player's figure keeps her stage height", () => {
-    const rec = record({ id: 'ember', name: 'Ember', description: '', tagline: '', bio: [], facts: [] }, { sprite: { file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, height: 0.86, expressions: {}, outfits: {}, outfitByScene: {}, outfitWears: {} } });
-    expect(createPlayers({ records: () => [rec], characterId: 'ember' }).resolve(undefined).sprite).toEqual({ file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, height: 0.86 });
+  it("the player's figure keeps her waist", () => {
+    const rec = record({ id: 'ember', name: 'Ember', description: '', tagline: '', bio: [], facts: [] }, { sprite: { file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, waist: 0.36, expressions: {}, outfits: {}, outfitByScene: {}, outfitWears: {} } });
+    expect(createPlayers({ records: () => [rec], characterId: 'ember' }).resolve(undefined).sprite).toEqual({ file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, waist: 0.36 });
   });
 
   it("the player's figure keeps her pixel flag", () => {

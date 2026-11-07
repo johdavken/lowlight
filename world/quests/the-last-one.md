@@ -10,6 +10,8 @@ bars: field-deck
 starts: rue-hab
 after: rue_two
 pitch: She has a question for you, and she's only ever had the one.
+posted-by: Rue
+brief: Rue's hanger, after dark, with the door left open. Crew do the groundwork first, then comes one long night.
 pay: 1000-1200
 night: +72h
 fallout: +48h

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { offTemplate, rolledBeats } from './job-template';
-import { parseQuestFile } from './quests';
+import { blowUpSpread, offTemplate, rolledBeats } from './job-template';
+import { parseQuestFile, type QuestEntry } from './quests';
 
 const PAIRS: Record<1 | 2, string[][]> = { 1: [['cool', 'reflex'], ['body', 'wits'], ['body', 'tech']], 2: [['cool', 'reflex'], ['wits', 'tech'], ['body', 'cool'], ['tech', 'wits'], ['reflex', 'body']] };
 const text = (o: { tier?: 1 | 2; beats?: number; checks?: number[]; take?: number; head?: string; patch?: (s: string) => string } = {}) => {
@@ -58,4 +58,24 @@ describe('tier templates (tier template spec §1)', () => {
     expect(parse(text({ beats: 2 })).warnings).toEqual([]);
   });
   it('a template job reads template: true', () => expect(parse(text({ head: 'template: true' })).entry.template).toBe(true));
+});
+
+describe('blowUpSpread (approach shapes spec §2)', () => {
+  /** A job of one beat: two cards, a miss on either blows it unless `soft`. */
+  const job = (stats: string[], o: { tier?: number; id?: string; soft?: boolean } = {}) =>
+    ({
+      tier: o.tier ?? 2,
+      beats: new Map([[o.id ?? 'out', [{ choices: stats.map((stat, i) => ({ id: `c${i}`, fail: 'lost', check: { stat } })) }]]]),
+      outcomes: new Map([['lost', { effects: o.soft ? { take: 'part' } : { blown: true } }]]),
+    }) as unknown as QuestEntry;
+
+  it("flags a stat on more than two thirds of a tier's blow-up beats", () => {
+    expect(blowUpSpread([job(['cool', 'body']), job(['cool', 'reflex']), job(['cool', 'wits'])])).toEqual([{ tier: 2, stat: 'cool', on: 3, of: 3 }]);
+  });
+  it('two of three is fine', () => {
+    expect(blowUpSpread([job(['cool', 'body']), job(['cool', 'reflex']), job(['tech', 'wits'])])).toEqual([]);
+  });
+  it('a soft beat, a push beat and another tier do not count', () => {
+    expect(blowUpSpread([job(['cool', 'body']), job(['cool', 'wits'], { soft: true }), job(['cool', 'wits'], { id: 'push-1' }), job(['tech', 'wits']), job(['tech', 'reflex']), job(['cool', 'wits'], { tier: 1 }), job(['body', 'wits'], { tier: 1 }), job(['body', 'tech'], { tier: 1 })]).filter((r) => r.stat === 'cool')).toEqual([]);
+  });
 });

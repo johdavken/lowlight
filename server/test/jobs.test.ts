@@ -13,6 +13,7 @@ import { fakePlayers } from './fixtures/players';
 import { openDb, type Db } from '../src/db';
 import { COSTS, type CostId } from '../../shared/costs';
 import { dealAs, settleLikeOld } from './settle';
+import { GM_HOLD_MS } from '../src/gm';
 import { MISSION_CLOSE, QUEST_INSTRUCTIONS } from '../src/instructions';
 import { Journal } from '../src/journal';
 import { Room } from '../src/room-state';
@@ -2307,6 +2308,111 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
       expect(plays.mia.presses).toBeUndefined();
     });
   });
+  describe('trouble has a shape (approach shapes spec §1)', () => {
+    type T = { db: Parameters<typeof runOn>[0]; d: Parameters<typeof runOn>[1] };
+    const as = (t: T, approach: 'quiet' | 'smooth' | 'hard') => {
+      const run = runOn(t.db, t.d)!;
+      t.db.setMeta(keyOn(t.d), JSON.stringify({ ...run, setup: { ...run.setup!, approach } }));
+    };
+    const waiting = (t: T) => runOn(t.db, t.d)!.pending as DicePending;
+    const firsts = (relay: ChatRelay) => active(relay).costs!.dealt.filter((c) => c.first).map((c) => c.cost);
+
+    it('a deal leaves out the approach\'s never cost and leads with its first', async () => {
+      const t = await go([], crew(), { rolls: [4] });
+      as(t, 'smooth');
+      await card(t.relay, 'door', 'talk');
+      const dealt = waiting(t).dealt!.map((d) => d.cost);
+      expect(dealt).not.toContain('small');
+      expect(dealt[0]).toBe('worse');
+    });
+    it('HARD is never dealt ALARM', async () => {
+      const t = await go([], crew(), { rolls: [4] });
+      as(t, 'hard');
+      await card(t.relay, 'door', 'talk');
+      expect(waiting(t).dealt!.map((d) => d.cost)).not.toContain('alarm');
+    });
+    it('the first pick is refused on another card, then the second is free', async () => {
+      const t = await go([], crew(), { rolls: [4] });
+      await card(t.relay, 'door', 'talk');
+      dealAs(t.db, keyOn(t.d), ['worse', 'alarm', 'small'], 2);
+      expect(await card(t.relay, 'door', '!cost', 'worse')).toBe('pick ALARM +1 first');
+      expect(await card(t.relay, 'door', '!cost', 'alarm')).toMatchObject({ ok: true });
+      expect(await card(t.relay, 'door', '!cost', 'small')).toMatchObject({ ok: true });
+    });
+    it('the view marks the first card until it is picked', async () => {
+      const t = await go([], crew(), { rolls: [4] });
+      await card(t.relay, 'door', 'talk');
+      dealAs(t.db, keyOn(t.d), ['worse', 'alarm'], 2);
+      expect(firsts(t.relay)).toEqual(['alarm']);
+      await card(t.relay, 'door', '!cost', 'alarm');
+      expect(firsts(t.relay)).toEqual([]);
+    });
+    it('a first cost that was not dealt leaves the pick free', async () => {
+      const t = await go([], crew(), { rolls: [4] });
+      as(t, 'hard');
+      await card(t.relay, 'door', 'talk');
+      dealAs(t.db, keyOn(t.d), ['small', 'worse'], 1);
+      expect(firsts(t.relay)).toEqual([]);
+      expect(await card(t.relay, 'door', '!cost', 'worse')).toMatchObject({ ok: true });
+    });
+    it('an AFTER A ROLL ability still plays before the forced card, not after', async () => {
+      const before = await go(['dez'], crew({ dez: ['door-hold'] }), { rolls: [4], gamble: 2 });
+      await card(before.relay, 'door', 'talk');
+      dealAs(before.db, keyOn(before.d), ['alarm', 'worse'], 1);
+      expect(await card(before.relay, 'door', '!after', 'dez/door-hold')).toMatchObject({ ok: true });
+      const late = await go(['dez'], crew({ dez: ['door-hold'] }), { rolls: [4], gamble: 2 });
+      await card(late.relay, 'door', 'talk');
+      dealAs(late.db, keyOn(late.d), ['alarm', 'worse'], 1);
+      await card(late.relay, 'door', '!cost', 'alarm');
+      expect(await card(late.relay, 'door', '!after', 'dez/door-hold')).toBe('before you pick a cost');
+    });
+    it('Stand Firm cancels the forced pick', async () => {
+      const t = await go(['dez'], crew({ dez: ['firm'] }, { dez: 3 }), { rolls: [4] });
+      as(t, 'hard');
+      await card(t.relay, 'door', 'talk', 'dez/firm');
+      dealAs(t.db, keyOn(t.d), ['take', 'worse'], 2);
+      expect(await card(t.relay, 'door', '!cost', 'worse')).toBe('pick TAKE −1 first');
+      await card(t.relay, 'door', '!cost', 'take');
+      expect(waiting(t).settled).toEqual([{ cost: 'take', how: 'ability' }]);
+    });
+    it('a rerun redeals in shape, and the first pick still stands', async () => {
+      const t = await go(['dez'], crew({ dez: ['twice'] }, { dez: 2 }), { rolls: [2], rerun: [4] });
+      await card(t.relay, 'door', 'talk');
+      await card(t.relay, 'door', '!after', 'dez/twice');
+      const dealt = waiting(t).dealt!.map((d) => d.cost);
+      expect(dealt[0]).toBe('alarm');
+      expect(dealt).not.toContain('take');
+      expect(await card(t.relay, 'door', '!cost', dealt[1])).toBe('pick ALARM +1 first');
+    });
+    it('a bare TAKE IT takes the first cost', async () => {
+      const t = await go([], crew(), { rolls: [2] });
+      await card(t.relay, 'door', 'talk');
+      expect(waiting(t).dealt![0].cost).toBe('alarm');
+      await card(t.relay, 'door', '!take');
+      expect(runOn(t.db, t.d)!.alarm ?? 0).toBeGreaterThan(0);
+    });
+    it('Take the Hit takes the deal from the first cost', async () => {
+      const t = await go(['dez'], crew({ dez: ['hit'] }, { dez: 2 }), { rolls: [2] });
+      await card(t.relay, 'door', 'talk');
+      await card(t.relay, 'door', '!after', 'dez/hit');
+      expect(runOn(t.db, t.d)!.alarm ?? 0).toBe(0);
+    });
+    it('an ability on a picked ALARM has nothing to act on with HARD', async () => {
+      const t = await go(['dez'], crew({ dez: ['log-wipe'] }), { rolls: [4] });
+      as(t, 'hard');
+      await card(t.relay, 'door', 'talk');
+      dealAs(t.db, keyOn(t.d), ['take', 'worse'], 1);
+      expect(await card(t.relay, 'door', '!after', 'dez/log-wipe')).toBe('pick ALARM +1 first');
+    });
+    it('a forced ALARM can be RESISTed', async () => {
+      const t = await go([], crew(), { rolls: [4] });
+      await card(t.relay, 'door', 'talk');
+      dealAs(t.db, keyOn(t.d), ['alarm', 'worse'], 1);
+      await card(t.relay, 'door', '!cost', 'alarm');
+      await card(t.relay, 'door', '!resist', 'alarm');
+      expect(runOn(t.db, t.d)!.alarm ?? 0).toBe(0);
+    });
+  });
   describe('gambles, trades and the end (ability pass spec §2)', () => {
     const park = (t: { db: Parameters<typeof runOn>[0]; d: Parameters<typeof runOn>[1] }) => runOn(t.db, t.d)!.pending as DicePending;
     const set = (t: { db: Parameters<typeof runOn>[0]; d: Parameters<typeof runOn>[1] }, patch: Record<string, unknown>) => t.db.setMeta(keyOn(t.d), JSON.stringify({ ...runOn(t.db, t.d)!, ...patch }));
@@ -2319,6 +2425,8 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
       expect(t.kit().nerveLeft).toBe(before - 1);
       expect(park(t)).toMatchObject({ roll: { kind: 'clean', pass: true, gamble: { die: 5, from: 'cost' } } });
       expect(park(t).dealt).toBeUndefined();
+      // Nothing left to pay: the way on doesn't say a cost lands.
+      expect(active(t.relay).choices).toEqual([{ id: '!take', line: 'CARRY ON' }]);
       await card(t.relay, 'door', '!take');
       expect(runOn(t.db, t.d)!).toMatchObject({ beat: 'desk', takeFill: 2 });
       expect(rollLine(runOn(t.db, t.d)!.picks[0].roll as DiceRoll)).toContain('GAMBLE 5');
@@ -2439,7 +2547,8 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
     });
     it('trade-alarm: ALARM −1 and TAKE −1 as it lands', async () => {
       const t = await go(['dez'], crew({ dez: ['wipe'] }), { rolls: [4] });
-      set(t, { alarm: 1, takeFill: 2 });
+      // SMOOTH: its first cost is a next-roll one, so the ALARM this test counts stays out of the picks.
+      set(t, { alarm: 1, takeFill: 2, setup: { ...runOn(t.db, t.d)!.setup!, approach: 'smooth' } });
       await card(t.relay, 'door', 'talk');
       expect(await card(t.relay, 'door', '!after', 'dez/wipe')).toMatchObject({ ok: true });
       for (const c of (park(t).dealt ?? []).filter((d) => d.cost === 'worse' || d.cost === 'small').slice(0, 1)) await card(t.relay, 'door', '!cost', c.cost);
@@ -3056,10 +3165,10 @@ describe("a roll's life, phase 1 (roll lifecycle spec §1)", () => {
     }
     throw new Error('no day');
   };
-  const at = async (o: Parameters<typeof relayWith>[0] & { day?: number } = {}, people: string[] = [], crewOf: CrewMember[] = []) => {
+  const at = async (o: Parameters<typeof relayWith>[0] & { day?: number } = {}, people: string[] = [], crewOf: CrewMember[] = [], approach: 'quiet' | 'smooth' = 'smooth') => {
     const d = o.day ?? plainDoor('easy');
     const r = relayWith({ clock: () => evening(d), ...(crewOf.length ? { crew: { members: crewOf } } : {}), ...o });
-    expect(await r.relay.startQuest('hicks', 'back-door', ...(people.length ? [{ approach: 'smooth' as const, people, favour: false }] : []))).toMatchObject({ ok: true });
+    expect(await r.relay.startQuest('hicks', 'back-door', ...(people.length ? [{ approach, people, favour: false }] : []))).toMatchObject({ ok: true });
     return { ...r, d };
   };
   const go = (relay: ChatRelay, beat: string, choice: string, card?: string) => relay.chooseQuest('hicks', { id: 'back-door', beat, choice, ...(card ? { card } : {}) });
@@ -3202,7 +3311,7 @@ describe("a roll's life, phase 1 (roll lifecycle spec §1)", () => {
     await go(vet.relay, 'door', '!after', 'ash/clean-exit');
     expect(pend(vet).pick).toBe(1);
     for (let n = 0; n < 40; n++) {
-      const t = await at({ rolls: [5], day: plainDay(n) }, ['dez'], [member('dez', 'runner', slot(['log-wipe']), 1)]);
+      const t = await at({ rolls: [5], day: plainDay(n) }, ['dez'], [member('dez', 'runner', slot(['log-wipe']), 1)], 'quiet');
       await go(t.relay, 'door', 'talk');
       if (!pend(t).dealt!.some((c) => c.cost === 'alarm')) continue;
       await go(t.relay, 'door', '!cost', 'alarm');
@@ -3232,6 +3341,48 @@ describe("a roll's life, phase 1 (roll lifecycle spec §1)", () => {
     const none = await at({ rolls: [5] });
     await go(none.relay, 'door', 'talk');
     expect(pend(none).dealt!.every((c) => c.by === 'written')).toBe(true);
+  });
+
+  it('the costs say writing while the GM is out, and stop when it answers', async () => {
+    let answer!: (v: { text: string }) => void;
+    const gm = { complete: vi.fn(() => new Promise<{ text: string }>((r) => (answer = r))) };
+    const t = await at({ rolls: [5], gm });
+    await go(t.relay, 'door', 'talk');
+    expect(states(t.events).at(-1)!.active!.costs!.writing).toBe(true);
+    answer({ text: JSON.stringify({ lines: Object.fromEntries(pend(t).dealt!.map((c) => [COSTS[c.cost].tag, 'The street shifts around you here.'])) }) });
+    await flush();
+    await flush();
+    expect(states(t.events).at(-1)!.active!.costs!.writing).toBeUndefined();
+  });
+  it('a GM that fails stops writing, and the written lines stand', async () => {
+    const gm = { complete: vi.fn(async () => Promise.reject(new Error('down'))) };
+    const t = await at({ rolls: [5], gm });
+    await go(t.relay, 'door', 'talk');
+    await flush();
+    await flush();
+    const last = states(t.events).at(-1)!.active!.costs!;
+    expect(last.writing).toBeUndefined();
+    expect(last.dealt.every((c) => c.by === 'written')).toBe(true);
+  });
+  it('a GM past the hold is dropped: the written line never changes after it shows', async () => {
+    const timers = vi.spyOn(globalThis, 'setTimeout');
+    let answer!: (v: { text: string }) => void;
+    const gm = { complete: vi.fn(() => new Promise<{ text: string }>((r) => (answer = r))) };
+    const t = await at({ rolls: [5], gm });
+    await go(t.relay, 'door', 'talk');
+    const hold = timers.mock.calls.find((c) => c[1] === GM_HOLD_MS)![0] as () => void;
+    timers.mockRestore();
+    hold();
+    expect(states(t.events).at(-1)!.active!.costs!.writing).toBeUndefined();
+    answer({ text: JSON.stringify({ lines: Object.fromEntries(pend(t).dealt!.map((c) => [COSTS[c.cost].tag, 'The street shifts around you here.'])) }) });
+    await flush();
+    await flush();
+    expect(pend(t).dealt!.every((c) => c.by === 'written')).toBe(true);
+  });
+  it('no GM: nothing says writing', async () => {
+    const t = await at({ rolls: [5] });
+    await go(t.relay, 'door', 'talk');
+    expect(states(t.events).at(-1)!.active!.costs!.writing).toBeUndefined();
   });
 
   it('rewind brings back the same deal and lines without a new GM call', async () => {
@@ -3297,7 +3448,7 @@ describe("a roll's life, phase 1 (roll lifecycle spec §1)", () => {
   });
 
   it('review M5: a save keeps what is settled and only fills up to the new pick count', async () => {
-    const vet = await at({ rolls: [2, 5] }, ['ash'], [member('ash', 'runner', slot(['clean-exit']), 3)]);
+    const vet = await at({ rolls: [2, 5] }, ['ash'], [member('ash', 'runner', slot(['clean-exit']), 3)], 'quiet');
     await go(vet.relay, 'door', 'talk');
     dealAs(vet.db, keyOn(vet.d), ['alarm', 'heat', 'worse'], 2);
     await go(vet.relay, 'door', '!cost', 'alarm');
@@ -3963,6 +4114,11 @@ describe('a contract (tier 3 contracts spec §2)', () => {
     await t.relay.playDueQuest('hicks');
   };
   const go = { approach: 'quiet' as const, people: [], favour: false };
+  it('a comms: beat says so to the tabs, with no room', async () => {
+    const t = await start({ book: [job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('# offer\n', '# offer\ncomms: yes\n'), 'the-contract'), BACK] });
+    expect(t.relay.questState('hicks').active).toMatchObject({ comms: true });
+    expect(t.relay.questState('hicks').active!.room).toBeUndefined();
+  });
 
   describe('a guest (guest crew spec §2)', () => {
     const EMBER: ContactCard = { id: 'ember', name: 'Ember Zhou', accent: '#ff4f8b', portrait: null, spec: 'runner' };
@@ -4253,6 +4409,16 @@ describe('a contract (tier 3 contracts spec §2)', () => {
       t.relay.emitQuestState('hicks');
       expect(notes()).toEqual([`// THE TEST CONTRACT — A REPORT IS IN. IT'S WITH ${t.relay['deps'].quests!.contactName('nix-direct').toUpperCase()}.`]);
     });
+    // The choice cut straight to chat: the table closed and nobody answered it (playtest).
+    it('she answers a pick that goes back to the wait', async () => {
+      const t = await open('clean');
+      await t.pick('report-boat', 'leave');
+      const rows = t.db.allMessages('hicks');
+      const row = rows.findLast((m) => m.mode === 'quest' && m.role === 'user')!;
+      expect(row.quest).toMatchObject({ waiting: true });
+      expect(row.quest!.silent).toBeUndefined();
+      expect(rows.at(-1)).toMatchObject({ role: 'agent', replyTo: row.id });
+    });
     it('a report plays once', async () => {
       const t = await open('clean');
       await t.pick('report-boat', 'leave');
@@ -4493,7 +4659,11 @@ describe('a contract (tier 3 contracts spec §2)', () => {
       const crew = { get reports() { return reports; } } as unknown as Partial<CrewState>;
       let now = evening(3);
       const r = relayWith({ book: [REAL], rep: 50, clock: () => now, crew, rolls: [6, 6, 6, 6, 6, 6, 6] });
-      const pick = (beat: string, choice: string) => r.relay.chooseQuest('hicks', { id: 'the-subtraction', beat, choice });
+      // Her answer to a pick back to the wait ends by playing what's due, in the background.
+      const pick = async (beat: string, choice: string) => {
+        while (r.relay.busy) await new Promise((res) => setTimeout(res, 0));
+        return r.relay.chooseQuest('hicks', { id: 'the-subtraction', beat, choice });
+      };
       expect(await r.relay.startQuest('hicks', 'the-subtraction')).toMatchObject({ ok: true });
       const id = r.db.metaWithPrefix('quest.hicks.the-subtraction@')[0].k.slice('quest.hicks.'.length);
       const run = () => parseRun(r.db.getMeta(questKey('hicks', id)))!;
@@ -4520,6 +4690,11 @@ describe('a contract (tier 3 contracts spec §2)', () => {
       expect(await pick('fallout', last)).toMatchObject({ ok: true });
       expect(run().done).toBe(true);
       if (turn === 'go') expect(run().recruit).toMatchObject({ spec: 'ears' });
+      // Outfits as rewards: every ending but the blown one opens Hicks's tie, and the notice says where to wear it.
+      expect((run().kit ?? []).some((e) => e.outfit === 'hicks/tie')).toBe(true);
+      expect(r.events.some((e) => e.type === 'notice' && e.text === '// NEW OUTFIT · HICKS · TIE (YOU → WARDROBE)')).toBe(true);
+      // The fallout has no debrief: its ending row carries the line for the end card.
+      expect(questRows(r.db).at(-1)!.quest!.rewards).toEqual(['OUTFIT · HICKS · TIE']);
     });
   });
   it('WALK AWAY: while it waits, for rep; not once in', async () => {

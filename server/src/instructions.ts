@@ -80,9 +80,16 @@ export const TRAVEL_LINE = "[travel: you've just arrived together; the [room] li
 export const QUEST_INSTRUCTIONS =
   "The story has just moved on: the [quest — …: …] line at the end of this message is what happened, word for word, and the user has just read it on their screen. Don't retell any of it: don't describe again what it describes, don't repeat anyone's words from it, and don't walk through it in your own words. Start from the moment its last line leaves off and react to that in character, in one short beat: a few short paragraphs. Don't add to what it says happened.";
 
+/**
+ * Rides with every job or quest row's note, close to the line it's about: on Run Sheet's closing turn she took the line's
+ * "you" for herself and came home as the player (playtest, 3 takes of 3).
+ */
+export const whoIsYou = (player: string): string =>
+  `[who's who: [job — …] and [quest — …] lines are told to ${player}, so "you" in them is ${player} and never you; "she" or "he" in them can be you. Answer as yourself, from where you are right now, with ${player} in front of you. Never write what ${player} did or saw as your own.]`;
+
 /** Setting out on a mission (missions spec §3): her one line as the job starts; the beat, the player and the job follow in [mission]. */
 export const MISSION_OPEN =
-  "You're setting out on a job together. The [job — …: …] line at the end of this message is the first thing you both see, and the user has just read it. Say one short line in character as you set out: one or two sentences, no more. Don't describe the scene again, don't decide anything for the user, and never mention odds, rolls or numbers. The [mission] block's deck and heat are the user's own kit, not anything the job is about: don't mix them up with what you're carrying or chasing. Talk like a person, not a game: never say heat, heat score, rep, tier, ALARM or EDGE.";
+  "The job is setting out, whether you're going along or staying on the line. The [job — …: …] line at the end of this message is how it starts, and the user has just read it. Say one short line in character as it starts: one or two sentences, no more. Don't describe the scene again, don't repeat anything it already has you say, don't decide anything for the user, and never mention odds, rolls or numbers. The [mission] block's deck and heat are the user's own kit, not anything the job is about: don't mix them up with what you're carrying or chasing. Talk like a person, not a game: never say heat, heat score, rep, tier, ALARM or EDGE.";
 
 /** A mission's end (missions spec §3): her one line on how it went; the run is in [mission summary]. */
 export const MISSION_CLOSE =

@@ -17,6 +17,8 @@ export const CIPHER = {
   refillGap: 10,
   /** A run is due while fewer than this many are open. */
   refillBelow: 2,
+  /** Replies an open truth goes without a clue before it's set aside (cold), so a run can replace it. */
+  coldAfter: 60,
   /** Replies to wait after a failed cipher call (the provider down) before trying again. */
   retryGap: 3,
   truthMax: 300,
@@ -29,9 +31,10 @@ export const CIPHER = {
 /** One contact's Cipher events for `player` (story meta). */
 export const cipherKey = (player: string) => `cipher.${player}`;
 
+/** `replies` on a truth or clue: the playthrough's replies when it was written (since 2026-11-07; older ones have none). */
 export type CipherEvent =
-  | { t: 'truth'; id: string; kind: TruthKind; truth: string; knownBy: string[]; comesOutWhen: string; changes: string; clueIdeas: string; seq: number }
-  | { t: 'clue'; id: string; text: string; messageId: string; at: number; place: string; onPage: boolean; seq: number }
+  | { t: 'truth'; id: string; kind: TruthKind; truth: string; knownBy: string[]; comesOutWhen: string; changes: string; clueIdeas: string; replies?: number; seq: number }
+  | { t: 'clue'; id: string; text: string; messageId: string; at: number; place: string; onPage: boolean; replies?: number; seq: number }
   | { t: 'learned'; id: string; seq: number }
   /** A cipher run happened (spec §2.2): even one that wrote nothing waits refillGap. */
   | { t: 'run'; replies: number; seq: number };
@@ -52,7 +55,8 @@ export interface Truth {
   comesOutWhen: string;
   changes: string;
   clueIdeas: string;
-  state: 'open' | 'out';
+  /** cold: open for CIPHER.coldAfter replies with no clue, set aside; nobody carries it, its seen clues stay. */
+  state: 'open' | 'out' | 'cold';
   clues: Clue[];
 }
 
@@ -98,23 +102,49 @@ function mixRefusal(truths: readonly Truth[], t: Pick<NewTruth, 'kind' | 'knownB
 /**
  * Every contact's events as one Cipher, in `seq` order. A truth that would break the cap or the mix is dropped (two
  * Residuals can race a run); a clue or learned whose truth isn't there (rewound on another contact) is dropped too.
+ * An open truth goes cold once CIPHER.coldAfter replies pass since it was written or last clued, checked at every
+ * dated event and at `replies`, so a run that replaced it folds the same way it was checked.
  */
 export function foldCipher(lists: CipherEvent[][], replies: number): CipherState {
   const truths: Truth[] = [];
+  /** Replies at a truth's birth or its newest dated clue. */
+  const warm = new Map<string, number>();
   let lastRun: number | null = null;
-  for (const e of lists.flat().sort((a, b) => a.seq - b.seq)) {
-    if (e.t === 'run') lastRun = Math.max(lastRun ?? 0, e.replies);
-    else if (e.t === 'truth') {
+  const age = (now: number) => {
+    for (const t of truths) if (t.state === 'open' && now - (warm.get(t.id) ?? now) >= CIPHER.coldAfter) t.state = 'cold';
+  };
+  // A truth from before `replies` was stored: the runner writes its run first in the same list, so that run dates it.
+  const dated = lists.map((list) => {
+    let last = 0;
+    return list.map((e): CipherEvent => {
+      if (e.t === 'run') last = e.replies;
+      return e.t === 'truth' && e.replies === undefined ? { ...e, replies: last } : e;
+    });
+  });
+  for (const e of dated.flat().sort((a, b) => a.seq - b.seq)) {
+    if (e.t === 'run') {
+      age(e.replies);
+      lastRun = Math.max(lastRun ?? 0, e.replies);
+    } else if (e.t === 'truth') {
+      age(e.replies!);
       if (mixRefusal(truths, e) !== null || truths.some((t) => t.id === e.id)) continue;
       truths.push({ id: e.id, kind: e.kind, truth: e.truth, knownBy: e.knownBy, comesOutWhen: e.comesOutWhen, changes: e.changes, clueIdeas: e.clueIdeas, state: 'open', clues: [] });
+      warm.set(e.id, e.replies!);
     } else {
+      if (e.t === 'clue' && e.replies !== undefined) age(e.replies);
       const t = truths.find((x) => x.id === e.id);
       if (!t) continue;
-      if (e.t === 'learned') t.state = 'out';
+      if (e.t === 'learned') {
+        if (t.state === 'open') t.state = 'out';
+      } else if (t.state === 'cold') continue;
       // A re-read of the same reply (KEEP GOING) can log its clue again: once is enough.
-      else if (!t.clues.some((c) => c.messageId === e.messageId && c.text === e.text)) t.clues.push({ text: e.text, messageId: e.messageId, at: e.at, place: e.place, onPage: e.onPage });
+      else if (!t.clues.some((c) => c.messageId === e.messageId && c.text === e.text)) {
+        t.clues.push({ text: e.text, messageId: e.messageId, at: e.at, place: e.place, onPage: e.onPage });
+        if (e.replies !== undefined && t.state === 'open') warm.set(t.id, Math.max(warm.get(t.id) ?? 0, e.replies));
+      }
     }
   }
+  age(replies);
   return { truths, replies, lastRun };
 }
 
@@ -206,7 +236,8 @@ export function looseEnds(s: CipherState, placeName: (id: string) => string): Lo
       .sort((a, b) => a.at - b.at)
       .map((c) => ({ text: c.text, place: placeName(c.place), at: c.at }));
   return {
-    open: s.truths.filter((t) => t.state === 'open').map(seen).filter((g) => g.length > 0),
+    // A cold truth's clues were still seen: they stay loose ends, never solved.
+    open: s.truths.filter((t) => t.state !== 'out').map(seen).filter((g) => g.length > 0),
     solved: s.truths.filter((t) => t.state === 'out').map((t) => ({ truth: t.truth, clues: seen(t) })),
   };
 }

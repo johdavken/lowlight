@@ -1,4 +1,4 @@
-/* The YOU step's panel: in 1P's widened file strip, styled like the model step's list (link.css). */
+/* The YOU step's panel: in 1P's widened file strip, styled like the model step's list (model-band.css). */
 .you-panel {
   display: flex;
   flex-direction: column;

@@ -362,21 +362,14 @@
 .cursor.c1 .lbl { left: -4px; }
 .cursor.c2 .lbl { right: -4px; }
 /* VS: the grid steps back. */
-[data-phase='ready'] .grid-band,
-[data-phase='model'] .grid-band { opacity: 0.25; filter: grayscale(1); }
-/* The model step's wide strip reaches x 1000: the band steps left, out from under it, and takes no clicks. */
-[data-phase='model'] .grid-band { left: calc(50% - 180px); pointer-events: none; }
+[data-phase='ready'] .grid-band { opacity: 0.25; filter: grayscale(1); }
+/* The model step's band stands where the grid stood. */
+[data-phase='model'] .grid-band { visibility: hidden; pointer-events: none; }
+[data-phase='model'] .link-invite { display: none; }
+/* Over the band, clear of its search. */
+[data-phase='model'] .dial-error { bottom: auto; top: 424px; }
 
-/* ---------- the model step: her file widens into the link / model panel ---------- */
-.p2 .file-strip.wide {
-  z-index: 12;
-  width: 600px;
-  padding-left: 96px;
-  background: linear-gradient(270deg, rgba(5, 2, 12, 0.96), rgba(5, 2, 12, 0.86));
-}
 .file-strip.wide .panel-host { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-/* Her art steps aside for the panel. */
-[data-phase='model'] .fighter.p2 > :not(.file-strip):not(.tag) { visibility: hidden; }
 .file-strip .link-invite { font: 16px var(--pixel); letter-spacing: 0.2em; color: #ffb347; }
 .tile-chip {
   position: absolute;

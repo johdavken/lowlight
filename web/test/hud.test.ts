@@ -313,10 +313,10 @@ describe('Hud Keys bar and SYS', () => {
     expect(hud.where()).toContain('THE NOODLE STALL');
   });
 
-  it('the right side, in order: texts (promised texts spec §6), notice, YOU, PEOPLE, TEXTS, QUEST, CREW, MAP, SYS', () => {
+  it('the right side, in order: texts (promised texts spec §6), notice, YOU, PEOPLE, TEXTS, QUEST, CREW, MAP, BOOK, SYS', () => {
     const { root } = full();
     expect([...q(root, '.hud-right').children].map((c) => c.className.split(' ')[0])).toEqual([
-      'hud-texts', 'notice', 'hud-you', 'hud-people', 'hud-tx', 'hud-quest', 'hud-crew', 'hud-map', 'hud-sys',
+      'hud-texts', 'notice', 'hud-you', 'hud-people', 'hud-tx', 'hud-quest', 'hud-crew', 'hud-map', 'hud-book', 'hud-sys',
     ]);
     expect(root.querySelector('.hud-sound, .hud-speed, .hud-bar .hud-model')).toBeNull();
   });

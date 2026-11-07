@@ -303,6 +303,9 @@ export function rerunRoll(o: { seed: string; roll: DiceRoll; faces?: number[] })
   return { ...(result.kind === 'miss' ? unsaved : was), faces, kind: result.kind, pass: result.pass, rerun: true };
 }
 
+/** The card a waiting pass shows when nothing's left to pay (a won gamble, a free 4–5): TAKE IT's way on, without its cost. */
+export const CARRY_ON = 'CARRY ON';
+
 /** A gamble's die (ability pass spec §2), seeded so rewind and BRANCH HERE roll the same. */
 export const gambleDie = (seed: string): number => 1 + Math.floor(rng(hashSeed(seed))() * 6);
 

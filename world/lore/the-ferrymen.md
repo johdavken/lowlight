@@ -1,6 +1,7 @@
 ---
 title: The Ferrymen
 category: Factions
+section: Gangs
 keys: [Ferrymen, Ferryman, smuggled in, forged papers, people smugglers, the crossing]
 districts: [tidal]
 places: [ferry-stairs]

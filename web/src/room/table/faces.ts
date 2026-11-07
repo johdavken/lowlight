@@ -7,12 +7,30 @@ import { GRADES, type Grade, type Specialty, type Timing } from '../../../../sha
 import type { ProgramKind } from '../../../../shared/programs';
 import type { ContactCard } from '../../../../shared/types';
 import { face } from '../crew-ui';
-import { rankMark, symbolMark } from './marks';
+import { rankMark, symbolMark, timingMark } from './marks';
 import { el } from './el';
 
 /** A card picture's file (web/public/cards/<name>.webp). */
 export type CardArt = 'quiet' | 'smooth' | 'hard' | 'favour' | 'lead' | 'tip' | 'empty' | 'back' | 'steady' | 'take';
 const artUrl = (a: CardArt) => `/cards/${a}.webp`;
+
+/** A call card's picture, by the stat it rolls: what you're doing (art/cards/prompt.md, sheet 12). A stat with none shows the black card. */
+const STAT_ART: Record<string, string> = { REFLEX: '/cards/stat-reflex.webp', COOL: '/cards/stat-cool.webp', BODY: '/cards/stat-body.webp', WITS: '/cards/stat-wits.webp', TECH: '/cards/stat-tech.webp' };
+
+/** A call card's picture with its stat's symbol over it. */
+export function statPicture(stat: string): HTMLElement {
+  const side = el('span', 'tb-side');
+  const src = STAT_ART[stat];
+  if (src) {
+    const img = el('img', 'tb-art');
+    img.src = src;
+    img.alt = '';
+    img.addEventListener('error', () => img.remove());
+    side.append(img);
+  }
+  side.append(symbolMark(stat.toLowerCase()));
+  return side;
+}
 
 /** A printed card: the black border and centred serif of a crew or program card (table.css). A long name wraps at its space, or sets smaller if it has none; a long line sets smaller. */
 const printed = (f: HTMLElement): HTMLElement => {
@@ -32,6 +50,15 @@ function frame(pic: HTMLElement, name: string, lines: string[], traits: { label:
   for (const t of traits) body.append(el('span', `tbc-tr${t.good ? '' : ' bad'}`, `${t.good ? '+' : '−'} ${t.label.toUpperCase()}`));
   for (const a of abilities) body.append(el('span', 'tbc-ab', `◆ ${a.toUpperCase()}`));
   f.append(pic, body);
+  return f;
+}
+
+/** An approach at SETUP: printed on a desktop, with how it goes wrong, then its rules (mockup approach-cards.html, C). */
+export function approachFace(art: CardArt, name: string, wrong: string, rules: { stats: string; start?: string; spared: string; first: string }): HTMLElement {
+  const f = artFace(art, name);
+  f.classList.add('tbc-print');
+  const line = (kind: string, text: string) => el('span', `tbc-note ${kind}`, text);
+  f.querySelector('.tbc-body')!.append(el('span', 'tbc-wrong', wrong), line('tbc-stats', rules.stats), ...(rules.start ? [line('tbc-start', rules.start)] : []), line('tbc-spared', rules.spared), line('tbc-first', rules.first));
   return f;
 }
 
@@ -59,9 +86,9 @@ export function crewFace(r: { name: string; spec: Specialty; grade: Grade; toNex
 const TIMING_WORD = { roll: 'ON A ROLL', after: 'AFTER A ROLL', end: 'AT THE END', auto: 'WHEN IT COMES' } as const;
 
 /**
- * An ability's card in a recruit's stack (crew abilities spec §2): its picture (web/public/abilities/<id>.webp, cut from
- * art/cards/prompt.md's ability sheets) over its timing's colour, when it plays as the chip, its label, what it does, its
- * state line. Without a picture the colour shows alone.
+ * An ability's card in a recruit's stack (crew abilities spec §2), printed like the crew's: its picture
+ * (web/public/abilities/<id>.webp, cut from art/cards/prompt.md's ability sheets) over its timing's colour, when it plays as
+ * the mark, its label, its state line, what it does. Without a picture the colour shows alone.
  */
 export function abilityFace(a: { id: string; label: string; timing: Timing; words: string }, note?: string): HTMLElement {
   const pic = el('span', `tbc-pic tbc-ability t-${a.timing}`);
@@ -69,8 +96,13 @@ export function abilityFace(a: { id: string; label: string; timing: Timing; word
   img.src = `/abilities/${a.id}.webp`;
   img.alt = '';
   img.addEventListener('error', () => img.remove());
-  pic.append(img, el('span', 'tbc-spec', TIMING_WORD[a.timing]));
-  return frame(pic, a.label.toUpperCase(), [a.words, ...(note ? [note] : [])]);
+  pic.append(img, timingMark(a.timing, TIMING_WORD[a.timing]));
+  const card = printed(frame(pic, a.label.toUpperCase(), [...(note ? [note] : []), a.words]));
+  // What it does runs to a few lines, where a crew card's notes keep to one.
+  const words = [...card.querySelectorAll('.tbc-note')].at(-1)!;
+  words.classList.remove('long');
+  words.classList.add('words');
+  return card;
 }
 
 /**

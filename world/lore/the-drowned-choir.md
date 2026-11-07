@@ -1,6 +1,7 @@
 ---
 title: The Drowned Choir
 category: Factions
+section: Movements
 keys: [Drowned Choir, the Choir, sea cult, waterline singers]
 districts: [marsh]
 places: []

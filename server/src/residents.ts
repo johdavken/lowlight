@@ -112,7 +112,7 @@ export function residentInfo(rec: ResidentRecord): ResidentInfo {
     sprite: {
       url: `${base}/sprite`,
       crop: rec.sprite.crop,
-      ...(rec.sprite.height !== undefined ? { height: rec.sprite.height } : {}),
+      ...(rec.sprite.waist !== undefined ? { waist: rec.sprite.waist } : {}),
       ...(rec.sprite.pixel ? { pixel: true } : {}),
       ...(names.length > 0 ? { expressions: Object.fromEntries(names.map((n) => [n, `${base}/sprite/${n}`])) } : {}),
       ...(outfits.length > 0 ? { outfits: Object.fromEntries(outfits.map((n) => [n, `${base}/outfit/${n}`])) } : {}),

@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { modelLabel } from '../../shared/model-label';
 import type { AgentInfo, Crop, SpriteRef } from '../../shared/types';
-import { AGENT_ID_RE, characterFile, deckOf, diceSettings, loadCharacter, statsOf, resolveExpressions, resolveOutfitByScene, resolveOutfitWears, resolveOutfits, resolveSprite, type Character } from './character';
+import type { OutfitUnlock } from '../../shared/standing';
+import { AGENT_ID_RE, characterFile, deckOf, diceSettings, loadCharacter, statsOf, resolveExpressions, resolveOutfitByScene, resolveOutfitUnlocks, resolveOutfitWears, resolveOutfits, resolveSprite, type Character } from './character';
 import { DEFAULT_FACE, resolveProfile, type CharacterProfile, type ProfileSource } from './character-profile';
 import { OPENROUTER_BASE_URL } from './config';
 import { oldProfileIdentity } from '../../shared/identity';
@@ -180,8 +181,8 @@ const capitalized = (id: string) => id.charAt(0).toUpperCase() + id.slice(1);
 export type SpriteRecord = {
   file: string;
   crop: Crop;
-  /** How tall she stands on stage (0.5–1); absent: full height. */
-  height?: number;
+  /** Where her waist is on the sprite, as a share of its height from the top; absent: she stands as drawn. */
+  waist?: number;
   /** Snapped art (Studio SNAP): drawn with hard pixels. */
   pixel?: true;
   expressions: Record<string, string>;
@@ -189,12 +190,15 @@ export type SpriteRecord = {
   outfitByScene: Record<string, string>;
   /** Outfit name → one line on what she has on in it (server-side only: her model is told, the client isn't). */
   outfitWears: Record<string, string>;
+  /** Outfits by standing: outfit name → what her standing must have reached (and for whom) before it's worn. */
+  outfitUnlocks?: Record<string, OutfitUnlock>;
 };
 
 /** Outfits and the scene → outfit map from one character file, resolved in its folder. */
-function resolveWardrobe(dir: string, c: Character | null | undefined, warn: (msg: string) => void): Pick<SpriteRecord, 'outfits' | 'outfitByScene' | 'outfitWears'> {
+function resolveWardrobe(dir: string, c: Character | null | undefined, warn: (msg: string) => void): Pick<SpriteRecord, 'outfits' | 'outfitByScene' | 'outfitWears' | 'outfitUnlocks'> {
   const outfits = resolveOutfits(dir, c?.outfits, warn);
-  return { outfits, outfitByScene: resolveOutfitByScene(c?.outfitByScene, outfits, warn), outfitWears: resolveOutfitWears(c?.outfitWears, outfits, warn) };
+  const unlocks = resolveOutfitUnlocks(c?.outfitUnlocks, outfits, warn);
+  return { outfits, outfitByScene: resolveOutfitByScene(c?.outfitByScene, outfits, warn), outfitWears: resolveOutfitWears(c?.outfitWears, outfits, warn), ...(Object.keys(unlocks).length > 0 ? { outfitUnlocks: unlocks } : {}) };
 }
 
 const hasWardrobe = (c: Character | null | undefined) => c?.outfits !== undefined || c?.outfitByScene !== undefined || c?.outfitWears !== undefined;
@@ -217,7 +221,7 @@ function spriteRef(id: string, sprite: Omit<SpriteRecord, 'file'>, select: strin
   return {
     url: `/api/agents/${id}/sprite`,
     crop: sprite.crop,
-    ...(sprite.height !== undefined ? { height: sprite.height } : {}),
+    ...(sprite.waist !== undefined ? { waist: sprite.waist } : {}),
     ...(sprite.pixel ? { pixel: true } : {}),
     ...(names.length > 0 ? { expressions: Object.fromEntries(names.map((n) => [n, `/api/agents/${id}/sprite/${n}`])) } : {}),
     ...(outfits.length > 0 ? { outfits: Object.fromEntries(outfits.map((n) => [n, `/api/agents/${id}/outfit/${n}`])) } : {}),

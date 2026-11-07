@@ -1,6 +1,7 @@
 ---
 title: The deck market
 category: Places
+section: The Spine
 keys: [deck market, the deck market, night market, under the deck market]
 districts: [spine]
 places: [deck-market]

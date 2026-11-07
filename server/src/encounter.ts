@@ -3,6 +3,7 @@
  * this moment in the scene — the room, the lore, both public files, who else is here and the
  * scene's last lines. The call itself is scenario cards' `completeOnce`.
  */
+import type { LoreLine } from '../../shared/lore';
 import { named, type Pronoun } from '../../shared/pronoun';
 import { ENCOUNTER_LINE_MAX, ENCOUNTER_RECENT_LINES, encounterText, strangerAt, type Stranger } from '../../shared/encounter';
 import { speakerBeats } from '../../shared/beats';
@@ -69,10 +70,12 @@ export function recentLines(rows: ChatMessage[], names: { player: string; contac
  * choosing lore, as `selectLore` reads them), and the stranger still here — at the line you'd write
  * next, so a scene that has ended (her closing reply in) has nobody left in it.
  */
-export function sceneNow(rows: ChatMessage[], names: { player: string; contact: string; others?: string[] }, max = ENCOUNTER_RECENT_LINES): { recent: string[]; loreRecent: string[]; stranger: Stranger | null } {
+export function sceneNow(rows: ChatMessage[], names: { player: string; contact: string; others?: string[] }, max = ENCOUNTER_RECENT_LINES): { recent: string[]; loreRecent: LoreLine[]; stranger: Stranger | null } {
   const recent = recentLines(rows, names, max);
   const next: ChatMessage = { id: '', role: 'user', text: '', toolLines: [], ts: Infinity, status: 'ok' };
-  return { recent, loreRecent: [...recent].reverse(), stranger: strangerAt([...rows, next], rows.length) };
+  // Yours: your lines and the game's [travel]/[gig]/… rows on your side; everyone else's are theirs (lore picking spec §3).
+  const yours = (l: string) => l.startsWith(`${names.player}: `) || l.startsWith('[');
+  return { recent, loreRecent: [...recent].reverse().map((text): LoreLine => ({ text, by: yours(text) ? 'you' : 'them' })), stranger: strangerAt([...rows, next], rows.length) };
 }
 
 /** The narrator's request (spec §2): the facts in order, then the names a stranger can't take. */

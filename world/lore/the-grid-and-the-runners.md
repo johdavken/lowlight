@@ -1,6 +1,7 @@
 ---
 title: The Grid and the Runners
 category: City
+section: Basics
 keys: [netrunner, netrunners, runner, runners, decks, jacking in]
 districts: []
 places: []

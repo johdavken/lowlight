@@ -10,12 +10,15 @@ import { ChatRelay, type ChatRelayDeps } from '../src/chat-relay';
 import { fakeBackend, reply } from './fixtures/backend';
 import { fakePlayers } from './fixtures/players';
 import { openDb, type Db } from '../src/db';
-import { MISSION_CLOSE, MISSION_OPEN, QUEST_INSTRUCTIONS } from '../src/instructions';
+import { MISSION_CLOSE, MISSION_OPEN, QUEST_INSTRUCTIONS, whoIsYou } from '../src/instructions';
+import { summaryMessages } from '../src/summary';
+import type { ChatMessage } from '../../shared/types';
 import { Journal } from '../src/journal';
 import { Room } from '../src/room-state';
 import { SceneRegistry } from '../src/scenes';
 import { generateScenes } from '../../tools/gen-placeholders';
-import { flagsOf, parseQuestFile, parseRun, type DicePending, questKey, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { flagsOf, parseQuestFile, parseRun, withSpring, type DicePending, questKey, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { boardBlock } from '../src/mission-run';
 import { MISSION, TRAIL } from '../../shared/quests.fixture';
 import { foldKit, heatIn, type KitEvent } from '../../shared/mission';
 import type { Deck } from '../../shared/gear';
@@ -218,6 +221,50 @@ describe('missions: checks', () => {
   });
 });
 
+describe('missions: who a line is told to (playtest: she answered as the player)', () => {
+  // The door on the line, the desk with her own view of it: Run Sheet's shape.
+  const ON_LINE = MISSION.replace('# door\n', '# door\nroom: default/workspace\n').replace('*The manifest is on the screen.*\n', '*The manifest is on the screen.*\n\nview nix-direct: You do not know whose manifest that is.\n');
+  const parsedLine = parseQuestFile('night-shift', ON_LINE, known);
+  if (!parsedLine.ok) throw new Error(JSON.stringify(parsedLine.problems));
+
+  it("the closing turn says who 'you' is, and brings the view of the beat it ended on", async () => {
+    const { relay, backend } = relayWith({ rolls: [6, 6], book: [parsedLine.entry] });
+    await relay.startQuest('hicks', 'night-shift');
+    await pick(relay, 'door', 'roof');
+    await pick(relay, 'desk', 'wipe');
+    const sent = lastUser(backend.reqs.at(-1)!);
+    expect(sent).toContain(whoIsYou('hicks'));
+    expect(sent).toContain('[what you think: You do not know whose manifest that is.]');
+    expect(sent).toContain('(told to hicks, so "you" here is hicks)');
+  });
+
+  it('the opening turn says who "you" is too', async () => {
+    const { relay, backend } = relayWith({ rolls: [6, 6] });
+    await relay.startQuest('hicks', 'night-shift');
+    expect(lastUser(backend.reqs[0])).toContain(whoIsYou('hicks'));
+  });
+
+  it("the summary signs a job's row as the narrator, not the player", () => {
+    const row = { id: 'r', role: 'user', text: 'You take it.', toolLines: [], ts: 0, status: 'ok', mode: 'quest', quest: { id: 'night-shift', title: 'Night Shift', beat: null, run: 'night-shift@0' } } as ChatMessage;
+    const sent = summaryMessages(null, [row], { self: 'Rue', player: 'Soren' }).map((m) => m.content).join('\n');
+    expect(sent).toContain('Narrator: [job — Night Shift (told to Soren, so "you" here is Soren): You take it.]');
+  });
+
+  it('a row shown at a beat she only hears is marked, and reads so in her history', async () => {
+    const { relay, db, backend } = relayWith({ rolls: [6, 6], book: [parsedLine.entry] });
+    await relay.startQuest('hicks', 'night-shift');
+    await pick(relay, 'door', 'roof');
+    await pick(relay, 'desk', 'wipe');
+    const rows = db.recentMessages('hicks', 50).filter((m) => m.mode === 'quest' && m.role === 'user');
+    expect(rows[0].quest!.heard).toBe('Nothing came over the line.');
+    expect(rows.at(-1)!.quest!.heard).toBeUndefined();
+    const history = backend.reqs.at(-1)!.messages.map((m) => m.content).join('\n');
+    expect(history).toContain("you weren't there, and this is all you heard on the line");
+    expect(rows[0].text).not.toBe('');
+    expect(history).not.toContain(rows[0].text.trim().split('\n')[0]);
+  });
+});
+
 describe('missions: the end', () => {
   it('effects append one event; end runs one reply with MISSION_CLOSE and the summary', async () => {
     const { relay, db, backend, kit } = relayWith({ rolls: [6, 6] });
@@ -349,3 +396,126 @@ describe('the quest picture', () => {
   });
 });
 
+
+describe('the board line: who posted it and what it involves', () => {
+  const posted = (withLine = '') => {
+    const r = parseQuestFile('night-shift', MISSION.replace(/^pitch: .*$/m, (l) => `${l}\nposted-by: A man in a grey coat.\nbrief: Look under the floor and leave it be.${withLine}`), known);
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    return r.entry;
+  };
+
+  it('the panel row and the board carry both; a job file without them carries neither', () => {
+    expect(relayWith({ book: [posted()] }).relay.questState('hicks').open[0]).toMatchObject({ postedBy: 'A man in a grey coat.', brief: 'Look under the floor and leave it be.' });
+    expect(relayWith().relay.questState('hicks').open[0]).not.toHaveProperty('postedBy');
+  });
+
+  it('the run keeps who posted it for the JOB column', async () => {
+    const { relay } = relayWith({ book: [posted()] });
+    await relay.startQuest('hicks', 'night-shift');
+    expect(relay.questState('hicks').active?.postedBy).toBe('A man in a grey coat.');
+  });
+
+  it('rides with her turns while the job runs, and stays out of an aside', async () => {
+    const { relay, backend } = relayWith({ book: [posted()] });
+    await relay.send('hicks', 'before');
+    expect(lastUser(backend.reqs.at(-1)!)).not.toContain('[board —');
+    await relay.startQuest('hicks', 'night-shift');
+    await relay.send('hicks', 'who offered this?');
+    const sent = lastUser(backend.reqs.at(-1)!);
+    expect(sent).toContain('[board — Night Shift:');
+    expect(sent).toContain('Posted by: A man in a grey coat. Look under the floor and leave it be.');
+    expect(sent).toContain("knows about this job and you don't yet");
+    await relay.send('hicks', 'aside', 'ooc');
+    expect(lastUser(backend.reqs.at(-1)!)).not.toContain('[board —');
+  });
+
+  it('known-by: the contact it names knows, and it stays open to anyone', async () => {
+    const heard = parseQuestFile('night-shift', MISSION.replace(/^pitch: .*$/m, (l) => `${l}\nposted-by: Dana.\nknown-by: [nix-direct]`), known);
+    if (!heard.ok) throw new Error(JSON.stringify(heard.problems));
+    expect(heard.entry.with).toEqual(['hicks', 'ember', 'nix-direct']);
+    const { relay, backend } = relayWith({ book: [heard.entry] });
+    await relay.startQuest('hicks', 'night-shift');
+    await relay.send('hicks', 'hey');
+    expect(lastUser(backend.reqs.at(-1)!)).toContain('you heard about it at work, so you know this. Posted by: Dana.');
+  });
+
+  it('known-by names a real character', () => {
+    const r = parseQuestFile('night-shift', MISSION.replace(/^pitch: .*$/m, (l) => `${l}\nknown-by: [nobody]`), { ...known, roster: new Set(['hicks', 'ember', 'nix-direct']) });
+    expect(r.ok ? [] : r.problems.map((p) => p.message)).toContain("no character 'nobody'");
+  });
+
+  it('on a job only she can run, she knows', async () => {
+    const own = parseQuestFile('night-shift', MISSION.replace('with: [hicks, ember, nix-direct]', 'with: [nix-direct]').replace(/^pitch: .*$/m, (l) => `${l}\nposted-by: Dana.`), known);
+    if (!own.ok) throw new Error(JSON.stringify(own.problems));
+    const { relay, backend } = relayWith({ book: [own.entry] });
+    await relay.startQuest('hicks', 'night-shift');
+    await relay.send('hicks', 'hey');
+    expect(lastUser(backend.reqs.at(-1)!)).toContain('your own job, so you know this. Posted by: Dana.');
+  });
+});
+
+describe('boardBlock', () => {
+  const o = { title: 'Cold Freight', postedBy: 'A man in a grey coat.', brief: 'Look under the floor.', player: 'Hicks' };
+
+  it("on a job that isn't hers: the player knows it, she doesn't, and she's to ask", () => {
+    const line = boardBlock({ ...o, knows: null });
+    expect(line).toContain('Posted by: A man in a grey coat. Look under the floor.');
+    expect(line).toContain("knows about this job and you don't yet");
+    expect(line).toContain('ask Hicks');
+    expect(line).toContain('Never name anyone else as the source');
+  });
+
+  it('on her own job she knows', () => {
+    expect(boardBlock({ ...o, knows: 'own' })).toBe('[board — Cold Freight: your own job, so you know this. Posted by: A man in a grey coat. Look under the floor.]');
+  });
+
+  it('a job she heard about at work: she knows it, and it isn\'t hers', () => {
+    expect(boardBlock({ ...o, knows: 'heard' })).toBe("[board — Cold Freight: not your job, but you heard about it at work, so you know this. Posted by: A man in a grey coat. Look under the floor. If what Hicks tells you doesn't fit, you can say so.]");
+  });
+
+  it('says what it has', () => {
+    expect(boardBlock({ ...o, postedBy: null, knows: 'own' })).toBe('[board — Cold Freight: your own job, so you know this. Look under the floor.]');
+  });
+});
+
+describe('the shipped jobs say who posted them', () => {
+  const map = JSON.parse(fs.readFileSync('map/lowlight.json', 'utf8')) as { places: { id: string }[] };
+  const live = { roster: new Set(fs.readdirSync('characters')), places: new Set(map.places.map((p) => p.id)), decks: null };
+  const files = fs.readdirSync('world/quests').filter((f) => f.endsWith('.md'));
+
+  it('every mission and contract has posted-by and brief, and neither says you', () => {
+    const jobs = files.flatMap((f) => {
+      const text = fs.readFileSync(`world/quests/${f}`, 'utf8');
+      return /^kind: (mission|contract)$/m.test(text) ? [{ f, text }] : [];
+    });
+    expect(jobs.length).toBeGreaterThan(0);
+    for (const { f, text } of jobs) {
+      const posted = /^posted-by: (.+)$/m.exec(text)?.[1];
+      const brief = /^brief: (.+)$/m.exec(text)?.[1];
+      expect([f, Boolean(posted), Boolean(brief)]).toEqual([f, true, true]);
+      // The contact's [board] line carries them, and "you" there would read as the contact.
+      expect([f, /\byou\b/i.test(`${posted} ${brief}`)]).toEqual([f, false]);
+    }
+  });
+
+  it('Cass knows the Tilt pit boss\'s jobs, Silas knows what posts at Second Socket', () => {
+    const who = (f: string) => /^known-by: \[(.+)\]$/m.exec(fs.readFileSync(`world/quests/${f}.md`, 'utf8'))?.[1];
+    for (const f of ['house-rules', 'marked-cards', 'the-long-night']) expect([f, who(f)]).toEqual([f, 'cass']);
+    for (const f of ['bad-batch', 'dead-air', 'cold-storage', 'return-to-sender']) expect([f, who(f)]).toEqual([f, 'silas']);
+  });
+
+  it('every job file still parses (front matter is YAML: a line can\'t open with { or hold ": " unquoted)', () => {
+    for (const f of files) {
+      const r = parseQuestFile(f.replace(/\.md$/, ''), fs.readFileSync(`world/quests/${f}`, 'utf8'), live as never);
+      expect([f, r.ok ? [] : r.problems.filter((p) => p.field === 'file' || p.field === 'posted-by' || p.field === 'brief')]).toEqual([f, []]);
+    }
+  });
+
+  it('a rescue fills {recruit} in both', () => {
+    const r = parseQuestFile('spring-quiet', fs.readFileSync('world/quests/spring-quiet.md', 'utf8'), live as never);
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    const q = withSpring(r.entry, { place: 'haes-noodles', tier: 1 }, 'Dez');
+    expect(q.postedBy).toContain('Dez');
+    expect(q.brief).toContain('Dez');
+  });
+});

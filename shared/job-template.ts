@@ -6,6 +6,7 @@
 import { jobTakeSize } from './dice';
 import { APPROACH_STATS, APPROACHES } from './hand';
 import type { Beat, QuestEntry } from './quests';
+import type { StatKey } from './stats';
 
 /** Each tier's shape: rolled beats, TAKE, and the check number on each rolled beat, in order. */
 export const TEMPLATES: Record<1 | 2 | 3, { beats: number; take: number; checks: number[]; pay: [number, number] }> = {
@@ -70,4 +71,29 @@ export function offTemplate(q: QuestEntry): string[] {
   }
   for (const [id, o] of q.outcomes) if (o.effects.heat) out.push(`outcome ${id}: heat: does nothing in a job`);
   return out;
+}
+
+/**
+ * The stats on more than two thirds of a tier's blow-up beats (approach shapes spec §2): a beat where a rolled card's miss
+ * blows the job or takes nothing, every variant of it as one. An approach with its die on all of them wins every job.
+ */
+export function blowUpSpread(jobs: QuestEntry[]): { tier: number; stat: StatKey; on: number; of: number }[] {
+  const tiers = new Map<number, StatKey[][]>();
+  for (const q of jobs) {
+    for (const [id, variants] of q.beats) {
+      if (/^push-/.test(id)) continue;
+      const cards = variants.flatMap((v) => v.choices);
+      const blows = cards.some((c) => {
+        const e = c.check && c.fail ? q.outcomes.get(c.fail)?.effects : undefined;
+        return e?.blown === true || e?.take === 'none';
+      });
+      if (blows) tiers.set(q.tier, [...(tiers.get(q.tier) ?? []), [...new Set(cards.flatMap((c) => (c.check ? [c.check.stat] : [])))]]);
+    }
+  }
+  return [...tiers].flatMap(([tier, beats]) =>
+    [...new Set(beats.flat())].flatMap((stat) => {
+      const on = beats.filter((b) => b.includes(stat)).length;
+      return on * 3 > beats.length * 2 ? [{ tier, stat, on, of: beats.length }] : [];
+    }),
+  );
 }

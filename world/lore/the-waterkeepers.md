@@ -1,6 +1,7 @@
 ---
 title: The Waterkeepers
 category: Factions
+section: Institutions
 keys: [Waterkeepers, Waterkeeper, Works crews, water guild, the water strike, pump crews]
 districts: [drownworks]
 places: []

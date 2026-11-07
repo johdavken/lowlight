@@ -1,6 +1,7 @@
 ---
 title: Karasu
 category: City
+section: Districts
 keys: [Karasu, the old city, first city]
 districts: [karasu]
 places: []

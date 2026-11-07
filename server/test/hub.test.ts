@@ -67,7 +67,7 @@ function makeHub(activeMessageId: string | null = null, activePlayer = 'hicks', 
 }
 
 describe("hub: who's here", () => {
-  const silas = { id: 'silas', kind: 'contact' as const, name: 'Silas', pronoun: 'he' as const, accent: '#6f9bff', thumb: '/api/agents/silas/thumb', sprite: null, face: { x: 0.5, y: 0.1 }, tagline: 'Counter.', facts: [] };
+  const silas = { id: 'silas', kind: 'contact' as const, name: 'Silas', pronoun: 'he' as const, accent: '#6f9bff', thumb: '/api/agents/silas/thumb', sprite: null, face: { x: 0.5, y: 0.1 }, tagline: 'Counter.', bio: [], facts: [] };
 
   it('a tab joining mid-scene gets the strip right after the scene list', () => {
     const { hub, db } = makeHub(null, 'hicks', { others: () => [silas], voices: () => [silas, { ...silas, id: 'ember', name: 'Ember' }] });

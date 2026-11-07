@@ -32,6 +32,8 @@ export interface PeopleOpts {
   dev: boolean;
   /** Go to a contact. */
   pick(id: string): void;
+  /** PEOPLE's wardrobe: her outfit picked (null: AUTO); a rejection puts the last pick back. */
+  onOutfit?(id: string, outfit: string | null): Promise<void> | void;
   /** Alt+L / Alt+O, from here. */
   toQuest?(tab: 'leads' | 'loose'): void;
   reducedMotion?: boolean;
@@ -134,7 +136,7 @@ export function openPeople(host: HTMLElement, o: PeopleOpts): PeopleHandle {
     show(tab);
   };
   void Promise.all([o.contacts(), o.leads().catch(() => [] as LeadView[])]).then(
-    ([list, held]) => swap(contactsTab(list, held, { current: o.current, dev: o.dev, pick: o.pick, journal: o.journal.element, onSelect: selected })),
+    ([list, held]) => swap(contactsTab(list, held, { current: o.current, dev: o.dev, pick: o.pick, journal: o.journal.element, onSelect: selected, onOutfit: o.onOutfit })),
     () => swap(el('div', 'pe-error', "Couldn't load your contacts.")),
   );
 

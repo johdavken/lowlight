@@ -9,7 +9,7 @@ async function room(page: Page): Promise<{ greetingId: string; errors: string[] 
   page.on('pageerror', (err) => errors.push(err.message));
   await page.setViewportSize({ width: 1920, height: 1080 });
   await skipSplash(page);
-  // As Hicks in the worker's first playthrough (played by the default player, who holds no deck), at the Intake's board.
+  // As Hicks in the worker's first playthrough (played by the default player, who holds only the pocket deck), at the Intake's board.
   await firstPlaythrough(page.request);
   await nixAt(page, 'lowlight-intake', 'LOWLIGHT INTAKE');
   const greetingId = (await page.locator('.msg.agent.s-ok').last().getAttribute('data-id'))!;
@@ -48,9 +48,9 @@ test('a job with a drawn complication, a red check and a crack ends in a debrief
   await grab.click();
   await expect(page.locator('.ct-window')).toBeVisible();
   await expect(page.locator('.ct-dump .ct-row')).toHaveCount(32);
-  // A corporate terminal (deck skins spec §3): the CORP look, the deck it linked (none here), the job's ALARM.
+  // A corporate terminal (deck skins spec §3): the CORP look, the deck it linked (the pocket deck everyone owns), the job's ALARM.
   await expect(page.locator('.ct-window')).toHaveClass(/ct-skin-corp/);
-  await expect(page.locator('.ct-linked')).toHaveText('LINKED · NO DECK');
+  await expect(page.locator('.ct-linked')).toHaveText('LINKED · POCKET DECK');
   await expect(page.locator('.ct-alarm i')).toHaveCount(3);
   await page.screenshot({ path: 'test-results/jobs-terminal.png' });
   // LEAVE walks away: a lockout, ALARM +1, and the part outcome.
@@ -61,7 +61,10 @@ test('a job with a drawn complication, a red check and a crack ends in a debrief
   await expect(page.locator('.db .db-tier')).toHaveText('MESSY', { timeout: 10_000 });
   await expect(page.locator('.db-roll')).toContainText('LOCKED OUT');
   // The ALARM it left with became HEAT (tier template spec §2).
-  await expect(page.locator('.db .db-heat')).toHaveText(/^HEAT [A-Z ]+ \+[1-9]/);
+  await expect(page.locator('.db .db-heat')).toHaveText(/^HEAT [A-Z ]+ \+[1-9] → \d+$/);
+  // Where it came from, and what the district's heat now does.
+  await expect(page.locator('.db .db-heat-why')).toContainText('ALARM +');
+  await expect(page.locator('.db .db-heat-now')).toContainText(/COOLS \d AT 06:00/);
   await expect(replies).toHaveCount(before + 2, { timeout: 10_000 });
   await page.waitForTimeout(800);
   // The line's keys step out for the report: its rolls run down where they stand.
@@ -213,6 +216,77 @@ test('a full ALARM: GET OUT with RUN and WALK IT OFF on the wire; the job ends e
     .toBe(before + 2);
   await expect(page.locator('.db .db-tier').last()).toHaveText(/MESSY|BLOWN/);
   await page.screenshot({ path: 'test-results/jobs-getaway-debrief.png' });
+  expect(errors).toEqual([]);
+  await send(page, { type: 'rewind', messageId: greetingId });
+  await expect(replies).toHaveCount(before, { timeout: 10_000 });
+});
+
+test('a mood landing after her reply joins the footer, in the box and at the table: the name stays in, the line clear of the text (playtest)', async ({ page }) => {
+  const { greetingId, errors } = await room(page);
+  const replies = page.locator('.msg.agent.s-ok');
+  const before = await replies.count();
+  const longReply = async () => {
+    const n = await replies.count();
+    await send(page, { type: 'user_message', text: 'len:1400' });
+    await expect(replies).toHaveCount(n + 1, { timeout: 10_000 });
+    await expect(page.locator('button.continue')).toBeVisible();
+  };
+  // No reply in progress, so the tool line comes with no message: the case that used to stand in the box's flow.
+  const mood = async (name: string) => {
+    await send(page, { type: 'dev_action', tool: 'apply_mood', args: { name }, as: 'agent' });
+    await expect(replies.last().locator('.foot .tool').last()).toHaveText(`// APPLY_MOOD · ${name.toUpperCase()}`);
+  };
+  const box = () =>
+    page.evaluate(() => {
+      const top = (s: string) => document.querySelector(s)!.getBoundingClientRect();
+      const msgs = document.querySelectorAll('.msg.agent');
+      const m = msgs[msgs.length - 1];
+      const shown = [...m.querySelectorAll<HTMLElement>('.foot .tool')].filter((t) => t.offsetHeight > 0).map((t) => t.getBoundingClientRect());
+      const text = m.querySelector('.text')!.getBoundingClientRect();
+      return { feed: top('#feed .feed').top, name: m.querySelector('.meta')!.getBoundingClientRect().top, textLeft: text.left, textBottom: text.bottom, lines: shown.map((t) => ({ left: t.left, top: t.top, bottom: t.bottom, right: t.right })), loose: document.querySelectorAll('#feed .feed > .tool').length, button: document.querySelector('button.continue')?.getBoundingClientRect().top ?? null };
+    });
+
+  // The box outside a job: full width, so the line shares CONTINUE's row.
+  await longReply();
+  const plain = await box();
+  await mood('tense');
+  const plainAfter = await box();
+  expect(plainAfter.name).toBe(plain.name);
+  expect(plainAfter.name).toBeGreaterThanOrEqual(plainAfter.feed);
+  expect(plainAfter.loose).toBe(0);
+
+  await page.locator('.hud-quest').click();
+  await startQuest(page, 'Back Door');
+  await goIn(page);
+  await expect(page.locator('.tb-job .tb-deal .tb-card').first()).toBeVisible({ timeout: 10_000 });
+
+  // At the table the box is narrow: the line takes the row over CONTINUE, whole, on the text's left edge.
+  await longReply();
+  const hud = await box();
+  await mood('storm');
+  const hudAfter = await box();
+  expect(hudAfter.name).toBe(hud.name);
+  expect(hudAfter.name).toBeGreaterThanOrEqual(hudAfter.feed);
+  expect(hudAfter.loose).toBe(0);
+  expect(hudAfter.lines).toHaveLength(1);
+  const [line] = hudAfter.lines;
+  expect(line.left).toBeCloseTo(hudAfter.textLeft, 0);
+  expect(line.top).toBeGreaterThanOrEqual(hudAfter.textBottom);
+  expect(line.bottom).toBeLessThanOrEqual(hudAfter.button!);
+  await page.screenshot({ path: 'test-results/jobs-footer-line.png' });
+
+  // A second one shows alone, the newest; on the last page, with no CONTINUE, it still clears the text.
+  await mood('late');
+  expect((await box()).lines).toHaveLength(1);
+  await expect(replies.last().locator('.foot .tool').last()).toBeVisible();
+  const go = page.locator('button.continue');
+  for (let i = 0; i < 12 && (await go.count()); i++) await go.click();
+  await expect(go).toHaveCount(0);
+  const last = await box();
+  expect(last.lines).toHaveLength(1);
+  expect(last.lines[0].top).toBeGreaterThanOrEqual(last.textBottom);
+  await page.screenshot({ path: 'test-results/jobs-footer-line-last.png' });
+
   expect(errors).toEqual([]);
   await send(page, { type: 'rewind', messageId: greetingId });
   await expect(replies).toHaveCount(before, { timeout: 10_000 });

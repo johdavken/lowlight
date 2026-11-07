@@ -1,6 +1,7 @@
 ---
 title: The catwalk
 category: Places
+section: The Spine
 keys: [the catwalk, maintenance catwalk, deck edge, the gantry]
 districts: [spine]
 places: [catwalk]

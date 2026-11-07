@@ -5,6 +5,8 @@ kind: mission
 spring: true
 after: null
 pitch: SDG moves {recruit} from the Tower to county intake at dawn, in a van with two guards. Their people know the route. Take the van.
+posted-by: "{recruit}'s friend, who knows the route."
+brief: The dawn transfer from the Sentinel Tower to county intake, along the ramp under the Spine. Same van, same two guards. Stop it and get {recruit} out.
 minutes: 20
 ---
 

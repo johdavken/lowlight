@@ -1,6 +1,7 @@
 ---
 title: Tidal Isle
 category: City
+section: Districts
 keys: [Tidal Isle, the Isle, customs, immigration, arrivals, papers, holding blocks]
 districts: [tidal]
 places: []

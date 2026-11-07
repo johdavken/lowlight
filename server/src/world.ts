@@ -8,12 +8,12 @@ import { parseInstance } from '../../shared/crew';
 import { foldWithCrew, type CrewEvent, type CrewState, type FoldJob } from '../../shared/crew-fold';
 import { parseCrewEvents } from './crew-view';
 import type { LeadEntry } from '../../shared/leads';
-import { fillRecruit, parseRun, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { fillRecruit, parseRun, rewardOutfits, type QuestEntry, type QuestStatus } from '../../shared/quests';
 import { outcomeTier, type Kit, type KitEvent } from '../../shared/mission';
 import { fixerKey, parseFixer } from '../../shared/stock';
 import { bookId, repFromEnv, solFromEnv, trustFromEnv } from './mission-run';
 import { DEFAULT_STATS, nerveMax, type Stats } from '../../shared/stats';
-import { DEFAULT_SHARED_STANDING, parseStored, standingKey, startValues, wordFor, type SharedStanding, type StoredStanding, type StandingConfig, type StandingValues } from '../../shared/standing';
+import { DEFAULT_SHARED_STANDING, parseStored, peakOf, standingKey, startValues, unlockMet, wordFor, type OutfitUnlock, type SharedStanding, type StoredStanding, type StandingConfig, type StandingValues } from '../../shared/standing';
 import { readHeldLeads } from './leads-held';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
@@ -34,6 +34,8 @@ import type { AgentRuntime } from './runtime';
 import { addNarrated, darkNow, dropUndone, powerOf, type PowerPlace } from './power';
 import type { Outage } from '../../shared/outage';
 import { cipherKey, foldCipher, looseEnds, parseCipherEvents, type CipherState } from '../../shared/cipher';
+import { agoWords, parseWitness, sceneRows, WITNESS_SCENE_NIGHTS, witnessedLine, witnessedScene, witnessPrefix } from '../../shared/witness';
+import { storyDay } from '../../shared/board';
 import type { ContactCard, LooseEndsView } from '../../shared/types';
 import { contactCardsFrom, giversFromEnv } from './contact-cards';
 
@@ -91,6 +93,10 @@ export interface CheckpointPort {
   active?(): { id: string } | null;
   /** The YOU sheet's outfit for `player` in the active playthrough (theirs only); null when none. Absent in test fakes. */
   outfitOf?(player: string): string | null;
+  /** The outfit picked for `contact` on PEOPLE in the active playthrough (worn everywhere); null: her room dresses her. Absent in test fakes. */
+  contactOutfitOf?(contact: string): string | null;
+  /** Outfits as rewards: false for `who`'s outfit while an ending gives it and no run in the active playthrough has. Absent in test fakes. */
+  outfitOpen?(who: string, name: string): boolean;
   /** A turn of `contactId` settled: the playthrough's location follows her room, and a queued checkpoint runs. */
   turnEnded(contactId: string): void;
   /** A turn that doesn't touch where you are ended (a text, deck spec §2): a checkpoint queued while it ran is taken now. */
@@ -166,6 +172,10 @@ export interface CheckpointPort {
   kitOf(player: string, at?: number): { kit: Kit; stats: Stats; crew: CrewState } | null;
   /** The playthrough's Cipher (cipher spec §2.1): every contact's `cipher.<player>` events folded, and her replies across them; null when it doesn't apply (no playthrough, or anyone but its player). */
   cipherOf(player: string): CipherState | null;
+  /** What `contactId` was there for in other contacts' rooms, as her `[you were there: …]` line (witness lines spec §3); null with nothing, or for anyone but the playthrough's player. */
+  witnessedLine(player: string, contactId: string, clock: number): string | null;
+  /** The scene behind her newest entry, word for word, for a night after it; null with none, or for anyone but the playthrough's player. */
+  witnessedScene(player: string, contactId: string, clock: number): string | null;
   /** Who a cipher run may give a truth to (cipher spec §2.2): the contacts met, never the player, with a line on each and her authored standing secret. */
   cipherCast(player: string): { id: string; name: string; pronoun: string; about: string; secret: string | null }[];
   /** LEADS: the leads the active playthrough's player holds, open ones first, oldest first within each. Throws 'no-playthrough'. */
@@ -303,8 +313,10 @@ export function createWorld(deps: {
   leadBook?(): LeadEntry[];
   /** The quest book (world/quests). */
   questBook?(): QuestEntry[];
+  /** Her outfits opened by standing (character.json `outfitUnlocks`); read live. */
+  outfitUnlocks?(contactId: string): Record<string, OutfitUnlock> | undefined;
   /** A roster character's stats and starting deck (missions spec §1); read live. Absent: 3s and none. */
-  kitStart?(player: string): { stats: Stats; deck: string | null };
+  kitStart?(player: string): { stats: Stats; deck: string | null; pocket?: string };
   /** A map place's district (small jobs spec §2): where an old mission's district-less heat lands. */
   districtOf?(placeId: string): string | null;
   /** The crew tables (world/crew). */
@@ -856,13 +868,57 @@ export function createWorld(deps: {
     return r;
   }
 
-  return {
+  /** The outfits endings give, worked out once per quest book. */
+  let lockedFor: { book: QuestEntry[]; set: Set<string> } | null = null;
+  /**
+   * Whether `who`'s outfit can be worn in the active playthrough. Outfits by standing: one with a rule opens once her
+   * standing on the player has reached it (her peak, so it stays), and only for its player; on herself as the player
+   * it's always open. Outfits as rewards: one some ending gives is closed until a run here has given it.
+   */
+  function outfitOpen(who: string, name: string): boolean {
+    const pt = playthroughs.active();
+    const rule = deps.outfitUnlocks?.(who)?.[name];
+    if (rule && pt?.player !== who) {
+      if (!pt || (rule.player !== undefined && rule.player !== pt.player)) return false;
+      const start = api.standingStart(who, pt.player);
+      if (start === null || !unlockMet(rule, peakOf(storedOn(pt, who), start))) return false;
+    }
+    const book = deps.questBook?.() ?? [];
+    if (lockedFor?.book !== book) lockedFor = { book, set: rewardOutfits(book) };
+    const key = `${who}/${name}`;
+    if (!lockedFor.set.has(key)) return true;
+    return pt ? (api.kitOf(pt.player)?.kit.outfits ?? []).includes(key) : false;
+  }
+
+  /** Her stored standing on the playthrough's player, from her live db or her file; null before any. */
+  function storedOn(pt: PlaythroughInfo, contact: string): StoredStanding | null {
+    const live = runtimeOf(contact)?.db;
+    if (live) return parseStored(live.getMeta(standingKey(pt.player)));
+    const file = path.join(playthroughs.charsDir(pt.id), contact, 'room.db');
+    if (!fs.existsSync(file)) return null;
+    const db = openDb(file, { defaultPlayer: pt.player });
+    try {
+      return parseStored(db.getMeta(standingKey(pt.player)));
+    } finally {
+      db.close();
+    }
+  }
+
+  const api: World = {
     branch,
     active: () => playthroughs.active(),
+    // A pick of an outfit still locked (outfits as rewards) is no pick: the plain sprite, or her room's.
     outfitOf(player) {
       const pt = playthroughs.active();
-      return pt?.player === player ? (pt.outfit ?? null) : null;
+      const o = pt?.player === player ? (pt.outfit ?? null) : null;
+      return o !== null && outfitOpen(player, o) ? o : null;
     },
+    contactOutfitOf(contact) {
+      const picks = playthroughs.active()?.contactOutfits;
+      const o = picks && Object.hasOwn(picks, contact) ? picks[contact] : null;
+      return o !== null && outfitOpen(contact, o) ? o : null;
+    },
+    outfitOpen: (who, name) => outfitOpen(who, name),
     hasSprite(player) {
       const p = basePlayers.resolve(player);
       return p.id === player && p.sprite !== null;
@@ -1057,14 +1113,14 @@ export function createWorld(deps: {
       const now = at ?? clockOf(pt);
       const key = `${pt.id}|${player}|${at ?? '-'}|${now}|${prints.join(';')}`;
       if (kitMemo?.key === key) return kitMemo.value;
-      const start = deps.kitStart?.(player) ?? { stats: DEFAULT_STATS, deck: null };
+      const start: { stats: Stats; deck: string | null; pocket?: string } = deps.kitStart?.(player) ?? { stats: DEFAULT_STATS, deck: null };
       const sol = solFromEnv(player);
       const seeded = [...repFromEnv(player).map((rep): KitEvent => ({ at: START, rep })), ...(sol ? [{ at: START, sol }] : [])];
       const kept = [...seeded, ...(at === undefined ? events : events.filter((e) => e.at <= at))];
       const crewBook = deps.crewBook?.() ?? emptyCrewBook();
       const job = (id: string) => book.find((q) => q.id === id);
       const r = foldWithCrew({
-        start: { deck: start.deck, nerveMax: nerveMax(start.stats), from: START },
+        start: { deck: start.deck, ...(start.pocket ? { pocket: start.pocket } : {}), nerveMax: nerveMax(start.stats), from: START },
         kitEvents: kept,
         crew: [...crewLists.values()].map((l) => (at === undefined ? l : l.filter((e) => e.at <= at))),
         now,
@@ -1087,6 +1143,28 @@ export function createWorld(deps: {
       const value = { kit: r.kit, stats: start.stats, crew: r.crew };
       kitMemo = { key, value };
       return value;
+    },
+    witnessedLine(player, contactId, clock) {
+      const pt = playthroughs.active();
+      if (!pt || pt.player !== player) return null;
+      // Read live, room by room: a rewind in the room it happened in takes it back.
+      const entries = withDbs(pt, (dbs) => [...dbs.values()].flatMap((db) => db.metaWithPrefix(witnessPrefix(player, contactId)).flatMap(({ v }) => parseWitness(v) ?? [])));
+      return witnessedLine(entries, storyDay(clock), deps.placeName, players.resolve(player).name);
+    },
+    witnessedScene(player, contactId, clock) {
+      const pt = playthroughs.active();
+      if (!pt || pt.player !== player) return null;
+      return withDbs(pt, (dbs) => {
+        const entries = [...dbs.entries()].flatMap(([room, db]) => db.metaWithPrefix(witnessPrefix(player, contactId)).flatMap(({ v }) => {
+          const w = parseWitness(v);
+          return w ? [{ room, db, w }] : [];
+        }));
+        const newest = entries.sort((a, b) => b.w.at - a.w.at)[0];
+        if (!newest) return null;
+        const nights = storyDay(clock) - storyDay(newest.w.at);
+        if (nights > WITNESS_SCENE_NIGHTS) return null;
+        return witnessedScene(sceneRows(newest.db.allMessages(player), newest.w.at), { place: deps.placeName(newest.w.scene), ago: agoWords(nights), player: players.resolve(player).name, contact: deps.contactName(newest.room) });
+      });
     },
     cipherOf(player) {
       const pt = playthroughs.active();
@@ -1409,4 +1487,5 @@ export function createWorld(deps: {
     },
     setLocation,
   };
+  return api;
 }

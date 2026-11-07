@@ -48,9 +48,13 @@ export function mountInput(
     onStay?: () => void;
     /** SUGGEST: opens the three drafts of your next line (PLAIN, PUSH, TURN), steered by what's typed (null: nothing). */
     suggest?: (steer: string | null) => void;
+    /** The box's text changed (the lore drawer reads it). */
+    onDraft?: (text: string) => void;
   } = {},
 ): {
   setBusy(b: boolean, label?: string): void;
+  /** What's in the box now. */
+  draft(): string;
   restoreDraft(text: string): void;
   /** Empties the field (a held quest line was chosen or sent as talk). */
   clearDraft(): void;
@@ -227,7 +231,14 @@ export function mountInput(
     size();
   };
   /** After the box's text changes: the hint makes room, the box takes its height. */
-  const fit = fitHint;
+  /** What `onDraft` last heard: every change to the box comes through `fit`, a send's and SUGGEST's as well as typing. */
+  let drafted = '';
+  const fit = () => {
+    fitHint();
+    if (ta.value === drafted) return;
+    drafted = ta.value;
+    opts.onDraft?.(drafted);
+  };
   const setHint = (parts: HintPart[]) => {
     hint.replaceChildren(
       ...parts.map((p) => {
@@ -415,6 +426,7 @@ export function mountInput(
     refit() {
       fit();
     },
+    draft: () => ta.value,
     clearDraft() {
       ta.value = '';
       fit();

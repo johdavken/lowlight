@@ -7,6 +7,8 @@ take-size: 4
 starts: under-the-cat
 after: null
 pitch: A guest checked out in a hurry and left a case in the room safe. Get it before the cleaners at six.
+posted-by: A fixer under the Cat. He won't say who the case is for.
+brief: Room 412 at the hotel under the Cat. Get into the room, open the safe and bring the case out to the fixer before the cleaners come at six.
 pay: 90-110
 draw complication: none | cleaner-early | guest-came-back
 draw cleaner: easy | hard

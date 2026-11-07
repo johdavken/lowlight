@@ -1,6 +1,7 @@
 ---
 title: The Freight Runners
 category: Factions
+section: Gangs
 keys: [Freight Runners, freight runner, Dockside smugglers, container theft, dock crews]
 districts: [dockside]
 places: []

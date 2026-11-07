@@ -109,7 +109,7 @@ describe('starting a quest', () => {
     expect(sent).toContain('[quest — Paper Trail. Where it stands: the [quest — Paper Trail: …] line at the end of this message, which they have just read\n');
     expect(sent.split('Boots on the stairs')).toHaveLength(2);
     expect(sent).toContain(QUEST_INSTRUCTIONS);
-    expect(sent).toContain('[quest — Paper Trail: *Boots on the stairs.*');
+    expect(sent).toContain('[quest — Paper Trail (told to hicks, so "you" here is hicks): *Boots on the stairs.*');
     expect(states(events).at(-1)!.active).toEqual({
       id: 'paper-trail',
       title: 'Paper Trail',
@@ -124,7 +124,7 @@ describe('starting a quest', () => {
 
   it("refuses a quest that isn't open here", async () => {
     const { relay, db } = relayWith({ place: 'haes-noodles' });
-    expect(await relay.startQuest('hicks', 'paper-trail')).toBe("that quest isn't open here");
+    expect(await relay.startQuest('hicks', 'paper-trail')).toBe("that job isn't open here");
     expect(rows(db)).toEqual([]);
   });
 
@@ -132,7 +132,7 @@ describe('starting a quest', () => {
     const { relay, backend } = relayWith();
     await relay.startQuest('hicks', 'paper-trail');
     await relay.send('hicks', 'What do we do?');
-    expect(lastUser(backend.reqs[1])).toContain('[quest — Paper Trail. Where it stands: *Boots on the stairs.*');
+    expect(lastUser(backend.reqs[1])).toContain('[quest — Paper Trail. Where it stands (told to hicks, so "you" here is hicks): *Boots on the stairs.*');
     await relay.send('hicks', 'quick question', 'ooc');
     expect(lastUser(backend.reqs[2])).not.toContain('[quest —');
   });

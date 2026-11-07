@@ -12,6 +12,8 @@ starts: rue-hab
 after: rue_one and trust>=mid
 trust: 1 / 2
 pitch: Nine thousand sol of a dead man's rent has a new owner. She wants to see the paper.
+posted-by: Rue
+brief: Her father's arrears were sold on to something called Graymark Receivables. Follow the paper down to a stall on the deck market and see who's holding it.
 pay: 360-440
 loot: what's in the broker's cash box
 ---
@@ -162,18 +164,21 @@ view rue: He has the paper in his hand and you haven't seen what's on it. You're
 - wipe: Tell her you can make it go away, tonight. → gone [set note=wiped]
 
 ## hers
-*She reads it standing up. Then the slip. She doesn't look at you for a long time. "You asked for this," she says. "You." She holds onto it with both hands. There's someone waiting on the stair, someone who works the market, who saw you in the box and has been looking for someone to work for. You've got two now.*
+*She reads it standing up. Then the slip. She doesn't look at you for a long time. "You asked for this," she says. "You." She holds onto it with both hands. {hire} is waiting on the stair, someone who works the market, who saw you in the box and has been looking for someone to work for. You've got two now.*
 gives: recruit ears hand
+hire-pitch: I work the market. I saw you in the box, and I see a lot more than that.
 → end
 
 ## slip
-*She reads it standing up, and she holds onto it with both hands. The slip's in your pocket, about the size of a tram ticket. There's someone waiting on the stair, who saw you in the box and has been looking for someone to work for. You've got two now.*
+*She reads it standing up, and she holds onto it with both hands. The slip's in your pocket, about the size of a tram ticket. {hire} is waiting on the stair, saw you in the box, and has been looking for someone to work for. You've got two now.*
 gives: recruit ears hand
+hire-pitch: I work the market. I saw you in the box, and I see a lot more than that.
 → end
 
 ## gone
-*She looks at you as if you've hit her. "That's it, then," she says. "That's what it is. That's how it starts." She takes the note out of your hand and goes inside. There's someone on the stair, who saw you in the box and has been looking for someone to work for. You've got two now.*
+*She looks at you as if you've hit her. "That's it, then," she says. "That's what it is. That's how it starts." She takes the note out of your hand and goes inside. {hire} is on the stair, saw you in the box, and has been looking for someone to work for. You've got two now.*
 gives: recruit ears hand
+hire-pitch: I work the market. I saw you in the box, and I see a lot more than that.
 → end
 
 # short

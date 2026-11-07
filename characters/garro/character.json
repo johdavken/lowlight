@@ -6,7 +6,8 @@
   "voice": "voice.md",
   "sprite": {
     "src": "garro-outfit-work.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.391
   },
   "expressions": {
     "happy": "garro-happy.png",

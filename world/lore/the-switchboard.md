@@ -1,6 +1,7 @@
 ---
 title: The Switchboard
 category: Factions
+section: Institutions
 keys: [Switchboard, fixer, fixers, the fixers' code]
 districts: []
 places: []

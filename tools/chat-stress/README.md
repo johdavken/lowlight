@@ -25,7 +25,7 @@ npm run chat-stress -- --keep                        # keep the src/ and data/ c
 ## What it does
 
 1. It runs `git archive` on the ref into `<out>/src`. That means it tests committed code only: commit before running.
-2. It builds that copy, copies `data/` into `<out>/data`, and starts its own server on port 7730 (`--port`; never 7700 or 7710).
+2. It builds that copy, copies `data/` into `<out>/data` with every character's chosen model and the Anthropic key taken out (so each contact runs on her default, GLM, never Claude through the Anthropic key), and starts its own server on port 7730 (`--port`; never 7700 or 7710).
    - If the port is taken, it stops before building and names the process holding it. That is usually a server
      left by an earlier run: stop it, or pass `--port`.
    - Once the server is up, it checks that the process answering on the port is the one it started.
@@ -74,6 +74,24 @@ The checks are in `analyze.ts`.
 | gin correction, no note | 2 of 6 | 3 of 6 (2 of 6 after b6759ac) | 2 missed notes | 0 | 0  | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 2026-11-05 shared plans run (feat/shared-plans fdd65329: `[people: …]`, the MEETING TIMES rule, held, nudge and guest lines; four meetings set, none with guests, no loose date in these 60): 60/60, every baseline row 0, 6 echo flags, $0.24.
+
+2026-11-05 witness lines run (feat/witness-lines ce5927e9: `[here too]`, the WITNESSES rule, `[you were there]`, +600 Residual tokens on witness turns): $0.32, 60 turns, 0 failed turns, 0 repeats, 0 cut-off, 0 failed calls, 0 missed lights or notes, 9 echo flags against 5 on the last run.
+
+2026-11-05 witness entries add up (571ab5c5: one short sentence a turn, day cap 800): $0.26, 60 turns, 0 failed turns, 0 repeats, 0 cut-off, 0 failed calls, 0 lost Residual runs, 7 echo flags.
+
+2026-11-06 witness in the room (fix/witness-present adcfa888: `[you were there]` says she was in the room, the WITNESSES rule leads with what they said or did, clips close as a sentence): $0.21, 60 turns, 0 failed turns, 0 repeats, 0 cut-off, 0 failed calls, 3 echo flags. Ember T4 missed-note and T10 missed-recap (the Residual's "nothing to write", the known Ember pair, on turns with nobody else in the scene) came back clean on a 10-turn Ember rerun ($0.01).
+
+2026-11-06 witness scene (feat/witness-scene: the visit's lines word for word beside `[you were there]`, for a night, capped at 10,000 characters): $0.20, 60 turns, every baseline row 0, 4 echo flags.
+
+2026-11-07 lore book (67ab1e1d: `only: book` kept out of `selectLore`, Second Socket's entry on every turn in that room, eight keyed CULTURE entries): $0.11 as first reported, 60 turns, every baseline row 0, 4 echo flags, 1 missed recap (Silas T10, the Residual left it on the last turn, as with Mother Rot on 2026-11-05). **Not a GLM baseline:** the data copy still carried the playtest model picks, so Cass, Ember, Silas and Nix ran on Claude Sonnet through the Anthropic key (not in the cost line); only Mother Rot and Hicks were on GLM. Runs from here drop the picks.
+
+2026-11-07 first GLM-only runs, side by side (both copies dropped the model picks and the Anthropic key; the two ran at once, so each cost line shows both, about $1.36 for the pair): master f6c8b455, 60/60, every baseline row 0 but one missed scene and one missed recap (Nix T8, T10), 9 echo flags; feat/lore-picking af799e6e (scored lore, shorts, case in her lines), 60/60, every baseline row 0, 8 echo flags. These two are the GLM baseline from here.
+
+2026-11-07 jobs panel (feat/jobs-panel 8f36a770: `[board]` while a mission runs, QUEST renamed; the script plays no jobs, so only the shared turn code is on its path; `[board]` was checked live, 18 GLM turns with Rue): $0.29, 60/60, every baseline row 0, 9 echoes (Silas 3, Mother Rot 2, Nix 1, Hicks 3), Hicks T10 missed-recap (the timing flag seen before).
+
+2026-11-07 cold truths (fix/cipher-cold 15b1390b: an open truth with no clue for 60 replies goes cold and leaves her `[cipher]` block and the narrator's; `repairJson` closes a list GLM ends with `}`): 60/60, every baseline row 0, 8 echo flags (Ember 2, Mother Rot 2, Hicks 2, Cass 1, Silas 1). Six cipher runs on the copy all parsed and wrote 1–3 truths each, every one but one with a truth refused by the one-per-keeper rule. $1.31 as reported, but another check was running on 7730/7731 against the same key, so that figure covers both.
+
+2026-11-06 job lines (fix/job-voice f817f4db: rows say who they're told to, `room:` and `comms:` beats reach her as what she heard, the closing turn keeps the last beat's view, Residual signs job rows as the narrator): $0.11, 60 turns, every baseline row 0, 4 echo flags. The script plays no jobs, so this only covers the Residual's new line; the job turns were checked by replaying Run Sheet (unfixed 3 of 3 as Soren, fixed 4 of 4 as Rue).
 
 2026-11-05 guest crew run (feat/guest-crew 4f3b37c4: Ember's and Silas's Halloran lines, the rewritten lead, the Residual's LEADS rule on turns with a lead on offer, no lead on offer in these 60): 60/60, every baseline row 0, 5 echo flags, Hicks T10 missed-recap (a timing flag seen before), $0.26.
 

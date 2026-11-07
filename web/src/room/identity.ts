@@ -85,9 +85,9 @@ export function shouldPause(e: KeyboardEvent, s: { feedExpanded: boolean; devPan
   return e.key === 'Escape' && !e.repeat && !e.defaultPrevented && !s.feedExpanded && !s.devPanelOpen && !s.journalOpen;
 }
 
-/** The room's chrome hotkeys: Alt+Y you (the sheet), Alt+S save, Alt+C contacts, Alt+J journal, Alt+L leads, Alt+O loose ends (those two on QUEST), Alt+X texts, Alt+T title, Alt+H hide the UI. */
-export type ChromeKey = 'you' | 'save' | 'people' | 'contacts' | 'leads' | 'journal' | 'loose' | 'quest' | 'crew' | 'texts' | 'title' | 'hide';
-const CHROME_KEYS: Record<string, ChromeKey> = { KeyY: 'you', KeyS: 'save', KeyP: 'people', KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal', KeyO: 'loose', KeyQ: 'quest', KeyK: 'crew', KeyX: 'texts', KeyT: 'title', KeyH: 'hide' };
+/** The room's chrome hotkeys: Alt+Y you (the sheet), Alt+S save, Alt+C contacts, Alt+J journal, Alt+L leads, Alt+O loose ends (those two on QUEST), Alt+X texts, Alt+T title, Alt+H hide the UI, Alt+B the book. */
+export type ChromeKey = 'you' | 'save' | 'people' | 'contacts' | 'leads' | 'journal' | 'loose' | 'quest' | 'crew' | 'texts' | 'title' | 'hide' | 'book';
+const CHROME_KEYS: Record<string, ChromeKey> = { KeyY: 'you', KeyS: 'save', KeyP: 'people', KeyC: 'contacts', KeyL: 'leads', KeyJ: 'journal', KeyO: 'loose', KeyQ: 'quest', KeyK: 'crew', KeyX: 'texts', KeyT: 'title', KeyH: 'hide', KeyB: 'book' };
 
 /**
  * The chrome action a key asks for: Alt+S, Alt+C or Alt+T (like the prompt's Alt+M), from anywhere,

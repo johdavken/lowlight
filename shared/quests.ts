@@ -19,6 +19,10 @@ import { GUEST_NOTE_MAX } from './contract';
 import { GRADES, HIREABLE, normalSpec, SPECIALTIES, type Grade, type Specialty } from './crew-book';
 
 export const QUEST_TEXT_MAX = 1800;
+/** A `hire-pitch:` line: what fits the HIRE card beside the stock pitches. */
+export const HIRE_PITCH_MAX = 120;
+/** What a job's ending gives (crew spec §5): `sex` when its text says he or she, `pitch` when it wrote one. */
+export type JobHire = { spec: Specialty; grade: Grade; sex?: 'man' | 'woman'; pitch?: string };
 export const QUEST_VIEW_MAX = 600;
 export const QUEST_CHOICE_MAX = 80;
 export const QUEST_CHOICES_MIN = 2;
@@ -87,6 +91,8 @@ export interface Beat {
   songWhen?: Condition[];
   /** `room: <scene id>`: the picture while the run is on this beat. View only: the contact stays where they are. */
   room?: string;
+  /** `comms: yes`: the contact is on the line for this beat, with no `room:` to bring it. */
+  onComms?: true;
   /** Words marked `{{ }}` in the text: the contact on the line. They read as plain text everywhere but the JOB column. */
   onLine?: string[];
   text: string;
@@ -123,8 +129,10 @@ export interface Effects {
   lost?: true;
   /** The arrangement (spec 2026-10-20): this outcome strikes the contact's deal to sit the player's chair; a cut of each job (Tier 2 spec 2026-11-01), or an old file's nightly retainer. */
   arrangement?: { cut: number; nights: 1 | 2 | 3 } | { retainer: number; nights: 1 | 2 };
-  /** Crew spec §5: `gives: recruit <specialty> <grade>`, a free hire card at the job's place until the next 06:00. */
-  recruit?: { spec: Specialty; grade: Grade };
+  /** Crew spec §5: `gives: recruit <specialty> <grade> [man|woman]`, a free hire card at the job's place until the next 06:00; `hire-pitch:` is what they say on it. */
+  recruit?: JobHire;
+  /** `gives: outfit <character> <outfit>`: that character's outfit, locked until an ending gives it, is theirs to wear in this playthrough. */
+  outfit?: { who: string; name: string };
   /** Guest crew spec §3: `guest-note: <text>`, what a brought guest knows now, written to their journal. */
   guestNote?: string;
   /** `settles: <contact id>: <text>`: what this ending settles for that contact, a line in every turn of theirs while the ending stands. */
@@ -155,8 +163,12 @@ export interface Wait {
 }
 
 export const QUEST_NEXT_MAX = 160;
-/** The QUEST list's one line on what a quest is about. */
+/** The JOBS list's one line on what a quest is about. */
 export const QUEST_PITCH_MAX = 200;
+/** A job's `posted-by:`, who it came from as far as the player knows. */
+export const QUEST_POSTED_BY_MAX = 80;
+/** A job's `brief:`, where it is and what the work is. */
+export const QUEST_BRIEF_MAX = 240;
 
 export interface QuestEntry {
   id: string;
@@ -165,7 +177,7 @@ export interface QuestEntry {
   kind: 'quest' | 'mission' | 'contract';
   /** A contract's arc (tier 3 contracts spec §2): the two waits in minutes, its groundwork, when it's offered, its rumor. */
   contract?: { night: number; fallout: number; pieces: { id: string; spec: Specialty; line: string }[]; postsAt: number; rumor: string; /** The lead you must hold before it's listed (world/leads id). */ lead?: string; /** Who comes as a guest (guest crew spec §2): a contact and a grade. */ guest?: { id: string; grade: Grade } };
-  /** What the QUEST list says a mission pays (null: not said). */
+  /** What the JOBS list says a mission pays (null: not said). */
   pay: number | null;
   /** Small jobs spec §1: the rep tier needed in the job's district (default 1). */
   tier: 1 | 2 | 3 | 4;
@@ -188,8 +200,14 @@ export interface QuestEntry {
   /** A kind of goods its clean or messy end drops (crew goods spec §6). */
   drops?: string;
   after: Condition[] | null;
-  /** One line for the QUEST list on what it's about (null: none). */
+  /** One line for the JOBS list on what it's about (null: none). */
   pitch: string | null;
+  /** Jobs: who it came from, as far as the player knows (`posted-by:`). */
+  postedBy?: string;
+  /** Jobs: where it is and what the work is (`brief:`), never how it goes. */
+  brief?: string;
+  /** Jobs: contacts who heard about it where they work (`known-by:`), though it isn't theirs. */
+  knownBy?: string[];
   /** Some wait in it has a deadline: it can be missed. */
   timed: boolean;
   /** The first beat's id. */
@@ -332,6 +350,9 @@ const frontSchema = z.strictObject({
   starts: oneLine(LORE_ID_MAX).nullish(),
   after: oneLine(200).nullish(),
   pitch: oneLine(QUEST_PITCH_MAX).nullish(),
+  'posted-by': oneLine(QUEST_POSTED_BY_MAX).nullish(),
+  brief: oneLine(QUEST_BRIEF_MAX).nullish(),
+  'known-by': z.array(oneLine(LORE_ID_MAX)).min(1).nullish(),
   /** A kind of goods its clean or messy end drops (crew goods spec §6). */
   drops: z.enum(['data', 'pharma', 'parts', 'luxuries', 'contraband']).nullish(),
   kind: z.enum(['quest', 'mission', 'contract']).nullish(),
@@ -463,6 +484,7 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
   let song: string | undefined;
   let songWhen: Condition[] | undefined;
   let room: string | undefined;
+  let onComms = false;
   const onLine: string[] = [];
   const spoken = (l: string) => l.replace(/\{\{(.+?)\}\}/g, (_, q: string) => (onLine.push(q), q));
   let first = true;
@@ -482,6 +504,10 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
     const roomLine = /^room:\s*(\S+)$/.exec(t);
     if (roomLine) {
       room = roomLine[1];
+      continue;
+    }
+    if (/^comms:\s*yes$/.test(t)) {
+      onComms = true;
       continue;
     }
     const sung = /^song:\s*(.+?)(?:\s+if\s+(.+))?$/.exec(t);
@@ -547,7 +573,7 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
   if (choices.length < QUEST_CHOICES_MIN || choices.length > QUEST_CHOICES_MAX) p(`needs ${QUEST_CHOICES_MIN}–${QUEST_CHOICES_MAX} choices (this has ${choices.length})`);
   const seen = new Set<string>();
   for (const c of choices) if (seen.has(c.id) || !seen.add(c.id)) p(`choice ${c.id} appears twice`);
-  return { id, when, stranger, ...(song ? { song, ...(songWhen ? { songWhen } : {}) } : {}), ...(room ? { room } : {}), ...(onLine.length ? { onLine } : {}), text: body, segments, views, choices };
+  return { id, when, stranger, ...(song ? { song, ...(songWhen ? { songWhen } : {}) } : {}), ...(room ? { room } : {}), ...(onComms ? { onComms: true as const } : {}), ...(onLine.length ? { onLine } : {}), text: body, segments, views, choices };
 }
 
 const span = (s: string): number | null => {
@@ -608,6 +634,7 @@ function parseOutcome(id: string, lines: string[], problems: QuestProblem[]): Ou
   }
   // Effect lines (missions spec §2): right above the arrow.
   const effects: Effects = {};
+  let hirePitch: string | null = null;
   while (kept.length > 0) {
     const t = kept[kept.length - 1].trim();
     let e: RegExpExecArray | null;
@@ -619,11 +646,13 @@ function parseOutcome(id: string, lines: string[], problems: QuestProblem[]): Ou
     else if (t === 'lost' && effects.lost === undefined) effects.lost = true;
     else if ((e = /^heat:\s*([+-]\d+)$/.exec(t)) && effects.heat === undefined) effects.heat = Number(e[1]);
     else if ((e = /^gives:\s*deck\s+([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(t)) && effects.deck === undefined) effects.deck = e[1];
+    else if ((e = /^gives:\s*outfit\s+([a-z0-9]+(?:-[a-z0-9]+)*)\s+([a-z0-9]+(?:-[a-z0-9]+)*)$/.exec(t)) && effects.outfit === undefined) effects.outfit = { who: e[1], name: e[2] };
     else if ((e = /^guest-note:\s*(.+)$/.exec(t)) && effects.guestNote === undefined) effects.guestNote = e[1];
     else if ((e = /^settles:\s*([a-z0-9]+(?:-[a-z0-9]+)*):\s*(.+)$/.exec(t))) (effects.settles ??= []).unshift({ who: e[1], text: e[2] });
     else if (/^takes:\s*deck$/.test(t) && effects.deck === undefined) effects.deck = null;
-    else if ((e = /^gives:\s*recruit\s+([a-z]+)\s+([a-z]+)$/i.exec(t)) && effects.recruit === undefined && (HIREABLE as string[]).includes(normalSpec(e[1].toLowerCase())) && GRADES.includes(e[2].toUpperCase() as (typeof GRADES)[number]))
-      effects.recruit = { spec: normalSpec(e[1].toLowerCase()) as Specialty, grade: GRADES.indexOf(e[2].toUpperCase() as (typeof GRADES)[number]) as Grade };
+    else if ((e = /^hire-pitch:\s*(.+)$/.exec(t)) && hirePitch === null) hirePitch = e[1];
+    else if ((e = /^gives:\s*recruit\s+([a-z]+)\s+([a-z]+)(?:\s+(man|woman))?$/i.exec(t)) && effects.recruit === undefined && (HIREABLE as string[]).includes(normalSpec(e[1].toLowerCase())) && GRADES.includes(e[2].toUpperCase() as (typeof GRADES)[number]))
+      effects.recruit = { spec: normalSpec(e[1].toLowerCase()) as Specialty, grade: GRADES.indexOf(e[2].toUpperCase() as (typeof GRADES)[number]) as Grade, ...(e[3] ? { sex: e[3].toLowerCase() as 'man' | 'woman' } : {}) };
     else if ((e = /^arrangement:\s*chair\s+(\d+)\s*\/\s*(\d+)$/.exec(t)) && effects.arrangement === undefined) {
       const retainer = Number(e[1]);
       const nights = Number(e[2]);
@@ -641,15 +670,31 @@ function parseOutcome(id: string, lines: string[], problems: QuestProblem[]): Ou
     else break;
     kept.pop();
   }
+  if (hirePitch !== null) {
+    if (!effects.recruit) p('hire-pitch: goes with gives: recruit');
+    else if (hirePitch.length > HIRE_PITCH_MAX) p(`hire-pitch: at most ${HIRE_PITCH_MAX} characters (this is ${hirePitch.length})`);
+    else effects.recruit.pitch = hirePitch;
+  }
   // One that didn't read (a blank line before the arrow, no sign on heat) would be shown as story: say so instead.
-  for (const line of kept) if (/^(pay|heat|gives|takes|take):/.test(line.trim()) || line.trim() === 'blown' || line.trim() === 'lost') p(`can't read the effect line '${line.trim()}' (right above the → line, no blank line: pay: 400 / full / half / +150, heat: +2 or -1, gives: deck <id>, gives: recruit <specialty> <grade>, takes: deck, take: full / part / none, blown, lost)`);
+  for (const line of kept) if (/^(pay|heat|gives|takes|take|hire-pitch):/.test(line.trim()) || line.trim() === 'blown' || line.trim() === 'lost') p(`can't read the effect line '${line.trim()}' (right above the → line, no blank line: pay: 400 / full / half / +150, heat: +2 or -1, gives: deck <id>, gives: outfit <character> <outfit>, gives: recruit <specialty> <grade> [man|woman], hire-pitch: <what they say>, takes: deck, take: full / part / none, blown, lost)`);
   for (const line of kept) if (/^(wait|next):/.test(line.trim())) p("wait: and next: go right after the '→' line");
   // ALARM and flags move on a choice's tags, never in an outcome: a line like that would be shown as story.
   for (const line of kept) if (/^alarm:/.test(line.trim()) || /^set [^\s=]+=\S+$/.test(line.trim())) p(`'${line.trim()}' only works on a choice: put [alarm +1] or [set name=value] on the choice that leads here`);
   const text = tidy(kept);
   if (text === '') p('needs some text');
+  if (text.includes('{hire}') && !effects.recruit) p('{hire} needs gives: recruit on the same ending');
   if (text.length > QUEST_TEXT_MAX) p(`at most ${QUEST_TEXT_MAX} characters (this is ${text.length})`);
   return { id, text, to: m ? m[1] : 'end', wait, next, effects };
+}
+
+/** An outfit's key in the kit and the locked set: `<character>/<outfit>`. */
+export const outfitKey = (o: { who: string; name: string }) => `${o.who}/${o.name}`;
+
+/** Every outfit some ending gives (`<character>/<outfit>`): each is locked until a run earns it. */
+export function rewardOutfits(quests: readonly QuestEntry[]): Set<string> {
+  const out = new Set<string>();
+  for (const q of quests) for (const o of q.outcomes.values()) if (o.effects.outfit) out.add(outfitKey(o.effects.outfit));
+  return out;
 }
 
 /** A `loot:` line's length (roll lifecycle spec): one short thing the GM can name. */
@@ -658,7 +703,7 @@ export const LOOT_MAX = 80;
 export function parseQuestFile(
   id: string,
   text: string,
-  known: { roster: ReadonlySet<string> | null; places: ReadonlySet<string> | null; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string> } | null; decks?: ReadonlySet<string> | null },
+  known: { roster: ReadonlySet<string> | null; places: ReadonlySet<string> | null; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string> } | null; decks?: ReadonlySet<string> | null; outfits?: ReadonlySet<string> | null },
 ): { ok: true; entry: QuestEntry; warnings: string[] } | { ok: false; problems: QuestProblem[] } {
   const problems: QuestProblem[] = idOk(id) ? [] : [{ field: 'id', message: `must be lowercase letters, digits and dashes, at most ${LORE_ID_MAX}` }];
   const s = splitFrontMatter(text);
@@ -749,6 +794,7 @@ export function parseQuestFile(
     else after = c;
   }
   if (known.roster && withIds) for (const w of withIds) if (!known.roster.has(w)) problems.push({ field: 'with', message: `no character '${w}'` });
+  if (known.roster) for (const w of f['known-by'] ?? []) if (!known.roster.has(w)) problems.push({ field: 'known-by', message: `no character '${w}'` });
   // A spring file (crew spec §5) posts where the held recruit was hired: no starts: of its own.
   if (f.spring) {
     if (f.kind !== 'mission') problems.push({ field: 'spring', message: 'spring: true goes only in a job (kind: mission)' });
@@ -829,6 +875,7 @@ export function parseQuestFile(
     if (arrangement && (mission || ownedBy({ with: withIds }) === null)) problems.push({ field: o.id, message: 'arrangement: goes only in a quest with one contact (not a job)' });
     if (o.to === 'back' && !contracted) problems.push({ field: o.id, message: "'→ back' goes only in a contract" });
     if (typeof o.effects.deck === 'string' && known.decks && !known.decks.has(o.effects.deck)) problems.push({ field: o.id, message: `gives: no deck '${o.effects.deck}' in world/gear/decks.md` });
+    if (o.effects.outfit && known.outfits && !known.outfits.has(outfitKey(o.effects.outfit))) problems.push({ field: o.id, message: `gives: no outfit '${o.effects.outfit.name}' in ${o.effects.outfit.who}'s character.json` });
     if (o.to !== 'end' && o.to !== 'back' && !beats.has(o.to)) problems.push({ field: o.id, message: `→ '${o.to}': no # beat by that id` });
     const w = o.wait;
     if (!w) continue;
@@ -912,7 +959,7 @@ export function parseQuestFile(
 
   if (problems.length > 0) return { ok: false, problems };
   const timed = [...outcomes.values()].some((o) => o.wait?.by != null);
-  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor!, ...(f.lead ? { lead: f.lead } : {}), ...(guest ? { guest } : {}) } } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.for ? { for: f.for } : {}), ...(f.bars ? { bars: f.bars } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}) };
+  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor!, ...(f.lead ? { lead: f.lead } : {}), ...(guest ? { guest } : {}) } } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, ...(f['posted-by'] ? { postedBy: f['posted-by'] } : {}), ...(f.brief ? { brief: f.brief } : {}), ...(f['known-by'] ? { knownBy: f['known-by'] } : {}), timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.for ? { for: f.for } : {}), ...(f.bars ? { bars: f.bars } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}) };
   if (entry.template) warnings.push(...offTemplate(entry));
   return { ok: true, warnings, entry };
 }
@@ -977,7 +1024,7 @@ export interface QuestRun {
   /** A rescue (crew spec §5): the held recruit it frees, where it was posted (their hire place) and its tier (their grade + 1). */
   spring?: { recruit: string; place: string; tier: 1 | 2 | 3 | 4 };
   /** Crew spec §5: the `gives: recruit` its ending outcome had; its free card shows at the job's place until the next 06:00. */
-  recruit?: { spec: Specialty; grade: Grade };
+  recruit?: JobHire;
   /** Guest crew spec §3: the `guest-note:` its ending had; a brought guest's next turn writes it down. */
   guestNote?: string;
   /** The `settles:` lines its ending had; each contact named reads theirs on every turn while this run stands. */
@@ -1295,7 +1342,7 @@ const runSchema = z.object({
     .catch(undefined),
   startDeck: z.string().nullable().optional(),
   spring: z.object({ recruit: z.string(), place: z.string(), tier: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]) }).optional(),
-  recruit: z.object({ spec: z.preprocess(normalSpec, z.enum(HIREABLE as [Specialty, ...Specialty[]])), grade: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]) }).optional(),
+  recruit: z.object({ spec: z.preprocess(normalSpec, z.enum(HIREABLE as [Specialty, ...Specialty[]])), grade: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), sex: z.enum(['man', 'woman']).optional(), pitch: z.string().optional() }).optional(),
   guestNote: z.string().optional(),
   settles: z.array(z.object({ who: z.string(), text: z.string() })).optional(),
   pendingCover: z.object({ outcome: z.string(), text: z.string(), pick: z.object({ choice: z.string(), line: z.string(), roll: rollSchema.optional() }).optional(), minutes: z.number() }).nullable().optional(),
@@ -1310,6 +1357,8 @@ const runSchema = z.object({
         district: z.string().optional(),
         deck: z.string().nullable().optional(),
         lose: z.array(z.string()).optional(),
+        // Outfits as rewards: `<character>/<outfit>`, opened by an ending.
+        outfit: z.string().optional(),
         // Spent (negative), or given back by a NERVE +1 ability (crew abilities spec §2).
         nerve: z.number().int().max(2).optional(),
         edge: z.literal(-1).optional(),
@@ -1384,20 +1433,42 @@ const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 /** The pick row's line for a card click: "Stall him till morning." → "You stall him till morning." */
 export const pickLine = (line: string) => `You ${lowerFirst(line)}`;
 
-/** The contact's `[quest]` block for the beat (spec §3): only this beat, only shown choices, only their view. */
-export function questBlock(q: QuestEntry, beat: Beat, ctx: CondCtx, oneLine: (s: string) => string, shown = false): string {
-  const choices = shownChoices(beat, ctx)
-    .map((c) => lowerFirst(c.line).replace(/[.!?…]+$/, ''))
-    .join('; ');
+/** What the contact thinks at this beat: their own view, or `view any`, then whichever gated lines hold. */
+export function beatViews(beat: Beat, ctx: CondCtx): string {
   const own = beat.views.filter((v) => v.contact === ctx.with);
   const plain = own.find((v) => v.when === null) ?? beat.views.find((v) => v.contact === 'any' && v.when === null);
   const gated = [...own, ...beat.views.filter((v) => v.contact === 'any')].filter((v) => v.when !== null && holds(v.when, ctx));
-  const views = [plain, ...gated].filter((v): v is View => v !== undefined).map((v) => v.text).join(' ');
+  return [plain, ...gated].filter((v): v is View => v !== undefined).map((v) => v.text).join(' ');
+}
+
+/** A beat the contact only hears: the picture is somewhere else, or they're on the line. */
+export const beatAway = (beat: Pick<Beat, 'room' | 'onComms'>): boolean => beat.room !== undefined || beat.onComms === true;
+
+/**
+ * Job and quest text is written to the player, so its "you" is them and its "she" may be the contact reading it.
+ * Unsaid, she answered as the player (Run Sheet, playtest: 3 takes of 3). `away`: she gets what she heard, not what they saw.
+ */
+const toldTo = (player: string, away: boolean): string => `(told to ${player}, so "you" here is ${player}${away ? `; you weren't there, and this is all you heard on the line` : ''})`;
+
+/**
+ * What the contact heard of a beat they aren't at: the player's pick and the words marked `{{ }}`. The rest of the beat
+ * is what the player saw; a label asking her not to know it still leaked (Run Sheet's stamp, 2 takes of 3).
+ */
+export function heardAt(beat: Pick<Beat, 'onLine'>, pick?: string): string {
+  return [pick, ...(beat.onLine ?? [])].filter(Boolean).join(' ') || 'Nothing came over the line.';
+}
+
+/** The contact's `[quest]` block for the beat (spec §3): only this beat, only shown choices, only their view. */
+export function questBlock(q: QuestEntry, beat: Beat, ctx: CondCtx, oneLine: (s: string) => string, shown = false, player?: string): string {
+  const choices = shownChoices(beat, ctx)
+    .map((c) => lowerFirst(c.line).replace(/[.!?…]+$/, ''))
+    .join('; ');
+  const views = beatViews(beat, ctx);
   const who = beat.stranger?.name ?? 'someone here';
   const knows = beat.stranger ? ` ${beat.stranger.name} knows only what is written above: give them no new facts, and they stay where they are, waiting.` : '';
   const tag = isJob(q) ? 'job' : 'quest';
   return (
-    `[${tag} — ${q.title}. Where it stands: ${shown ? `the [${tag} — ${q.title}: …] line at the end of this message, which they have just read` : oneLine(beat.text)}\n` +
+    `[${tag} — ${q.title}. Where it stands${!shown && player ? ` ${toldTo(player, beatAway(beat))}` : ''}: ${shown ? `the [${tag} — ${q.title}: …] line at the end of this message, which they have just read` : oneLine(beatAway(beat) ? heardAt(beat) : beat.text)}\n` +
     ` The choices in front of them: ${choices}.\n` +
     ` What you think: ${views}\n` +
     ` Talk it through as yourself, and never choose for them. If they act a choice out — say it to ${who}, start doing it — it hasn't happened yet: nobody answers it or moves on it, and your reply stops at the moment before it lands. These are the only choices; don't offer other ways out.${knows} Don't guess at what comes after.]`
@@ -1413,15 +1484,15 @@ export function questWaitBlock(title: string, line: string): string {
 /** A roll's result line in a row (`*COOL 3d · IN THE OPEN — 6 6, crit.*`, or a d100 one from before the table). */
 const ROLL_LINE = /\n*\*[A-Z]+ (?:\d+d · [A-Z ]+|\d+%) — [^*\n]*\.\*\n*/g;
 
-export function questRowText(row: { title: string; text: string; run?: string }, oneLine: (s: string) => string): string {
+export function questRowText(row: { title: string; text: string; run?: string; heard?: string }, oneLine: (s: string) => string, player?: string): string {
   // Her history leaves out the roll's result line (the table): no dice, odds or game words for her to echo.
-  const text = row.text
+  const text = (row.heard ?? row.text)
     .replace(ROLL_LINE, '\n\n')
     // The hand (spec 2026-10-29-the-hand §6): a call and a loss as her own bracketed lines.
     .replace(/⟦CALL⟧ ([^\n]*?)\.?(?=\n|$)/g, '[call: $1]')
     .replace(/⟦LOST⟧ ([^\n]*?)\.?(?=\n|$)/g, '[$1]')
     .trim();
-  return `[${row.run ? 'job' : 'quest'} — ${row.title}: ${oneLine(text.replace(/⟦([^⟧]+)⟧ /g, '($1) '))}]`;
+  return `[${row.run ? 'job' : 'quest'} — ${row.title}${player ? ` ${toldTo(player, row.heard !== undefined)}` : ''}: ${oneLine(text.replace(/⟦([^⟧]+)⟧ /g, '($1) '))}]`;
 }
 
 /** The pick check's instructions (spec §3, exact). */
@@ -1560,6 +1631,7 @@ export const QUEST_DRAFT_RULES = [
   "A next: line says what to do, never what happens if you don't.",
   'A stranger who could be anyone of a kind (a Sentinel, a dock hand) takes face: any <tag>; one the story knows by name and comes back to may take a fixed face.',
   "A pitch: line is the hook a player reads before START: the situation in one or two sentences, no choices, no outcomes.",
+  "A job (kind: mission or contract) also has posted-by: <who it came from, as far as the player knows, under 80 characters> and brief: <where it is and what the work is, one or two sentences, under 240 characters, no outcomes, no checks, and never 'you'>. The contact is told these and that the player knows them, so they must hold for every run of the job.",
   'A missed-it path plays wherever the player is with the contact: write it as news reaching them (a message, a call, someone passing it on), not as a scene at the place they missed.',
   "A choice line starts with a verb, since the row shows it as 'You <line>' ('Go back to the Tilt.', never 'Back to the Tilt.').",
   'A job may set posts: HH:MM-HH:MM (when it lists; may cross midnight) and trust: W / L (CLEAN raises trust with the contact by W, BLOWN lowers it by L; rep then doesn\'t move).',
@@ -1567,6 +1639,7 @@ export const QUEST_DRAFT_RULES = [
   "take-size: N (2–8) sets a job's TAKE clock; leave it out and the tier decides (3 / 4 / 6). A long job with plenty of picks can take a bigger clock (take-size: 4 on tier 1); a short one of two or three picks keeps the tier's.",
   'A quest with one contact may end in arrangement: chair-cut <5–50> / <nights 1–3> (that contact sits the player\'s chair for that cut of each job).',
   'A spring file (spring: true) is a rescue: no starts:, {recruit} for the held recruit\'s name; its clean and messy ends free them.',
+  "A job's ending may give someone: gives: recruit <specialty> <grade>, with man or woman after it when the text says he or she. {hire} in that ending is their name, and hire-pitch: <one or two short lines, first person, no quote marks> is what they say on the HIRE card. Keep the text to they/them or leave the word off when it doesn't matter.",
   "A job may end in up to three push beats (# push-1, # push-2, # push-3), played only when the player presses on after the take: each one's greed comes from the job's own prose, never stock loot, and each is harder than the last.",
   "A push outcome pays pay: +N (about 30–60 % of the job's pay) or gives something, and ends → end; every check in a push beat fails to an outcome marked lost (a bare line).",
   "A check's number sets its position, not its odds: 55 or more is IN THE DARK, 45–54 IN THE OPEN, 44 or less ON THE WIRE; red is one shot.",
@@ -1590,7 +1663,10 @@ export function questDraftPrompt(o: { outline: string; roster: { id: string; nam
       'with: [<contact ids>]   # leave out for anyone',
       'starts: <place id>',
       'after: null             # or a condition, e.g. "ledger=burned"',
-      "pitch: <one line for the QUEST list: what it's about, never how it goes>",
+      "pitch: <one line for the JOBS list: what it's about, never how it goes>",
+      'posted-by: <jobs: who it came from, as far as the player knows>',
+      'brief: <jobs: where it is and what the work is, never how it goes>',
+      'known-by: [<contact ids>]   # optional: contacts who work where it posts and would have heard, though it is not their job',
       '---',
       '',
       '# <beat-id>',
@@ -1635,6 +1711,11 @@ export function withSpring(q: QuestEntry, spring: { place: string; tier: 1 | 2 |
     return x;
   };
   return { ...(fill(q) as QuestEntry), starts: spring.place, tier: spring.tier };
+}
+
+/** `text` with `{hire}` as the name on its `gives: recruit` card; 'Someone' with no draw. */
+export function fillHire(text: string, name: string | null): string {
+  return text.replaceAll('{hire}', name ?? 'Someone');
 }
 
 /** `text` with `{recruit}` as the held recruit's first name (a spring file, crew spec §5); unchanged with none. */

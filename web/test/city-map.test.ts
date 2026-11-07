@@ -65,7 +65,7 @@ afterEach(() => {
   host.remove();
 });
 
-function mount(here?: string, extra: Partial<WhoIsWhere> = {}, m = map(), opts: { reducedMotion?: boolean; overlay?: HTMLElement } = {}) {
+function mount(here?: string, extra: Partial<WhoIsWhere> = {}, m = map(), opts: { reducedMotion?: boolean; overlay?: HTMLElement; listed?: boolean; onRevisit?: (p: { id: string }) => void } = {}) {
   cm = new CityMap(host, { onTravel: travel, onZoomTo: (f) => frames.push(f), onFocus: (p) => focused.push(p?.id ?? null), onCue: (c) => cues.push(c), ...opts });
   cm.render(m, who(here, extra));
   return m;
@@ -496,5 +496,122 @@ describe('CityMap raised pins (rendered map spec §5)', () => {
     cm.render(map(), who('a1'));
     expect(pin('a1')!.style.top).toBe('7%');
     expect($('.pin-stem')).toBeNull();
+  });
+});
+
+describe('CityMap listed (the game map)', () => {
+  const listed = (here?: string, extra: Partial<WhoIsWhere> = {}, more: { onRevisit?: (p: { id: string }) => void } = {}) => mount(here, extra, map(), { listed: true, ...more });
+  const thread = (id: string) => $(`.thr[data-district="${id}"]`)!;
+  const row = (id: string) => $(`.row[data-place="${id}"]`);
+  const open = () => $$('.thr.open').map((t) => t.dataset.district);
+
+  it('pins carry no tags; a thread per district with places, yours first and alone open', () => {
+    listed('b1');
+    expect($('.map-ntag')).toBeNull();
+    expect($$('.thr').map((t) => t.dataset.district)).toEqual(['b', 'a']);
+    expect(open()).toEqual(['b']);
+    expect(row('b1')!.textContent).toContain('HERE');
+  });
+
+  it('a shut thread still says how many places and who is in there', () => {
+    listed('a1');
+    expect($('.group em', thread('a'))!.textContent).toBe('2');
+    expect($$('.group .dots b', thread('a'))).toHaveLength(2);
+    expect($('.group .dots u', thread('a'))).not.toBeNull();
+    expect($('.group .dots u', thread('b'))).toBeNull();
+  });
+
+  it("the name and the line down a thread's side both fold it, and any number stay open", () => {
+    listed('a1');
+    click($('.group', thread('b')));
+    expect(open()).toEqual(['a', 'b']);
+    click($('.rail', thread('a')));
+    expect(open()).toEqual(['b']);
+    expect(cues).toEqual(['move', 'move']);
+  });
+
+  it('picking from a pin unfolds its thread; folding it keeps the card and marks the name', () => {
+    listed('a1');
+    click(pin('b1'));
+    expect(open()).toEqual(['a', 'b']);
+    expect(row('b1')!.classList.contains('on')).toBe(true);
+    click($('.group', thread('b')));
+    expect($('.map-strip .t')!.textContent).toBe('B ONE');
+    expect(thread('b').classList.contains('picked')).toBe(true);
+  });
+
+  it("the arrows walk the list's order", () => {
+    listed('b1');
+    cm.move(1);
+    expect(cm.focus).toBe('b1');
+    cm.move(1);
+    expect(cm.focus).toBe('a1');
+  });
+
+  it('a pin hovered lights its row, or its district name while the thread is shut', () => {
+    listed('a1');
+    hover(pin('a2'), true);
+    expect(row('a2')!.classList.contains('hot')).toBe(true);
+    hover(pin('a2'), false);
+    hover(pin('b1'), true);
+    expect(thread('b').classList.contains('hot')).toBe(true);
+  });
+
+  it('a row hovered pulses its pin; a district name hovered lights its border and name', () => {
+    listed('a1');
+    row('a2')!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(pin('a2')!.classList.contains('hot')).toBe(true);
+    $('.group', thread('b'))!.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+    expect(pin('a2')!.classList.contains('hot')).toBe(false);
+    expect($('path.dpoly[data-id="b"]')!.classList.contains('lit')).toBe(true);
+    expect(label('b')!.classList.contains('lit')).toBe(true);
+    expect(pin('b1')!.classList.contains('in')).toBe(true);
+    $('.map-places')!.dispatchEvent(new MouseEvent('mouseleave'));
+    expect($('path.dpoly.lit')).toBeNull();
+  });
+
+  it('a row picks, the picked row revisits', () => {
+    const went: string[] = [];
+    listed('a1', {}, { onRevisit: (p) => went.push(p.id) });
+    click(row('a2'));
+    expect(cm.focus).toBe('a2');
+    expect(went).toEqual([]);
+    click(row('a2'));
+    expect(went).toEqual(['a2']);
+  });
+
+  it('district names and borders are only printed', () => {
+    listed('a1');
+    click(label('a'));
+    click($('path.dpoly[data-id="a"]'));
+    expect(frames).toEqual([]);
+  });
+
+  it('GO rides in the card, with the reason it cannot go beside it', () => {
+    listed('a1');
+    click(pin('b1'));
+    click($('.map-strip .map-go .go'));
+    expect(travel).toHaveBeenCalledWith('b1');
+    click(pin('a1'));
+    expect($<HTMLButtonElement>('.map-strip .map-go .go')!.disabled).toBe(true);
+    expect($('.map-strip .why')!.textContent).toBe("you're here");
+  });
+
+  it('the card has its readout lines one box each, and the rooms inside the pin', () => {
+    const m = map();
+    m.places[2]!.readout = [{ label: 'WHAT', text: 'A room.' }];
+    mount('a1', { inside: { b1: [{ room: 'p/in', name: 'Back Room', inside: [] }] } }, m, { listed: true });
+    click(pin('b1'));
+    expect($('.map-strip .readout > div > dd')!.textContent).toBe('A room.');
+    expect($('.map-strip .map-inside .nm')!.textContent).toBe('Back Room');
+    expect($$('.map-strip .dh').map((h) => h.textContent)).toEqual(['INSIDE', "WHO'S HERE"]);
+  });
+
+  it('clear() empties the threads and keeps the list for the next map', () => {
+    listed('a1');
+    cm.clear();
+    expect($$('.thr')).toHaveLength(0);
+    cm.render(map(), who('a1'));
+    expect($$('.thr')).toHaveLength(2);
   });
 });

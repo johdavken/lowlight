@@ -1,6 +1,7 @@
 ---
 title: Drownworks
 category: City
+section: Districts
 keys: [Drownworks, the Works, Works people, water reclamation, reclamation, clean water]
 districts: [drownworks]
 places: []

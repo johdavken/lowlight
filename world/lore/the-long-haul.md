@@ -1,6 +1,7 @@
 ---
 title: The Long Haul
 category: Places
+section: The Spine
 keys: [Long Haul, the Long Haul, hauler stop, hauler's diner]
 districts: [spine]
 places: [long-haul]

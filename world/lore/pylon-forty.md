@@ -1,6 +1,7 @@
 ---
 title: Pylon Forty
-category: City
+category: Places
+section: The Spine
 keys: [Pylon Forty, the pylon, hung habs]
 districts: [spine]
 places: [soren-hab, oksanas-counter, rue-hab, listening-post]

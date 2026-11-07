@@ -193,7 +193,7 @@ const withNames = (book: CrewBook, origins: string[]) => origins.filter((d) => (
  * the name and face it used to the sets.
  * `origins` must already be the ones with names.
  */
-export function drawRecruit(o: { book: CrewBook; r: () => number; id: string; spec: Specialty; grade: Grade; district: string; origins: string[]; faces: Extra[]; usedFaces: Set<string>; usedNames: Set<string> }): Recruit {
+export function drawRecruit(o: { book: CrewBook; r: () => number; id: string; spec: Specialty; grade: Grade; district: string; origins: string[]; faces: Extra[]; usedFaces: Set<string>; usedNames: Set<string>; /** A job's text said he or she: only faces and names that fit. */ sex?: 'man' | 'woman' }): Recruit {
   const { r, spec, grade } = o;
   const homeR = r();
   const origin = o.origins.includes(o.district) && homeR < 2 / 3 ? o.district : o.origins.length > 0 ? pick(r, o.origins) : o.district;
@@ -204,11 +204,11 @@ export function drawRecruit(o: { book: CrewBook; r: () => number; id: string; sp
   // The name's draw comes before the face's, as it always has, but is spent after it: the face picks first and the
   // name comes from those that fit it (marked the same or unmarked), so the cards only change where they clashed.
   const nameR = names.length > 0 ? r() : 0;
-  const pool = (tags: string[]) => o.faces.filter((f) => tags.every((t) => f.tags.includes(t)) && !o.usedFaces.has(f.id));
+  const pool = (tags: string[]) => o.faces.filter((f) => [...tags, ...(o.sex ? [o.sex] : [])].every((t) => f.tags.includes(t)) && !o.usedFaces.has(f.id));
   const fp = pool(['crew', spec]).length > 0 ? pool(['crew', spec]) : pool(['local']);
   const face = fp.length > 0 ? pick(r, fp) : null;
   if (face) o.usedFaces.add(face.id);
-  const sex = face?.tags.find((t): t is 'man' | 'woman' => t === 'man' || t === 'woman');
+  const sex = o.sex ?? face?.tags.find((t): t is 'man' | 'woman' => t === 'man' || t === 'woman');
   const fits = sex ? names.filter((x) => (o.book.genders?.[x] ?? sex) === sex) : names;
   const from = fits.length > 0 ? fits : names;
   const name = from.length > 0 ? from[Math.floor(nameR * from.length)] : 'Nobody';
@@ -244,11 +244,14 @@ export function vouchedFor(o: FreeDraw & { contact: string; contactName: string;
   return { recruit, cost: 0, loyalty: 70, from: { vouched: o.contact, name: o.contactName } };
 }
 
+/** A job card's recruit id (crew spec §5): the same with or without its draw. */
+export const jobRecruitId = (seed: string, runKey: string) => `r-${hashSeed(`${seed}|job|${runKey}`).toString(36)}`;
+
 /** The free card a job's `gives: recruit` leaves at its place (crew spec §5): loyalty 50, seeded by (seed, run key). */
-export function jobRecruitCard(o: FreeDraw & { runKey: string; title: string; place: string; spec: Specialty; grade: Grade }): HireCard {
+export function jobRecruitCard(o: FreeDraw & { runKey: string; title: string; place: string; spec: Specialty; grade: Grade; sex?: 'man' | 'woman'; pitch?: string }): HireCard {
   const key = `${o.seed}|job|${o.runKey}`;
-  const recruit = drawRecruit({ book: o.book, r: rng(hashSeed(key)), id: `r-${hashSeed(key).toString(36)}`, spec: o.spec, grade: o.grade, district: o.district, origins: withNames(o.book, o.origins), faces: o.faces, usedFaces: new Set(o.usedFaces), usedNames: new Set(o.usedNames) });
-  return { recruit, cost: 0, loyalty: 50, from: { job: o.runKey, title: o.title } };
+  const recruit = drawRecruit({ book: o.book, r: rng(hashSeed(key)), id: jobRecruitId(o.seed, o.runKey), spec: o.spec, grade: o.grade, district: o.district, origins: withNames(o.book, o.origins), faces: o.faces, usedFaces: new Set(o.usedFaces), usedNames: new Set(o.usedNames), ...(o.sex ? { sex: o.sex } : {}) });
+  return { recruit: o.pitch ? { ...recruit, pitch: o.pitch } : recruit, cost: 0, loyalty: 50, from: { job: o.runKey, title: o.title } };
 }
 
 /**
@@ -387,6 +390,9 @@ export interface CrewOdds {
   why: string[];
 }
 
+/** The errand odds a district's heat takes off: 5 for each point above 3. */
+export const errandHeatCut = (heat: number): number => Math.max(0, 5 * (heat - 3));
+
 /** A send's odds (spec §2): grade base, off-fit, risk, traits, heat above 3, the clamp; then the band and fate splits. */
 export function crewOdds(o: { errand: ErrandKind; recruit: Recruit; traits: Trait[]; heat: number; goneUsed?: boolean; match?: Specialty }): CrewOdds {
   const e = o.errand;
@@ -410,10 +416,10 @@ export function crewOdds(o: { errand: ErrandKind; recruit: Recruit; traits: Trai
       c += t.effect.delta;
       why.push(`${t.label.toUpperCase()} ${signed(t.effect.delta)}`);
     }
-  if (o.heat > 3) {
-    const h = -5 * (o.heat - 3);
-    c += h;
-    why.push(`HEAT ${o.heat} ${signed(h)}`);
+  const cut = errandHeatCut(o.heat);
+  if (cut) {
+    c -= cut;
+    why.push(`HEAT ${o.heat} ${signed(-cut)}`);
   }
   const clean = Math.min(95, Math.max(5, c));
   const rest = 100 - clean;

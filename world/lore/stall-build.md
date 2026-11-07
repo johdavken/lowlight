@@ -1,6 +1,7 @@
 ---
 title: Stall Builds
 category: Tech
+section: Decks
 keys: [stall build, stall builds, franken-deck, home-built deck, repair stall, deck-repair stall]
 districts: []
 places: []

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { worksInGraft, type Ability, type CrewBook, type ErrandKind, type Trait } from './crew-book';
-import { growthStep, abilityPool, crewOdds, sellErrand, traitHas, dueAt, hireAbility, offerFor, errandsFor, hiresFor, jobRecruitCard, loyaltyWord, parseInstance, rollSend, slots, vouchedFor, WAGE, type Recruit } from './crew';
+import { growthStep, abilityPool, crewOdds, sellErrand, traitHas, dueAt, hireAbility, offerFor, errandsFor, hiresFor, jobRecruitCard, jobRecruitId, loyaltyWord, parseInstance, rollSend, slots, vouchedFor, WAGE, type Recruit } from './crew';
 import hiresBefore from './crew-hires.fixture.json';
 import type { Extra } from './extras';
 import type { GoodsKind } from './goods';
@@ -317,6 +317,18 @@ describe('free cards (crew spec §5)', () => {
     expect(c).toMatchObject({ cost: 0, loyalty: 50, from: { job: 'quest.hicks.weigh-station@4', title: 'Weigh Station' } });
     expect(c.recruit).toMatchObject({ spec: 'muscle', grade: 1, wage: WAGE[1] });
     expect(jobRecruitCard({ ...J, runKey: 'quest.hicks.weigh-station@5', spec: 'muscle', grade: 1 }).recruit!.id).not.toBe(c.recruit!.id);
+    expect(c.recruit!.id).toBe(jobRecruitId('pt1', 'quest.hicks.weigh-station@4'));
+  });
+  it('a job card keeps the gender its text says, and speaks its own pitch', () => {
+    const genders = { 'Daichi Mori': 'man', 'Hana Ibe': 'woman' } as const;
+    const faces2 = [face('crew-a', ['crew', 'muscle', 'man']), face('crew-b', ['crew', 'muscle', 'woman'])];
+    const J = { book: { ...book, names: { karasu: ['Daichi Mori', 'Hana Ibe'] }, genders }, title: 'Run Sheet', place: 'rue-hab', district: 'karasu', seed: 'pt1', faces: faces2, usedFaces: new Set<string>(), origins: ['karasu'], spec: 'muscle' as const, grade: 0 as const };
+    for (let i = 0; i < 40; i++) {
+      const r = jobRecruitCard({ ...J, runKey: `k${i}`, sex: 'man', pitch: 'I loaded rigs.' }).recruit!;
+      expect(r).toMatchObject({ name: 'Daichi Mori', face: 'crew-a', pitch: 'I loaded rigs.' });
+    }
+    // With neither, the draw is the one it always was.
+    expect(jobRecruitCard({ ...J, runKey: 'k1' }).recruit!.pitch).not.toBe('I loaded rigs.');
   });
 });
 

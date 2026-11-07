@@ -5,6 +5,7 @@ import { arrangementActive, arrangementKey, arrangementLine, chairTwoChecks, cut
 import type { ChatMessage, ChatMode, ContactCard, CrewAction, CrewView, Debrief, PlanCard, QuestState, RoomState, ServerEvent, SetupOffer, HandView, ProgramPreview, Take } from '../../shared/types';
 import { BAIL, DOC, jobWords, rescueOpen, type Recruit } from '../../shared/crew';
 import { crewLine } from '../../shared/crew-line';
+import { agoWords } from '../../shared/witness';
 import { STASH_MAX } from '../../shared/goods';
 import type { CrewEvent, CrewMember, CrewState } from '../../shared/crew-fold';
 import { TIMING, worksInGraft, type Ability, type Grade, type Specialty, type Trait } from '../../shared/crew-book';
@@ -20,7 +21,7 @@ import { readSummary } from './summary';
 import type { Backend } from './backend';
 import { TurnError, STREAM_OPEN_EVENT, type CompletionMessage, type ModelPair } from './turn';
 import { wearingLine, type WearEntry } from './wearing';
-import { TEXT_HEADING, TEXT_INSTRUCTIONS, promisedLine, textPlanLine, textWhereLine, herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, COMMS_BACK_INSTRUCTIONS, COMMS_DROP_LINE, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, commsLine, beatLine, RP_HEADING, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, ENCOUNTER_INSTRUCTIONS, QUEST_INSTRUCTIONS, MISSION_OPEN, MISSION_CLOSE, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, endSceneText, othersBlock, strangerBlock, type OtherVoice } from './instructions';
+import { whoIsYou, TEXT_HEADING, TEXT_INSTRUCTIONS, promisedLine, textPlanLine, textWhereLine, herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, COMMS_BACK_INSTRUCTIONS, COMMS_DROP_LINE, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, commsLine, beatLine, RP_HEADING, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, ENCOUNTER_INSTRUCTIONS, QUEST_INSTRUCTIONS, MISSION_OPEN, MISSION_CLOSE, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, endSceneText, othersBlock, strangerBlock, type OtherVoice } from './instructions';
 import { echoLine } from './echoes';
 import { habitsLine, readHabits } from './habits';
 import { parsePlan, parseSay, planKey, planSayKey, planSeenKey } from '../../shared/plan';
@@ -31,18 +32,18 @@ import { arrivalLine, greetDue } from './greet';
 import { formatClock, hhmmOf, promptClock, START, TURN_COST } from '../../shared/clock';
 import { pageLine, type Journal } from './journal';
 import type { Player } from './players';
-import { LORE_WINDOW, loreBlock, loreLogLine, mentionsKeys, type LoreSelection } from '../../shared/lore';
+import { LORE_WINDOW, loreBlock, loreLogLine, mentionsKeys, type LoreLine, type LoreSelection } from '../../shared/lore';
 import { leadsBlock, leadsLogLine, type LeadEntry, type LeadsForTurn } from '../../shared/leads';
 import { sceneBlock, WRITTEN_SCENE_TITLE } from '../../shared/scenario';
 import { moveLine } from '../../shared/arrival';
 import type { Extra } from '../../shared/extras';
-import { beatAt, beatText, isJob, ownedBy, postsOpen, mentionsFlag, chooseVariant, fillTimes, flagsOf, holds, openQuests, pickLine, stepMinutes, type CrackPick, questWaitBlock, startWait, waitDue, waitLine, type Outcome, type RunWait, questBlock, questKey, questRowText, shownChoices, type Beat, type CondCtx, type QuestEntry, type QuestRun, type QuestStatus } from '../../shared/quests';
+import { beatAt, beatAway, beatText, beatViews, fillHire, heardAt, isJob, ownedBy, postsOpen, mentionsFlag, chooseVariant, fillTimes, flagsOf, holds, openQuests, pickLine, stepMinutes, type CrackPick, questWaitBlock, startWait, waitDue, waitLine, type Outcome, type RunWait, questBlock, questKey, questRowText, shownChoices, type Beat, type CondCtx, type QuestEntry, type QuestRun, type QuestStatus } from '../../shared/quests';
 import { oneLine } from './persona';
-import { bookId, buildDebrief, clientsBlock, contractBlock, BURNER, coverCards, coveredLoss, crackLine, crackSetup, drawsFor, effectEvent, FALL_GUY, fallGuyFee, jobRunId, missionOpenBlock, missionSummary, payFor, playerKitLine, legacyRollLine, REROLL, rollLine, seedFor, STEADY, TAKE, AFTER, COST, RESIST, ARMOUR } from './mission-run';
-import { COSTS, dealCosts, picksFor, resistPrice, RESIST_CHROME_DIE, type CostId } from '../../shared/costs';
+import { boardBlock, bookId, buildDebrief, clientsBlock, contractBlock, BURNER, coverCards, coveredLoss, crackLine, crackSetup, drawsFor, effectEvent, FALL_GUY, fallGuyFee, jobRunId, missionOpenBlock, missionSummary, payFor, playerKitLine, legacyRollLine, REROLL, rollLine, seedFor, STEADY, TAKE, AFTER, COST, RESIST, ARMOUR } from './mission-run';
+import { COSTS, dealCosts, firstCost, picksFor, resistPrice, RESIST_CHROME_DIE, type CostId } from '../../shared/costs';
 import { writtenLine } from '../../shared/gm-lines';
-import { askGm, gmMessages, type GmComplete } from './gm';
-import { heatIn, outcomeTier, repDelta, repTier, TIER_NAMES, type Check, type CoverId, type Kit, type KitEvent, type Tier } from '../../shared/mission';
+import { askGm, GM_HOLD_MS, gmMessages, type GmComplete } from './gm';
+import { HEAT_MAX, heatIn, outcomeTier, repDelta, repTier, TIER_NAMES, type Check, type CoverId, type Kit, type KitEvent, type Tier } from '../../shared/mission';
 import { hashSeed, postedJobs, storyDay } from '../../shared/board';
 import { rng } from '../../shared/rng';
 import { angleFlags, contractRep, GUEST_ABILITIES, guestFlags, guestId, NIGHT_ALARM_MAX, nightAlarm, WALK_AWAY_REP } from '../../shared/contract';
@@ -53,10 +54,10 @@ import type { Deck } from '../../shared/gear';
 import { belowTier, FIREWALL, HOT_LOAD_NERVE, jobLeans, programJudge, slotsFor, type Program } from '../../shared/programs';
 import { DEFAULT_STATS } from '../../shared/stats';
 import { kitLine } from '../../shared/kit-line';
-import { afterEffect, rerunRoll, swappedCheck, ALARM_SHIFT, gambleDie, gambleFaces, gambleResult, stepRefusal, crackTake, statDice, ALARM_MAX, effectPushRefusal, fragileDies, kindResult, poolOf, POOL_MAX, PRESS_NERVE, PUSH_NERVE, resultOf, jobTakeSize, tierLine, tradeRefusal, type DiceResult, type Pool, type Effect, type Position, type PushMode, type Trade } from '../../shared/dice';
+import { afterEffect, CARRY_ON, rerunRoll, swappedCheck, ALARM_SHIFT, gambleDie, gambleFaces, gambleResult, stepRefusal, crackTake, statDice, ALARM_MAX, effectPushRefusal, fragileDies, kindResult, poolOf, POOL_MAX, PRESS_NERVE, PUSH_NERVE, resultOf, jobTakeSize, tierLine, tradeRefusal, type DiceResult, type Pool, type Effect, type Position, type PushMode, type Trade } from '../../shared/dice';
 import { abilityCard, abilityCardId, abilityEffect, abilityNerve, AGAIN_RISK, CALL_VERB, callEffect, pressed, CONTACT_BURN, CONTACT_BURN_REASON, CONTACT_VERB, contactId, crewLines, FAVOUR_BURN, FAVOUR_ON_HOLD, MAX_CONTACTS, favourFor, hardStartTake, type Setup, jobShares, lossOnAgain, MAX_PEOPLE, SPEC_STAT, type Approach, type Call, type CallEffect } from '../../shared/hand';
 import { ceilingOf, settleTake, takeOf } from './take-run';
-import { effectTagOf, isLegacyPending, isLegacyRoll, isOldRun, parseRun as parseRunOf, withGetaway, withSpring, type Choice, type DealtCost, type DicePending, type DiceRoll, type Roll, type SettledCost } from '../../shared/quests';
+import { effectTagOf, isLegacyPending, isLegacyRoll, isOldRun, parseRun as parseRunOf, withGetaway, withSpring, type Choice, type JobHire, type DealtCost, type DicePending, type DiceRoll, type Roll, type SettledCost } from '../../shared/quests';
 import { canOffer, dropTake, heatLeft, lossEvents, nextPushBeat, PRESS, PUSH_BEAT, WALK, walkValue } from './push-run';
 
 /** A turn that found no key linked (unlinked mid-session): the player relinks at select. */
@@ -87,6 +88,10 @@ export interface ChatRelayDeps {
   scheduleLine?: (clock: number) => string | null;
   /** `[city: the power is out across Karasu since 22:00]` while her room's district is dark at `clock` (blackouts phase 3 §5). */
   cityLine?: (clock: number) => string | null;
+  /** Her `[you were there: …]` line (witness lines spec §3): what she was in the room for elsewhere. Absent: none. */
+  witnessedLine?: (player: string) => string | null;
+  /** The scene behind that line, word for word (witness lines, 2026-11-06). Absent: none. */
+  witnessedScene?: (player: string) => string | null;
   /**
    * Her plan's card for `player` (her plans spec §5): a going plan that stands while she's with you, off comms;
    * null otherwise. Absent: plans don't apply.
@@ -134,8 +139,9 @@ export interface ChatRelayDeps {
   /**
    * The lore book's entries for this turn: the room's scene, and recent text (this turn's first, then older lines, newest first).
    * `force`: entries a finished papers run hands her, the bulletin's and its origins' (Papers spec §4.2).
+   * `recent` says who wrote each line, and `present` who is in the scene (lore picking spec §2, §3).
    */
-  lore?: (sceneId: string, recent: string[], force?: readonly string[]) => LoreSelection;
+  lore?: (sceneId: string, recent: readonly LoreLine[], force?: readonly string[], present?: readonly string[]) => LoreSelection;
   /**
    * Leads (spec 2026-10-12): this turn's for `player`, from `recent` (the lore window, this turn's
    * text first). `replaced`: leads the take being rewritten gave, which the new take hasn't (yet).
@@ -197,7 +203,7 @@ export interface ChatRelayDeps {
     /** The latest `until` any room's `crewTold.<player>` holds (crew spec §5's `[crew]` line); null: none told yet. */
     crewToldUntil?(): number | null;
     /** The recruit a job's `gives: recruit` card draws (crew spec §5), for the debrief's line; absent: no line. */
-    jobRecruit?(o: { runKey: string; title: string; place: string; district: string; spec: Specialty; grade: Grade }): Recruit;
+    jobRecruit?(o: { runKey: string; title: string; place: string; district: string } & JobHire): Recruit;
     /** A district's display name (the favour's line); absent: its id title-cased. */
     districtName?(id: string): string;
   };
@@ -282,6 +288,13 @@ const actedOn = (p: DicePending, rid: string): boolean => p.call?.card === rid |
 const rollFills = (q: Pick<QuestEntry, 'kind'>, run: QuestRun): boolean => scoring(q, run) && run.getaway !== true && run.push?.state !== 'playing';
 /** Whether Saw It Coming took this card back on this beat (tier 3 beat play spec §2). */
 const barredOn = (run: Pick<QuestRun, 'barred'>, beat: string, choice: string): boolean => run.barred?.beat === beat && run.barred.choice === choice;
+/** A waiting pass with nothing left to land: no ALARM or heat on the roll, and none on its route. */
+function nothingToPay(beat: Beat, run: QuestRun, p: NonNullable<QuestRun['pending']>): boolean {
+  if (isLegacyPending(p) || !p.roll.pass || p.cost.alarm > 0 || p.cost.heat > 0) return false;
+  const choice = beat.choices.find((c) => c.id === p.choice);
+  return !choice || tagsOf(choice, run.flags).alarm <= 0;
+}
+
 /** Why a gamble or a trade can't act on this roll, or null (ability pass spec §2). The picks already on it count. */
 function afterRefusal(kind: string, q: QuestEntry, run: QuestRun, p: Pick<DicePending, 'roll' | 'cost' | 'beat' | 'choice'> & Partial<DicePending>): string | null {
   const picked = (c: CostId) => (p.settled ?? []).filter((x) => x.cost === c && x.how !== 'resisted' && x.how !== 'armour' && x.how !== 'ability').length;
@@ -371,7 +384,12 @@ const scoring = (q: Pick<QuestEntry, 'kind'>, run: Pick<QuestRun, 'contract'>): 
 /** A program's refusals that mean the rest of the pick already did its work (final review I1): dropped, not refused. */
 const COVERED = new Set(['ALREADY IN THE DARK', 'ALREADY BIG']);
 
+/** A job's poster and brief, as a row of the panel carries them. */
+const filed = (q: QuestEntry) => ({ ...(q.postedBy ? { postedBy: q.postedBy } : {}), ...(q.brief ? { brief: q.brief } : {}) });
+
 export class ChatRelay {
+  /** Cost deals the GM is writing lines for, by player and roll; the value is the call that holds it. */
+  private gmWriting = new Map<string, symbol>();
   private turnActive = false;
   /**
    * A row moved the clock live and the room hasn't checked yet: it does once the row's state is written
@@ -474,7 +492,7 @@ export class ChatRelay {
   /** The leads the running turn offers her (give_lead reads them); empty when idle. */
   /** The Residual recorded a lead she told (give_lead's line, as a notice), so QUEST and any contract it opens catch up. */
   leadRecorded(player: string, title: string): void {
-    this.deps.emit({ type: 'notice', text: `// LEAD — ${title} (QUEST → LEADS)`, for: 'quest' }, player);
+    this.deps.emit({ type: 'notice', text: `// LEAD — ${title} (JOBS → LEADS)`, for: 'quest' }, player);
     this.emitQuestState(player);
   }
 
@@ -830,6 +848,7 @@ export class ChatRelay {
           active: {
             id: q.id,
             title: q.title,
+            ...(q.postedBy ? { postedBy: q.postedBy } : {}),
             beat: PUSH_BEAT,
             choices: [{ id: WALK, line: `WALK — ${walk.sol} SOL · HEAT ${walk.heat < 0 ? `−${-walk.heat}` : `+${walk.heat}`}` },...(nextPushBeat(q, p.stage) ? [{ id: PRESS, line: 'PRESS ON' }] : [])],
             ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}),
@@ -856,7 +875,7 @@ export class ChatRelay {
       // A costly roll waiting (the table spec §3): STEADY / TAKE IT; an old save's parked REROLL gets TAKE IT only.
       // A costly roll waiting (roll lifecycle spec §1): its dealt costs (the job's `costs`), no cards; one parked before
       // the deal, or an old save's REROLL, gets TAKE IT only.
-      else if (run.pending) cards = !isLegacyPending(run.pending) && run.pending.dealt ? [] : [{ id: TAKE, line: 'TAKE IT' }];
+      else if (run.pending) cards = !isLegacyPending(run.pending) && run.pending.dealt ? [] : [{ id: TAKE, line: nothingToPay(beat, run, run.pending) ? CARRY_ON : 'TAKE IT' }];
       else
         cards = shownChoices(beat, rctx).filter((c) => !barredOn(run, beat.id, c.id)).map((c) => {
           const setup = c.crack && isJob(q) ? this.crackSetupFor(status.id, beat.id, c, rctx) : null;
@@ -875,7 +894,7 @@ export class ChatRelay {
       const job = isJob(q) ? { tier: q.tier, ...(run.push?.state === 'playing' ? { pressing: true as const } : {}), ...(hand ? { hand } : {}), ...(costs ? { costs } : {}), ...(scoring(q, run) ? { take: { filled: takeOf(run, q), size: jobTakeSize(q) } } : {}), ...(run.getaway ? { getaway: true as const } : {}), alarm: run.alarm ?? 0, nerve: { left: kit?.nerveLeft ?? 0, max: kit?.nerveMax ?? 0 }, heat: rctx.heat ?? 0, pay: q.payRange ?? ([0, 0] as [number, number]), ...(run.pending ? { rolled: isLegacyPending(run.pending) ? { choice: run.pending.choice, chance: run.pending.chance, rolls: run.pending.rolls } : { choice: run.pending.choice, faces: run.pending.roll.faces, keep: run.pending.roll.keep, kind: run.pending.roll.kind, cost: run.pending.cost, ...(run.pending.roll.saved ? { saved: true as const } : {}), ...(run.pending.roll.gamble ? { gamble: run.pending.roll.gamble } : {}), ...(run.pending.roll.rerun ? { rerun: true as const } : {}), ...(run.pending.roll.lessTake ? { lessTake: run.pending.roll.lessTake } : {}), ...(run.pending.roll.missTake ? { missTake: true as const } : {}), ...(run.pending.roll.effect ? { effect: run.pending.roll.effect } : {}) } } : {}) } : {};
       return {
         ...none,
-        active: { id: q.id, title: q.title, beat: beat.id, ...(beat.song && holds(beat.songWhen ?? null, rctx) ? { song: beat.song } : {}), ...(beat.room ? { room: beat.room, ...(run.setup?.guest ? { roomGuest: run.setup.guest.id } : {}) } : {}), ...(beat.onLine ? { onLine: beat.onLine } : {}), choices: cards, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...job, ...(Object.keys(cracks).length ? { crack: cracks } : {}), ...(blown ? { blown } : {}) },
+        active: { id: q.id, title: q.title, ...(q.postedBy ? { postedBy: q.postedBy } : {}), beat: beat.id, ...(beat.song && holds(beat.songWhen ?? null, rctx) ? { song: beat.song } : {}), ...(beat.room ? { room: beat.room, ...(run.setup?.guest ? { roomGuest: run.setup.guest.id } : {}) } : {}), ...(beat.onComms ? { comms: true as const } : {}), ...(beat.onLine ? { onLine: beat.onLine } : {}), choices: cards, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...job, ...(Object.keys(cracks).length ? { crack: cracks } : {}), ...(blown ? { blown } : {}) },
       };
     }
     const quests = openQuests(
@@ -913,7 +932,7 @@ export class ChatRelay {
     const arcView = arc?.q?.contract && arcRun?.run.contract
       ? { id: arc.q.id, title: arc.q.title, ...(arc.q.art ? { art: `/api/quests/art/${arc.q.art}` } : {}), next: arcRun.run.contract.stage === 'fallout' ? "It isn't over yet." : nightLeft > 0 ? `The night is in ${Math.ceil(nightLeft / 60)}h.` : "It's tonight.", stage: arcRun.run.contract.stage, walk: arcRun.run.contract.stage === 'waiting', pieces: arc.q.contract.pieces.map((p) => ({ id: p.id, spec: p.spec, state: (crewNow?.reports?.[`${arcRun.id}:${p.id}`] ? 'back' : crewNow?.groundwork?.[arcRun.id]?.some((g) => g.piece === p.id) ? 'out' : 'open') as 'open' | 'out' | 'back' })) }
       : null;
-    return { ...none, ...(arcView ? { arc: arcView } : {}), ...(rumors.length ? { rumors } : {}), open: [...open.map((q) => ({ id: q.id, title: q.title, pitch: q.pitch, timed: q.timed, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...(gone && isJob(q) ? { locked: 'NERVE GONE — BACK AT 06:00' } : {}), ...(q.kind === 'mission' || q.kind === 'contract' ? { mission: { pay: q.pay, tier: q.tier, ...(q.payRange ? { range: q.payRange } : {}), ...crewRow(q), ...(ownedBy(q) ? { own: qs.contactName(ownedBy(q)!) } : {}), ...(q.trust ? { trust: true as const } : {}), ...(this.capped(q, player) ? { capped: qs.contactName(qs.contact) } : {}), ...(q.commsAt ? { comms: qs.placeName(q.commsAt) } : {}) } } : {}), ...(isJob(q) && (!q.contract || qs.status(player).some((s) => bookId(s.id) === q.id && nightOpen(s.run))) ? { setup: this.setupOffer(q, player) } : {}), ...(isJob(q) && q.once ? { once: true as const } : {}) })), ...tier2Rows] };
+    return { ...none, ...(arcView ? { arc: arcView } : {}), ...(rumors.length ? { rumors } : {}), open: [...open.map((q) => ({ id: q.id, title: q.title, pitch: q.pitch, ...filed(q), timed: q.timed, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...(gone && isJob(q) ? { locked: 'NERVE GONE — BACK AT 06:00' } : {}), ...(q.kind === 'mission' || q.kind === 'contract' ? { mission: { pay: q.pay, tier: q.tier, ...(q.payRange ? { range: q.payRange } : {}), ...crewRow(q), ...(ownedBy(q) ? { own: qs.contactName(ownedBy(q)!) } : {}), ...(q.trust ? { trust: true as const } : {}), ...(this.capped(q, player) ? { capped: qs.contactName(qs.contact) } : {}), ...(q.commsAt ? { comms: qs.placeName(q.commsAt) } : {}) } } : {}), ...(isJob(q) && (!q.contract || qs.status(player).some((s) => bookId(s.id) === q.id && nightOpen(s.run))) ? { setup: this.setupOffer(q, player) } : {}), ...(isJob(q) && q.once ? { once: true as const } : {}) })), ...tier2Rows] };
   }
 
   /** A job's SETUP card (the hand spec §1): its district, your tier and heat there, the favour, and the crew ready to bring. */
@@ -1205,6 +1224,7 @@ export class ChatRelay {
             id: q.id,
             title: q.title,
             pitch: q.pitch,
+            ...filed(q),
             ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}),
             ...(q.tier !== undefined ? { tier: q.tier } : {}),
             pay: q.pay,
@@ -1409,9 +1429,8 @@ export class ChatRelay {
       .sort((a, b) => b.run.at - a.run.at)
       .slice(0, 3);
     if (!done.length) return null;
-    const when = (d: number) => (today - d <= 0 ? 'tonight' : today - d === 1 ? 'last night' : today - d < 7 ? 'a few nights ago' : 'a while back');
     const how = { clean: 'went well', messy: 'got done, not cleanly', blown: 'went bad' } as const;
-    return `[done together: ${done.map(({ q, run }) => `${q.title} — ${how[this.tierOf(run)]}${this.playedHer(run) ? ', you lent a hand' : ''}, ${when(run.endDay!)}`).join('; ')}]`;
+    return `[done together: ${done.map(({ q, run }) => `${q.title} — ${how[this.tierOf(run)]}${this.playedHer(run) ? ', you lent a hand' : ''}, ${agoWords(today - run.endDay!)}`).join('; ')}]`;
   }
 
   /** One sentence on what the player carries and how hot they are (missions spec §4); null without a kit or with nothing to say. */
@@ -1464,7 +1483,7 @@ export class ChatRelay {
     const ctx = this.deps.quests?.ctx(player) ?? null;
     if (here?.wait && here.q && this.waitIntact(here.q, here.wait)) return questWaitBlock(here.q.title, waitLine(here.wait, this.deps.quests!.placeName));
     const now = this.deps.clockNow?.() ?? 0;
-    return here?.q && here.beat && ctx ? fillTimes(questBlock(here.q, { ...here.beat, choices: here.beat.choices.filter((c) => !barredOn(here.status.run, here.beat!.id, c.id)) }, this.runCtx(here.q, here.status.run, ctx, player), oneLine, shown), now) : null;
+    return here?.q && here.beat && ctx ? fillTimes(questBlock(here.q, { ...here.beat, choices: here.beat.choices.filter((c) => !barredOn(here.status.run, here.beat!.id, c.id)) }, this.runCtx(here.q, here.status.run, ctx, player), oneLine, shown, this.deps.players.resolve(player).name), now) : null;
   }
 
   /**
@@ -1480,7 +1499,11 @@ export class ChatRelay {
     // A row she doesn't answer has no note (walking away; a job's middle beats).
     if (qd.silent) return null;
     const run = qs.status(this.pid).find((s) => s.id === (qd.run ?? q.id) && s.contact === qs.contact)?.run;
-    if (qd.beat === null && !qd.waiting) return run ? `${MISSION_CLOSE}\n\n${missionSummary(q, run, qs.decks?.() ?? [], qd.debrief, this.summaryCrew(run, questKey(this.pair(), qd.run ?? q.id)))}` : MISSION_CLOSE;
+    if (qd.beat === null && !qd.waiting) {
+      if (!run) return MISSION_CLOSE;
+      const summary = missionSummary(q, run, qs.decks?.() ?? [], qd.debrief, this.summaryCrew(run, questKey(this.pair(), qd.run ?? q.id)));
+      return [MISSION_CLOSE, summary, this.lastView(q, run)].filter(Boolean).join('\n\n');
+    }
     // The first beat, before any pick: a wait-resumed beat has no pick either, but comes later.
     // A contract sets out at its night, not its offer (tier 3 contracts spec §2).
     if (!qd.pick && (q.contract ? qd.beat === 'night' : qd.beat === q.first && (run?.picks.length ?? 0) === 0)) {
@@ -1490,6 +1513,15 @@ export class ChatRelay {
       return `${MISSION_OPEN}\n\n${missionOpenBlock(q, playerKitLine(name, ctx?.stats ?? DEFAULT_STATS, carriedOn(q, ctx?.deck ?? null), ctx?.heat ?? 0), came)}`;
     }
     return null;
+  }
+
+  /** The view of the beat a job ended on: the run has no beat by its closing turn, so her [job] block is gone (Run Sheet, playtest). */
+  private lastView(q: QuestEntry, run: QuestRun): string | null {
+    const last = run.picks.filter((p) => !p.beat.startsWith('!')).at(-1);
+    const beat = last ? beatAt(q, last.beat, run.variant) : undefined;
+    const ctx = this.deps.quests?.ctx(this.pid) ?? null;
+    const views = beat && ctx ? beatViews(beat, this.runCtx(q, run, ctx, this.pid)) : '';
+    return views ? `[what you think: ${fillTimes(views, this.deps.clockNow?.() ?? 0)}]` : null;
   }
 
   /** A mission's beat between the first and the last (missions spec §3): she never answers it, so REGENERATE and RETRY don't either. */
@@ -1520,7 +1552,7 @@ export class ChatRelay {
     this.questShown.set(player, json);
     this.deps.emit({ type: 'quest_state', state }, player);
     // A rumor says so once (tier 3 contracts spec §5). Not story: a rewind doesn't take back having heard it.
-    for (const r of state.rumors ?? []) this.noticeOnce(player, `contractOffer.${player}.${r.id}`, `// A RUMOR — ${r.line} (QUEST → RUMORS)`);
+    for (const r of state.rumors ?? []) this.noticeOnce(player, `contractOffer.${player}.${r.id}`, `// A RUMOR — ${r.line} (JOBS → RUMORS)`);
   }
 
   /** A quest notice, once across the rooms: each room keeps its own db, and one built later hasn't heard. */
@@ -1689,9 +1721,9 @@ export class ChatRelay {
     // A locked Tier 2 row (Tier 2 spec §1) lists with its checklist, but doesn't start.
     if (listedRow?.checks && listedRow.locked) return 'that one is still locked';
     const q = listedRow ? (post?.q ?? this.deps.quests!.book().find((e) => e.id === id)) : undefined;
-    if (post && post.place !== this.deps.quests!.placeId()) return "that quest isn't open here";
+    if (post && post.place !== this.deps.quests!.placeId()) return "that job isn't open here";
     const ctx = this.deps.quests?.ctx(this.pid) ?? null;
-    if (!q || !ctx) return "that quest isn't open here";
+    if (!q || !ctx) return "that job isn't open here";
     // NERVE gone (the table spec §3): no new job until the next 06:00.
     if (isJob(q) && this.deps.quests?.kit?.(this.pid).nerveGone) return 'nerve gone — back at 06:00';
     // The arrangement's nights cap (spec 2026-10-20 §2): greyed in the list, refused here.
@@ -1726,7 +1758,7 @@ export class ChatRelay {
     const job: Partial<QuestRun> = mission ? { draws, alarm: hard ? 1 : 0, day, startDeck: carried?.id ?? null, ...(pay !== null ? { pay } : {}), ...(hand ? { setup: { ...hand, tier: q.tier, ...abilities, at: this.deps.clockNow?.() ?? 0, deck } } : {}), ...(loads.length ? { programs: loads.map((id) => ({ id, at: this.deps.clockNow?.() ?? 0 })) } : {}), ...(hard && hardStartTake(q.tier) > 0 ? { takeFill: hardStartTake(q.tier) } : {}), ...(post ? { spring: { recruit: post.recruit, place: post.place, tier: post.tier } } : {}) } : {};
     const rctx = this.runCtx(q, { flags, alarm: job.alarm ?? 0 } as QuestRun, ctx, this.pid);
     const chosen = chooseVariant(q, q.first, rctx);
-    if (!chosen) return "that quest isn't open here";
+    if (!chosen) return "that job isn't open here";
     const { beat, variant } = chosen;
     const drawn = this.drawFace(beat.stranger, {});
     const row = this.questRow(q, [beatText(beat, rctx)], { beat }, undefined, drawn.face, mission ? { run: runId } : {});
@@ -1737,7 +1769,7 @@ export class ChatRelay {
   private async goInContract(status: QuestStatus, setup: { approach: Approach; people: string[]; favour: boolean; contacts?: string[]; programs?: string[] }): Promise<Result | string> {
     const q = this.deps.quests!.book().find((e) => e.id === bookId(status.id));
     const ctx = this.deps.quests?.ctx(this.pid) ?? null;
-    if (!q || !ctx) return "that quest isn't open here";
+    if (!q || !ctx) return "that job isn't open here";
     if (this.deps.quests?.kit?.(this.pid).nerveGone) return 'nerve gone — back at 06:00';
     if (this.deps.quests?.status(this.pid).some((s) => s.id !== status.id && !s.run.done && s.run.beat !== null)) return 'finish what you started first';
     const checked = this.checkSetup(q, setup);
@@ -1766,7 +1798,7 @@ export class ChatRelay {
     };
     const rctx = this.runCtx(q, run0, ctx, this.pid);
     const chosen = chooseVariant(q, 'night', rctx);
-    if (!chosen) return "that quest isn't open here";
+    if (!chosen) return "that job isn't open here";
     const drawn = this.drawFace(chosen.beat.stranger, run0.faces ?? {});
     const row = this.questRow(q, [beatText(chosen.beat, rctx)], { beat: chosen.beat }, undefined, drawn.face, { run: status.id });
     return this.questTurn(row, status.id, { ...run0, beat: chosen.beat.id, variant: chosen.variant, wait: null, at: Date.now(), ...(drawn.faces ? { faces: drawn.faces } : {}) }, 0);
@@ -1967,8 +1999,9 @@ export class ChatRelay {
       const parked: DicePending = { beat: beat.id, choice: choice.id, at, roll, cost, ...(died ? { died } : {}), ...(call ? { call } : {}), ...(pressCall ? { after: [pressCall] } : {}), ...(dealt.length ? { dealt, pick, settled: [] } : {}) };
       const key = questKey(this.pair(), status.id);
       this.deps.db.setMeta(key, JSON.stringify({ ...run1, kit: [...(run1.kit ?? []), ...events], pending: parked, at: Date.now() }));
-      this.emitQuestState();
+      // The GM first, so the state that shows the costs already says it's writing.
       if (dealt.length && this.deps.gm) void this.fillGm(this.deps.gm, key, this.pid, q, beat, choice, parked, { filled, size: jobTakeSize(q) });
+      this.emitQuestState();
       return OK;
     }
     return this.landRoll({ q, beat, status, ctx, choice, line, t, roll, cost, events, died, heat, calls: played });
@@ -1984,7 +2017,7 @@ export class ChatRelay {
     const plays = r.kind === 'miss' ? choice.fail : choice.to;
     const ends = !plays || (q.outcomes.get(plays)?.to ?? 'end') === 'end';
     const can = { take: r.fills && filled > 0, next: !ends, alarm: (run.alarm ?? 0) + r.alarm < ALARM_MAX };
-    const ids = r.kind === 'cost' || r.kind === 'miss' ? dealCosts(seed, can) : [];
+    const ids = r.kind === 'cost' || r.kind === 'miss' ? dealCosts(seed, can, run.setup?.approach) : [];
     const pick = Math.max(picksFor(r.kind, r.position, ids.length), Math.min(r.atLeast ?? 0, ids.length));
     const written = this.deps.quests?.gmWritten?.() ?? {};
     return { dealt: pick > 0 ? ids.map((c) => ({ cost: c, line: writtenLine(written, c, `${seed}|${c}`), by: 'written' as const })) : [], pick, filled };
@@ -2236,8 +2269,8 @@ export class ChatRelay {
     const run: QuestRun = { ...run0, kit: [...(run0.kit ?? []), ...(nerve ? [{ at, nerve, ...(lift ? { lift } : {}) }] : [])], pending: next, at: Date.now() };
     if (kind === 'take-hit') return this.landDealt(q, beat, { ...status, run }, ctx);
     this.deps.db.setMeta(key, JSON.stringify(run));
-    this.emitQuestState();
     if (redealt && this.deps.gm) void this.fillGm(this.deps.gm, key, this.pid, q, beat, choice, next, { filled, size: jobTakeSize(q) });
+    this.emitQuestState();
     return OK;
   }
 
@@ -2255,11 +2288,14 @@ export class ChatRelay {
     const settled = p.settled ?? [];
     const why = choice?.check?.red ? 'ONE SHOT' : kit?.nerveGone ? 'NERVE GONE' : (kit?.nerveLeft ?? 0) < 1 ? 'NO NERVE' : undefined;
     const holds = Boolean(choice?.check?.grid && pool?.deck?.match === 'holds');
+    // The approach's own cost is the only first pick (approach shapes spec §1).
+    const first = settled.length === 0 ? firstCost(run.setup?.approach, p.dealt!.map((d) => d.cost)) : null;
     return {
       pick: p.pick ?? 0,
+      ...(this.gmWriting.has(`${player}|${p.at}`) ? { writing: true as const } : {}),
       dealt: p.dealt!.map((d) => {
         const x = settled.find((y) => y.cost === d.cost);
-        return { cost: d.cost, tag: COSTS[d.cost].tag, line: d.line, by: d.by, picked: Boolean(x), ...(x?.how ? { settled: x.how } : {}), ...(x?.faces ? { faces: x.faces } : {}), ...(x?.nerve !== undefined ? { nerve: x.nerve } : {}) };
+        return { cost: d.cost, tag: COSTS[d.cost].tag, line: d.line, by: d.by, picked: Boolean(x), ...(d.cost === first ? { first: true as const } : {}), ...(x?.how ? { settled: x.how } : {}), ...(x?.faces ? { faces: x.faces } : {}), ...(x?.nerve !== undefined ? { nerve: x.nerve } : {}) };
       }),
       resist: { dice: statDice((ctx.stats ?? DEFAULT_STATS).edge) + (choice?.check?.grid && pool?.deck?.chrome ? RESIST_CHROME_DIE : 0), ok: why === undefined, ...(why ? { why } : {}) },
       armour: run.setup?.deck && !isOldRun(run) ? (choice?.check?.red ? { ok: false, left: 0 } : this.firewallView(run, run.setup.deck)) : { ok: holds && !run.armourUsed, left: holds && !run.armourUsed ? 1 : 0 },
@@ -2300,6 +2336,9 @@ export class ChatRelay {
       if (!id || !p.dealt!.some((d) => d.cost === id)) return "that cost isn't dealt";
       if (settled.some((x) => x.cost === id)) return 'already picked';
       if (settled.length >= (p.pick ?? 0)) return 'pick no more';
+      // Nothing lands on the deal itself: AFTER A ROLL abilities and gambles need a roll with nothing picked yet.
+      const first = settled.length === 0 ? firstCost(run0.setup?.approach, p.dealt!.map((d) => d.cost)) : null;
+      if (first && first !== id) return `pick ${COSTS[first].tag} first`;
       // Stand Firm (tier 3 beat play spec §2): the first cost picked on a roll is gone.
       const firm = run0.firm && settled.length === 0;
       return write({ ...run0, pending: { ...p, settled: [...settled, { cost: id, ...(firm ? { how: 'ability' as const } : {}) }] }, at: Date.now() });
@@ -2360,20 +2399,33 @@ export class ChatRelay {
 
   /**
    * The GM's lines for a parked roll's dealt costs (roll lifecycle spec §1.4). They replace written lines on costs not
-   * yet picked, if the same roll is still waiting; a pick keeps the line it showed.
+   * yet picked, if the same roll is still waiting; a pick keeps the line it showed. `writing` holds the cards' lines back
+   * meanwhile, up to GM_HOLD_MS; a later answer is dropped, so a line never changes once it shows.
    */
   private async fillGm(gm: GmComplete, key: string, player: string, q: QuestEntry, beat: Beat, choice: Choice, parked: DicePending, take: { filled: number; size: number }): Promise<void> {
+    const tag = `${player}|${parked.at}`;
+    const me = Symbol(tag);
+    this.gmWriting.set(tag, me);
+    const done = () => {
+      if (this.gmWriting.get(tag) !== me) return;
+      this.gmWriting.delete(tag);
+      this.emitQuestState(player);
+    };
+    const hold = setTimeout(done, GM_HOLD_MS);
     const costs = parked.dealt!.map((d) => d.cost);
     const msgs = gmMessages({ title: q.title, beat: beat.text, choice: choice.line, kind: parked.roll.kind === 'miss' ? 'miss' : 'cost', position: parked.roll.position, loot: q.loot ?? q.pitch ?? q.title, take, costs });
     const lines = await askGm(gm, msgs, costs, (text) => this.deps.emit({ type: 'dev_log', level: 'info', text }, player));
-    if (Object.keys(lines).length === 0) return;
+    clearTimeout(hold);
+    // Past the hold, or a redeal took over: the written lines are up, or the deal is another one's.
+    if (this.gmWriting.get(tag) !== me) return;
     const run = parseRunOf(this.deps.db.getMeta(key));
     const p = run?.pending;
-    if (!run || !p || isLegacyPending(p) || !p.dealt || p.beat !== parked.beat || p.choice !== parked.choice || p.at !== parked.at || p.roll.faces.join() !== parked.roll.faces.join()) return;
-    const picked = new Set((p.settled ?? []).map((x) => x.cost));
-    const dealt = p.dealt.map((d) => (!picked.has(d.cost) && lines[d.cost] ? { ...d, line: lines[d.cost]!, by: 'gm' as const } : d));
-    this.deps.db.setMeta(key, JSON.stringify({ ...run, pending: { ...p, dealt } }));
-    this.emitQuestState(player);
+    if (Object.keys(lines).length > 0 && run && p && !isLegacyPending(p) && p.dealt && p.beat === parked.beat && p.choice === parked.choice && p.at === parked.at && p.roll.faces.join() === parked.roll.faces.join()) {
+      const picked = new Set((p.settled ?? []).map((x) => x.cost));
+      const dealt = p.dealt.map((d) => (!picked.has(d.cost) && lines[d.cost] ? { ...d, line: lines[d.cost]!, by: 'gm' as const } : d));
+      this.deps.db.setMeta(key, JSON.stringify({ ...run, pending: { ...p, dealt } }));
+    }
+    done();
   }
 
   /** The run's calls, with a parked roll's card and its AFTER A ROLL presses (they're written when it lands). */
@@ -2692,9 +2744,11 @@ export class ChatRelay {
       return this.questTurn(row, status.id, { ...run, ...pushed, beat: 'getaway', variant: chosen.variant, wait: null, done: false, getaway: true }, cost, false, 0);
     }
     if (!step.run.done) {
-      const played = await this.questTurn(this.questRow(q, texts, step, o.pick, drawn.face, { run: status.id }), status.id, run, cost, false, 0);
-      // A contract's pick back to its wait is silent, so no turn ends to bring what's due: the next report, or the night.
-      if (run.contract && run.wait) await this.playDueQuest(this.pid);
+      // A contract's pick back to its wait closes the table with nothing after it, so she answers it (playtest).
+      const backToWait = Boolean(run.contract && run.wait);
+      const played = await this.questTurn(this.questRow(q, texts, step, o.pick, drawn.face, { run: status.id }), status.id, run, cost, backToWait, 0);
+      // Her turn's end doesn't play what's due from here: the next report, or the night.
+      if (backToWait) await this.playDueQuest(this.pid);
       return played;
     }
     // Pressing on (spec §1): a push beat's outcome wins into the pot or loses it; a job's take brings up the card.
@@ -2935,7 +2989,11 @@ export class ChatRelay {
     const moved = preview && preview.moved !== 0 ? (preview.moved > 0 ? 'up' : 'down') : undefined;
     // The debrief's sol is the job's own; the retainer has its own line.
     const deckAt = run.setup?.deck?.id ? ((this.deps.quests?.decks?.() ?? []).find((d) => d.id === run.setup!.deck!.id) ?? null) : null;
-    const debrief = buildDebrief({ q, run: { ...done, kit: [...(run.kit ?? []), ...extra] }, tier, district, before, delta, cover, programs: this.deps.quests?.programs?.() ?? [], deck: deckAt, ...(trustLine !== undefined ? { trust: trustLine } : {}), ...(moved ? { trustMoved: moved } : {}) });
+    // The district's heat once this job lands: what's there now, what the end adds, what the crew's traits add.
+    const crewHeat = this.crewHeat(run, tier, questKey(this.pair(), runId));
+    const heatNow = this.deps.quests?.kit?.(player).heat?.[district] ?? 0;
+    const heatAfter = Math.min(HEAT_MAX, Math.max(0, heatNow + extra.reduce((n, e) => n + (e.heat ?? 0), 0) + crewHeat));
+    const debrief = buildDebrief({ q, run: { ...done, kit: [...(run.kit ?? []), ...extra] }, tier, district, before, delta, cover, programs: this.deps.quests?.programs?.() ?? [], deck: deckAt, heat: { after: heatAfter, cooled: cooled.length, crew: crewHeat }, ...(trustLine !== undefined ? { trust: trustLine } : {}), ...(moved ? { trustMoved: moved } : {}) });
     if (cut > 0) debrief.cut = { name: qs!.contactName(qs!.contact), pct: deal!.a.cut, amount: cut };
     if (q.drops && tier !== 'blown') debrief.loot = { label: q.drops.toUpperCase(), ...((qs?.crewState?.()?.stash?.length ?? 0) >= STASH_MAX ? { lost: true as const } : {}) };
     const crew = this.debriefCrew(run, questKey(this.pair(), runId));
@@ -2947,13 +3005,46 @@ export class ChatRelay {
     const recruit = q.outcomes.get(end.outcome)?.effects.recruit;
     if (recruit) {
       done.recruit = recruit;
-      const r = qs?.jobRecruit?.({ runKey: questKey(this.pair(), runId), title: q.title, place: q.starts, district, spec: recruit.spec, grade: recruit.grade });
+      const r = this.drawHire(q, runId, recruit);
       // On a full roster HIRE will say no: the line says so now.
       const view = qs?.crewView?.() ?? null;
       const full = view !== null && view.used >= view.slots;
-      if (r) debrief.recruit = `RECRUIT · ${r.name.toUpperCase()} WANTS IN${full ? ' · NO FREE SLOT' : ''}`;
+      const place = (qs?.placeName(q.starts) ?? q.starts).toUpperCase();
+      if (r) debrief.recruit = `RECRUIT · ${r.name.toUpperCase()} · ${full ? `AT ${place} UNTIL 06:00 · NO FREE SLOT` : `FREE AT ${place} UNTIL 06:00`}`;
     }
+    // Outfits as rewards: what the ending opens, under the recruit's line.
+    const outfit = q.outcomes.get(end.outcome)?.effects.outfit;
+    if (outfit) debrief.outfit = this.outfitLine(outfit);
     return { done, debrief };
+  }
+
+  /** `OUTFIT · HICKS · TIE`: the debrief's line for an outfit an ending gives. */
+  private outfitLine(o: { who: string; name: string }): string {
+    return `OUTFIT · ${(this.deps.quests?.contactName(o.who) ?? o.who).toUpperCase()} · ${o.name.toUpperCase()}`;
+  }
+
+  /** Who a job's `gives: recruit` draws (crew spec §5), the one its card will show; null with no draw to hand. */
+  private drawHire(q: QuestEntry, runId: string, gift: JobHire): Recruit | null {
+    return this.deps.quests?.jobRecruit?.({ ...gift, runKey: questKey(this.pair(), runId), title: q.title, place: q.starts, district: this.districtOf(q) ?? 'unknown' }) ?? null;
+  }
+
+  /** A row's text with `{hire}` as the name on the card its ending leaves. */
+  private hireNamed(q: QuestEntry, text: string, runId: string | undefined): string {
+    if (!text.includes('{hire}')) return text;
+    const gift = [...q.outcomes.values()].find((o) => o.effects.recruit && text.includes(o.text))?.effects.recruit;
+    return fillHire(text, gift && runId ? (this.drawHire(q, runId, gift)?.name ?? null) : null);
+  }
+
+  /** The heat crew traits add on a messy job, as the crew fold will land it. Hidden traits count; the debrief names no one. */
+  private crewHeat(run: QuestRun, tier: Tier, key: string): number {
+    if (!run.setup || tier !== 'messy') return 0;
+    const members = this.deps.quests?.crewState?.()?.members ?? [];
+    const traits = this.deps.quests?.crewTraits?.() ?? [];
+    const recruits = members.map((m) => ({ id: m.recruit.id, spec: m.recruit.spec, traits: m.recruit.traits.flatMap((t) => traits.filter((x) => x.id === t)), goneUsed: m.goneUsed }));
+    return jobShares({ setup: run.setup, calls: run.calls ?? [], tier, seed: key, recruits, getOut: run.getaway === true })
+      .filter((s) => s.kind === 'messy')
+      .flatMap((s) => recruits.find((r) => r.id === s.rid)?.traits ?? [])
+      .reduce((n, t) => n + (t.effect.kind === 'heat-on-messy' ? t.effect.n : 0), 0);
   }
 
   /** The debrief's crew lines (the hand spec §4): drawn as the crew fold draws them, from the run's key. */
@@ -3042,12 +3133,16 @@ export class ChatRelay {
     const step = this.followOutcome(q, outcome, { ...ctx, flags: { ...ctx.flags, ...flags } }, clock, status.run);
     const effect = effectEvent({ ...outcome.effects, heat: undefined }, clock, { pay: null, district: this.districtOf(q) });
     const pick = { choice: choice.id, line };
-    const row = this.questRow(q, [line, ...step.texts], step, pick, undefined, { run: status.id });
+    // Outfits as rewards: no debrief here, so the end card shows what the ending opened.
+    const outfit = outcome.effects.outfit && step.run.done ? outcome.effects.outfit : null;
+    const row = this.questRow(q, [line, ...step.texts], step, pick, undefined, { run: status.id, ...(outfit ? { rewards: [this.outfitLine(outfit)] } : {}) });
     // A recruit's card goes up when the contract closes, so `gives: recruit` works here or on the night's end.
     const recruit = outcome.effects.recruit;
     const closed = step.run.done && status.run.contract ? { contract: { ...status.run.contract, closedAt: clock } } : {};
     // A fallout has no debrief to show the card, so it says so here.
     if (recruit && step.run.done) this.deps.emit({ type: 'notice', text: `// SOMEONE WANTS WORK — at ${this.deps.quests?.placeName(q.starts) ?? q.starts} until 06:00 (CREW → HIRE)`, for: 'quest' }, this.pair());
+    // The kit event below opens it; the notice says where to wear it (yours on YOU, a contact's on PEOPLE).
+    if (outfit) this.deps.emit({ type: 'notice', text: `// NEW ${this.outfitLine(outfit)} (${outfit.who === this.pair() ? 'YOU' : 'PEOPLE'} → WARDROBE)`, for: 'quest' }, this.pair());
     const run: QuestRun = { ...status.run, ...step.run, ...closed, ...(recruit ? { recruit } : {}), flags, picks: [...status.run.picks, { beat: beat.id, choice: choice.id }], ...(effect ? { kit: [...(status.run.kit ?? []), effect] } : {}), at: Date.now() };
     return this.questTurn(row, status.id, run, minutes, !step.run.done);
   }
@@ -3101,11 +3196,11 @@ export class ChatRelay {
   }
 
   /** A quest row: the shown texts, and the snapshot of where it left the quest. */
-  private questRow(q: QuestEntry, texts: string[], step: { beat: Beat | null; run?: Pick<QuestRun, 'wait'> }, pick?: { choice: string; line: string; roll?: Roll }, face?: string, job: Pick<NonNullable<ChatMessage['quest']>, 'run' | 'debrief'> = {}): ChatMessage {
+  private questRow(q: QuestEntry, texts: string[], step: { beat: Beat | null; run?: Pick<QuestRun, 'wait'> }, pick?: { choice: string; line: string; roll?: Roll }, face?: string, job: Pick<NonNullable<ChatMessage['quest']>, 'run' | 'debrief' | 'rewards'> = {}): ChatMessage {
     return {
       id: crypto.randomUUID(),
       role: 'user',
-      text: texts.filter((t) => t !== '').join('\n\n'),
+      text: this.hireNamed(q, texts.filter((t) => t !== '').join('\n\n'), job.run),
       toolLines: [],
       ts: Date.now(),
       status: 'ok',
@@ -3116,6 +3211,7 @@ export class ChatRelay {
         beat: step.beat?.id ?? null,
         ...(pick ? { pick } : {}),
         ...(step.run?.wait ? { waiting: true as const } : {}),
+        ...(step.beat && beatAway(step.beat) ? { heard: heardAt(step.beat, pick?.line) } : {}),
         ...(step.beat?.stranger ? { stranger: { name: step.beat.stranger.name, voice: step.beat.stranger.voice, ...(face ? { face } : {}) } } : {}),
         ...job,
       },
@@ -3755,13 +3851,16 @@ export class ChatRelay {
     const { journal, db } = this.deps;
     const kit = this.kitLineFor(player);
     const job = this.jobLineFor();
+    const board = userMessage.mode !== 'ooc' && userMessage.mode !== 'end' ? this.boardLineFor(player.name) : null;
     const jobsWith = this.jobsWithLine();
     // In character only, like the lights line: no client pitched in an OOC aside or an END SCENE recap.
     const inCharacter = userMessage.mode !== 'ooc' && userMessage.mode !== 'end';
     const clients = inCharacter ? this.clientsLineFor() : null;
     const deal = inCharacter ? this.arrangementNow() : null;
     const arrangement = deal ? arrangementLine({ player: player.name, ...deal }) : null;
-    const you = [player.line, kit, jobsWith, ...this.settledLines(), job, clients, arrangement].filter((x): x is string => Boolean(x)).join('\n') || null;
+    const witnessed = inCharacter ? (this.deps.witnessedLine?.(player.id) ?? null) : null;
+    const witnessedScene = inCharacter ? (this.deps.witnessedScene?.(player.id) ?? null) : null;
+    const you = [player.line, kit, jobsWith, witnessed, witnessedScene, ...this.settledLines(), job, board, clients, arrangement].filter((x): x is string => Boolean(x)).join('\n') || null;
     // On comms you didn't arrive together, and walking back to her she greets you (comms review I4): no TRAVEL_LINE for either.
     const commsTravel = userMessage.mode === 'travel' && (this.commsNow(this.pid)?.on === true || this.hungUpBy(userMessage.id));
     const arrival = userMessage.mode === 'greet' ? this.arrival(userMessage) : userMessage.mode === 'travel' && !commsTravel ? TRAVEL_LINE : null;
@@ -3959,6 +4058,17 @@ export class ChatRelay {
     return arc?.run.contract && con ? contractBlock({ title: con.title, stage: arc.run.contract.stage, left: (arc.run.contract.wait?.from ?? 0) - (this.deps.clockNow?.() ?? 0), found: Object.keys(arc.run.contract.results), grade: (arc.run.flags.grade as Tier | undefined) ?? null }) : null;
   }
 
+  /** Her [board] block: while a job runs here, what its file says and who knows it. A contract has her [job] block instead. */
+  private boardLineFor(player: string): string | null {
+    const qs = this.deps.quests;
+    if (!qs) return null;
+    const s = qs.status(this.pid).find((x) => x.contact === qs.contact && !x.run.done && !x.run.contract);
+    const file = s && qs.book().find((e) => e.id === bookId(s.id));
+    const q = file && this.asRun(file, s.run);
+    // `kind`, not `run.contract`: a contract's run has none until its offer ends.
+    return q && q.kind === 'mission' && (q.postedBy || q.brief) ? boardBlock({ title: q.title, postedBy: q.postedBy ?? null, brief: q.brief ?? null, player, knows: ownedBy(q) === qs.contact ? 'own' : q.knownBy?.includes(qs.contact) ? 'heard' : null }) : null;
+  }
+
   /** The pair's opening scene while it's on: its scene row, with no END SCENE after it but the one this turn answers. */
   private openingScene(userMessage: ChatMessage, all: ChatMessage[]): ChatMessage | null {
     const at = all.findIndex((m) => m.mode === 'scene');
@@ -3975,17 +4085,23 @@ export class ChatRelay {
   /**
    * Text for choosing lore: this turn's (when there is one), then up to LORE_WINDOW older lines of
    * this pair, newest first, then the opening scene's text while it's on (never once it has ended).
+   * Each says who wrote it: yours, or hers; the opening scene's counts as yours, as it sets the scene for both.
    */
-  private loreRecent(userMessage: ChatMessage, turnText: string | null, scene: ChatMessage | null): string[] {
+  private loreRecent(userMessage: ChatMessage, turnText: string | null, scene: ChatMessage | null): LoreLine[] {
     const older = this.deps.db
       .recentMessages(this.pair(), LORE_WINDOW + 2, 'scene')
       // Not this turn's own line, and not the take a regenerate replaces (the model never sees it either).
       .filter((m) => m.id !== userMessage.id && !(this.target.kind === 'take' && m.id === this.target.reply.id) && m.text !== '' && m.mode !== 'scene')
-      .map((m) => m.text)
+      .map((m): LoreLine => ({ text: m.text, by: m.role === 'user' ? 'you' : 'them' }))
       .reverse()
       .slice(0, LORE_WINDOW);
-    const recent = turnText !== null && turnText !== '' ? [turnText, ...older] : older;
-    return scene ? [...recent, scene.text] : recent;
+    const recent: LoreLine[] = turnText !== null && turnText !== '' ? [{ text: turnText, by: 'you' }, ...older] : older;
+    return scene ? [...recent, { text: scene.text, by: 'you' }] : recent;
+  }
+
+  /** Who is in the scene, for lore (spec §2): her and the turn's player. A scene adds its others; a text has none. */
+  private lorePresent(player: string): string[] {
+    return [this.deps.self?.().name ?? this.deps.agentName, player].filter((n): n is string => typeof n === 'string' && n !== '');
   }
 
   /** The `[arrival: …]` line for a greeting: measured from the line before her greet row. */
@@ -4013,11 +4129,12 @@ export class ChatRelay {
     const older = db
       .recentMessages(this.pair(), LORE_WINDOW + 2, 'text')
       .filter((m) => m.id !== userMessage.id && !(this.target.kind === 'take' && m.id === this.target.reply.id) && m.text !== '')
-      .map((m) => m.text)
+      .map((m): LoreLine => ({ text: m.text, by: m.role === 'user' ? 'you' : 'them' }))
       .reverse()
       .slice(0, LORE_WINDOW);
-    const recentText = [userMessage.text, ...older];
-    const lore = this.deps.lore ? this.deps.lore(this.deps.room.state.sceneId, recentText) : null;
+    const recentLines: LoreLine[] = [{ text: userMessage.text, by: 'you' }, ...older];
+    const recentText = recentLines.map((l) => l.text);
+    const lore = this.deps.lore ? this.deps.lore(this.deps.room.state.sceneId, recentLines, undefined, this.lorePresent(player.name)) : null;
     const loreText = lore ? loreBlock(lore.picks.map((p) => p.entry)) : null;
     const standingText = this.deps.standing?.(player.id, null) ?? null;
     // Photos spec §3: the ones that fit her now, read fresh each turn (a REGEN or EDIT too).
@@ -4070,7 +4187,7 @@ export class ChatRelay {
             : userMessage.mode === 'encounter'
               ? ENCOUNTER_INSTRUCTIONS
               : userMessage.mode === 'quest'
-                ? (this.missionNote(userMessage) ?? QUEST_INSTRUCTIONS)
+                ? `${this.missionNote(userMessage) ?? QUEST_INSTRUCTIONS}\n\n${whoIsYou((this.turnPlayer ?? this.deps.players.resolve(this.pair())).name)}`
               : userMessage.mode === 'gig'
                 ? GIG_INSTRUCTIONS
                 : userMessage.mode === 'dice'
@@ -4101,17 +4218,19 @@ export class ChatRelay {
           : userMessage.mode === 'encounter'
             ? encounterText({ title: userMessage.encounter?.title ?? '', text: userMessage.text }, oneLine)
             : userMessage.mode === 'quest'
-              ? questRowText({ title: userMessage.quest?.title ?? '', text: userMessage.text, run: userMessage.quest?.run }, oneLine)
+              ? questRowText({ title: userMessage.quest?.title ?? '', text: userMessage.text, run: userMessage.quest?.run, heard: userMessage.quest?.heard }, oneLine, player.name)
             : userMessage.mode === 'gig' && userMessage.gig
               ? gigText(userMessage.gig)
               : userMessage.mode === 'dice' && userMessage.dice
                 ? diceText(userMessage.dice)
                 : userMessage.text;
     // The lore for this room and what was just said: her identity, then the book's block.
-    const recentText = this.loreRecent(userMessage, target.kind === 'continue' ? null : turnText, scene);
+    const recentLines = this.loreRecent(userMessage, target.kind === 'continue' ? null : turnText, scene);
+    const recentText = recentLines.map((l) => l.text);
     const papers = userMessage.mode === 'gig' ? userMessage.gig?.papers : undefined;
     const force = papers ? [...new Set([...papers.bulletin.map((b) => b.lore), ...(papers.extraLore ?? [])])] : null;
-    const lore = this.deps.lore ? (force ? this.deps.lore(room.state.sceneId, recentText, force) : this.deps.lore(room.state.sceneId, recentText)) : null;
+    // Present (spec §2): her, the player and the turn's own others (none out of character), as the [others] line has them.
+    const lore = this.deps.lore ? this.deps.lore(room.state.sceneId, recentLines, force ?? undefined, [...this.lorePresent(player.name), ...others.map((o) => o.name)]) : null;
     if (lore) emit({ type: 'dev_log', level: 'info', text: loreLogLine(lore) });
     const loreText = lore ? loreBlock(lore.picks.map((p) => p.entry)) : null;
     // Leads (in character only): what's on her mind, what she could give, and what you hold that points to her.
@@ -4159,7 +4278,7 @@ export class ChatRelay {
             text: turnText,
             blocks,
           };
-    return buildMessages({ instructions, history: this.turnHistory(userMessage), turn, summary: readSummary(db, this.pair()) });
+    return buildMessages({ instructions, history: this.turnHistory(userMessage), turn, summary: readSummary(db, this.pair()), player: player.name });
   }
 
   private async consumeStream(userMessage: ChatMessage, model: ModelPair | null): Promise<Result> {

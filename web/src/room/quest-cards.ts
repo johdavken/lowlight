@@ -41,7 +41,10 @@ export interface QuestCards {
   /** The cards for the beat here, under its written text (`story`: the latest quest row's, without your pick line). */
   show(active: Active | null, story?: string): void;
   /** The quest just ended: its last text, no cards, until closed; a job's debrief under it. */
-  end(title: string, story: string, job?: { debrief: Debrief; cue(name: 'clean' | 'messy' | 'blown'): void; reduced: boolean }): void;
+  /** `rewards`: what an ending with no debrief gave (a contract's fallout), a line each under the story. */
+  end(title: string, story: string, job?: { debrief: Debrief; cue(name: 'clean' | 'messy' | 'blown'): void; reduced: boolean }, rewards?: string[]): void;
+  /** A pick's outcome as the job goes back to its wait: the end's panel, until closed, with nothing ended. */
+  outcome(title: string, story: string): void;
   /** The quest here waits for its next beat (quest waits spec §4): what to do, where, from and by when; `now` is the story clock. */
   waiting(w: Waiting | null, now: number | null, story?: string): void;
   /** The story clock moved: the countdown follows. */
@@ -117,6 +120,8 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
   /** PUSH is on for the next checked card (the table spec §3). */
   let pushOn = false;
   let ended: string | null = null;
+  /** The panel is a pick's outcome, not an ending. */
+  let outcome = false;
   /** The ended job's debrief card, built once (its stamp cue and count-up play once). */
   let debrief: HTMLElement | null = null;
   let lit: { choice: string; text: string } | null = null;
@@ -180,7 +185,7 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
         render();
       };
       const head = headOf(ended);
-      head.append(el('span', 'qc-end', 'THE END'), close);
+      head.append(...(outcome ? [] : [el('span', 'qc-end', 'THE END')]), close);
       host.append(head);
       if (story) host.append(storyEl(story));
       if (debrief) host.append(debrief);
@@ -294,12 +299,23 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
       lit = null;
       render();
     },
-    end(title, s, job) {
+    outcome(title, s) {
       active = null;
       waiting = null;
       ended = title;
+      outcome = true;
       story = s;
-      debrief = job ? debriefEl(job.debrief, job) : null;
+      debrief = null;
+      lit = null;
+      render();
+    },
+    end(title, s, job, rewards) {
+      active = null;
+      waiting = null;
+      ended = title;
+      outcome = false;
+      story = s;
+      debrief = job ? debriefEl(job.debrief, job) : rewardsEl(rewards ?? []);
       lit = null;
       render();
     },
@@ -332,10 +348,29 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
 }
 
 /** The newest quest row of yours (the room's story so far): its title, its written text without your pick line, and whether it ended the quest. */
-export function latestQuestStory(rows: readonly ChatMessage[]): { id: string; title: string; text: string; ended: boolean } | null {
+/** A pick that left the beat for a wait with no panel of its own: its outcome has nowhere else to stand, since beats stay out of the box. */
+export function backToWait(prev: { active: unknown } | null, next: { active: unknown; waiting: unknown }, story: { id: string; ended: boolean } | null, shown: string | null): boolean {
+  return Boolean(prev?.active) && !next.active && !next.waiting && story !== null && !story.ended && story.id !== shown;
+}
+
+/** What an ending with no debrief gave, a line each as the debrief writes a recruit; null with nothing. */
+function rewardsEl(rewards: readonly string[]): HTMLElement | null {
+  if (rewards.length === 0) return null;
+  const box = document.createElement('div');
+  box.className = 'qc-rewards';
+  for (const r of rewards) {
+    const line = document.createElement('div');
+    line.className = 'db-recruit db-outfit';
+    line.textContent = r;
+    box.append(line);
+  }
+  return box;
+}
+
+export function latestQuestStory(rows: readonly ChatMessage[]): { id: string; title: string; text: string; ended: boolean; rewards?: string[] } | null {
   const m = rows.findLast((r) => r.role === 'user' && r.mode === 'quest' && r.quest);
   if (!m?.quest) return null;
   const pick = m.quest.pick?.line;
   const text = pick && m.text.startsWith(pick) ? m.text.slice(pick.length).replace(/^\n+/, '') : m.text;
-  return { id: m.id, title: m.quest.title, text, ended: m.quest.beat === null && m.quest.waiting !== true };
+  return { id: m.id, title: m.quest.title, text, ended: m.quest.beat === null && m.quest.waiting !== true, ...(m.quest.rewards?.length ? { rewards: m.quest.rewards } : {}) };
 }

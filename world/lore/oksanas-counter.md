@@ -1,6 +1,7 @@
 ---
 title: Oksana's
 category: Places
+section: The Spine
 keys: [Oksana, Oksana's, Oksana's counter]
 districts: [spine]
 places: [oksanas-counter]

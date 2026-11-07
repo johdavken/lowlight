@@ -1,6 +1,7 @@
 ---
 title: Scoma
 category: Factions
+section: Gangs
 keys: [Scoma, Soma scams, knockoff stims, fake stims, stim dealers]
 districts: [strand]
 places: []

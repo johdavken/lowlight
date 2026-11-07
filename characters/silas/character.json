@@ -26,7 +26,8 @@
   "selectExpression": "smile",
   "sprite": {
     "src": "silas-outfit-outdoors.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.431
   },
   "expressions": {
     "smile": "silas-smile.png",

@@ -1,6 +1,7 @@
 ---
 title: The OhhCee's
 category: Factions
+section: Gangs
 keys: [OhhCee's, OhhCees, OC, overclocked, the overclocked, off script, chrome gang]
 districts: []
 places: []

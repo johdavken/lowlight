@@ -18,6 +18,7 @@ import { WeatherSystem } from './weather';
 import { weatherBoundsFor, weatherLightsFor } from './weather-frame';
 import { drawArea, isMasked, maskFor } from './weather-mask';
 import { EffectsLayer, type EffectsArt, type EffectsState, type Strike } from './effects';
+import { FrameCounter } from './frame-counter';
 
 export interface Renderer {
   /** `base` is where the scene's pack is served (default '/scenes/'). */
@@ -35,6 +36,8 @@ export interface Renderer {
   setPaused(paused: boolean): void;
   /** Caps the frame rate; 0 = uncapped. */
   setMaxFps(fps: number): void;
+  /** The cap in force; 0 means none. */
+  maxFps(): number;
   /** Called on each lightning strike in the current room (the sound plays the thunder). */
   onStrike(fn: (s: Strike) => void): void;
   /** The room's light at a point on screen (CSS px), from what was shaded last frame; null before a room state is shaded. */
@@ -133,6 +136,7 @@ export class PixiRenderer implements Renderer {
   private mouseTarget = { x: 0, y: 0 };
   private mouse = { x: 0, y: 0 };
   private t = 0;
+  private readonly frames = new FrameCounter();
   private readonly lighting = new LightingFilter();
   /** The canvas view's fit from the last resize (device px), for mapping screen points into the room. */
   private viewFit = { scale: 1, x: 0, y: 0, dpr: 1 };
@@ -208,7 +212,10 @@ export class PixiRenderer implements Renderer {
       this.mouseTarget.x = 0;
       this.mouseTarget.y = 0;
     });
-    app.ticker.add((ticker) => this.frame(ticker.deltaMS / 1000));
+    app.ticker.add((ticker) => {
+      this.frames.drew(performance.now());
+      this.frame(ticker.deltaMS / 1000);
+    });
   }
 
   async loadScene(scene: SceneDef, base = '/scenes/'): Promise<void> {
@@ -290,6 +297,10 @@ export class PixiRenderer implements Renderer {
     this.app.ticker.maxFPS = fps;
   }
 
+  maxFps(): number {
+    return this.app.ticker.maxFPS;
+  }
+
   time(): number {
     return this.t;
   }
@@ -333,7 +344,7 @@ export class PixiRenderer implements Renderer {
   }
 
   fps(): number {
-    return this.app.ticker.FPS;
+    return this.frames.rate(performance.now());
   }
 
   /** True if more than 5% of the scene render texture's pixels are not black (test hook). */

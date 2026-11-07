@@ -5,6 +5,7 @@
  * graft-results.html D) the same node reads as the bag picture, the sums and the crew's cards (table.css); the rolls go
  * to the JOB column (`debriefRolls`).
  */
+import { heatEffects, WARY_HEAT } from '../../../shared/heat';
 import { repTier, TIER_NAMES } from '../../../shared/mission';
 import type { Debrief } from '../../../shared/types';
 import { face } from './crew-ui';
@@ -20,6 +21,20 @@ const el = (tag: string, cls: string, text?: string) => {
 };
 const upper = (id: string) => id.replace(/-/g, ' ').toUpperCase();
 const signed = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`);
+
+/** The heat a job left, where it came from, and what the district's heat now does. An older debrief has the total alone. */
+function heatLines(d: Debrief): HTMLElement[] {
+  const { district, delta, after, parts } = d.heat;
+  const total = el('div', 'db-heat', `HEAT ${upper(district)} ${signed(delta)}${after === undefined ? '' : ` → ${after}`}`);
+  if (after === undefined || !parts) return [total];
+  const effects = heatEffects(after);
+  const cools = `COOLS ${repTier(d.rep.after)} AT 06:00`;
+  return [
+    total,
+    el('div', 'db-heat-why', parts.map((p) => `${p.label} ${signed(p.n)}`).join(' · ')),
+    el('div', 'db-heat-now', [...(effects.length ? effects : [`NO PENALTY UNTIL ${WARY_HEAT}`]), cools].join(' · ')),
+  ];
+}
 
 /** One check's line: `TECH 74% · 91 no · 40 clean`, or a crack's `CRACK · 2 TRIES USED · ACCESS GRANTED`. */
 const KIND_WORD = { crit: 'CRIT', clean: 'CLEAN', cost: 'COST', miss: 'MISS' } as const;
@@ -139,6 +154,7 @@ export function debriefEl(d: Debrief, o: { cue(name: 'clean' | 'messy' | 'blown'
   if (d.crew?.length) row.append(crewEl(d));
   // gives: recruit (crew spec §5): someone from the job wants in.
   if (d.recruit) row.append(el('div', 'db-recruit', d.recruit));
+  if (d.outfit) row.append(el('div', 'db-recruit db-outfit', d.outfit));
   // Programs that ran (programs spec §2.5): a line each.
   if (d.programs?.length) {
     const list = el('div', 'db-programs');
@@ -184,7 +200,7 @@ export function debriefEl(d: Debrief, o: { cue(name: 'clean' | 'messy' | 'blown'
   sums.append(keep);
   if (d.loot) sums.append(el('div', 'db-loot', `A LOT OF ${d.loot.label}${d.loot.lost ? ' · NO ROOM IN THE STASH' : ''}`));
   totals.append(sums);
-  if (d.heat.delta !== 0) totals.append(el('div', 'db-heat', `HEAT ${upper(d.heat.district)} ${signed(d.heat.delta)}`));
+  if (d.heat.delta !== 0) totals.append(...heatLines(d));
   // A trust job (Intake board spec §2): her word when it changed, and no rep line (rep doesn't move).
   if (d.trust !== undefined) {
     if (d.trust) totals.append(el('div', 'db-trust', `${d.trust.name.toUpperCase()} · ${d.trust.before.toUpperCase()} → ${d.trust.after.toUpperCase()}`));

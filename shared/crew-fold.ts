@@ -149,7 +149,7 @@ const signedN = (n: number) => (n >= 0 ? `+${n}` : `−${-n}`);
 const firstName = (r: Recruit) => r.name.split(' ')[0];
 
 export function foldWithCrew(o: {
-  start: { deck: string | null; nerveMax: number; from: number };
+  start: { deck: string | null; pocket?: string | null; nerveMax: number; from: number };
   kitEvents: KitEvent[];
   crew: CrewEvent[][];
   now: number;

@@ -4,7 +4,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it } from 'vitest';
-import { alive, cleanup, cleanupDetached, listenerInode, pgidOf, portFree, stopGroup, whoListens } from './scratch';
+import { alive, cleanup, defaultModelsOnly, cleanupDetached, listenerInode, pgidOf, portFree, stopGroup, whoListens } from './scratch';
 
 const servers: net.Server[] = [];
 afterEach(() => {
@@ -95,4 +95,12 @@ it('stops a whole process group, and kills one that ignores SIGTERM', async () =
   await stopGroup(stubborn.pid!, 300);
   expect(alive(stubborn.pid!)).toBe(false);
   await stopGroup(stubborn.pid!, 300); // already gone: no throw
+});
+
+it('runs every contact on her default model: chosen models and the Anthropic key are dropped from the copy, the OpenRouter key kept', () => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'chat-stress-data-'));
+  fs.writeFileSync(path.join(data, 'settings.json'), JSON.stringify({ version: 1, keys: { openrouter: 'or', anthropic: 'an' }, recentModels: ['x'], characterModels: { cass: 'anthropic/claude-sonnet-5.5' } }));
+  expect(defaultModelsOnly(data)).toEqual({ dropped: ['cass: anthropic/claude-sonnet-5.5'], anthropicKey: true });
+  expect(JSON.parse(fs.readFileSync(path.join(data, 'settings.json'), 'utf8'))).toEqual({ version: 1, keys: { openrouter: 'or' }, recentModels: ['x'], characterModels: {} });
+  expect(defaultModelsOnly(fs.mkdtempSync(path.join(os.tmpdir(), 'chat-stress-data-')))).toEqual({ dropped: [], anthropicKey: false });
 });

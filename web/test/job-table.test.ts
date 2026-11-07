@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mountJobTable, onTable, tableAction, tipsFor } from '../src/room/table/job-table';
+import { WAIT_CHARS } from '../src/room/table/decode';
 import { tabWords } from '../src/room/table/tabs';
 import { ALARM_MAX } from '../../shared/dice';
 import type { QuestState } from '../../shared/types';
@@ -72,9 +73,11 @@ describe('a job on the table', () => {
     expect($('.tb-nerve').getAttribute('aria-label')).toBe('NERVE 4/5');
     // No empty PEOPLE slots mid-job: nobody can be added now.
     expect($$('.g-people .tb-slot').map((s) => s.dataset.id)).toEqual(['dez', 'moss']);
-    // Each checked choice carries its position's mark and colour; the prose sits under the title.
+    // Each checked choice carries its stat's picture and its position's word and colour; the prose sits under the title.
     expect(choice('swap').dataset.pos).toBe('open');
-    expect(choice('swap').querySelector('.tb-pos')!.getAttribute('src')).toBe('/table/open.webp');
+    expect(choice('swap').querySelector('.tb-side-word')!.textContent).toBe('OPEN');
+    expect(choice('swap').querySelector('.tb-art')!.getAttribute('src')).toBe('/cards/stat-reflex.webp');
+    expect(choice('swap').querySelector('.tbc-symbol')!.getAttribute('aria-label')).toBe('REFLEX');
     expect(choice('leave').dataset.pos).toBeUndefined();
     expect($('.tb-head').compareDocumentPosition($('.tb-prose')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect($('.tb-push img').getAttribute('src')).toBe('/table/push.webp');
@@ -296,10 +299,11 @@ describe('Graft tips on the table', () => {
   it('a beat offers the table tips', () => {
     const { t, tips } = mountWith();
     t.show(A);
-    expect(offered(tips)).toEqual(['roll', 'position', 'take', 'alarm', 'nerve', 'call']);
+    // The JOB column against her line comes first (it stands on the stage, so tips.ts looks for it there).
+    expect(offered(tips)).toEqual(['job', 'roll', 'position', 'take', 'alarm', 'nerve', 'call']);
     expect(tips.offer.mock.calls.at(-1)?.[1]).toBe(t.root);
     t.show({ ...A, beat: 'two', take: undefined, hand: { ...A.hand!, people: A.hand!.people.filter((p) => p.id === 'moss') } });
-    expect(offered(tips)).toEqual(['roll', 'position', 'alarm', 'nerve']);
+    expect(offered(tips)).toEqual(['job', 'roll', 'position', 'alarm', 'nerve']);
   });
 
   it('final review I1: a dealt roll with HEAT +1 among its costs offers HEAT first', () => {
@@ -459,7 +463,10 @@ describe("ability cards: index tabs under the recruit that turn their card over 
     vi.advanceTimersByTime(1000);
     expect(up()).toBe('dez/cool-head');
     expect(glyph('dez/cool-head').classList.contains('on')).toBe(true);
-    expect(slot('dez/cool-head').textContent).toContain('ON A ROLL');
+    expect(slot('dez/cool-head').querySelector('.tbc-symbol.t-roll')!.getAttribute('aria-label')).toBe('ON A ROLL');
+    // Printed like the crew's: the name, then its state, then what it does.
+    expect(slot('dez/cool-head').querySelector('.tbc-print')).not.toBeNull();
+    expect(slot('dez/cool-head').querySelector('.tbc-note + .tbc-note.words')).not.toBeNull();
     expect(slot('dez/cool-head').textContent).toContain('1 NERVE');
     flipTo('dez/quick-sale');
     expect(slot('dez/quick-sale').dataset.state).toBe('locked');
@@ -760,6 +767,26 @@ describe('effect on the table (effect and NERVE spec §3)', () => {
 describe("a dealt roll's cost cards (roll lifecycle spec §1.5, mockup cost-cards.html A)", () => {
   const dealt = (o: Partial<NonNullable<Active['costs']>> = {}): Active => ({ ...A, choices: [], rolled: { choice: 'swap', faces: [3, 1], keep: 'high', kind: 'miss', cost: { alarm: 0, heat: 0 } }, costs: { ...COSTS_VIEW, ...o } });
   const cost = (id: string) => $(`.tb-costs .tb-cost[data-cost="${id}"]`);
+  it('while the GM writes, a written line waits', () => {
+    const { t } = mount();
+    t.show(dealt({ writing: true }));
+    const line = cost('alarm').querySelector('.tb-cost-line')!;
+    expect(line.classList.contains('wait')).toBe(true);
+    expect(line.textContent).toHaveLength(WAIT_CHARS);
+    expect(line.textContent).not.toContain('log');
+  });
+  it('a picked cost shows its line, the GM or not', () => {
+    const { t } = mount();
+    t.show(dealt({ writing: true, dealt: COSTS_VIEW.dealt.map((c, i) => ({ ...c, picked: i === 0 })) }));
+    expect(cost('alarm').querySelector('.tb-cost-line')!.textContent).toBe('A log fills in your name.');
+  });
+  it('the wait ends with the line', () => {
+    const { t } = mount();
+    t.show(dealt({ writing: true }));
+    t.show(dealt());
+    expect(cost('alarm').querySelector('.tb-cost-line')!.classList.contains('wait')).toBe(false);
+    expect(cost('alarm').querySelector('.tb-cost-line')!.textContent).toBe('A log fills in your name.');
+  });
 
   it('deals the costs beside the waiting roll: tag, line, PICK head; no STEADY anywhere', () => {
     const { t } = mount();
@@ -987,6 +1014,14 @@ describe('DECK: the carried deck and its slots (programs spec §2.1)', () => {
     document.dispatchEvent(esc);
     expect(esc.defaultPrevented).toBe(true);
     expect($('.tb-load-tray').hidden).toBe(true);
+  });
+
+  it('a waiting roll with nothing to pay says CARRY ON, not that a cost lands', () => {
+    const { t } = mount();
+    t.show({ ...A, choices: [{ id: '!take', line: 'CARRY ON' }], rolled: { choice: 'swap', faces: [6], keep: 'high', kind: 'clean', cost: { alarm: 0, heat: 0 } } });
+    expect(choice('!take').textContent).toContain('CARRY ON');
+    expect(choice('!take').textContent).toContain('NOTHING TO PAY');
+    expect(choice('!take').textContent).not.toContain('THE COST LANDS');
   });
 
   it('the pool line previews programs', () => {

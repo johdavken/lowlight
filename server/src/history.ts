@@ -37,7 +37,7 @@ export const CONTINUE_INSTRUCTION =
 export type Turn = { kind: 'reply'; head?: string[]; contextLines: string[]; text: string; blocks?: string[] } | { kind: 'continue'; blocks?: string[] };
 
 /** A stored line as her model reads it in the history (also what the Residual reads); null when it isn't sent. */
-export function toCompletion(m: ChatMessage): CompletionMessage | null {
+export function toCompletion(m: ChatMessage, player?: string): CompletionMessage | null {
   // The opening scene reaches her as the [scene] block, never as a line of the conversation.
   if (m.mode === 'scene') return null;
   // An end line is never dropped for being empty — it's the placeholder marking where the scene ended.
@@ -47,7 +47,7 @@ export function toCompletion(m: ChatMessage): CompletionMessage | null {
   // An event that cut in: where it happened, in her history as an [event] line.
   if (m.role === 'user' && m.mode === 'encounter') return m.status === 'failed' ? null : { role: 'user', content: encounterText({ title: m.encounter?.title ?? '', text: m.text }, oneLine) };
   // A quest's beat or pick: its [quest] line, word for word as shown.
-  if (m.role === 'user' && m.mode === 'quest') return m.status === 'failed' ? null : { role: 'user', content: questRowText({ title: m.quest?.title ?? '', text: m.text, run: m.quest?.run }, oneLine) };
+  if (m.role === 'user' && m.mode === 'quest') return m.status === 'failed' ? null : { role: 'user', content: questRowText({ title: m.quest?.title ?? '', text: m.text, run: m.quest?.run, heard: m.quest?.heard }, oneLine, player) };
   // A finished gig run: its [gig] line, from the row's snapshot.
   if (m.role === 'user' && m.mode === 'gig') return m.status === 'failed' || !m.gig ? null : { role: 'user', content: gigText(m.gig) };
   // A finished liar's dice game: its [dice] line, from the row's snapshot.
@@ -84,10 +84,12 @@ export function buildMessages(input: {
   history: ChatMessage[];
   turn: Turn;
   summary?: { text: string; through: string; prev?: { text: string; through: string } } | null;
+  /** Who job and quest lines are told to. */
+  player?: string;
   /** A text turn (deck spec §3): the summary always leads, since it's how a text knows how the last scene went. */
   alwaysSummary?: boolean;
 }): CompletionMessage[] {
-  const sent = input.history.map((m) => ({ id: m.id, c: toCompletion(m) })).filter((x): x is { id: string; c: CompletionMessage } => x.c !== null);
+  const sent = input.history.map((m) => ({ id: m.id, c: toCompletion(m, input.player) })).filter((x): x is { id: string; c: CompletionMessage } => x.c !== null);
   const usable = sent.map((x) => x.c);
   const start = historyStart(usable);
   const kept = usable.slice(start);

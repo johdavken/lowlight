@@ -26,10 +26,10 @@ describe('loadResidents', () => {
     expect(hae).toBeDefined();
     expect(hae.name).toBe('Hae');
     expect(hae.accent).toBe('#ff8a3c');
-    expect(hae.sprite.outfitByScene).toEqual({ 'karasu/noodle-stall': 'work2' });
-    expect(Object.keys(hae.sprite.expressions)).toEqual(['happy', 'annoyed', 'concerned', 'angry']);
+    expect(hae.sprite.outfitByScene).toEqual({ 'karasu/noodle-stall': 'work' });
+    expect(hae.sprite.expressions).toEqual({});
     expect(hae.voice()).toContain('Hae');
-    expect(hae.face).toEqual({ x: 0.47, y: 0.16 });
+    expect(hae.face).toEqual({ x: 0.525, y: 0.115 });
     expect(warnings).toEqual([]);
   });
 
@@ -72,9 +72,9 @@ describe('residentInfo', () => {
     const info = residentInfo(loadResidents(CHARACTERS, warn).get('hae')!);
     expect(info.id).toBe('hae');
     expect(info.sprite.url).toBe('/api/residents/hae/sprite');
-    expect(info.sprite.outfits!.work2).toBe('/api/residents/hae/outfit/work2');
-    expect(info.sprite.expressions!.happy).toBe('/api/residents/hae/sprite/happy');
-    expect(info.sprite.outfitByScene).toEqual({ 'karasu/noodle-stall': 'work2' });
+    expect(info.sprite.outfits!.work).toBe('/api/residents/hae/outfit/work');
+    expect(info.sprite.expressions).toBeUndefined();
+    expect(info.sprite.outfitByScene).toEqual({ 'karasu/noodle-stall': 'work' });
     expect(info.thumb).toBe('/api/residents/hae/thumb');
   });
 });
@@ -92,13 +92,13 @@ describe('a resident\'s snapped art', () => {
   });
 });
 
-describe('a resident\'s stage height', () => {
+describe('a resident\'s waist', () => {
   it('reaches her info like a contact\'s', () => {
     fs.cpSync(path.join(CHARACTERS, 'hae'), path.join(root, 'hae'), { recursive: true });
     const file = path.join(root, 'hae', 'character.json');
     const c = JSON.parse(fs.readFileSync(file, 'utf8'));
-    fs.writeFileSync(file, JSON.stringify({ ...c, sprite: { ...c.sprite, height: 0.9 } }));
-    expect(residentInfo(loadResidents(root, warn).get('hae')!).sprite.height).toBe(0.9);
+    fs.writeFileSync(file, JSON.stringify({ ...c, sprite: { ...c.sprite, waist: 0.378 } }));
+    expect(residentInfo(loadResidents(root, warn).get('hae')!).sprite.waist).toBe(0.378);
   });
 });
 

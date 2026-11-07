@@ -1,6 +1,7 @@
 ---
 title: Titan
 category: City
+section: Corps
 keys: [Titan, asteroid mining, space mining, ore, imports, orbit]
 districts: []
 places: []

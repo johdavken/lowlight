@@ -7,6 +7,9 @@ take-size: 4
 starts: the-tilt
 after: null
 pitch: A rival game two doors down is taking the Tilt's regulars. Put a marked deck on its table and let it sink itself.
+posted-by: The Tilt's pit boss.
+brief: It runs behind a laundrette two doors down from the Tilt, with a doorman on the back room. Get past him and swap the house deck for a marked one while the game's on.
+known-by: [cass]
 pay: 90-110
 draw complication: none | doorman-knows-you | game-moved-upstairs
 draw doorman: easy | hard
@@ -20,7 +23,7 @@ temper: doorman
 
 *The rival game runs behind a laundrette two doors down from the Tilt. The doorman looks at you for a long time. He's heard your name this week, and not from friends.*
 
-- talk: Talk your way in anyway. → in / turned-away [check cool 55 · cass +10 · mother-rot +10]
+- talk: Talk your way in anyway. → in / turned-away [check cool 40 · cass +10 · mother-rot +10]
 - pay: Pay him double to forget your face. → in [clock +20m, set paid=yes]
 
 # door

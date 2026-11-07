@@ -1,6 +1,7 @@
 ---
 title: The Capers
 category: Factions
+section: Runners
 keys: [Capers, Caper, runner hunters, bounty runners, corp hunters, burned decks]
 districts: []
 places: []

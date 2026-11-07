@@ -208,12 +208,18 @@
 .tb-cost.pickable:hover, .tb-cost.pickable:focus-visible { border-color: var(--user); outline: none; }
 .tb-cost.picked { border-color: var(--amber, #ffc56b); box-shadow: 0 0 0 1px var(--amber, #ffc56b), 0 0 14px rgba(255, 197, 107, 0.35); }
 .tb-cost.settled { opacity: 0.5; }
+.tb-cost.waits { opacity: 0.55; }
 .tb-cost.settled .tb-cost-line { text-decoration: line-through; }
 .tb-cost-tag { font: 500 26px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.06em; color: #fff; }
+.tb-cost-first { font: 500 15px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.08em; color: var(--amber, #ffc56b); }
 .tb-cost-line { font: 13px/1.45 var(--mono, 'IBM Plex Mono', monospace); opacity: 0.6; font-style: italic; }
 /* The GM's line fades in over the written one. */
 .tb-cost-line.gm { opacity: 0.95; font-style: normal; animation: tb-cost-in 450ms ease-out; }
 @keyframes tb-cost-in { from { opacity: 0; } to { opacity: 0.95; } }
+/* The GM is writing: noise in the line's place, and the letters lock in over it (decode.ts). */
+.tb-cost-line.wait { opacity: 0.75; font-style: normal; color: var(--user, #7fe7ff); word-break: break-all; }
+.tb-cost-line.decoding { animation: none; }
+.tb-noise { color: var(--user, #7fe7ff); font-style: normal; word-break: break-all; }
 @media (prefers-reduced-motion: reduce) { .tb-cost-line.gm { animation: none; } }
 .tb-cost-btns { display: flex; flex-direction: column; gap: 4px; margin-top: auto; }
 .tb-cost-btn { font: 15px/1.1 var(--pixel); letter-spacing: 0.14em; padding: 3px 8px 2px; border: 1px solid currentColor; background: none; color: var(--ink, #cfeff7); text-align: left; cursor: pointer; }
@@ -360,6 +366,8 @@
 .ts-approach .tb-card { width: 168px; min-height: 0; padding: 0; overflow: hidden; --tbc-c: var(--user); }
 .ts-approach .tbc-pic { height: 92px; }
 .ts-approach .tbc-name { font-size: 22px; color: var(--user); }
+.ts-approach .tbc-wrong { display: none; }
+.ts-approach .tbc-art { object-position: 50% 0; }
 .ts-contacts { flex-direction: row !important; flex-wrap: wrap; align-items: flex-end; max-width: 380px; }
 .ts-contacts .tb-group-label { width: 100%; }
 .ts-ready:not(.ts-contacts) { flex-direction: column !important; flex: none; width: 348px; min-width: 0; }
@@ -427,7 +435,6 @@
 .tb-job .tb-card[data-pos='dark'] { border-left-color: #4f9dff; }
 .tb-job .tb-card[data-pos='open'] { border-left-color: #ffb347; }
 .tb-job .tb-card[data-pos='wire'] { border-left-color: #ff3b5c; }
-.tb-pos { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; }
 /* A blown job's debrief, stamped. */
 .tb-seal { position: absolute; top: -10px; right: -6px; width: 92px; height: 92px; transform: rotate(12deg); filter: drop-shadow(0 3px 4px #000); pointer-events: none; }
 .tb-card.tb-debrief { overflow: visible; }
@@ -483,7 +490,8 @@
 .tb-hand .tbc-tr, .tb-hand .tbc-ab { font-size: 13px; }
 /* Crew and program cards print in a black border catching the room's light: warm from the lamps, cool from the neon.
    The band sits somewhere else on each card (--lx), so a row doesn't look stamped. */
-.tb-slot:has(> .tbc-print) {
+.tb-slot:has(> .tbc-print),
+.tb:not(.phone) .ts-approach .tb-card {
   position: relative;
   border: 0;
   border-radius: 11px;
@@ -491,8 +499,8 @@
   background: #09080b linear-gradient(125deg, #2c1d10 0%, #15131a 30%, #3f3c47 46%, #14161c 60%, #10242e 100%) var(--lx, 27%) 30% / 240% 240%;
 }
 /* The same light over the whole card, faintly: a glossy print catching the room. */
-.tb-slot:has(> .tbc-print)::before { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; mix-blend-mode: screen; opacity: 0.4; background: linear-gradient(125deg, rgba(240, 170, 95, 0.5) 0%, rgba(240, 170, 95, 0) 30%, rgba(255, 250, 240, 0.32) 46%, rgba(120, 190, 225, 0) 60%, rgba(90, 170, 215, 0.5) 100%) var(--lx, 27%) 30% / 240% 240%; }
-.tb-slot > .tbc-print { position: absolute; inset: var(--print, 8px); width: auto; height: auto; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px #57525e; }
+.tb-slot:has(> .tbc-print)::before, .tb:not(.phone) .ts-approach .tb-card::before { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; mix-blend-mode: screen; opacity: 0.4; background: linear-gradient(125deg, rgba(240, 170, 95, 0.5) 0%, rgba(240, 170, 95, 0) 30%, rgba(255, 250, 240, 0.32) 46%, rgba(120, 190, 225, 0) 60%, rgba(90, 170, 215, 0.5) 100%) var(--lx, 27%) 30% / 240% 240%; }
+.tb-slot > .tbc-print, .tb:not(.phone) .ts-approach .tb-card > .tbc-print { position: absolute; inset: var(--print, 8px); width: auto; height: auto; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px #57525e; }
 .tb-hand .g-deck .tb-slot.on:has(> .tbc-print)::after { inset: var(--print, 8px); border-radius: 3px; }
 .ts-ready { --print: 5px; }
 /* Their words, centred on the fade: a serif name, then the card's lines, the first in its colour and the rest quieter. */
@@ -506,6 +514,7 @@
 .ts-ready .tb-slot > .tbc-print .tbc-name { font-size: 14px; }
 .ts-ready .tb-slot > .tbc-print .tbc-name.long { font-size: 12px; }
 .ts-ready .tb-slot > .tbc-print .tbc-note { font-size: 12px; letter-spacing: 0.04em; }
+.tb-slot > .tbc-print .tbc-note.words { font-size: 13px; line-height: 1.12; letter-spacing: 0.04em; white-space: normal; }
 /* Trade or stat top left, rank top right: printed on the picture, no backing (marks.ts). */
 .tbc-mark { position: absolute; z-index: 1; top: 6px; display: block; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.75)); }
 .tbc-mark svg { display: block; width: 100%; height: auto; }
@@ -513,6 +522,10 @@
 /* A program's stat in the name's brass: its amber would sink into the art's lamp glow. */
 .tbc-prog .tbc-symbol { color: #ecd9a8; }
 .tbc-rank { right: 7px; width: 18px; }
+/* An ability's timing, in its index tab's colours. */
+.tbc-symbol.t-roll { color: #a8ff60; }
+.tbc-symbol.t-after { color: #7fe9ff; }
+.tbc-symbol.t-end, .tbc-symbol.t-auto { color: #ffc56b; }
 .ts-ready .tbc-mark { top: 4px; }
 .ts-ready .tbc-symbol { left: 5px; width: 16px; }
 .ts-ready .tbc-rank { right: 5px; width: 14px; }
@@ -576,6 +589,8 @@
 .tb-card.pic .tbc-name { font-size: 24px; color: var(--user); text-shadow: 0 0 6px rgba(0, 0, 0, 0.9); }
 .tb-card.pic[data-choice='!take'] { border-color: #ff5a5a; --tbc-c: #ff5a5a; }
 .tb-card.pic[data-choice='!take'] .tbc-name { color: #ff8f8f; }
+.tb-card.pic[data-choice='!take']:has(.tb-free) { border-color: var(--user); --tbc-c: var(--user); }
+.tb-card.pic[data-choice='!take'] .tb-free .tbc-name { color: var(--user); }
 .tb-card.pic[data-choice='!steady'] .tbc-art { object-position: 50% 28%; }
 .tb-card.pic[data-choice='!take'] .tbc-art { object-position: 50% 30%; }
 /* The job's written text reads in the JOB column beside the subtitles (job-column.ts): the table keeps the
@@ -607,8 +622,10 @@
 .tb-call { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 0; min-height: 110px; }
 .tb-call.none { opacity: 0.45; }
 .tb-side { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 38%, color-mix(in srgb, var(--pc) 30%, transparent), #05020a 75%); border-right: 1px solid color-mix(in srgb, var(--pc) 60%, transparent); }
-.tb-side .tb-pos { position: absolute; top: 10px; left: 50%; right: auto; width: 48px; height: 48px; transform: translateX(-50%); image-rendering: pixelated; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--pc) 60%, transparent)); }
-.tb-side-word { position: absolute; left: 0; right: 0; bottom: 7px; text-align: center; font: 500 20px/0.85 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.04em; color: var(--pc); }
+.tb-side .tb-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.tb-side .tbc-mark { color: #ecd9a8; }
+.tb-say { display: flex; gap: 10px; }
+.tb-side-word { font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--pc); }
 .tb-main { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 7px 10px; }
 .tb-call .tb-line { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
 .tb-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
@@ -810,6 +827,8 @@
 .tb.hud:not(.phone) .tb-debrief .db-tier { margin: 0 0 6px; font: 500 104px/0.82 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.05em; color: var(--db); text-shadow: 0 0 22px var(--db-glow), 0 2px 3px #000; }
 .tb.hud:not(.phone) .tb-debrief .db-take { display: none; }
 .tb.hud:not(.phone) .tb-debrief .db-totals { display: block; margin: 0; font: 18px/1.35 var(--pixel); letter-spacing: 0.13em; }
+.tb.hud:not(.phone) .tb-debrief .db-heat-why, .tb.hud:not(.phone) .tb-debrief .db-heat-now { font-size: 15px; line-height: 1.35; letter-spacing: 0.1em; }
+.tb.hud:not(.phone) .tb-debrief .db-heat-now { margin-bottom: 6px; }
 .tb.hud:not(.phone) .tb-debrief .db-sums { display: block; margin-bottom: 10px; }
 .tb.hud:not(.phone) .tb-debrief .db-sum { display: flex; justify-content: space-between; font: 21px/1.35 var(--pixel); letter-spacing: 0.14em; }
 .tb.hud:not(.phone) .tb-debrief .db-sum .db-sep { display: none; }
@@ -863,4 +882,116 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .tb-foil .tbc-pic::after { animation: none; }
+}
+
+/* A call as a printed card (mockup position-cards.html, C1): the crew cards' stock and size, its stat's picture filling it,
+   the words on a fade, the position's colour on the line round the picture. Five in a deal, or one asking THAT'S MY CHOICE,
+   stay wide: a second row would run onto the hand, and the question doesn't fit. */
+.tb.hud:not(.phone) .tb-deal:not(:has(> .tb-card:nth-of-type(5))) > .tb-card:is(:has(> .tb-call), :has(> .tb-plain)):not(:has(.tb-said)) {
+  width: 192px;
+  height: 256px;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 11px;
+  clip-path: none;
+  text-align: center;
+  background: #09080b linear-gradient(125deg, #2c1d10 0%, #15131a 30%, #3f3c47 46%, #14161c 60%, #10242e 100%) 27% 30% / 240% 240%;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.7);
+
+  /* The crew cards' light across the whole card. */
+  &::before { content: ''; position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; mix-blend-mode: screen; opacity: 0.4; background: linear-gradient(125deg, rgba(240, 170, 95, 0.5) 0%, rgba(240, 170, 95, 0) 30%, rgba(255, 250, 240, 0.32) 46%, rgba(120, 190, 225, 0) 60%, rgba(90, 170, 215, 0.5) 100%) 27% 30% / 240% 240%; }
+  &:hover[data-state='up'] { box-shadow: 0 0 14px color-mix(in srgb, var(--pc, #7fe9ff) 55%, transparent); }
+  &.is-locked { box-shadow: 0 0 0 2px var(--user); }
+  /* A result takes over the line round the picture, heavier. */
+  &.is-pass { --pc: #7dff9b; --edge: 2px; }
+  &.is-cost { --pc: #ffc56b; --edge: 2px; }
+  &.is-fail { --pc: #ff5a5a; --edge: 2px; }
+  /* A card you can't play dims with its frame; opacity stays the deal's, for the roll's fade. */
+  &:has(> .none) { filter: brightness(0.5) saturate(0.6); }
+
+  > .tb-face { position: absolute; inset: 8px; display: block; width: auto; min-height: 0; border-radius: 3px; background: #05020a; box-shadow: 0 0 0 var(--edge, 1px) color-mix(in srgb, var(--pc, #57525e) 62%, #57525e); }
+  > .tb-face.none { opacity: 1; }
+  .tb-side { position: absolute; inset: 0; overflow: hidden; border: 0; border-radius: 3px; background: #05020a; }
+  .tb-main { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; gap: 4px; padding: 26px 8px 7px; border-radius: 0 0 3px 3px; background: linear-gradient(to bottom, transparent, rgba(5, 2, 10, 0.86) 24px, rgba(5, 2, 10, 0.97)); }
+  .tb-line { display: block; font: 13px/1.36 'Libre Baskerville', Georgia, serif; letter-spacing: 0; color: #f0e6cd; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+  .tb-foot { align-items: center; margin-top: 0; }
+  .tb-flags { justify-content: center; }
+  .tb-tag, .tb-flags .tb-flag { padding: 1px 4px 0; font-size: 12px; letter-spacing: 0.1em; }
+  .tb-tray { justify-content: center; gap: 6px; }
+  /* The symbol says the stat; the words are on the hover panel. */
+  .tb-stat { display: none; }
+  .tb-cells i { width: 12px; height: 12px; box-shadow: 0 0 4px var(--c); }
+  .tb-sum { margin-left: 0; font-size: 24px; }
+  .tb-sum small { font-size: 12px; }
+  .tb-say { justify-content: center; }
+  .tb-side-word, .tb-eff { align-self: center; font-size: 14px; letter-spacing: 0.14em; }
+  .tb-eff { color: #ecd9a8; }
+  .tb-eff.small { color: rgba(236, 217, 168, 0.6); }
+  .tb-eff.big { color: #ffc56b; text-shadow: none; }
+  .tb-side .tbc-mark { top: 7px; }
+  .tb-side .tbc-symbol { left: 7px; width: 26px; }
+  /* Sources hang off the foot, as abilities do off a crew card. */
+  .tb-srcs { top: calc(100% + 6px); left: 2px; }
+
+  /* No dice: the black card, its line and what it is, in the middle. */
+  > .tb-plain .tb-main { top: 0; justify-content: center; gap: 12px; padding: 8px; background: none; }
+  > .tb-plain .tb-foot { margin-top: 0; }
+  .tb-noroll { font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: rgba(236, 217, 168, 0.6); }
+  &.cover > .tb-plain { box-shadow: 0 0 0 1px var(--tool); }
+}
+/* A card asking THAT'S MY CHOICE stays wide, at its own height beside the printed ones. */
+.tb.hud:not(.phone) .tb-deal > .tb-card:has(.tb-said) { align-self: flex-start; }
+/* A roll waiting on its costs: a small print of the card beside the dice, clear of the costs under it. */
+.tb.hud:not(.phone) .tb-parked .tb-card {
+  width: 99px;
+  height: 132px;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 7px;
+  clip-path: none;
+  background: #09080b linear-gradient(125deg, #2c1d10 0%, #15131a 30%, #3f3c47 46%, #14161c 60%, #10242e 100%) 27% 30% / 240% 240%;
+
+  &.is-pass { --pc: #7dff9b; }
+  &.is-cost { --pc: #ffc56b; }
+  &.is-fail { --pc: #ff5a5a; }
+  > .tb-face { position: absolute; inset: 5px; display: block; width: auto; min-height: 0; border-radius: 2px; box-shadow: 0 0 0 2px var(--pc, #57525e); }
+  .tb-side { position: absolute; inset: 0; overflow: hidden; border: 0; background: #05020a; }
+  .tb-main { display: none; }
+  .tb-side .tbc-symbol { left: 5px; width: 18px; }
+  .tb-side .tbc-mark { top: 5px; }
+}
+
+/* The approaches on the crew cards' stock, full size (mockup approach-cards.html, C). Three at 256 only clear the
+   PEOPLE row with the title beside them, so the title leaves the centre line; it comes back while the tray is open,
+   which needs that side. A phone's SETUP scrolls and keeps the picture strip. */
+.tb:not(.phone).tb-setup:not(:has(.ts-stage.picking)) .ts-pitch {
+  position: relative;
+  top: 20px;
+  justify-self: start;
+  width: 180px;
+  height: 46px;
+  margin-left: 282px;
+  text-align: left;
+
+  .ts-title { flex-direction: column; align-items: flex-start; align-self: flex-start; gap: 5px; padding: 8px 22px 8px 12px; }
+}
+.tb:not(.phone) .ts-approach {
+  position: relative;
+  margin: -48px 0 6px;
+
+  > .tb-group-label { position: absolute; left: -188px; top: 128px; white-space: nowrap; }
+  .tb-card { width: 192px; height: 256px; overflow: visible; }
+  .tbc-pic { position: absolute; inset: 0; height: auto; }
+  .tbc-body { position: absolute; left: 0; right: 0; bottom: 0; align-items: center; gap: 3px; padding: 30px 5px 8px; text-align: center; background: linear-gradient(to bottom, transparent, rgba(5, 2, 10, 0.86) 26px, rgba(5, 2, 10, 0.97)); }
+  .tbc-name { font: 700 20px/1.15 'Libre Baskerville', Georgia, serif; letter-spacing: 0.04em; color: #ecd9a8; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+  .tbc-wrong { display: block; padding: 0 3px 2px; font: italic 11.5px/1.35 'Libre Baskerville', Georgia, serif; letter-spacing: 0; color: #f0e6cd; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
+  .tbc-note { font-size: 14px; line-height: 1.05; opacity: 1; white-space: nowrap; }
+  .tbc-stats { color: var(--user); }
+  .tbc-start { color: #ecd9a8; opacity: 0.8; }
+  .tbc-spared { color: #7dff9b; }
+  .tbc-first { color: #ff8fa3; }
 }

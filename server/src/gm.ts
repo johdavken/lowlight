@@ -10,6 +10,8 @@ import type { CompletionMessage } from './turn';
 
 /** Long enough for GLM's low reasoning (the live check: 4 of 10 ran past 8 s); the cards show written lines meanwhile. */
 export const GM_TIMEOUT_MS = 15000;
+/** How long a card waits for its line. Past this the written line stands and a late answer is dropped, so words never change under the reader. */
+export const GM_HOLD_MS = 8000;
 /** The probe's: a little heat for variety. */
 export const GM_TEMPERATURE = 0.8;
 /** Room for low reasoning and a few short lines (GLM's thinking counts toward the cap). */

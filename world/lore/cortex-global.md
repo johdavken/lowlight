@@ -1,6 +1,7 @@
 ---
 title: Cortex Global
 category: City
+section: Corps
 keys: [Cortex, Cortex Global, skill chips, skill chip, carts, cybernetics]
 districts: []
 places: []

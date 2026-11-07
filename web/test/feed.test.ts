@@ -546,11 +546,23 @@ describe('Feed stage mode (the dialogue box)', () => {
     expect(root.classList.contains('speaker-user')).toBe(false);
   });
 
-  it('standalone tool lines after the current message show beneath it', () => {
+  it("a tool line with no reply in progress joins the current line's footer, taking no height from the box (playtest)", () => {
     const { root, feed } = stageFeed();
     feed.setHistory([msg({ id: 'u1', role: 'user', text: 'a' }), msg({ id: 'a1', text: 'b' })]);
     feed.toolLine(null, '// SET_LIGHT · LAMP · 50%');
-    expect(shown(root).map((n) => n.dataset.id ?? n.textContent)).toEqual(['a1', '// SET_LIGHT · LAMP · 50%']);
+    expect(shown(root).map((n) => n.dataset.id)).toEqual(['a1']);
+    expect(el(root, 'a1').querySelector('.foot .tool')!.textContent).toBe('// SET_LIGHT · LAMP · 50%');
+    // It stays with that line: redrawn with it, and gone from the box with it.
+    feed.upsert(msg({ id: 'a1', text: 'b, again' }));
+    expect(el(root, 'a1').querySelector('.foot .tool')!.textContent).toBe('// SET_LIGHT · LAMP · 50%');
+    feed.upsert(msg({ id: 'u2', role: 'user', text: 'c' }));
+    expect(shown(root).map((n) => n.dataset.id)).toEqual(['u2']);
+  });
+
+  it('a tool line before anything has been said stands alone', () => {
+    const { root, feed } = stageFeed();
+    feed.toolLine(null, '// SET_SCENE · ROOFTOP · FADE');
+    expect(shown(root).map((n) => n.textContent)).toEqual(['// SET_SCENE · ROOFTOP · FADE']);
   });
 
   it("the player's line stays current until her first text, then hers (Review Focus 1)", () => {
@@ -699,7 +711,8 @@ describe('Feed stage mode (the dialogue box)', () => {
     feed.upsert(msg({ id: 'long', text: 'y' }));
     feed.toolLine(null, '// SET_SCENE · ROOFTOP · FADE');
     expect(root.querySelector('button.continue')!.textContent).toBe('[CONTINUE ▸ 1/3]');
-    expect(shown(root).map((n) => n.dataset.id ?? n.textContent)).toEqual(['long', '// SET_SCENE · ROOFTOP · FADE']);
+    expect(shown(root).map((n) => n.dataset.id)).toEqual(['long']);
+    expect(el(root, 'long').querySelector('.foot .tool')!.textContent).toBe('// SET_SCENE · ROOFTOP · FADE');
   });
 
   it("reports her line's expression; the player's line has none", () => {
@@ -1956,6 +1969,11 @@ describe('quest rows in the feed', () => {
     expect(row.querySelector('.qr-head')!.textContent).toBe('◆ QUEST · PAPER TRAIL');
     expect(row.querySelector('.qr-pick')).toBeNull();
     expect(row.querySelector('.text')!.textContent).toContain('Boots on the stairs.');
+  });
+
+  it("a job's row says JOB", () => {
+    const root = mount([msg({ id: 'q1', role: 'user', mode: 'quest', text: '*The crate.*', ts: 1, quest: { id: 'bad-batch', title: 'Bad Batch', beat: 'crate', run: 'bad-batch@0' } })]);
+    expect(root.querySelector('.qr-head')!.textContent).toBe('◆ JOB · BAD BATCH');
   });
 
   it("a pick row shows the pick line as the player's, then what followed", () => {

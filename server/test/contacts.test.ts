@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import type { PlaythroughInfo, RoomState } from '../../shared/types';
-import { aroundContacts, contactsAndAround, knownContacts, placesOf } from '../src/contacts';
+import { aroundContacts, contactsAndAround, knownContacts, placesOf, type RosterContact } from '../src/contacts';
 import { openDb, type Db } from '../src/db';
 import { tempDir } from './fixtures/temp-dir';
 
@@ -323,5 +323,25 @@ describe('her file (FILE on YOU, spec 2026-10-28 §2)', () => {
     expect(nix.facts).toEqual([{ label: 'TELL', value: 'x' }]);
     expect('bio' in cass).toBe(false);
     expect('facts' in cass).toBe(false);
+  });
+});
+
+describe("PEOPLE's wardrobe", () => {
+  it('carries her outfits, the pick (while still hers) and what her room puts her in; none without outfits', () => {
+    const chars = tempDir('contacts-');
+    withDb(chars, 'cass', (db) => db.insertMessage('hicks', { id: 'c1', role: 'user', text: 'hi', toolLines: [], ts: 1, status: 'ok' }));
+    const roster: RosterContact[] = [
+      { ...ROSTER[0], wardrobe: { outfits: ['work', 'home'], byScene: { 'karasu/lowlight-intake': 'work' } } },
+      { ...ROSTER[1], wardrobe: { outfits: ['bar'], byScene: {} } },
+      ROSTER[2],
+    ];
+    const pt = { ...playthrough(), contactOutfits: { nix: 'home', cass: 'gone' } };
+    const [nix, cass] = knownContacts(chars, pt, roster, names);
+    expect(nix).toMatchObject({ outfits: ['work', 'home'], outfit: 'home', sceneOutfit: 'work' });
+    expect(cass.outfits).toEqual(['bar']);
+    expect('outfit' in cass).toBe(false);
+    expect('sceneOutfit' in cass).toBe(false);
+    const [plain] = knownContacts(chars, playthrough(), [ROSTER[0]], names);
+    expect('outfits' in plain).toBe(false);
   });
 });

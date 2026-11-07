@@ -1,6 +1,8 @@
 ---
 title: Lowlight Street Slang
 category: City
+section: Slang
+only: model
 keys: [slang, street talk, blanks, bounced, clean water, drowned, upstack, downstack, the tide, Spectra says]
 districts: []
 places: []

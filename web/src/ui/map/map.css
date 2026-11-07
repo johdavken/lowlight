@@ -279,3 +279,110 @@
   fill: transparent;
   filter: none;
 }
+
+/* ── the game's map (`listed`): no tags, the places down the left folded under their districts, and the place's card in
+   the bottom right corner reading upward from its name (map list mock, 2026-11-05). Text lies on the picture in a dark
+   halo, as the district names do, with the map darkened under it. ── */
+.city-map.listed { --map-teko: 'Teko', sans-serif; --map-halo: 0 0 2px #000, 0 0 2px #000, 0 0 3px #000, 0 0 7px #000, 0 0 12px rgba(0, 0, 0, 0.8); }
+.city-map.listed:not(.far) .pin .who { display: flex; }
+/* A place lit: its pin pulses. */
+.city-map.listed .pin .ping { display: none; position: absolute; width: 16px; height: 16px; left: -8px; top: -8px; border-radius: 50%; border: 2px solid var(--map-green); box-shadow: 0 0 10px var(--map-green); pointer-events: none; animation: map-ping 1.7s ease-out infinite; }
+.city-map.listed .pin .ping + .ping { animation-delay: 0.85s; }
+@keyframes map-ping { from { transform: scale(0.7); opacity: 1; } to { transform: scale(5.2); opacity: 0; } }
+.city-map.listed .pin:is(.focus, .hot) .ping { display: block; }
+.city-map.listed .pin:is(.focus, .hot) { z-index: 6; }
+.city-map.listed .pin:is(.focus, .hot)::before { background: var(--map-green); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.8), 0 0 14px var(--map-green); scale: 1.35; }
+.city-map.map-still.listed .pin .ping { animation: none; opacity: 0.6; transform: scale(1.8); }
+@media (prefers-reduced-motion: reduce) {
+  .city-map.listed .pin .ping { animation: none; opacity: 0.6; transform: scale(1.8); }
+}
+/* A district's name hovered in the list. */
+.city-map.listed.dimmed .pin:not(.in):not(.focus) { opacity: 0.28; }
+.map-rendered .city-map.listed .dpoly.lit,
+.city-map.listed .dpoly.lit { fill: rgba(61, 255, 122, 0.07); stroke: var(--map-green); stroke-opacity: 0.8; stroke-width: 1.4; stroke-dasharray: 8 6; }
+.city-map.listed .city-names .dname { transition: opacity 0.15s, fill 0.15s; }
+.city-map.listed .city-names .dname.lit { fill: var(--map-green); }
+/* A name the list or the card would sit on. */
+.city-map.listed .city-names .dname.under { opacity: 0.1; }
+
+/* The map darkened under the list, and in the corner while a card is open. */
+.city-map.map-overlay.listed::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 430px; background: linear-gradient(to right, rgba(2, 1, 6, 0.62) 65%, rgba(2, 1, 6, 0)); }
+.city-map.listed .map-strip::before { content: ''; position: absolute; z-index: -1; inset: -70px -28px -48px -110px; pointer-events: none; background: radial-gradient(ellipse at 100% 100%, rgba(2, 1, 6, 0.72) 48%, rgba(2, 1, 6, 0) 74%); }
+
+/* ── the list ── */
+.map-places { position: absolute; left: 0; top: 0; bottom: 0; width: 340px; padding: 84px 20px 96px 28px; box-sizing: border-box; overflow-y: auto; scrollbar-width: none; pointer-events: none; text-shadow: var(--map-halo); -webkit-mask-image: linear-gradient(transparent 66px, #000 92px, #000 calc(100% - 70px), transparent calc(100% - 24px)); mask-image: linear-gradient(transparent 66px, #000 92px, #000 calc(100% - 70px), transparent calc(100% - 24px)); }
+.map-places-head { padding: 8px 0; margin-bottom: 4px; font: 600 30px/1 var(--map-teko); letter-spacing: 0.14em; color: var(--map-green); }
+.map-places button { display: flex; align-items: center; padding: 0; color: inherit; background: none; border: 0; outline: none; text-align: left; text-shadow: inherit; cursor: pointer; pointer-events: auto; }
+.map-places .group { gap: 7px; width: 100%; padding: 6px 0 3px; font: 17px/1.25 var(--map-pixel); letter-spacing: 0.16em; color: var(--map-amber); }
+.map-places .group:hover,
+.map-places .thr.hot .group,
+.map-places .thr.picked:not(.open) .group { color: var(--map-green); }
+/* + shut, − open. */
+.map-places .tw { flex: none; position: relative; width: 11px; height: 11px; }
+.map-places .tw::before,
+.map-places .tw::after { content: ''; position: absolute; left: 0; top: 5px; width: 11px; height: 1px; background: currentColor; box-shadow: 0 0 3px #000; transition: transform 0.16s; }
+.map-places .tw::after { transform: rotate(90deg); }
+.map-places .thr.open .tw::after { transform: rotate(0); }
+.map-places .group em { font-style: normal; letter-spacing: 0; opacity: 0.6; }
+.map-places .dots { display: flex; gap: 3px; }
+.map-places .dots b { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 1px #000, 0 0 4px var(--c); }
+.map-places .dots u { width: 7px; height: 7px; border-radius: 50%; background: var(--map-cyan); box-shadow: 0 0 5px var(--map-cyan); }
+.map-places .thr.open .group :is(em, .dots) { display: none; }
+/* Shut, a thread's rows fold to nothing. */
+.map-places .kids { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.16s ease-out; }
+.map-places .thr.open .kids { grid-template-rows: 1fr; }
+.map-places .kids > div { position: relative; min-height: 0; overflow: hidden; padding-left: 15px; visibility: hidden; transition: visibility 0.16s; }
+.map-places .thr.open .kids > div { visibility: visible; }
+.map-places .rail { position: absolute; left: 0; top: 0; bottom: 4px; width: 13px; }
+.map-places .rail::before { content: ''; position: absolute; left: 5px; top: 0; bottom: 0; width: 1px; background: var(--map-amber); opacity: 0.45; box-shadow: 0 0 3px #000; }
+.map-places .rail:hover::before { width: 2px; background: var(--map-green); opacity: 1; }
+.map-places .row { gap: 10px; width: 100%; padding: 2px 8px; border-left: 2px solid transparent; color: #eef7f0; }
+.map-places .row .t { font: 14.5px/1.25 var(--map-mono); white-space: nowrap; }
+.map-places .row .h { font: 15px/1.25 var(--map-pixel); letter-spacing: 0.16em; color: var(--map-cyan); white-space: nowrap; }
+.map-places .row:hover,
+.map-places .row:is(.on, .hot) { border-left-color: var(--map-green); }
+.map-places .row:is(.on, .hot) .t { color: var(--map-green); }
+.city-map.map-still .map-places :is(.kids, .kids > div),
+.city-map.map-still .map-places .tw::before,
+.city-map.map-still .map-places .tw::after { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .map-places :is(.kids, .kids > div),
+  .map-places .tw::before,
+  .map-places .tw::after { transition: none; }
+}
+/* A finger needs more than a pointer. */
+@media (pointer: coarse) {
+  .map-places .group { padding: 10px 0 7px; }
+  .map-places .row { padding: 7px 8px; }
+  .map-places .rail { width: 15px; }
+}
+
+/* ── the card ── */
+.city-map.listed .map-strip { z-index: 0; left: auto; right: 28px; top: auto; bottom: 48px; width: 320px; max-height: 760px; padding: 0; overflow: visible; text-align: right; text-shadow: var(--map-halo); background: none; border: 0; clip-path: none; }
+.city-map.listed .map-strip .body { display: flex; flex-direction: column-reverse; animation-name: map-print-up; }
+@keyframes map-print-up { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(-100px -100px -100px -100px); } }
+.city-map.listed .map-strip .t { font: 600 38px/1 var(--map-teko); letter-spacing: 0.03em; color: #fff; }
+.city-map.listed .map-strip .s { margin: 8px 0 2px; font: 15px/1.25 var(--map-pixel); letter-spacing: 0.16em; color: var(--map-amber); }
+.city-map.listed .map-strip .readout { display: flex; flex-direction: column-reverse; margin: 0 0 8px; }
+.city-map.listed .map-strip .readout > div { margin-top: 7px; }
+.city-map.listed .map-strip .readout dt { padding: 0; font: 15px/1.25 var(--map-pixel); letter-spacing: 0.16em; color: var(--map-amber); white-space: normal; }
+.city-map.listed .map-strip .readout dd { font: 13px/1.45 var(--map-mono); color: #fff; }
+.city-map.listed .map-strip .sec { margin-bottom: 8px; }
+.city-map.listed .map-strip .dh { margin: 0 0 6px; font: 600 19px/1 var(--map-teko); letter-spacing: 0.14em; color: var(--map-green); }
+.city-map.listed .map-strip .who { justify-content: flex-end; }
+.city-map.listed .map-strip .none { font: 15px/1.25 var(--map-pixel); letter-spacing: 0.16em; color: rgba(238, 247, 240, 0.6); }
+.city-map.listed .map-strip .acts { justify-content: flex-end; flex-wrap: wrap; margin: 0; padding: 0 0 12px; }
+.city-map.listed .map-strip .why { font: 15px/1.25 var(--map-pixel); letter-spacing: 0.16em; text-transform: uppercase; color: rgba(238, 247, 240, 0.6); }
+.city-map.listed .map-strip .gig-open { transform: none; text-shadow: none; }
+.city-map.listed .map-go { position: static; translate: none; }
+.city-map.listed .map-go :is(.go, .go-comms) { padding: 4px 20px 2px; font: 600 21px/1.1 var(--map-teko); letter-spacing: 0.14em; color: #05020c; background: var(--map-green); text-shadow: none; transform: none; }
+.city-map.listed .map-go .go-comms { background: var(--map-pink); }
+.city-map.listed .map-go :is(.go, .go-comms):disabled { color: rgba(238, 247, 240, 0.4); background: rgba(61, 255, 122, 0.14); }
+.city-map.listed .map-go .invite { font: 15px/1.25 var(--map-pixel); background: none; }
+/* The rooms inside, turned to read from the right. */
+.city-map.listed .map-strip .map-inside { position: static; padding: 0; background: none; border: 0; box-shadow: none; transform: none; white-space: normal; }
+.city-map.listed .map-strip .map-inside li { flex-direction: row-reverse; padding-left: 0; font: 15px/1.35 var(--map-pixel); transform: none; color: #fff; }
+.city-map.listed .map-strip .map-inside li::before { content: '┘'; }
+.city-map.listed .map-strip .map-inside li[data-depth='2'] { padding-right: 14px; }
+.city-map.listed .map-strip .map-inside li[data-depth='3'] { padding-right: 28px; }
+.city-map.listed .map-strip .map-inside li[data-depth='4'] { padding-right: 42px; }

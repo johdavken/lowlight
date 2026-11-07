@@ -21,6 +21,18 @@ async function catalogWith(json: unknown = LIST, status = 200, now = () => 0) {
   return createModelCatalog({ baseUrl: stub.url, apiKey: () => 'sk-or-cat', now });
 }
 
+describe('createModelPicker.choose', () => {
+  it('refuses a model off the list, unless she is already on it', async () => {
+    const catalog = await catalogWith();
+    let stored = 'gone/old-model';
+    const picker = createModelPicker({ catalog, defaultModel: 'z-ai/glm-5.2', provider: 'openrouter', curated: () => [], store: { get: () => stored, set: (id) => (stored = id ?? 'z-ai/glm-5.2') }, credit: async () => null });
+    expect(await picker.choose('gone/old-model')).toBeNull();
+    expect(await picker.choose('gone/other-model')).toBe('unknown-model');
+    expect(await picker.choose('deepseek/deepseek-v3.2')).toBeNull();
+    expect(stored).toBe('deepseek/deepseek-v3.2');
+  });
+});
+
 describe('createModelCatalog', () => {
   it('labels strip the provider prefix and prices are per million tokens', async () => {
     const c = await catalogWith();
@@ -28,6 +40,19 @@ describe('createModelCatalog', () => {
     expect(glm).toEqual({ id: 'z-ai/glm-5.2', label: 'GLM 5.2', priceIn: 0.4, priceOut: 1.6 });
     expect(c.labelFor('z-ai/glm-5.2')).toBe('GLM 5.2');
     expect(c.labelFor('unknown/thing')).toBe('thing');
+  });
+
+  it("leaves out a model that says it can't call tools; one that doesn't say stays, and context comes through", async () => {
+    const c = await catalogWith({
+      data: [
+        { id: 'a/tools', name: 'A: Tools', supported_parameters: ['tools', 'temperature'], context_length: 131072 },
+        { id: 'a/no-tools', name: 'A: No Tools', supported_parameters: ['temperature'] },
+        { id: 'a/silent', name: 'A: Silent' },
+      ],
+    });
+    expect((await c.list())?.map((m) => m.id)).toEqual(['a/tools', 'a/silent']);
+    expect((await c.get('a/tools'))?.context).toBe(131072);
+    expect(await c.get('a/no-tools')).toBeNull();
   });
 
   it('is cached for an hour', async () => {
@@ -97,8 +122,14 @@ describe('createModelPicker', () => {
     const { picker } = await pickerWith(['deepseek/deepseek-v3.2', 'z-ai/glm-5.2', 'other/x']);
     const e = await picker.event();
     expect(e).toMatchObject({ type: 'model', model: 'z-ai/glm-5.2', provider: 'openrouter', label: 'GLM 5.2', backend: 'direct', credit: 4.12 });
-    expect(e.choices!.map((c) => c.id)).toEqual(['z-ai/glm-5.2', 'deepseek/deepseek-v3.2', 'other/x']);
-    expect(e.choices![2]).toEqual({ id: 'other/x', label: 'x', priceIn: null, priceOut: null });
+    expect(e.choices!.map((c) => c.id)).toEqual(['z-ai/glm-5.2', 'deepseek/deepseek-v3.2']);
+  });
+
+  it('a recent off the list is not offered, but she keeps her current one, by its id', async () => {
+    const { picker } = await pickerWith(['other/x'], 'gone/old-model');
+    const e = await picker.event();
+    expect(e.choices!.map((c) => c.id)).toEqual(['z-ai/glm-5.2', 'gone/old-model']);
+    expect(e.choices![1]).toEqual({ id: 'gone/old-model', label: 'old-model', priceIn: null, priceOut: null });
   });
 
   it('a current model picked with OTHER is in the list too', async () => {
@@ -174,7 +205,7 @@ describe('createAnthropicCatalog / createRoutedCatalog', () => {
 
 describe('createModelPicker: via', () => {
   it('marks the choices that run through the Anthropic key', async () => {
-    const catalog = await catalogWith();
+    const catalog = await catalogWith({ data: [...LIST.data, { id: 'anthropic/claude-sonnet-5.5', name: 'Anthropic: Claude Sonnet 5.5' }] });
     const picker = createModelPicker({
       catalog,
       defaultModel: 'z-ai/glm-5.2',

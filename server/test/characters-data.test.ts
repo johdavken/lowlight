@@ -51,9 +51,9 @@ describe("the shipped characters, in rooms", () => {
     expect(loadResidents(dir, () => {}).get('hae')?.pronoun).toBe('she');
   });
 
-  it("Hae wears work2 at karasu/noodle-stall", () => {
+  it("Hae wears work at karasu/noodle-stall", () => {
     const hae = loadResidents(path.join(root, 'characters'), () => {}).get('hae')!;
-    expect(hae.sprite.outfitByScene).toEqual({ 'karasu/noodle-stall': 'work2' });
+    expect(hae.sprite.outfitByScene).toEqual({ 'karasu/noodle-stall': 'work' });
   });
 });
 

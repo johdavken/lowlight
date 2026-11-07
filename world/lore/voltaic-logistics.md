@@ -1,6 +1,7 @@
 ---
 title: Voltaic Logistics
 category: City
+section: Corps
 keys: [Voltaic, Voltaic Logistics, cranes, sky-freighters, hyper-trains, freight trains, shipping]
 districts: []
 places: []

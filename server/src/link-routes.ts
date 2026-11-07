@@ -149,7 +149,7 @@ export function registerLinkRoutes(
     return { thinking: o.settings.narratorThinking() };
   });
 
-  app.get<{ Querystring: { q?: string } }>('/api/models', async (req) => {
+  app.get<{ Querystring: { q?: string; all?: string } }>('/api/models', async (req) => {
     const all = await o.catalog.list();
     const byId = new Map((all ?? []).map((m) => [m.id, m]));
     const fallback = (id: string): ModelChoice => ({ id, label: modelLabel(id), priceIn: null, priceOut: null });
@@ -161,10 +161,11 @@ export function registerLinkRoutes(
     const picks = MODEL_PICKS.filter((p) => (!onlyAnthropic || p.id.startsWith('anthropic/')) && (all === null || byId.has(p.id))).map((p) => via({ ...(byId.get(p.id) ?? fallback(p.id)), why: p.why }));
     const recent = o.settings
       .recentModels()
-      .filter((id) => !onlyAnthropic || id.startsWith('anthropic/'))
+      .filter((id) => (!onlyAnthropic || id.startsWith('anthropic/')) && (all === null || byId.has(id)))
       .map((id) => via(byId.get(id) ?? fallback(id)));
     const q = (req.query.q ?? '').trim();
     const results = (q.length >= SEARCH_MIN ? ((await o.catalog.search(q, SEARCH_MAX)) ?? []) : []).map(via);
-    return { picks, recent, results };
+    // `all=1`, the model step's browse list: every model, or null with the catalog down.
+    return { picks, recent, results, ...(req.query.all === '1' ? { all: all?.map(via) ?? null } : {}) };
   });
 }

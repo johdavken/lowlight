@@ -498,3 +498,17 @@ describe('mentionsFlag (crew spec §2)', () => {
     expect(mentionsFlag(parse(JOB.replace('# desk\n', '# desk if cased=clean\n*Quick.*\n\n- grab: Grab it. → paid\n- skim: Skim it. → part\n\n# desk\n')), 'cased')).toBe(true);
   });
 });
+
+// Silas was in the player's ear with no tag: the tag needed a room, and the job had none yet (playtest).
+describe('comms: on a beat', () => {
+  const file = (line: string) => TRAIL.replace(/^(# \S+)$/m, `$1\n${line}`);
+  it('marks the contact on the line, with no room', () => {
+    const r = parseQuestFile('t', file('comms: yes'), { roster, places });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect([...r.entry.beats.values()].flat().some((b) => b.onComms === true && !b.room)).toBe(true);
+  });
+  it("doesn't reach the beat's text", () => {
+    const r = parseQuestFile('t', file('comms: yes'), { roster, places });
+    if (r.ok) expect(JSON.stringify([...r.entry.beats.values()])).not.toContain('comms: yes');
+  });
+});

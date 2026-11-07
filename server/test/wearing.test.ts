@@ -80,6 +80,14 @@ describe('wearingEntries', () => {
     expect(wearingEntries({ ...base, sceneId: 'karasu/zhou-flat', others }).map((e) => e.name)).toEqual(['Ember', 'Nix', 'Hae']);
   });
 
+  it("PEOPLE's pick beats the scene for her and the others; no pick, the scene dresses them", () => {
+    const others = [{ id: 'hae', name: 'Hae', pronoun: 'she' as const }];
+    const picks: Record<string, string> = { ember: 'indoors' };
+    const pick = (id: string) => picks[id] ?? null;
+    expect(wearingEntries({ ...base, sceneId: 'karasu/zhou-flat', others, pick }).map((e) => e.text)).toEqual(['black crop top', 'grey coat', 'apron']);
+    expect(wearingEntries({ ...base, sceneId: 'karasu/zhou-flat', others, pick: () => null }).map((e) => e.text)).toEqual(['old hoodie', 'grey coat', 'apron']);
+  });
+
   it('a player with no sprite (a persona) has no entry', () => {
     expect(wearingEntries({ ...base, sceneId: 'x', player: { id: 'you', name: 'You', pronoun: 'they' } }).map((e) => e.name)).toEqual(['Ember']);
   });

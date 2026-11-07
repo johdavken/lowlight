@@ -10,10 +10,10 @@ vi.mock('../../shared/crew-fold', async (orig) => {
 
 import { buildApp } from '../src/app';
 import { openDb, type Db } from '../src/db';
-import { crewKey } from '../src/crew-view';
+import { crewKey, freeHireWaiting } from '../src/crew-view';
 import { makeFixture } from './fixtures/agents';
 import { chunk, startStubOpenRouter } from './fixtures/stub-openrouter';
-import { foldWithCrew, type CrewEvent } from '../../shared/crew-fold';
+import { foldWithCrew, type CrewEvent, type CrewState } from '../../shared/crew-fold';
 import type { Recruit } from '../../shared/crew';
 import type { ChatMessage } from '../../shared/types';
 import { questKey } from '../../shared/quests';
@@ -307,5 +307,30 @@ describe('a job card on GET /api/crew (crew spec §5)', () => {
     const lh = v.hires.find((h: { place: string }) => h.place === 'long-haul');
     const card = lh.cards.find((c: { from?: unknown }) => c.from);
     expect(card).toMatchObject({ cost: 0, loyalty: 50, from: { job: questKey(s.pt.player, 'weigh-station@0'), title: 'Weigh Station' }, recruit: { spec: 'muscle', grade: 1 } });
+  });
+
+  it("/api/kit crewFree: a job's free card lights the dot until it's hired or 06:00 takes it", async () => {
+    const s = await start();
+    const kit = async () => JSON.parse((await s.built.app.inject({ method: 'GET', url: '/api/kit' })).body).kit;
+    const db = s.open('nix');
+    expect((await kit()).crewFree).toBe(false);
+    db.insertMessage(s.pt.player, line('n1', 10));
+    db.setReplyStamp({ messageId: 'n1', take: 0 });
+    const run = { variant: 0, wait: null, picks: [], flags: {}, at: 1, beat: null, done: true, take: 'full', setup: { approach: 'quiet', people: [], favour: false, at: 1100, endAt: 1150 }, recruit: { spec: 'muscle', grade: 1, pitch: 'I lift.' } };
+    db.setMeta(questKey(s.pt.player, 'weigh-station@0'), JSON.stringify(run));
+    db.setReplyStamp(null);
+    expect((await kit()).crewFree).toBe(true);
+    const v = JSON.parse((await s.built.app.inject({ method: 'GET', url: '/api/crew' })).body).crew;
+    const card = v.hires.find((h: { place: string }) => h.place === 'long-haul').cards.find((c: { from?: unknown }) => c.from);
+    expect(card.recruit.pitch).toBe('I lift.');
+    write(db, s.pt.player, card.recruit.id, [{ ...hire, recruit: card.recruit }], 'n2');
+    expect((await kit()).crewFree).toBe(false);
+  });
+
+  it('crewFree goes out at the next 06:00', () => {
+    const j = { runKey: 'k', endAt: 1200 };
+    const o = { crew: { members: [] } as unknown as CrewState, seed: 's', jobCards: [j] };
+    expect(freeHireWaiting({ ...o, now: 1300 })).toBe(true);
+    expect(freeHireWaiting({ ...o, now: 1800 })).toBe(false);
   });
 });

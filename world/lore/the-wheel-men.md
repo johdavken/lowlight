@@ -1,6 +1,7 @@
 ---
 title: The Wheel-Men
 category: Factions
+section: Gangs
 keys: [Wheel-Men, Wheel Men, wheel man, Strand gang, barkers, boardwalk racket]
 districts: [strand]
 places: []

@@ -6,6 +6,8 @@ tier: 1
 starts: long-haul
 after: null
 pitch: A man in a grey coat in the corner booth wants a look inside a hauler's trailer before it crosses into Nexus at dawn. He doesn't say who he works for. He doesn't have to.
+posted-by: A man in a grey coat. He doesn't say who he works for.
+brief: One of the rigs outside the Long Haul has a floor that sits too high. Look under it while the driver sleeps, leave everything where it was, and report back to the booth.
 pay: 90-110
 ---
 

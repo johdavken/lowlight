@@ -1,6 +1,7 @@
 ---
 title: The Co-ops
 category: Factions
+section: Institutions
 keys: [co-ops, co-op, mutual aid, street clinic, sliding scale, free clinic]
 districts: []
 places: [lowlight-intake]

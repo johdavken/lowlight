@@ -93,8 +93,8 @@ test('SETUP and the table: a guest is a foil card, with her bust and GUEST', asy
 });
 
 test('a beat with a song takes the music over the table, and hands it back', async ({ page }) => {
-  const songs = ((await (await page.request.get('/api/songs')).json()) as { songs: { title: string; url: string }[] }).songs;
-  const song = songs.find((s) => !s.url.includes('Nix')) ?? songs[0];
+  // A beat's own track: it's never a room's song, so the room can't be what's heard.
+  const song = ((await (await page.request.get('/api/songs')).json()) as { beats: { title: string; url: string }[] }).beats[0];
   let sing: string | undefined = song.title;
   let last: { state: { active?: { song?: string } | null } } | null = null;
   let toPage: (m: string) => void = () => {};
@@ -171,6 +171,38 @@ test('a beat in another room: the room, the contact on the line in CRT, a guest 
   await expect.poll(() => page.evaluate(() => window.__nixRoom!.viewScene?.())).not.toBe('nexus/spectra-archive');
 });
 
+test('a beat with the contact on the line and no room: the tag and CRT, the same room, the figure stays', async ({ page }) => {
+  await page.routeWebSocket(/\/ws|\/socket|\/api/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => {
+      if (typeof m !== 'string' || !m.includes('"quest_state"')) return ws.send(m);
+      const e = JSON.parse(m) as { state: { active?: { comms?: boolean } | null } };
+      if (e.state.active) e.state.active.comms = true;
+      ws.send(JSON.stringify(e));
+    });
+  });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await skipSplash(page);
+  await enter(page);
+  if ((await scene(page).textContent()) !== 'LOWLIGHT INTAKE') {
+    await send(page, { type: 'dev_action', tool: 'go_to', args: { id: 'lowlight-intake', transition: 'fade' } });
+    await expect(scene(page)).toHaveText('LOWLIGHT INTAKE', { timeout: 10_000 });
+    await enter(page);
+  }
+  await page.locator('.hud-quest').click();
+  await page.locator('.ql-row.ql-job').first().click();
+  await page.locator('.ql-file .ql-start').click();
+  await page.locator('.ts-go').click();
+  await expect(page.locator('.feed-root.on-line')).toHaveCount(1, { timeout: 15_000 });
+  await expect(page.locator('#whos-here .wh-role', { hasText: 'ON COMMS' })).toHaveCount(1);
+  await expect(scene(page)).toHaveText('LOWLIGHT INTAKE');
+  await expect(page.locator('#stage-figures.on-comms')).toHaveCount(0);
+  // Her reply finishes here: one still streaming runs into the next test's playthrough.
+  await page.waitForTimeout(2500);
+  await page.screenshot({ path: 'test-results/on-the-line.png' });
+});
+
 test('a full hand in another room: three crew and a Q3 deck, and no inset to clear', async ({ page }) => {
   const person = (id: string, name: string) => ({ id, name, spec: 'runner', grade: 2, toNext: 2, face: null, traits: [], free: 1, risk: null, down: false, abilities: [] });
   await page.routeWebSocket(/\/ws|\/socket|\/api/, (ws) => {
@@ -197,7 +229,8 @@ test('a full hand in another room: three crew and a Q3 deck, and no inset to cle
     await enter(page);
   }
   await page.locator('.hud-quest').click();
-  await page.locator('.ql-row.ql-job').first().click();
+  // Its line is Night Shift's: Back Door posts too, in either order.
+  await page.locator('.ql-row.ql-job', { hasText: /night shift/i }).click();
   await page.locator('.ql-file .ql-start').click();
   await page.locator('.ts-go').click();
   await expect(page.locator('.feed-root.on-line')).toHaveCount(1, { timeout: 15_000 });
@@ -227,6 +260,15 @@ test('RUMORS: the rumor, START, the offer, then its pieces wait on ELSEWHERE', a
   await expect(take).toBeVisible({ timeout: 10_000 });
   await take.click();
   await expect(page.locator('.qc-card:visible, .tb-card:visible')).toHaveCount(0, { timeout: 15_000 });
+  // The pick back to the wait: its outcome stays up through her answer, and nothing has ended.
+  await expect(page.locator('.qc-story')).toContainText('He closes the ledger.');
+  await expect(page.locator('.qc-end')).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => document.querySelectorAll('.msg.agent').length)).toBeGreaterThan(0);
+  await page.waitForTimeout(1500);
+  await expect(page.locator('.qc-story')).toContainText('He closes the ledger.');
+  await page.screenshot({ path: 'test-results/contract-outcome.png' });
+  await page.locator('.qc-close').click();
+  await expect(page.locator('.qc-story')).toHaveCount(0);
   await page.keyboard.press('Alt+KeyQ');
   await page.locator('.ql-tab[data-tab="away"]').click();
   await expect(page.locator('.ql-piece')).toHaveCount(3);

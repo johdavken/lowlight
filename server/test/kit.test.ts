@@ -7,6 +7,7 @@ import { openDb, type Db } from '../src/db';
 import { makeFixture } from './fixtures/agents';
 import { chunk, startStubOpenRouter } from './fixtures/stub-openrouter';
 import { questKey } from '../../shared/quests';
+import { STARTER_DECK } from '../../shared/mission';
 import { MISSION } from '../../shared/quests.fixture';
 import { fixerKey } from '../../shared/stock';
 import { DEFAULT_STATS } from '../../shared/stats';
@@ -64,7 +65,8 @@ describe('the kit across the playthrough', () => {
     cass.setReplyStamp({ messageId: 'c20', take: 0 });
     cass.setMeta(questKey(player, 'job-b'), runWith([{ at: 1310, sol: 50, heat: 2 }]));
     cass.setReplyStamp(null);
-    expect(s.built.world.kitOf(player)).toMatchObject({ kit: { sol: 150, heat: { unknown: 2 }, deck: null }, stats: DEFAULT_STATS });
+    // No starting deck: she carries the Pocket deck everyone owns.
+    expect(s.built.world.kitOf(player)).toMatchObject({ kit: { sol: 150, heat: { unknown: 2 }, deck: STARTER_DECK }, stats: DEFAULT_STATS });
   });
 
   it('branch above a paying row drops its sol', async () => {
@@ -88,7 +90,8 @@ describe('the kit across the playthrough', () => {
     const res = await s.built.app.inject({ method: 'GET', url: '/api/kit' });
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({
-      kit: { deck: null, owned: [], sol: 0, heat: 0, heatHere: 0, here: null, heatBy: {}, hottest: null, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: 5, nerveMax: 5, stats: DEFAULT_STATS, crewLatest: null, crewPicks: false },
+      // The Pocket deck everyone owns, carried with no other; its catalog row is the live world/gear/decks.md, so match by id.
+      kit: { deck: expect.objectContaining({ id: STARTER_DECK }), owned: [expect.objectContaining({ id: STARTER_DECK })], sol: 0, heat: 0, heatHere: 0, here: null, heatBy: {}, hottest: null, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: 5, nerveMax: 5, stats: DEFAULT_STATS, crewLatest: null, crewPicks: false, crewFree: false },
     });
   });
 

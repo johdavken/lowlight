@@ -21,7 +21,7 @@ function leadProblem(q: QuestEntry, leads: LeadEntry[]): string | null {
  * roster, a place not on the map, a branch that goes nowhere) warns once and is skipped; a missing
  * folder is an empty book. With `leads`, so is a contract whose lead isn't in that book or doesn't point at its contact.
  */
-export function loadQuestBook(dir: string, known: { roster: ReadonlySet<string>; places: ReadonlySet<string>; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string> } | null; decks?: ReadonlySet<string> | null }, warn: (m: string) => void, leads?: LeadEntry[]): QuestEntry[] {
+export function loadQuestBook(dir: string, known: { roster: ReadonlySet<string>; places: ReadonlySet<string>; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string> } | null; decks?: ReadonlySet<string> | null; outfits?: ReadonlySet<string> | null }, warn: (m: string) => void, leads?: LeadEntry[]): QuestEntry[] {
   let names: fs.Dirent[];
   try {
     names = fs.readdirSync(dir, { withFileTypes: true });

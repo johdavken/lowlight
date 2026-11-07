@@ -44,7 +44,8 @@
   },
   "sprite": {
     "src": "ines-base.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.387
   },
   "expressions": {
     "annoyed": "ines-annoyed.png",

@@ -15,7 +15,7 @@ describe('the board tells stories, jobs and one-offs apart', () => {
       { id: 'trail', title: 'Paper Trail', pitch: null, timed: false },
       { id: 'book', title: 'The Book of Names', pitch: null, timed: false, once: true, mission: { pay: 320, tier: 1 } },
     ]));
-    expect([...h.querySelectorAll('.ql-group')].map((g) => g.textContent)).toEqual(['STORY', 'JOBS · ON THE TABLE']);
+    expect([...h.querySelectorAll('.ql-group')].map((g) => g.textContent)).toEqual(['STORY', 'ON THE TABLE']);
     const rows = [...h.querySelectorAll<HTMLElement>('.ql-row')];
     expect(rows.map((r) => [r.querySelector('.ql-title')!.textContent, r.className])).toEqual([
       ['Paper Trail', 'ql-row ql-story'],
@@ -205,5 +205,15 @@ describe('a contract waiting', () => {
     expect([...h.querySelectorAll('.ql-piece')].map((p) => p.textContent)).toEqual(['BOAT · SEND MUSCLE', 'ROOF · OUT', 'GOODWILL · BACK']);
     h.querySelector<HTMLButtonElement>('.ql-walk')!.click();
     expect(onWalk).toHaveBeenCalledWith('c');
+  });
+
+  it("a job's file says who posted it, then the pitch, then what it involves", () => {
+    const h = document.createElement('div');
+    document.body.append(h);
+    const list = mountQuestList(h, { onStart: vi.fn() });
+    list.show(state([{ id: 'night', title: 'Night Shift', pitch: 'A crate.', postedBy: 'A man in a grey coat.', brief: 'Open it.', timed: false, mission: { pay: 400, tier: 1 } }]));
+    list.toggle();
+    const parts = [...h.querySelectorAll('.ql-file .ql-postedby, .ql-file .ql-pitch, .ql-file .ql-brief')].map((e) => e.textContent);
+    expect(parts).toEqual(['POSTED BY A man in a grey coat.', 'A crate.', 'Open it.']);
   });
 });

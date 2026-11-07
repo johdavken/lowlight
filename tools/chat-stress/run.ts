@@ -18,7 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
 import { earlierOf, flagsOf, summary, type Expect, type TurnRecord } from './analyze';
-import { cleanup, cleanupDetached, inGroup, killGroup, portFree, stopGroup, whoListens } from './scratch';
+import { cleanup, cleanupDetached, inGroup, killGroup, portFree, stopGroup, whoListens, defaultModelsOnly } from './scratch';
 import { traceLines, waitForResidual } from './trace';
 
 interface Script {
@@ -26,7 +26,8 @@ interface Script {
   turns: { text: string; mode?: 'rp' | 'ooc'; expect?: Expect }[];
 }
 
-const REPO = path.resolve(import.meta.dirname, '..', '..');
+/** The main checkout, from a worktree too: data/ and node_modules are only there. */
+const REPO = path.dirname(spawnSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd: import.meta.dirname, encoding: 'utf8' }).stdout.trim());
 const TURN_TIMEOUT_MS = 180_000;
 /** How long a finished turn waits for its Residual to finish before it's recorded (the Residual's own limit is 60 s). */
 const RESIDUAL_WAIT_LIMIT_MS = 65_000;
@@ -62,12 +63,18 @@ function prepare(o: ReturnType<typeof args>): { src: string; data: string } {
   const src = path.join(o.out, 'src');
   const data = path.join(o.out, 'data');
   fs.mkdirSync(src, { recursive: true });
-  const archive = spawnSync('git', ['archive', o.ref], { cwd: REPO, maxBuffer: 1 << 30 });
+  // Through a file: the tree is past 1 GiB, more than spawnSync will buffer (it died with no message).
+  const tarball = path.join(o.out, 'src.tar');
+  const archive = spawnSync('git', ['archive', `--output=${tarball}`, o.ref], { cwd: REPO });
   if (archive.status !== 0) throw new Error(`git archive ${o.ref} failed: ${archive.stderr.toString()}`);
-  const untar = spawnSync('tar', ['-x', '-C', src], { input: archive.stdout });
+  const untar = spawnSync('tar', ['-xf', tarball, '-C', src]);
   if (untar.status !== 0) throw new Error(`tar failed: ${untar.stderr.toString()}`);
+  fs.rmSync(tarball);
   fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(src, 'node_modules'));
   fs.cpSync(path.join(REPO, 'data'), data, { recursive: true });
+  // GLM, the model the baselines were run on: a character's own pick (Claude through the Anthropic key, say) is not.
+  const models = defaultModelsOnly(data);
+  if (models.dropped.length > 0 || models.anthropicKey) console.log(`models: every contact on her default; dropped ${[...models.dropped, ...(models.anthropicKey ? ['the Anthropic key'] : [])].join(', ')}`);
   run('npx', ['vite', 'build'], src);
   return { src, data };
 }

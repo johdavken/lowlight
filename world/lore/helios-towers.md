@@ -1,6 +1,7 @@
 ---
 title: Helios Towers
 category: City
+section: Districts
 keys: [Helios Towers, the Towers, Helios, corp district, five towers, tower city]
 districts: [helios]
 places: []

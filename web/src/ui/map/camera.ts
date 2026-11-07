@@ -65,6 +65,12 @@ export function clampView(v: View, map: Size, screen: Size): View {
   return { scale: v.scale, tx: fit(v.tx, map.w, screen.w), ty: fit(v.ty, map.h, screen.h) };
 }
 
+/** `v` moved so the city still covers the screen, each way. */
+export function coverView(v: View, map: Size, screen: Size): View {
+  const fit = (t: number, m: number, s: number) => Math.min(0, Math.max(s - m * v.scale, t));
+  return { scale: v.scale, tx: fit(v.tx, map.w, screen.w), ty: fit(v.ty, map.h, screen.h) };
+}
+
 /** The whole city: 1×, centred. */
 export function cityView(map: Size, screen: Size): View {
   return clampView({ scale: 1, tx: (screen.w - map.w) / 2, ty: (screen.h - map.h) / 2 }, map, screen);

@@ -3,7 +3,7 @@ import path from 'node:path';
 
 const AUDIO = /\.(ogg|mp3|wav)$/i;
 const IMAGE = /\.(png|jpe?g|webp)$/i;
-const FULL = /^(scenes|web\/public\/sound|world\/splash|world\/districts)\//;
+const FULL = /^(scenes|web\/public\/sound|world\/splash|world\/districts|world\/lore)\//;
 
 /** Files under `dir` matching `re`, as forward-slash paths relative to `dir`. */
 function files(dir: string, re: RegExp): string[] {
@@ -78,7 +78,7 @@ function credits(text: string, restrictedOnly = false): { full: Set<string>; pic
 }
 
 /** The uncredited files among scene audio (by pack folder), shared sounds, splash images and theme songs, and district art. */
-function scan(packDirs: { pack: string; dir: string }[], soundDir: string, splashDir: string, districtsDir: string, creditsText: string): string[] {
+function scan(packDirs: { pack: string; dir: string }[], soundDir: string, splashDir: string, districtsDir: string, creditsText: string, loreDir?: string): string[] {
   const { full, picks, freePicks } = credits(creditsText);
   const missing: string[] = [];
   for (const { pack, dir } of packDirs) {
@@ -98,6 +98,10 @@ function scan(packDirs: { pack: string; dir: string }[], soundDir: string, splas
   for (const rel of files(districtsDir, IMAGE)) {
     if (!full.has(`world/districts/${rel}`)) missing.push(`world/districts/${rel}`);
   }
+  // Lore pictures (corp logos), beside their entries.
+  for (const rel of loreDir ? files(loreDir, IMAGE) : []) {
+    if (!full.has(`world/lore/${rel}`)) missing.push(`world/lore/${rel}`);
+  }
   return missing.sort();
 }
 
@@ -105,12 +109,12 @@ const packsIn = (scenesDir: string) => (fs.existsSync(scenesDir) ? fs.readdirSyn
 
 /** Shipped audio and splash images with no entry in CREDITS.md (spec §3.3), from a stage and the built front end, sorted. */
 export function uncredited(stageDir: string, webDistDir: string, creditsText: string): string[] {
-  return scan(packsIn(path.join(stageDir, 'scenes')), path.join(webDistDir, 'sound'), path.join(stageDir, 'world', 'splash'), path.join(stageDir, 'world', 'districts'), creditsText);
+  return scan(packsIn(path.join(stageDir, 'scenes')), path.join(webDistDir, 'sound'), path.join(stageDir, 'world', 'splash'), path.join(stageDir, 'world', 'districts'), creditsText, path.join(stageDir, 'world', 'lore'));
 }
 
 /** The same check read from the repo in place, for Studio's checks: the shipped packs, web/public/sound, world/splash. */
 export function uncreditedSources(root: string, packs: string[], creditsText: string): string[] {
-  return scan(packs.map((pack) => ({ pack, dir: path.join(root, 'scenes', pack) })), path.join(root, 'web', 'public', 'sound'), path.join(root, 'world', 'splash'), path.join(root, 'world', 'districts'), creditsText);
+  return scan(packs.map((pack) => ({ pack, dir: path.join(root, 'scenes', pack) })), path.join(root, 'web', 'public', 'sound'), path.join(root, 'world', 'splash'), path.join(root, 'world', 'districts'), creditsText, path.join(root, 'world', 'lore'));
 }
 
 export type AudioStatus = 'public' | 'restricted' | 'unlisted';

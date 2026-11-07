@@ -91,7 +91,7 @@ async function start(
     fs.copyFileSync(path.join(__dirname, '..', '..', 'characters', 'nix-direct', 'nix-direct-outfit-outdoors.png'), path.join(dir, `${id}.png`));
   }
   // Hae, the noodle stall's resident (a fixed character), copied from the repo.
-  if (overrides.hae) fs.cpSync(path.join(__dirname, '..', '..', 'characters', 'hae'), path.join(cfg.charactersDir, 'hae'), { recursive: true });
+  if (overrides.hae) copyHaeWithAFace(cfg.charactersDir);
   if (overrides.persona) {
     fs.mkdirSync(cfg.personaDir, { recursive: true });
     fs.writeFileSync(path.join(cfg.personaDir, 'persona.json'), JSON.stringify(overrides.persona));
@@ -177,6 +177,14 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2000): Promise<void
     if (Date.now() - start_ > timeoutMs) throw new Error('waitFor: timed out');
     await new Promise((r) => setTimeout(r, 10));
   }
+}
+
+/** The shipped Hae has no faces, so the copy gets one: these tests cover a resident who has them. */
+function copyHaeWithAFace(charactersDir: string): void {
+  const dir = path.join(charactersDir, 'hae');
+  fs.cpSync(path.join(__dirname, '..', '..', 'characters', 'hae'), dir, { recursive: true });
+  const file = path.join(dir, 'character.json');
+  fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), expressions: { happy: 'hae-outfit-work.png' } }));
 }
 
 describe('buildApp / websocket hub', () => {
@@ -383,6 +391,16 @@ describe('buildApp / websocket hub', () => {
     await fetch(`${base}/api/agents`); // re-reads the registry
     const { persona } = await (await fetch(`${base}/api/persona?as=nix`)).json();
     expect(persona.expressions).toEqual({ happy: '/api/agents/nix/sprite/happy' });
+  });
+
+  it("/api/persona sends the character's waist, so the player's figure meets the line too", async () => {
+    const { baseUrl, cfg } = await start({ cast: ['zed'], autoPlaythrough: false });
+    const file = path.join(cfg.charactersDir, 'zed', 'character.json');
+    const json = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...json, sprite: { ...json.sprite, waist: 0.417 } }));
+    await fetch(`${baseUrl}/api/agents`); // re-reads the registry
+    const { persona } = await (await fetch(`${baseUrl}/api/persona?as=zed`)).json();
+    expect(persona.sprite.waist).toBe(0.417);
   });
 
   it("/api/persona sends the character's file: bio paragraphs and facts (FILE on YOU)", async () => {
@@ -649,7 +667,7 @@ describe('buildApp / websocket hub', () => {
         withHae,
         { openrouterUrl: or.url },
       );
-      fs.cpSync(path.join(__dirname, '..', '..', 'characters', 'hae'), path.join(cfg.charactersDir, 'hae'), { recursive: true });
+      copyHaeWithAFace(cfg.charactersDir);
       const app = await buildApp(cfg);
       try {
         for (const id of ['nix', 'alpha']) {
@@ -672,7 +690,7 @@ describe('buildApp / websocket hub', () => {
 
   it('GET /api/residents/:id/…: her sprite, outfits, faces and thumb; 404 for unknown names and non-residents', async () => {
     const { baseUrl: base } = await start({ hae: true });
-    for (const url of ['/api/residents/hae/sprite', '/api/residents/hae/outfit/work2', '/api/residents/hae/sprite/happy', '/api/residents/hae/thumb']) {
+    for (const url of ['/api/residents/hae/sprite', '/api/residents/hae/outfit/work', '/api/residents/hae/sprite/happy', '/api/residents/hae/thumb']) {
       const ok = await fetch(`${base}${url}`);
       expect(ok.status, url).toBe(200);
       expect(ok.headers.get('content-type')).toContain('image/png');

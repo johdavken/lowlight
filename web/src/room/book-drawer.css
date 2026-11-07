@@ -1,0 +1,77 @@
+/* The lore drawer (book-drawer.ts, spec 2026-11-06): the holo pane's look in lilac, at the room's right, the scene still up. lb- only. */
+:root { --book-w: 580px; --book-a: #c9a8ff; }
+/* Its own layer on the game stage, over the JOB column's. Its right edge is the band's, as the column's is: the scene keys stand outside it. */
+.lb-layer { position: absolute; inset: 0; z-index: 26; pointer-events: none; }
+.lb-root {
+  --lb-teko: var(--cs-teko, 'Teko', var(--pixel));
+  position: absolute;
+  top: 90px;
+  right: var(--sub-x);
+  bottom: var(--feed-bottom, 70px);
+  width: var(--book-w);
+  display: flex;
+  flex-direction: column;
+  color: #e7e0f5;
+  background: linear-gradient(135deg, rgba(201, 168, 255, 0.15), rgba(255, 79, 139, 0.05) 60%, rgba(9, 4, 18, 0.86)), rgba(10, 6, 20, 0.78);
+  border: 1px solid rgba(201, 168, 255, 0.55);
+  box-shadow: 0 0 34px rgba(201, 168, 255, 0.13) inset;
+  clip-path: polygon(0 0, 96% 0, 100% 4%, 100% 100%, 4% 100%, 0 96%);
+  backdrop-filter: blur(3px);
+  pointer-events: auto;
+}
+.lb-root[hidden] { display: none; }
+.lb-root.lb-flicker { animation: ql-flicker-in 0.32s steps(1, end); }
+@media (prefers-reduced-motion: reduce) {
+  .lb-root.lb-flicker { animation: none; }
+}
+
+.lb-head { flex: none; display: flex; align-items: baseline; padding: 14px 25px 6px; font: 27px var(--pixel); letter-spacing: 0.3em; color: var(--book-a); }
+.lb-esc { margin-left: auto; font-size: 18px; letter-spacing: 0.2em; color: #a99cbd; }
+.lb-tabs { flex: none; display: flex; gap: 4px; padding: 6px 25px 0; border-bottom: 1px solid rgba(201, 168, 255, 0.35); }
+.lb-tab { font: 19px var(--pixel); letter-spacing: 0.2em; padding: 3px 16px; cursor: pointer; color: #a99cbd; background: none; border: 1px solid rgba(201, 168, 255, 0.25); border-bottom: 0; }
+.lb-tab.on { color: #160c26; background: var(--book-a); border-color: var(--book-a); }
+.lb-find { flex: none; margin: 8px 25px 2px; padding: 4px 12px; font: 19px var(--pixel); letter-spacing: 0.1em; color: #fff; background: rgba(10, 6, 18, 0.5); border: 1px solid rgba(201, 168, 255, 0.35); outline: none; }
+.lb-find:focus { border-color: var(--book-a); }
+.lb-find::placeholder { color: #a99cbd; }
+.lb-find[hidden] { display: none; }
+.lb-note { flex: none; padding: 8px 25px 0; font: 18px var(--pixel); letter-spacing: 0.16em; color: #ff9a9a; }
+.lb-note[hidden] { display: none; }
+
+.lb-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 0 22px; scrollbar-width: thin; scrollbar-color: rgba(201, 168, 255, 0.4) transparent; }
+.lb-grp { padding: 8px 25px 3px; font: 17px var(--pixel); letter-spacing: 0.24em; color: var(--book-a); }
+.lb-row,
+.lb-cat { display: block; width: 100%; text-align: left; cursor: pointer; color: inherit; background: none; border: 0; border-left: 3px solid transparent; }
+.lb-row { padding: 3px 22px; }
+.lb-row:hover,
+.lb-cat:hover { background: rgba(201, 168, 255, 0.08); }
+.lb-row.on { background: rgba(201, 168, 255, 0.16); border-left-color: var(--book-a); }
+.lb-row-title { display: block; font: 27px/1.15 var(--lb-teko); color: #f4eefc; }
+.lb-row-sub { display: block; font: 15px var(--pixel); letter-spacing: 0.16em; color: #a99cbd; }
+.lb-cat { padding: 6px 22px; font: 18px var(--pixel); letter-spacing: 0.2em; color: #a99cbd; }
+.lb-cat[aria-expanded='true'] { color: var(--book-a); }
+/* A section's fold, and its rows, a step in from the category's. */
+.lb-sec { padding: 4px 22px 4px 44px; font-size: 16px; }
+.lb-in .lb-row,
+.lb-in .lb-body { padding-left: 44px; }
+.lb-body {
+  padding: 6px 22px 11px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--chat-font, var(--mono));
+  font-size: calc(15px * var(--text-scale, 1));
+  line-height: 1.5;
+  background: rgba(201, 168, 255, 0.1);
+  border-left: 3px solid var(--book-a);
+}
+.lb-body p { margin: 0 0 8px; }
+/* A corp's logo over its entry (light grey and one colour on transparent): kept small, left, with room under it. */
+.lb-art { display: block; max-width: 70%; max-height: 92px; margin: 4px 0 10px; object-fit: contain; object-position: left center; }
+.lb-art.lb-art-tall { max-height: 150px; }
+.lb-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; }
+.lb-facts dt { font: 15px var(--pixel); letter-spacing: 0.16em; color: var(--book-a); }
+.lb-facts dd { margin: 0; }
+.lb-secret-head { margin-top: 10px; font: 15px var(--pixel); letter-spacing: 0.16em; color: var(--book-a); }
+.lb-body .lb-secret { margin: 2px 0 0; }
+
+/* Her line moves over while it's open, as the JOB column has it (job-column.css). At a table nothing moves: the drawer stands over the right of it (spec §6). */
+.feed-root.feed-stage.book-col:not(.job-col):not(.expanded) .feed { right: calc(var(--sub-x) + var(--book-w) + 24px); }

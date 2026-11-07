@@ -1,4 +1,7 @@
-/** The focused place's file, on a slanted strip at the map's right edge: its readout, who's there, then GIGS. GO rides on the pin's tag (buildGo). */
+/**
+ * The focused place's file, on a slanted strip at the map's right edge: its readout, who's there, then GIGS. GO rides on the
+ * pin's tag (buildGo). On the game's `listed` map it stands in the corner and reads upward from the name (map.css), GO on top.
+ */
 import { her } from '../../room/her-copy';
 import type { District, Place } from '../../../../shared/map-schema';
 import type { SideRoom } from '../../../../shared/exits';
@@ -13,6 +16,8 @@ export interface FileStripOpts {
   who: WhoIsWhere;
   /** GIGS: run a job from a gig place. Without it, no GIGS. */
   onGigs?: (place: Place, district: District) => void;
+  /** The game's map: no tags, so the card carries GO and the rooms inside. */
+  listed?: { go?: HTMLElement; inside?: HTMLElement };
 }
 
 export function buildFileStrip(o: FileStripOpts): HTMLElement {
@@ -23,18 +28,37 @@ export function buildFileStrip(o: FileStripOpts): HTMLElement {
   // Its dossier lines (world/readouts/<id>.md): a label, then the line.
   if (o.place.readout?.length) {
     const dl = el('dl', 'readout');
-    for (const r of o.place.readout) dl.append(el('dt', '', r.label), el('dd', '', r.text));
+    for (const r of o.place.readout) {
+      const pair = [el('dt', '', r.label), el('dd', '', r.text)];
+      // One box a line: the corner card turns the lines over, each keeping its label above it.
+      if (o.listed) {
+        const line = el('div', '');
+        line.append(...pair);
+        dl.append(line);
+      } else dl.append(...pair);
+    }
     body.append(dl);
   }
   const names = new Map<string, string>();
   const walk = (rooms: SideRoom[]): void => rooms.forEach((r) => (names.set(r.room, r.name), walk(r.inside)));
   walk(o.who.inside?.[o.place.id] ?? []);
-  body.append(peopleList(o.who.people.filter((m) => m.place === o.place.id), names));
+  const people = peopleList(o.who.people.filter((m) => m.place === o.place.id), names);
+  if (o.listed?.inside) body.append(section('INSIDE', o.listed.inside));
+  body.append(o.listed ? section("WHO'S HERE", people) : people);
   const acts = el('div', 'acts');
+  const why = o.listed && goBlocked(o.place, o.who);
+  if (why) acts.append(el('span', 'why', why));
   if (o.onGigs && o.place.gigs) acts.append(gigsControl(o.place, o.district, o.who, o.onGigs));
+  if (o.listed?.go) acts.append(o.listed.go);
   if (acts.childElementCount) body.append(acts);
   strip.append(body);
   return strip;
+}
+
+function section(title: string, content: HTMLElement): HTMLElement {
+  const s = el('div', 'sec');
+  s.append(el('div', 'dh', title), content);
+  return s;
 }
 
 /** Who's here; someone in one of the pin's side rooms says which. */

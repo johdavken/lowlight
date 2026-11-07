@@ -85,9 +85,9 @@ export function summaryDue(history: ChatMessage[], through: string | null): Chat
 /** The summary call: the Residual's opening, then the old summary and the lines about to drop. */
 export function summaryMessages(old: string | null, dropping: ChatMessage[], names: { self: string; player: string }): CompletionMessage[] {
   const lines = dropping
-    .map((m) => ({ m, c: toCompletion(m) }))
+    .map((m) => ({ m, c: toCompletion(m, names.player) }))
     .filter((x): x is { m: ChatMessage; c: CompletionMessage } => x.c !== null)
-    .map(({ m, c }) => `${m.role === 'user' ? names.player : names.self}: ${c.content.replace(/\s*\n\s*/g, ' ')}`);
+    .map(({ m, c }) => `${m.mode === 'quest' && m.role === 'user' ? 'Narrator' : m.role === 'user' ? names.player : names.self}: ${c.content.replace(/\s*\n\s*/g, ' ')}`);
   const system = [
     `You keep the records for a roleplay between ${names.self} and ${names.player}. You never write story. Now you keep its running summary: what happened tonight, in order, and the mood they're in now.`,
     `Fold the new lines into the summary so far. Keep the turns that matter and what led to them; drop small talk. Lasting facts are kept elsewhere: this is the flow of the night. Up to ${SUMMARY_MAX} characters of plain prose, past tense, no headings, no JSON.`,

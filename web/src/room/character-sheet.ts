@@ -9,6 +9,8 @@
  */
 import type { Fact, KitView, SpriteRef } from '../../../shared/types';
 import type { Deck } from '../../../shared/gear';
+import { EFFECT_HEAT } from '../../../shared/dice';
+import { WARY_HEAT } from '../../../shared/heat';
 import { repTier, TIER_NAMES } from '../../../shared/mission';
 import { SLOTS } from '../../../shared/programs';
 import type { StatKey } from '../../../shared/stats';
@@ -192,7 +194,7 @@ function streetPage(kit: KitView): HTMLElement {
   const n = el('div', 'cs-street');
   n.append(
     sec('tonight', 'TONIGHT', '', nerve, el('div', 'cs-line', 'Spent to push a roll or steady a cost on a job; back at 06:00.')),
-    sec('districts', 'DISTRICTS', '20 KNOWN · 45 TRUSTED · 75 A NAME', ...(rows.length ? [head, ...rows] : []), el('div', 'cs-line cs-after', `${here}Heat cools at 06:00; as it climbs, jobs there turn harder and favours dry up.`)),
+    sec('districts', 'DISTRICTS', '20 KNOWN · 45 TRUSTED · 75 A NAME', ...(rows.length ? [head, ...rows] : []), el('div', 'cs-line cs-after', `${here}Heat cools at 06:00. At ${WARY_HEAT} some jobs open warier and errands slip; at ${EFFECT_HEAT} rolls are a step smaller and favours stop.`)),
     planned('condition', 'CONDITION', emptyRow('HEALTH', '—'), emptyRow('THE HUM', '—')),
   );
   return n;

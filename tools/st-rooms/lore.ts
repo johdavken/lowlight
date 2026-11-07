@@ -1,5 +1,6 @@
 // Lowlight's lore book (world/lore/*.md) as a SillyTavern World Info book: one entry per file, triggered by its keys,
-// the always-on ones constant. Districts and places (Lowlight's own conditions) don't carry over.
+// the always-on ones constant. Districts and places (Lowlight's own conditions) don't carry over, and neither do
+// book-only entries: World Info is what the model reads.
 //
 // When more triggers than SillyTavern's budget holds, it keeps the highest `order` first, so the order ranks entries by
 // what a scene needs most (people, then places, then the city…). Lowlight ranks by how recently a key came up, which
@@ -69,8 +70,8 @@ const list = (v: string | undefined) =>
 
 export function worldInfoFrom(files: { name: string; text: string }[]): { entries: Record<string, WorldInfoEntry> } {
   const entries: Record<string, WorldInfoEntry> = {};
-  files.forEach((f, uid) => {
-    const { meta, body } = frontMatter(f.text);
+  const parsed = files.map((f) => ({ name: f.name, ...frontMatter(f.text) })).filter((f) => f.meta.only !== 'book');
+  parsed.forEach(({ name, meta, body }, uid) => {
     const always = meta.always === 'true';
     const scoped = list(meta.districts).length > 0 || list(meta.places).length > 0;
     const order = always ? ALWAYS_ORDER : (CATEGORY_ORDER[meta.category ?? ''] ?? CATEGORY_ORDER.City) - (scoped ? SCOPED_PENALTY : 0);
@@ -78,7 +79,7 @@ export function worldInfoFrom(files: { name: string; text: string }[]): { entrie
       uid,
       key: list(meta.keys),
       keysecondary: [],
-      comment: meta.title || f.name.replace(/\.md$/, ''),
+      comment: meta.title || name.replace(/\.md$/, ''),
       content: body,
       constant: always,
       selective: true,

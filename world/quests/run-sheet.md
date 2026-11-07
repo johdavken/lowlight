@@ -13,6 +13,8 @@ starts: rue-hab
 after: null
 trust: 1 / 2
 pitch: You schedule freight for Kestrel. She'd like to see you do it.
+posted-by: Rue
+brief: "Rue has work for a scheduler: a Kestrel run sheet from one particular night. She'll be on the line while it's done."
 pay: 90-110
 loot: a Kestrel run sheet, three years old
 ---
@@ -112,13 +114,15 @@ view rue: This job happened tonight and you heard all of it. You don't know whos
 - freight: Tell her it's a Kestrel audit mark. A scheduler would say so. → freight [set stamp=hidden]
 
 ## told
-*She doesn't say anything for a while. Then she folds the sheet into the jacket. The loader from the yard is waiting at the foot of the stair when you go down. He saw what you did and wrote nothing down, and he'd like to work for someone who isn't Kestrel. Nobody at the branch has ever heard of him.*
-gives: recruit muscle green
+*She doesn't say anything for a while. Then she folds the sheet into the jacket. The loader from the yard is waiting at the foot of the stair when you go down. {hire}, he says. He saw what you did and wrote nothing down, and he'd like to work for someone who isn't Kestrel. Nobody at the branch has ever heard of him.*
+gives: recruit muscle green man
+hire-pitch: Nine years loading for Kestrel. I saw what you did, and I never wrote it down.
 → end
 
 ## freight
-*"Audit," she says. She folds the sheet into the jacket. You can't tell what she believes. The loader from the yard is at the foot of the stair when you go down. He saw what you did, and he'd like to work for someone who isn't Kestrel. Nobody at the branch has ever heard of him.*
-gives: recruit muscle green
+*"Audit," she says. She folds the sheet into the jacket. You can't tell what she believes. The loader from the yard is at the foot of the stair when you go down. {hire}, he says. He saw what you did, and he'd like to work for someone who isn't Kestrel. Nobody you report to has ever heard of him.*
+gives: recruit muscle green man
+hire-pitch: Nine years loading for Kestrel. I saw what you did, and I never wrote it down.
 → end
 
 # burned

@@ -2322,7 +2322,7 @@ describe('ChatRelay per pair', () => {
 
   describe('cache-friendly order (scribe spec §7)', () => {
     const TEO: LoreEntry = { id: 'teo', title: 'Teo', keys: ['Teo'], districts: [], places: [], always: false, body: 'A runner who owes.' };
-    const lore: ChatRelayDeps['lore'] = (_scene, recent) => (recent[0]?.includes('Teo') ? { picks: [{ entry: TEO, why: 'key' }], dropped: [], chars: 20 } : { picks: [], dropped: [], chars: 0 });
+    const lore: ChatRelayDeps['lore'] = (_scene, recent) => (recent[0]?.text.includes('Teo') ? { picks: [{ entry: TEO, why: 'key' }], dropped: [], chars: 20 } : { picks: [], dropped: [], chars: 0 });
 
     it('two rp turns in a row share the request prefix up to the latest user message, though the lore changed', async () => {
       const { stub, turns } = await pairStub();
@@ -2440,7 +2440,7 @@ describe('ChatRelay per pair', () => {
       const { relay, db } = pairRelay(stub.url, {
         identity: () => 'I AM NIX',
         lore: (_scene, recent) => {
-          recents.push(recent);
+          recents.push(recent.map((l) => l.text));
           return { picks: [], dropped: [], chars: 0 };
         },
       });
@@ -2509,19 +2509,29 @@ describe('ChatRelay per pair', () => {
 
     it("gets the room's scene and recent text: this turn first, then up to four older lines, never the context lines", async () => {
       const { stub } = await pairStub();
-      const calls: { sceneId: string; recent: string[] }[] = [];
-      const { relay, room } = pairRelay(stub.url, { lore: (sceneId, recent) => (calls.push({ sceneId, recent }), { picks: [], dropped: [], chars: 0 }) });
+      const calls: { sceneId: string; recent: string[]; by: string[] }[] = [];
+      const { relay, room } = pairRelay(stub.url, { lore: (sceneId, recent) => (calls.push({ sceneId, recent: recent.map((l) => l.text), by: recent.map((l) => l.by) }), { picks: [], dropped: [], chars: 0 }) });
       for (const t of ['one', 'two', 'three', 'four']) await relay.send('cass', t);
-      expect(calls[0]).toEqual({ sceneId: room.state.sceneId, recent: ['one'] });
+      expect(calls[0]).toEqual({ sceneId: room.state.sceneId, recent: ['one'], by: ['you'] });
       expect(calls[2].recent).toEqual(['three', 'reply 2', 'two', 'reply 1', 'one']);
+      // Who wrote each line (lore picking spec §3): yours, hers.
+      expect(calls[2].by).toEqual(['you', 'them', 'you', 'them', 'you']);
       expect(calls[3].recent).toEqual(['four', 'reply 3', 'three', 'reply 2', 'two']);
       for (const c of calls) for (const r of c.recent) expect(r.startsWith('[')).toBe(false);
+    });
+
+    it('names who is in the scene: her and the turn\'s player (lore picking spec §2)', async () => {
+      const { stub } = await pairStub();
+      const present: (readonly string[] | undefined)[] = [];
+      const { relay } = pairRelay(stub.url, { lore: (_s, _r, _f, p) => (present.push(p), { picks: [], dropped: [], chars: 0 }) });
+      await relay.send('cass', 'hi');
+      expect(present[0]?.length).toBeGreaterThan(0);
     });
 
     it("a regenerate doesn't choose lore from the take it replaces", async () => {
       const { stub } = await pairStub();
       const calls: string[][] = [];
-      const { relay, db } = pairRelay(stub.url, { lore: (_s, recent) => (calls.push(recent), { picks: [], dropped: [], chars: 0 }) });
+      const { relay, db } = pairRelay(stub.url, { lore: (_s, recent) => (calls.push(recent.map((l) => l.text)), { picks: [], dropped: [], chars: 0 }) });
       await relay.send('cass', 'one');
       await relay.send('cass', 'two');
       const replyId = db.allMessages('cass').filter((m) => m.role === 'agent').at(-1)!.id;

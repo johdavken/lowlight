@@ -7,15 +7,15 @@ import { APPROACHES, MAX_CONTACTS, MAX_PEOPLE, type Approach } from '../../../..
 import type { SetupOffer } from '../../../../shared/types';
 import { cardEl, trayHead, mountDeal, type TableCard } from './deal';
 import { el, type TableCue } from './el';
-import { contactInfo, favourInfo, mountCardInfo, programInfo, recruitInfo, slotInfo, type Info } from './card-info';
+import { approachInfo, contactInfo, favourInfo, GOES_WRONG, mountCardInfo, programInfo, recruitInfo, slotInfo, type Info } from './card-info';
 import { mountTableShell } from './shell';
 import type { Tips } from './tips';
-import { artFace, contactFace, crewFace, deckLabel, programFace, slotFace } from './faces';
+import { approachFace, artFace, contactFace, crewFace, deckLabel, programFace, slotFace } from './faces';
 
-const APPROACH_FACE: Record<Approach, [string, string]> = {
-  quiet: ['QUIET', 'REFLEX · TECH +1d'],
-  smooth: ['SMOOTH', 'COOL · WITS +1d'],
-  hard: ['HARD', 'BODY +1d · ALARM 1'],
+const APPROACH_RULES: Record<Approach, { stats: string; spared: string; first: string }> = {
+  quiet: { stats: 'REFLEX · TECH +1d', spared: 'NO TAKE LOSS', first: 'ALARM FIRST' },
+  smooth: { stats: 'COOL · WITS +1d', spared: 'NEVER SMALL', first: 'WORSE FIRST' },
+  hard: { stats: 'BODY +1d', spared: 'NO ALARM COSTS', first: 'TAKE FIRST' },
 };
 /** Ready crew cards shown at once; more slide along the same row (four hires pushed the table up a row). */
 const READY_SHOWN = 3;
@@ -73,8 +73,8 @@ export function mountSetup(
     },
   });
   // HARD's TAKE 1 head start is from tier 2 up (balancing 2026-11-01).
-  const hardTake = o.tier !== null && o.tier >= 2 ? ' · TAKE 1' : '';
-  deal.deal(APPROACHES.map((a): TableCard => ({ id: a, face: artFace(a, APPROACH_FACE[a][0], [a === 'hard' ? APPROACH_FACE[a][1].replace(' · ALARM 1', `${hardTake} · ALARM 1`) : APPROACH_FACE[a][1]]), state: 'up' })));
+  const hardStart = o.tier !== null && o.tier >= 2 ? 'START TAKE 1 · ALARM 1' : 'START ALARM 1';
+  deal.deal(APPROACHES.map((a): TableCard => ({ id: a, face: approachFace(a, a.toUpperCase(), GOES_WRONG[a], { ...APPROACH_RULES[a], ...(a === 'hard' ? { start: hardStart } : {}) }), state: 'up' })));
   const markApproach = () => {
     for (const c of how.querySelectorAll<HTMLElement>('.tb-card')) c.classList.toggle('chosen', c.dataset.id === approach);
   };
@@ -101,6 +101,7 @@ export function mountSetup(
   const infoOf = (card: HTMLElement): Info | null => {
     const id = card.dataset.id!;
     const tier = o.tier ?? undefined;
+    if ((APPROACHES as readonly string[]).includes(id)) return approachInfo(id as Approach);
     const c = offer.crew.find((x) => x.id === id);
     if (c) return recruitInfo(c, tier ? { tier } : {});
     if (id === 'favour') return favourInfo();

@@ -90,7 +90,8 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data: { limit_remaining: 9.5 } }));
       }
       if (req.url === '/api/v1/models') {
-        const data = DIRECT.models.map((m) => ({ ...m, pricing: { prompt: '0.0000004', completion: '0.0000016' } }));
+        const listed = [...DIRECT.models, { id: 'google/no-tools', name: 'Google: No Tools', supported_parameters: ['temperature'] }];
+        const data = listed.map((m) => ({ ...m, pricing: { prompt: '0.0000004', completion: '0.0000016' }, context_length: 131072 }));
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data }));
       }
       // The opening's narrator (one non-streaming request): three fixed openings.

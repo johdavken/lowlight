@@ -1,6 +1,7 @@
 ---
 title: Chrome Decks
 category: Tech
+section: Decks
 keys: [chrome deck, chrome decks, built-in deck, internal deck, wired runner]
 districts: []
 places: []

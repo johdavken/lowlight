@@ -319,6 +319,20 @@ describe('DevPanel stage crops', () => {
     expect(writeText).toHaveBeenCalledWith(json);
   });
 
+  it('STAGE: PULL moves figures live and survives a re-render (reconnect)', () => {
+    const { root, panel } = setup();
+    const crops = { left: { top: 0, bottom: 0.5 }, right: { top: 0, bottom: 0.5 } };
+    const pull = { value: 1, onChange: vi.fn() };
+    panel.setStageCrops(crops, () => {}, pull);
+    const slider = () => root.querySelector<HTMLInputElement>('.dp-stage-pull')!;
+    expect(slider().value).toBe('100');
+    slider().value = '50';
+    slider().dispatchEvent(new Event('change'));
+    expect(pull.onChange).toHaveBeenLastCalledWith(0.5);
+    panel.setStageCrops(crops, () => {}, pull);
+    expect(slider().value).toBe('50');
+  });
+
   it("STAGE: a slider tweak is kept in the caller's crops, so a re-render (reconnect) shows what the figure shows", () => {
     const { root, panel } = setup();
     const crops = { left: { top: 0, bottom: 0.5 }, right: { top: 0, bottom: 0.5 } };

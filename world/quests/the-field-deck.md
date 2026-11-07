@@ -7,6 +7,8 @@ template: true
 starts: long-haul
 after: null
 pitch: A Sentinel field deck went missing off a depot truck on the Spine. SDG counts its decks and is offering to pay for this one back. A stall at the deck market is offering more to sell it. Find it first.
+posted-by: SDG's reward notice, with a deck market stall bidding against it.
+brief: A hauler at the Long Haul saw a crate come off a depot truck and go down the service ramp toward Pylon Forty. Track it into the deck market and get to the deck first.
 pay: 360-440
 once: true
 ---

@@ -50,7 +50,8 @@ export function cipherRunMessages(i: CipherRunInput): CompletionMessage[] {
   ].join('\n\n');
 
   // Who holds what (review I3): nobody keeps two open truths, so the run must see who's taken.
-  const kept = (t: Truth) => `${t.kind} · ${flat(t.truth)} · kept by ${t.knownBy.length > 0 ? t.knownBy.join(', ') : 'nobody here'} (${t.state})`;
+  // A cold one is still true, so a new truth mustn't fight it; nobody carries it any more.
+  const kept = (t: Truth) => `${t.kind} · ${flat(t.truth)} · kept by ${t.knownBy.length > 0 ? t.knownBy.join(', ') : 'nobody here'} (${t.state === 'cold' ? 'dropped, still true' : t.state})`;
   const holding = new Set(i.state.truths.filter((t) => t.state === 'open').flatMap((t) => t.knownBy));
   const user = [
     i.cast

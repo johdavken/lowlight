@@ -1,6 +1,8 @@
 ---
 title: Grid and Chrome Slang
 category: City
+section: Slang
+only: model
 keys: [lacquer, carts, carted, borrowed hands, the hum, the script, off script, ghosts]
 districts: []
 places: []

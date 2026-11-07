@@ -1,3 +1,4 @@
+import { WAIST_MAX, WAIST_MIN } from '../../shared/waist';
 import fs from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
@@ -7,7 +8,7 @@ import { BLOCK_WHY_MAX, blocksOverlap, parseDays, parseHhmm, type Block } from '
 import type { Crop } from '../../shared/types';
 import { WEARS_MAX, capAtWordBoundary } from '../../shared/persona';
 import { oneLine } from './persona';
-import { parseStandingConfig, STANDING, type StandingConfig, type StandingValues } from '../../shared/standing';
+import { parseStandingConfig, STANDING, type OutfitUnlock, type StandingConfig, type StandingValues } from '../../shared/standing';
 
 /** A character folder's id (and a roster id). */
 export const AGENT_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -24,14 +25,12 @@ export const spriteSchema = z.object({
     .object({ top: unit(), bottom: unit() })
     .refine((c) => c.top < c.bottom, { message: 'sprite crop must have 0 ≤ top < bottom ≤ 1' })
     .optional(),
-  // Checked on its own (resolveSprite), so a bad height costs only the height, not the sprite.
-  height: z.unknown().optional(),
+  // Checked on its own (resolveSprite), so a bad waist costs only the waist, not the sprite.
+  waist: z.unknown().optional(),
   // Studio's SNAP: the art is on the cast's pixel grid, so the game draws it with hard pixels.
   pixel: z.unknown().optional(),
 });
 export const DEFAULT_CROP = { top: 0, bottom: 0.5 };
-/** How tall she stands on stage, as a share of the full figure height (the tallest are 1). */
-export const SPRITE_HEIGHT_MIN = 0.5;
 
 /** `characters/<id>/character.json`: who she is, how she looks, and (with a backend) the model she runs on. */
 const characterSchema = z.object({
@@ -63,6 +62,7 @@ const characterSchema = z.object({
   outfits: z.unknown().optional(),
   outfitByScene: z.unknown().optional(),
   outfitWears: z.unknown().optional(),
+  outfitUnlocks: z.unknown().optional(),
   // The following four are checked on their own (resolveProfile), so a bad value costs only that field.
   tagline: z.unknown().optional(),
   bio: z.unknown().optional(),
@@ -301,7 +301,7 @@ export function scheduleReader(charactersDir: string, hasRoom: (id: string) => b
   });
 }
 
-export function resolveSprite(dir: string, raw: unknown, warn: (msg: string) => void, fallback: string): { file: string; crop: Crop; height?: number; pixel?: true } | null {
+export function resolveSprite(dir: string, raw: unknown, warn: (msg: string) => void, fallback: string): { file: string; crop: Crop; waist?: number; pixel?: true } | null {
   if (raw === undefined) return null;
   const parsed = spriteSchema.safeParse(raw);
   if (!parsed.success) {
@@ -314,14 +314,13 @@ export function resolveSprite(dir: string, raw: unknown, warn: (msg: string) => 
     warn(`sprite '${parsed.data.src}' is missing or outside its folder; ${fallback}`);
     return null;
   }
-  const h = parsed.data.height;
-  const height = h === undefined ? undefined : typeof h === 'number' && h >= SPRITE_HEIGHT_MIN && h <= 1 ? h : null;
-  if (height === null) warn(`sprite.height must be a number from ${SPRITE_HEIGHT_MIN} to 1; standing her at full height`);
-  // Full height (1) is the default and isn't carried.
+  const w = parsed.data.waist;
+  const waist = w === undefined ? undefined : typeof w === 'number' && w >= WAIST_MIN && w <= WAIST_MAX ? w : null;
+  if (waist === null) warn(`sprite.waist must be a number from ${WAIST_MIN} to ${WAIST_MAX}; standing her as drawn`);
   return {
     file,
     crop: parsed.data.crop ?? DEFAULT_CROP,
-    ...(typeof height === 'number' && height < 1 ? { height } : {}),
+    ...(typeof waist === 'number' ? { waist } : {}),
     ...(parsed.data.pixel === true ? { pixel: true as const } : {}),
   };
 }
@@ -426,6 +425,37 @@ export function resolveOutfitWears(raw: unknown, outfits: Record<string, string>
     }
     const text = capAtWordBoundary(oneLine(line.trim()), WEARS_MAX);
     if (text) out[name] = text;
+  }
+  return out;
+}
+
+/**
+ * `outfitUnlocks` (outfits by standing): outfit name → `{ trust?, warmth?, player? }`, each threshold a whole number
+ * −10..10 her standing must have reached, `player` the one player it's for. A bad entry is left out with a warning.
+ */
+export function resolveOutfitUnlocks(raw: unknown, outfits: Record<string, string>, warn: (msg: string) => void): Record<string, OutfitUnlock> {
+  if (raw === undefined) return {};
+  if (!isPlainObject(raw)) {
+    warn('outfitUnlocks must be an object of outfit name → { trust, warmth, player }; ignoring it');
+    return {};
+  }
+  const value = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v >= STANDING.min && v <= STANDING.max;
+  const out: Record<string, OutfitUnlock> = {};
+  for (const [name, r] of Object.entries(raw)) {
+    const ok =
+      Object.hasOwn(outfits, name) &&
+      isPlainObject(r) &&
+      Object.keys(r).every((k) => ['trust', 'warmth', 'player'].includes(k)) &&
+      (r.trust !== undefined || r.warmth !== undefined) &&
+      (r.trust === undefined || value(r.trust)) &&
+      (r.warmth === undefined || value(r.warmth)) &&
+      (r.player === undefined || (typeof r.player === 'string' && AGENT_ID_RE.test(r.player)));
+    if (!ok) {
+      warn(`outfitUnlocks '${name}' names no outfit or isn't { trust and/or warmth from ${STANDING.min} to ${STANDING.max}, player? }; leaving it out`);
+      continue;
+    }
+    const rule = r as OutfitUnlock;
+    out[name] = { ...(rule.trust !== undefined ? { trust: rule.trust } : {}), ...(rule.warmth !== undefined ? { warmth: rule.warmth } : {}), ...(rule.player !== undefined ? { player: rule.player } : {}) };
   }
   return out;
 }

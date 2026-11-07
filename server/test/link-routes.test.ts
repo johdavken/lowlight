@@ -282,6 +282,30 @@ describe('/api/models', () => {
     expect(body.results).toEqual([]);
   });
 
+  it('all=1 → every listed model, Claude marked via anthropic; absent without it', async () => {
+    const { app } = await start({ key: 'sk-or-k-123456', anthropicKey: GOOD_ANT });
+    const body = (await app.inject({ method: 'GET', url: '/api/models?all=1' })).json() as { all: { id: string; via?: string }[] };
+    expect(body.all.length).toBeGreaterThan(30);
+    expect(body.all.find((m) => m.id === 'anthropic/claude-sonnet-5.5')?.via).toBe('anthropic');
+    expect((await app.inject({ method: 'GET', url: '/api/models' })).json()).not.toHaveProperty('all');
+  });
+
+  it('all=1 with the catalog down → null, the picks still there', async () => {
+    const { app, stub } = await start({ key: 'sk-or-k-123456' });
+    stub.models = { status: 500, json: {} };
+    const body = (await app.inject({ method: 'GET', url: '/api/models?all=1' })).json() as { all: null; picks: unknown[] };
+    expect(body.all).toBeNull();
+    expect(body.picks.length).toBeGreaterThan(0);
+  });
+
+  it("a recent model the list no longer has isn't offered", async () => {
+    const { app, settings } = await start({ key: 'sk-or-k-123456' });
+    settings.pushRecent('x/recent-one');
+    settings.pushRecent('gone/old-model');
+    const recent = async () => ((await app.inject({ method: 'GET', url: '/api/models' })).json() as { recent: { id: string }[] }).recent.map((r) => r.id);
+    expect(await recent()).toEqual(['x/recent-one']);
+  });
+
   it('picks missing from the catalog are hidden', async () => {
     const { app } = await start();
     const body = (await app.inject({ method: 'GET', url: '/api/models' })).json() as { picks: { id: string }[] };

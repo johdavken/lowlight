@@ -1,6 +1,7 @@
 ---
 title: Dock Slates
 category: Tech
+section: Decks
 keys: [dock slate, dock slates, Voltaic slate, manifest deck, freight terminal]
 districts: []
 places: []

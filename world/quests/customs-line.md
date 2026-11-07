@@ -7,6 +7,8 @@ with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's sister comes in on the night ferry. SDG customs has started pulling people off the stairs before they reach the street.
+posted-by: Mira, one of Nix's clients.
+brief: Mira's sister comes in on the 01:40 from the Isle with no stamp worth the paper. Get her up the Ferry Stairs past SDG customs.
 pay: 90-110
 posts: 20:00-02:00
 trust: 1 / 1

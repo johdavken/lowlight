@@ -368,7 +368,12 @@
     ]
   ],
   "sound": {
-    "indoor": false
+    "indoor": false,
+    "music": {
+      "songs": [
+        "Time by the Freight.ogg"
+      ]
+    }
   },
   "effects": [
     {

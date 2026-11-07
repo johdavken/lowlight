@@ -26,6 +26,22 @@ export function cleanupDetached(out: string): void {
   spawn('rm', ['-rf', '--', ...dirs], { detached: true, stdio: 'ignore' }).unref();
 }
 
+/**
+ * Makes a data copy's settings run every contact on her character.json default (GLM): her chosen model is
+ * dropped, and so is the Anthropic key, so no turn can reach Claude through it. Returns what it changed.
+ */
+export function defaultModelsOnly(dataDir: string): { dropped: string[]; anthropicKey: boolean } {
+  const file = path.join(dataDir, 'settings.json');
+  if (!fs.existsSync(file)) return { dropped: [], anthropicKey: false };
+  const s = JSON.parse(fs.readFileSync(file, 'utf8')) as { keys?: Record<string, string>; characterModels?: Record<string, string> };
+  const dropped = Object.entries(s.characterModels ?? {}).map(([id, model]) => `${id}: ${model}`);
+  const anthropicKey = Boolean(s.keys?.anthropic);
+  s.characterModels = {};
+  if (s.keys) delete s.keys.anthropic;
+  fs.writeFileSync(file, `${JSON.stringify(s, null, 2)}\n`, { mode: 0o600 });
+  return { dropped, anthropicKey };
+}
+
 /** Whether nothing listens on 127.0.0.1:`port` (where the scratch server binds). */
 export function portFree(port: number): Promise<boolean> {
   return new Promise((resolve) => {

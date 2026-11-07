@@ -6,7 +6,8 @@
   "voice": "voice.md",
   "sprite": {
     "src": "tilly-outfit-work.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.361
   },
   "expressions": {
     "smile": "tilly-smile.png",

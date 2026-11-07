@@ -20,6 +20,33 @@ afterEach(() => {
 });
 
 describe('markLore', () => {
+  it('a longer key that fails its capitals leaves the shorter keys in it (final review)', () => {
+    setGlossary([
+      { id: 'freight-runners', title: 'Freight Runners', keys: ['Freight Runners'], text: 'Smugglers.' },
+      { id: 'dockside', title: 'Dockside', keys: ['freight'], text: 'The port.' },
+      { id: 'grid', title: 'The grid', keys: ['runners'], text: 'Runners.' },
+    ]);
+    const p = line('the freight runners hauled it');
+    markLore(p);
+    expect(marks(p)).toEqual([
+      ['dockside', 'freight'],
+      ['grid', 'runners'],
+    ]);
+    const q = line('two runners and the Freight Runners');
+    markLore(q);
+    expect(marks(q)).toEqual([['grid', 'runners'], ['freight-runners', 'Freight Runners']]);
+  });
+
+  it('a capitalised key keeps its capitals in what it marks; a leading "the" either case (lore picking spec §1)', () => {
+    setGlossary([{ id: 'shelf', title: 'Mirage Heights', keys: ['the Shelf'], text: 'Government.' }, { id: 'tide', title: 'Tide', keys: ['the tide'], text: 'A sweep.' }]);
+    const p = line('She put it on the shelf. The tide is in.');
+    markLore(p);
+    expect(marks(p)).toEqual([['tide', 'The tide']]);
+    const q = line('Up on The Shelf tonight.');
+    markLore(q);
+    expect(marks(q)).toEqual([['shelf', 'The Shelf']]);
+  });
+
   it('marks each entry once per line, longest key first, ignoring case, whole words only', () => {
     const p = line('Cortex Global runs it. cortex again, and Aegis. Cortexian is not a word here.');
     markLore(p);

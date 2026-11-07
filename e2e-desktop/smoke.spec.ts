@@ -40,11 +40,11 @@ test('the packaged app links a key and gets a reply, with its version on the tit
     await showTile(page, DIRECT.id);
     await page.locator(`.tile[data-id="${DIRECT.id}"]`).click();
     await expect(phase(page)).toHaveAttribute('data-phase', 'model');
-    const field = page.locator('.link-panel .lp-key');
+    const field = page.locator('.model-band .lp-key');
     await expect(field).toBeFocused();
     await field.fill(GOOD_KEY);
     await page.keyboard.press('Enter');
-    await expect(page.locator('.model-panel')).toBeVisible();
+    await expect(page.locator('.model-band[data-tab="her"]')).toBeVisible();
     await page.keyboard.press('Enter');
     await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
     await page.keyboard.press('Enter');

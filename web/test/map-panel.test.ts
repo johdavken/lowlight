@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CityMapData } from '../../shared/map-schema';
+import { setFramePace } from '../src/ui/frame-clock';
 import { MapPanel } from '../src/ui/map';
 import type { WhoIsWhere } from '../src/ui/map/city-map';
 
@@ -239,10 +240,21 @@ describe('MapPanel camera, keys and cues', () => {
     expect(p.isOpen).toBe(false);
   });
 
-  it("a district's name frames the camera on it (map pins spec §3)", async () => {
+  it("a district's name on the map does nothing: the list has the places (map list mock, 2026-11-05)", async () => {
     await opened();
-    root.querySelector<SVGElement>('svg.city-names text.dname.has[data-id="karasu"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(scale()).toBeGreaterThan(1);
+    expect(root.querySelector('svg.city-names text.dname.has')).toBeNull();
+    root.querySelector<SVGElement>('svg.city-names text.dname[data-id="karasu"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(scale()).toBe(1);
+  });
+
+  it('a row picks its place without moving far; the same row again goes in to it', async () => {
+    await opened();
+    const row = () => root.querySelector<HTMLElement>('.map-places .row[data-place="the-tilt"]')!;
+    row().click();
+    expect(root.querySelector('.map-strip .t')?.textContent).toBe('THE TILT');
+    expect(scale()).toBe(1);
+    row().click();
+    expect(scale()).toBe(2);
   });
 
   it('pins are dots far out and carry names zoomed in', async () => {
@@ -265,6 +277,37 @@ describe('MapPanel camera, keys and cues', () => {
   it('opens at the whole city when you are not on the map', async () => {
     await opened({}, () => ({ people: [] }));
     expect(scale()).toBe(1);
+  });
+
+  it('with a frame clock, a drag moves the screen on its next tick, to the latest view', async () => {
+    await opened();
+    const s = root.querySelector<HTMLElement>('.map-screen')!;
+    s.dispatchEvent(new WheelEvent('wheel', { deltaY: -400, clientX: 600, clientY: 400, bubbles: true, cancelable: true }));
+    const ptr = (type: string, x: number) =>
+      Object.assign(new MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: 400, button: 0 }), { pointerId: 1 });
+    const world = root.querySelector<HTMLElement>('.map-world')!;
+    let next: FrameRequestCallback | null = null;
+    vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => ((next = cb), 1));
+    vi.stubGlobal('cancelAnimationFrame', () => {});
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    setFramePace(60);
+    const start = world.style.transform;
+    s.dispatchEvent(ptr('pointerdown', 300));
+    s.dispatchEvent(ptr('pointermove', 340));
+    s.dispatchEvent(ptr('pointermove', 380));
+    expect(world.style.transform).toBe(start);
+    next!(1004); // the same tick: still waiting
+    expect(world.style.transform).toBe(start);
+    next!(1017);
+    const moved = world.style.transform;
+    expect(moved).not.toBe(start);
+    s.dispatchEvent(ptr('pointerup', 380));
+    setFramePace(0);
+    vi.unstubAllGlobals();
+    // One move for both events, to where the second one went.
+    s.dispatchEvent(ptr('pointerdown', 380));
+    s.dispatchEvent(ptr('pointerup', 380));
+    expect(world.style.transform).toBe(moved);
   });
 
   it('a resize keeps your zoom and your place in the margin (spec 2026-10-28 Review Focus 1)', async () => {
@@ -319,12 +362,15 @@ describe('MapPanel camera, keys and cues', () => {
     expect(p.isOpen).toBe(false);
   });
 
-  it("plays confirm on a district's name and move on an arrow", async () => {
+  it('plays move on a row, a fold and an arrow, and confirm going in', async () => {
     const onCue = vi.fn();
     await opened({ onCue });
-    root.querySelector<SVGElement>('svg.city-names text.dname.has[data-id="karasu"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const row = root.querySelector<HTMLElement>('.map-places .row[data-place="the-tilt"]')!;
+    row.click();
+    row.click();
+    root.querySelector<HTMLElement>('.map-places .group')!.click();
     key('ArrowLeft');
-    expect(onCue.mock.calls.map((c) => c[0])).toEqual(['confirm', 'move']);
+    expect(onCue.mock.calls.map((c) => c[0])).toEqual(['move', 'confirm', 'move', 'move']);
   });
 });
 
@@ -350,6 +396,22 @@ describe('MapPanel camera motion', () => {
       expect(now.scale).toBeGreaterThan(1);
       expect(now.scale * now.inv).toBeCloseTo(1, 5);
     }
+  });
+
+  it('a pick during the ease back out lets it finish (review: it froze partway)', async () => {
+    vi.useFakeTimers();
+    panel = new MapPanel(root, { load: async () => shipped(), who: atIntake });
+    const s = root.querySelector<HTMLElement>('.map-screen')!;
+    Object.defineProperty(s, 'clientWidth', { configurable: true, value: 1200 });
+    Object.defineProperty(s, 'clientHeight', { configurable: true, value: 800 });
+    panel.open();
+    await vi.advanceTimersByTimeAsync(1000);
+    for (let i = 0; i < 3; i++) s.dispatchEvent(new WheelEvent('wheel', { deltaY: -200, clientX: 600, clientY: 400, bubbles: true, cancelable: true }));
+    esc();
+    await vi.advanceTimersByTimeAsync(100);
+    root.querySelector<HTMLElement>('.map-places .row')!.click();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(root.querySelector<HTMLElement>('.map-world')!.style.transform).toMatch(/scale\(1\)/);
   });
 
   it('opens exactly on the city view (the picture covering the screen, centred), and closing the district leaves it there', async () => {

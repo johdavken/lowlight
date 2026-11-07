@@ -61,7 +61,6 @@ export const COPY = {
   newGameFailed: (why: string) => `// COULDN'T START A NEW GAME — ${why}`,
   /** The link panel and the model step (spec 2026-10-08 §5). */
   link: {
-    heading: 'LINK A MIND',
     why: 'Your contacts think through OpenRouter. Paste a key to wake them — it stays on this machine.',
     fieldLabel: 'OPENROUTER KEY',
     getKeyLead: 'no key? ',
@@ -71,6 +70,7 @@ export const COPY = {
     back: '[ESC] BACK',
     linked: (credit: number | null) => (credit === null ? 'linked' : `linked · $${credit.toFixed(2)}`),
     noCredit: 'no credit on this key',
+    noCreditShort: 'NO CREDIT',
     errors: {
       'key-rejected': "key rejected — OpenRouter didn't accept that key. Check you copied all of it.",
       unreachable: 'OpenRouter unreachable — check your connection.',
@@ -80,9 +80,19 @@ export const COPY = {
     stripExtra: (p: Pronoun) => `▶ PICK ${forms(p).her.toUpperCase()} TO LINK A MIND`,
     titleLink: 'LINK A MIND',
     titleModel: (p: Pronoun) => `CHOOSE ${forms(p).hers.toUpperCase()} MIND`,
+    titleKeys: 'KEYS',
+    /** The band's tabs (ALL MODELS counts them once they've loaded). */
+    tabHer: (p: Pronoun) => `FOR ${forms(p).her.toUpperCase()}`,
+    tabAll: (n: number | null) => (n === null ? 'ALL MODELS' : `ALL MODELS ${n}`),
+    tabKeys: 'KEYS',
+    allVendors: 'ALL',
+    heads: { model: 'MODEL', memory: 'MEMORY', price: 'IN / OUT' },
+    free: 'FREE',
+    loading: 'loading…',
+    catalogOffline: "the model list can't be reached right now",
     linkLine: (last4: string | null, credit: number | null, provider: 'openrouter' | 'anthropic' = 'openrouter') =>
       `${provider === 'anthropic' ? 'ANTHROPIC' : 'OPENROUTER'} …${last4 ?? '????'}${credit === null ? '' : ` · $${credit.toFixed(2)}`}`,
-    /** The switch at the top of LINK A MIND, and an unlinked provider's button on the model list. */
+    /** A row's name on KEYS, and the band's summary of what's linked. */
     providers: { openrouter: 'OPENROUTER', anthropic: 'ANTHROPIC' },
     addLink: (provider: 'openrouter' | 'anthropic') => `+ LINK ${provider === 'anthropic' ? 'ANTHROPIC' : 'OPENROUTER'}`,
     via: 'via your Anthropic key',
@@ -102,11 +112,12 @@ export const COPY = {
     unlinkFailed: (why: string) => `// COULDN'T UNLINK — ${why}`,
     unlink: 'UNLINK',
     unlinkConfirm: 'UNLINK? CLICK AGAIN',
-    groups: { current: 'CURRENT', picks: 'PICKS', recent: 'RECENT', results: 'RESULTS' },
+    groups: { current: 'CURRENT', picks: 'PICKS', recent: 'RECENT' },
     reset: (p: Pronoun, label: string) => `↺ reset to ${forms(p).hers} default · ${label}`,
     search: 'SEARCH',
     searchEmpty: 'no matches',
-    hint: '[▲▼] CHOOSE · TYPE TO SEARCH · [ENTER] PICK · [ESC] BACK',
+    hint: '[▲▼] CHOOSE · [◀▶] TAB · TYPE TO SEARCH · [ENTER] PICK · [ESC] BACK',
+    hintKeys: '[▲▼] CHOOSE · [◀▶] TAB · [ENTER] KEY · [ESC] BACK',
     hintLink: 'PASTE KEY · [ENTER] LINK · [ESC] BACK',
   },
   /** The YOU step (spec 2026-10-08 playable persona §2). */

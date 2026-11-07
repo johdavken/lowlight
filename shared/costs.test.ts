@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COSTS, dealCosts, picksFor, resistPrice } from './costs';
+import { COSTS, dealCosts, firstCost, picksFor, resistPrice } from './costs';
 
 const all = { take: true, next: true, alarm: true };
 
@@ -47,5 +47,40 @@ describe('HEAT +1 (tier template spec §2)', () => {
       expect(d).toHaveLength(3);
       expect(d).not.toContain('heat');
     }
+  });
+});
+
+describe('trouble has a shape (approach shapes spec §1)', () => {
+  const seeds = Array.from({ length: 30 }, (_, i) => `s${i}`);
+
+  it("dealCosts: an approach's never cost isn't dealt, and the three left are", () => {
+    for (const [approach, never] of [['quiet', 'take'], ['smooth', 'small'], ['hard', 'alarm']] as const)
+      for (const s of seeds) {
+        const d = dealCosts(s, all, approach);
+        expect(d).not.toContain(never);
+        expect(new Set(d).size).toBe(3);
+      }
+  });
+
+  it('dealCosts: the first-pick cost leads', () => {
+    for (const [approach, first] of [['quiet', 'alarm'], ['smooth', 'worse'], ['hard', 'take']] as const) for (const s of seeds) expect(dealCosts(s, all, approach)[0]).toBe(first);
+  });
+
+  it('dealCosts: no approach deals as before', () => {
+    expect(dealCosts('run|door|talk|costs', all)).toEqual(['small', 'worse', 'alarm']);
+    for (const s of seeds) expect(dealCosts(s, all, null)).toEqual(dealCosts(s, all));
+  });
+
+  it('dealCosts: only what can bite, whatever the approach', () => {
+    expect(dealCosts('x', { take: false, next: false, alarm: true }, 'hard')).toEqual([]);
+    expect(dealCosts('x', { take: false, next: false, alarm: true }, 'quiet')).toEqual(['alarm']);
+    for (const s of seeds) expect(dealCosts(s, { ...all, next: false }, 'smooth')).not.toContain('worse');
+  });
+
+  it("firstCost: the approach's cost when it's dealt, else null", () => {
+    expect(firstCost('quiet', ['worse', 'alarm'])).toBe('alarm');
+    expect(firstCost('hard', ['small', 'worse'])).toBeNull();
+    expect(firstCost(null, ['alarm'])).toBeNull();
+    expect(firstCost(undefined, ['alarm'])).toBeNull();
   });
 });

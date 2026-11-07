@@ -88,7 +88,11 @@ describe('sceneNow (final review I1, I2)', () => {
     const rows = [row({ text: 'old line' }), row({ role: 'agent', text: 'the Orchid' })];
     const now = sceneNow(rows, names);
     expect(now.recent).toEqual(['Hicks: old line', 'Nix: the Orchid']);
-    expect(now.loreRecent).toEqual(['Nix: the Orchid', 'Hicks: old line']);
+    // Who wrote each (lore picking spec §3): the player's line is yours, hers is theirs.
+    expect(now.loreRecent).toEqual([
+      { text: 'Nix: the Orchid', by: 'them' },
+      { text: 'Hicks: old line', by: 'you' },
+    ]);
   });
 
   it('after END SCENE and her closing reply, the stranger has gone for the next draw', () => {

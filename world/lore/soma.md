@@ -1,6 +1,7 @@
 ---
 title: Soma
 category: City
+section: Corps
 keys: [Soma, cloned organs, designer stims, stims, synthetic food, synth, biotech]
 districts: []
 places: []

@@ -14,6 +14,7 @@ const hae: OtherInfo = {
   sprite: { url: '/api/residents/hae/sprite', crop: { top: 0, bottom: 0.5 }, expressions: { happy: '/api/residents/hae/sprite/happy' } },
   face: { x: 0.5, y: 0.1 },
   tagline: '',
+  bio: [],
   facts: [],
 };
 const silas: OtherInfo = {
@@ -26,6 +27,7 @@ const silas: OtherInfo = {
   sprite: { url: '/api/agents/silas/sprite', crop: { top: 0, bottom: 0.5 }, expressions: { annoyed: '/api/agents/silas/sprite/annoyed' } },
   face: { x: 0.48, y: 0.12 },
   tagline: 'Second Socket counter. Lives on the grid.',
+  bio: [],
   facts: [{ label: 'HANDLE', value: 'Gumshoe.' }],
 };
 
@@ -123,7 +125,12 @@ describe('the party window (who\'s here, 2026-10-17)', () => {
     party!.setStranger({ name: 'Arlo Venn', url: '/api/extras/sdg-07' });
     root.querySelector<HTMLElement>('.wh-tile[data-id="silas"]')!.click();
     expect(root.querySelector('.wh-card .wh-card-name')!.textContent).toBe('SILAS');
+    // Only the card hears it: the lore drawer on the same window closes on the next one.
+    const after = vi.fn();
+    window.addEventListener('keydown', after, true);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    window.removeEventListener('keydown', after, true);
+    expect(after).not.toHaveBeenCalled();
     expect(root.querySelector('.wh-card')).toBeNull();
     root.querySelector<HTMLElement>('.wh-tile[data-id="silas"]')!.click();
     document.body.click();

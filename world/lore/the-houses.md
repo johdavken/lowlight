@@ -1,6 +1,7 @@
 ---
 title: The Houses
 category: Factions
+section: Institutions
 keys: [the houses, house contract, placement agency, house debt, leaving a house]
 districts: []
 places: []

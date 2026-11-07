@@ -8,6 +8,8 @@ export const PROVIDERS: readonly Provider[] = ['openrouter', 'anthropic'];
 export type LinkStatus = { state: LinkState; openrouter: LinkInfo; anthropic: LinkInfo };
 export type LinkError = 'bad-key' | 'key-rejected' | 'unreachable';
 export type ModelLists = { picks: ModelChoice[]; recent: ModelChoice[]; results: ModelChoice[] };
+/** The model step's lists: the picks, recent models and the whole catalog (null when it can't be read). */
+export type ModelBrowse = { picks: ModelChoice[]; recent: ModelChoice[]; all: ModelChoice[] | null };
 
 const json = { 'content-type': 'application/json' };
 
@@ -33,6 +35,13 @@ export async function putLink(apiKey: string, provider: Provider = 'openrouter')
 export async function deleteLink(provider: Provider = 'openrouter'): Promise<void> {
   const res = await fetch(`/api/link/${provider}`, { method: 'DELETE' });
   if (!res.ok) throw new Error(`/api/link: HTTP ${res.status}`);
+}
+
+/** The model step's lists, in one go. */
+export async function browseModels(): Promise<ModelBrowse> {
+  const res = await fetch('/api/models?all=1');
+  if (!res.ok) throw new Error(`/api/models: HTTP ${res.status}`);
+  return (await res.json()) as ModelBrowse;
 }
 
 /** The shipped picks and recent models; with `q` (2+ characters), the catalog's matches too. */

@@ -7,6 +7,9 @@ template: true
 starts: second-socket
 after: null
 pitch: A dead man's freezer locker in the Spine, and a crate of chips his family doesn't know about. Yet.
+posted-by: A go-between at Second Socket, for someone who knew what the dead man kept.
+brief: The cold lockers under the Spine. The dead man's locker hides a crate of chips. Get past the warden, open it and carry the crate out before the family clears it.
+known-by: [silas]
 pay: 360-440
 draw complication: none | family-came-early | locker-rewired
 draw warden: easy | hard
@@ -109,13 +112,13 @@ take: part
 *There are boots on the stairs now, and the warden's shouting up them. The service door at the back is chained, but the chain is old.*
 
 - door: Kick the service door. → gone / cornered [check body 50 · ines +10]
-- bluff: Go up the stairs towards them, crate on your shoulder, like it's Tuesday. → gone / cornered [check cool 50 · cass +10]
+- bluff: Drop over the stair rail behind them, crate on your shoulder, and run. → gone / cornered [check reflex 50 · cass +10]
 
 # out
 
 *The rows are quiet again. The warden doesn't look up as you pass.*
 
-- walk: Walk out the front with the crate under your arm. → gone / cornered [check cool 50 · cass +10]
+- walk: Wait for the warden's eyes to drop and slip out the front with the crate. → gone / cornered [check reflex 50 · cass +10]
 - back: Haul the crate out through the loading bay. → gone / cornered [check body 50 · ines +10]
 
 ## gone

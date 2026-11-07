@@ -293,14 +293,23 @@ export class DevPanel {
   /**
    * STAGE: top/bottom crop sliders for both figures (live, through `onChange`), and the `crop` JSON
    * to paste into persona.json / character.json, with a COPY button. `crops` is the caller's live
-   * record: a tweak is written back into it, so a later re-render (a reconnect) keeps it.
+   * record: a tweak is written back into it, so a later re-render (a reconnect) keeps it. `pull` adds
+   * PULL, how far figures move toward the waist line, live; its `value` is kept the same way.
    */
-  setStageCrops(crops: { left: Crop; right: Crop }, onChange: (side: 'left' | 'right', crop: Crop) => void): void {
+  setStageCrops(crops: { left: Crop; right: Crop }, onChange: (side: 'left' | 'right', crop: Crop) => void, pull?: { value: number; onChange: (v: number) => void }): void {
     const now = { left: { ...crops.left }, right: { ...crops.right } };
     const json = el('pre', 'dp-stage-json');
     const fmt = (c: Crop) => `"crop": { "top": ${+c.top.toFixed(2)}, "bottom": ${+c.bottom.toFixed(2)} }`;
     const paint = () => (json.textContent = `you    ${fmt(now.left)}\nagent  ${fmt(now.right)}`);
     const rows = el('div', 'dp-stage-sliders');
+    if (pull) {
+      const slider = this.makeSlider('dp-stage-pull', 'WAIST PULL', 'How far figures move toward the waist line', (v) => {
+        pull.value = v;
+        pull.onChange(v);
+      });
+      slider.setValue(pull.value);
+      rows.append(slider.wrap);
+    }
     for (const side of ['left', 'right'] as const) {
       for (const edge of ['top', 'bottom'] as const) {
         const label = `${side === 'left' ? 'YOU' : 'AGENT'} ${edge.toUpperCase()}`;

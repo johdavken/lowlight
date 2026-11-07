@@ -5,14 +5,15 @@ import type { ChatRelay } from '../src/chat-relay';
 import type { Db } from '../src/db';
 
 /**
- * A dealt roll settled in the old rules' spirit: ALARM first, then HEAT, then the rest, all taken. Undefined when nothing
+ * A dealt roll settled in the old rules' spirit: the approach's first cost, ALARM, HEAT, then the rest, all taken. Undefined when nothing
  * waits.
  */
 export async function settleLikeOld(relay: ChatRelay, id: string, beat: string) {
   const costs = relay.questState('hicks').active?.costs;
   if (!costs) return undefined;
   const order: CostId[] = ['alarm', 'heat', 'worse', 'small', 'take'];
-  const picks = costs.dealt.map((c) => c.cost).sort((a, b) => order.indexOf(a) - order.indexOf(b)).slice(0, costs.pick);
+  const rank = (c: (typeof costs.dealt)[number]) => (c.first ? -1 : order.indexOf(c.cost));
+  const picks = [...costs.dealt].sort((a, b) => rank(a) - rank(b)).map((c) => c.cost).slice(0, costs.pick);
   for (const c of picks) await relay.chooseQuest('hicks', { id, beat, choice: '!cost', card: c });
   return relay.chooseQuest('hicks', { id, beat, choice: '!take' });
 }

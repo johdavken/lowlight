@@ -1,6 +1,7 @@
 ---
 title: Spectra Broadcast Network
 category: City
+section: Corps
 keys: [SBN, Spectra, Spectra Broadcast Network, the news, Spectra says]
 districts: []
 places: []

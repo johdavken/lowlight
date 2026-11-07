@@ -31,7 +31,8 @@
   "dice": { "bluff": 0.4, "nerve": 0.6, "suspicion": 0.4 },
   "sprite": {
     "src": "nix-direct-outfit-outdoors.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.365
   },
   "expressions": {
     "happy": "nix-direct-happy.png",

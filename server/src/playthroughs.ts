@@ -34,6 +34,8 @@ export interface Playthroughs {
   setSolo(id: string, solo: boolean): void;
   /** Sets the outfit the player wears (null: back to the plain sprite, the key goes); updatedAt stays. */
   setOutfit(id: string, outfit: string | null): void;
+  /** Picks `contact`'s outfit everywhere (null: her room dresses her again, the key goes); updatedAt stays. */
+  setContactOutfit(id: string, contact: string, outfit: string | null): void;
   /** WAIT: the story clock never goes below `m` again. */
   setClockFloor(id: string, m: number): void;
   /** The city's weather (city weather spec §5): the room you're in sets it. Not a reason to re-sort LOAD. */
@@ -300,6 +302,16 @@ export function createPlaythroughs(
       update(id, (info) => {
         if (outfit === null) delete info.outfit;
         else info.outfit = outfit;
+      });
+    },
+
+    setContactOutfit(id, contact, outfit) {
+      update(id, (info) => {
+        const picks = { ...info.contactOutfits };
+        if (outfit === null) delete picks[contact];
+        else picks[contact] = outfit;
+        if (Object.keys(picks).length > 0) info.contactOutfits = picks;
+        else delete info.contactOutfits;
       });
     },
 

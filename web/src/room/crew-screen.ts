@@ -56,9 +56,9 @@ export function markCrewSeen(pt: string, at: number | null): void {
   }
 }
 
-/** The CREW word's dot: a result landed since you last looked, or a promotion's pick is waiting (crew abilities spec §4). */
-export function crewDotOn(kit: { crewLatest: number | null; crewPicks?: boolean }, seen: number): boolean {
-  return (kit.crewLatest !== null && kit.crewLatest > seen) || kit.crewPicks === true;
+/** The CREW word's dot: a result landed since you last looked, a promotion's pick (crew abilities spec §4) or a job's free hire is waiting. */
+export function crewDotOn(kit: { crewLatest: number | null; crewPicks?: boolean; crewFree?: boolean }, seen: number): boolean {
+  return (kit.crewLatest !== null && kit.crewLatest > seen) || kit.crewPicks === true || kit.crewFree === true;
 }
 
 export function openCrew(host: HTMLElement, o: CrewOpts): CrewHandle {

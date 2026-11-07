@@ -3,7 +3,8 @@
  * and the focused place's card (the overlay, fixed on screen). Pins follow the zoom (map pins spec, 2026-10-30): small dots
  * with a dot per person you know when far out, the full name with faces when near, a tag that would cover a more
  * important one hiding to its pin. A district's name zooms the camera to it. Used by the game's MAP and Studio's
- * preview (one host for both, no camera).
+ * preview (one host for both, no camera). The game's map is `listed`: no tags, the places down the left (PlaceList), and the
+ * card at the foot of the right side with GO on it (map list mock, 2026-11-05).
  */
 import { liftPct, toScreen } from '../../../../shared/map-projection';
 import type { CityMapData, District, Place } from '../../../../shared/map-schema';
@@ -14,6 +15,7 @@ import { districtFrame, type Frame } from './camera';
 import { buildFileStrip, buildGo, goBlocked } from './file-strip';
 import { drawNames, NAMES_BOX } from './lettering';
 import { pathD } from './path';
+import { dot, PlaceList, type PlaceThread } from './place-list';
 import './map.css';
 
 /** At this zoom and closer, pins carry their names (map pins spec §2); further out they're dots. */
@@ -62,6 +64,10 @@ export interface CityMapOpts {
   /** The focused place changed (a click, the arrows): the camera may bring it into view. Null: none. */
   onFocus?: (place: Place | null) => void;
   onCue?: (cue: MapCue) => void;
+  /** The game's map: pins carry no names, a list has the places, and the map's names and borders are only printed. */
+  listed?: boolean;
+  /** The picked place's row clicked again: the camera should go in to it. */
+  onRevisit?: (place: Place) => void;
 }
 
 /** The place your room is, by its `pack/scene` link: the first one, if two share it. */
@@ -109,6 +115,8 @@ export class CityMap {
   private layoutFrame = 0;
   /** A pan's look at whether the picked tag still fits (fitFocus). */
   private fitFrame = 0;
+  /** The places down the left, on a `listed` map. */
+  private readonly list: PlaceList | null = null;
 
   constructor(
     host: HTMLElement,
@@ -119,6 +127,7 @@ export class CityMap {
     this.svg = svgEl('svg', { class: 'city-lines', viewBox: '0 0 1000 1000', preserveAspectRatio: 'none' });
     this.names = svgEl('svg', { class: 'city-names', viewBox: `0 0 ${NAMES_BOX.w} ${NAMES_BOX.h}`, preserveAspectRatio: 'none' });
     this.names.addEventListener('click', (e) => {
+      if (opts.listed) return;
       const t = (e.target as Element).closest<SVGElement>('text.dname.has');
       if (!t) return;
       e.stopPropagation();
@@ -129,6 +138,27 @@ export class CityMap {
     host.append(this.root);
     this.over = el('div', `city-map map-overlay${still}`);
     (opts.overlay ?? host).append(this.over);
+    if (opts.listed) {
+      this.root.classList.add('listed');
+      this.over.classList.add('listed');
+      this.list = new PlaceList({
+        onPick: (id) => {
+          this.select(id);
+          this.opts.onCue?.('move');
+        },
+        onRevisit: (id) => {
+          const p = this.map?.places.find((x) => x.id === id);
+          if (!p) return;
+          this.opts.onCue?.('confirm');
+          this.opts.onRevisit?.(p);
+        },
+        onHot: (id) => this.heat(id),
+        onDistrict: (id) => this.lightDistrict(id),
+        onFold: () => this.opts.onCue?.('move'),
+        onResize: () => this.fitFocus(),
+      });
+      this.over.append(this.list.el);
+    }
     this.setScale(1);
   }
 
@@ -165,7 +195,7 @@ export class CityMap {
     // A pan doesn't change which tags overlap: only a new zoom lays them out again (review M5). It can carry the
     // picked tag to the edge, though: that one looks again.
     if (scale === this.scale && this.root.style.getPropertyValue('--pz')) {
-      if (this._focus && !this.fitFrame) this.fitFrame = requestAnimationFrame(() => ((this.fitFrame = 0), this.fitFocus()));
+      if ((this._focus || this.list) && !this.fitFrame) this.fitFrame = requestAnimationFrame(() => ((this.fitFrame = 0), this.fitFocus()));
       return;
     }
     this.scale = scale;
@@ -174,7 +204,7 @@ export class CityMap {
     this.root.style.setProperty('--pz', String(pinSize(scale)));
     this.root.style.setProperty('--tz', String(tagSize(scale)));
     if (far) for (const p of this.layer.querySelectorAll('.pin.crowded')) p.classList.remove('crowded');
-    else this.scheduleLayout();
+    this.scheduleLayout();
   }
 
   /** Opens `id`'s card (null closes it). */
@@ -235,25 +265,39 @@ export class CityMap {
     this.svg.replaceChildren();
     this.names.replaceChildren();
     this.layer.replaceChildren();
-    this.over.replaceChildren();
+    this.over.querySelector('.map-strip')?.remove();
+    if (!this.list) this.over.replaceChildren();
+    this.root.classList.remove('dimmed');
+    this.list?.clear();
   }
 
   dispose(): void {
     cancelAnimationFrame(this.layoutFrame);
     cancelAnimationFrame(this.fitFrame);
+    this.list?.dispose();
     this.root.remove();
     this.over.remove();
   }
 
   /** Every place, district by district in map order: what the arrows walk. */
   private order(): string[] {
-    if (!this.map) return [];
-    return this.map.districts.flatMap((d) => placesIn(this.map!, d.id).map((p) => p.id));
+    return this.threads().flatMap((t) => t.places.map((p) => p.id));
+  }
+
+  /** The districts with places, in map order; on a `listed` map yours comes first, as the list has it. */
+  private threads(): PlaceThread[] {
+    const map = this.map;
+    if (!map) return [];
+    const all = map.districts.map((district) => ({ district, places: placesIn(map, district.id) })).filter((t) => t.places.length);
+    if (!this.list) return all;
+    const home = (t: PlaceThread) => t.places.some((p) => p.id === this.who.here);
+    return [...all.filter(home), ...all.filter((t) => !home(t))];
   }
 
   private draw(): void {
     if (!this.map) return;
     this.paintWorld();
+    this.list?.render(this.threads(), this.who);
     this.paintCard();
     this.scheduleLayout();
   }
@@ -268,7 +312,22 @@ export class CityMap {
     this.scheduleLayout();
   }
 
+  /** A row hovered: its pin pulses. */
+  private heat(id: string | null): void {
+    for (const pin of this.layer.querySelectorAll<HTMLElement>('.pin')) pin.classList.toggle('hot', pin.dataset.place === id);
+  }
+
+  /** A district's name hovered in the list: its border and name light, its pins stand out from the rest. */
+  private lightDistrict(id: string | null): void {
+    this.root.classList.toggle('dimmed', id !== null);
+    for (const p of this.svg.querySelectorAll<SVGPathElement>('path.dpoly')) p.classList.toggle('lit', p.dataset.id === id);
+    for (const t of this.names.querySelectorAll<SVGElement>('text.dname')) t.classList.toggle('lit', t.dataset.id === id);
+    const inIt = new Set(this.map?.places.filter((p) => p.district === id).map((p) => p.id));
+    for (const pin of this.layer.querySelectorAll<HTMLElement>('.pin')) pin.classList.toggle('in', inIt.has(pin.dataset.place!));
+  }
+
   private hover(id: string | null, district: string | null): void {
+    this.list?.hot(id);
     this.hovered = id;
     // Classes only: hovering through a crowd shows the hovered tag (CSS) without reshuffling the rest (review M6).
     for (const pin of this.layer.querySelectorAll<HTMLElement>('.pin')) pin.classList.toggle('on', pin.dataset.place === id || pin.dataset.place === this._focus);
@@ -315,7 +374,7 @@ export class CityMap {
     this.svg.replaceChildren(svgEl('defs', {}));
     this.svg.firstChild!.appendChild(glowFilter());
     this.layer.replaceChildren();
-    const hasPlaces = new Set(map.places.map((p) => p.district));
+    const hasPlaces = new Set(this.list ? [] : map.places.map((p) => p.district));
     for (const d of map.districts) {
       const has = hasPlaces.has(d.id);
       if (d.border) this.drawBorder(d, has);
@@ -342,6 +401,7 @@ export class CityMap {
     pin.dataset.place = p.id;
     // A finger-sized target round the diamond, whatever the zoom (review I2: far-out pins on a phone).
     pin.append(el('span', 'hit'));
+    if (this.list) pin.append(el('span', 'ping'), el('span', 'ping'));
     const [px, py] = toScreen(p.pin, this.heights[p.id] ?? 0);
     pin.style.left = `${px}%`;
     pin.style.top = `${py}%`;
@@ -361,6 +421,13 @@ export class CityMap {
       for (const m of here) who.append(dot(m));
       pin.append(who);
     }
+    pin.addEventListener('mouseenter', () => this.hover(p.id, d.id));
+    pin.addEventListener('mouseleave', () => this.hover(null, null));
+    pin.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.select(p.id);
+    });
+    if (this.list) return pin;
     // Near (and on hover far out): the name, with the faces of who's at the pin.
     const tag = el('span', 'map-ntag');
     const inner = el('span', 'in');
@@ -372,12 +439,6 @@ export class CityMap {
     pin.append(tag);
     // The rooms inside drop down under the tag while its card is open (CSS), each with who's in it. Information only: no GO.
     if (sideIds.size) pin.append(insideList(inside, here));
-    pin.addEventListener('mouseenter', () => this.hover(p.id, d.id));
-    pin.addEventListener('mouseleave', () => this.hover(null, null));
-    pin.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.select(p.id);
-    });
     return pin;
   }
 
@@ -395,6 +456,7 @@ export class CityMap {
 
   /** The picked pin's tag, with GO past its name, turns to the pin's left when it would run off the screen's right. */
   private fitFocus(): void {
+    if (this.list) return this.clearNames();
     const pin = this.layer.querySelector<HTMLElement>('.pin.focus');
     for (const p of this.layer.querySelectorAll('.pin.flip')) if (p !== pin) p.classList.remove('flip');
     const tag = pin?.querySelector<HTMLElement>('.map-ntag');
@@ -407,14 +469,33 @@ export class CityMap {
     pin.classList.toggle('flip', right > o.right - 12);
   }
 
-  /** The focused place's card, replaced (it prints in again), and GO on its tag; none without a focus. */
+  /** On a `listed` map, the printed names the list or the card would sit on step back. */
+  private clearNames(): void {
+    const card = this.over.querySelector('.map-strip')?.getBoundingClientRect();
+    const boxes = card ? [card, this.list!.box()] : [this.list!.box()];
+    for (const t of this.names.querySelectorAll('text.dname')) {
+      const r = t.getBoundingClientRect();
+      t.classList.toggle('under', boxes.some((b) => r.right > b.left - 10 && r.left < b.right + 10 && r.bottom > b.top - 10 && r.top < b.bottom + 10));
+    }
+  }
+
+  /** The focused place's card, replaced (it prints in again), and GO on its tag (in the card on a `listed` map); none without a focus. */
   private paintCard(): void {
     this.over.querySelector('.map-strip')?.remove();
     for (const g of this.layer.querySelectorAll('.map-go')) g.remove();
+    this.list?.pick(this._focus);
     if (!this.map || !this._focus) return;
     const place = this.map.places.find((p) => p.id === this._focus);
     const district = place && this.map.districts.find((x) => x.id === place.district);
     if (!place || !district) return;
+    if (this.list) {
+      const inside = this.who.inside?.[place.id] ?? [];
+      const go = this.opts.onTravel ? buildGo(place, this.who, this.opts.onTravel) : undefined;
+      const people = this.who.people.filter((x) => x.place === place.id);
+      this.over.append(buildFileStrip({ place, district, who: this.who, onGigs: this.opts.onGigs, listed: { go, inside: inside.length ? insideList(inside, people) : undefined } }));
+      this.fitFocus();
+      return;
+    }
     const strip = buildFileStrip({ place, district, who: this.who, onGigs: this.opts.onGigs });
     const pinEl = this.layer.querySelector<HTMLElement>(`.pin[data-place="${place.id}"]`);
     if (this.opts.onTravel) pinEl?.querySelector('.map-ntag')?.append(buildGo(place, this.who, this.opts.onTravel));
@@ -436,12 +517,6 @@ function glowFilter(): SVGFilterElement {
   f.append(blur, merge);
   return f;
 }
-
-const dot = (m: MapPerson): HTMLElement => {
-  const b = el('b', '');
-  b.style.setProperty('--c', m.accent);
-  return b;
-};
 
 /** A person's face in a tag (a dot in their colour when they have none). */
 const face = (m: MapPerson): HTMLElement => {

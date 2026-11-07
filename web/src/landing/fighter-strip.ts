@@ -150,7 +150,7 @@ export class FighterStrip {
   private readonly failedArt = new Set<string>();
   private agent: LandingAgent | null = null;
   private models: StripModels | null = null;
-  /** The model step's panel, standing in for her file while it's up. */
+  /** The YOU step's panel, standing in for the file while it's up. */
   private panel: HTMLElement | null = null;
 
   constructor(host: HTMLElement, side: Side, o: { reducedMotion: boolean }) {
@@ -239,7 +239,7 @@ export class FighterStrip {
     this.renderExtra();
   }
 
-  /** The model step's panel takes the (widened) strip's place; null gives the file back. */
+  /** The YOU step's panel takes the strip's place; null gives the file back. */
   setPanel(panel: HTMLElement | null): void {
     if (panel === this.panel) return;
     this.panel?.remove();

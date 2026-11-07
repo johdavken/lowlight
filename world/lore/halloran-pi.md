@@ -1,6 +1,7 @@
 ---
 title: Halloran, P.I.
 category: Culture
+section: Entertainment
 keys: [Halloran, Halloran P.I., detective holovid, holovids]
 districts: []
 places: []

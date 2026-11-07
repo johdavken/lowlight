@@ -1,6 +1,7 @@
 ---
 title: Cloudridge
 category: City
+section: Districts
 keys: [Cloudridge, the Ridge, old money, mansions, Executive Terraces, hills]
 districts: [cloudridge]
 places: []

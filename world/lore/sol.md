@@ -1,6 +1,7 @@
 ---
 title: Sol
 category: City
+section: Basics
 keys: [sol, currency, solutions per second, hard sol, scrip, sol-sick]
 districts: []
 places: []

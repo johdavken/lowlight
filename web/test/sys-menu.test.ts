@@ -16,7 +16,7 @@ const key = (k: string) => {
 const wheel = (el: HTMLElement, deltaY: number) => el.dispatchEvent(new WheelEvent('wheel', { deltaY, bubbles: true, cancelable: true }));
 
 beforeEach(() => {
-  h = { onVolume: vi.fn(), onMute: vi.fn(), onMusic: vi.fn(), onAmbient: vi.fn(), onTextSpeed: vi.fn(), onTextStep: vi.fn(), onSizeStep: vi.fn(), onFontStep: vi.fn(), onChatKeys: vi.fn(), onModel: vi.fn(), onThinking: vi.fn(), onTips: vi.fn(), onTipsAgain: vi.fn(), onMirror: vi.fn(), onOpenChange: vi.fn(), onPause: vi.fn() } as typeof h;
+  h = { onVolume: vi.fn(), onMute: vi.fn(), onMusic: vi.fn(), onAmbient: vi.fn(), onTextSpeed: vi.fn(), onTextStep: vi.fn(), onSizeStep: vi.fn(), onFontStep: vi.fn(), onChatKeys: vi.fn(), onModel: vi.fn(), onThinking: vi.fn(), onTips: vi.fn(), onTipsAgain: vi.fn(), onMirror: vi.fn(), onFrameRate: vi.fn(), onOpenChange: vi.fn(), onPause: vi.fn() } as typeof h;
   m = new SysMenu(h);
   document.body.append(m.el);
 });
@@ -43,6 +43,25 @@ describe('SysMenu', () => {
     expect(h.onTips).toHaveBeenLastCalledWith(true);
     key('Enter');
     expect(h.onTipsAgain).toHaveBeenCalledTimes(2);
+  });
+
+  it('the FRAME RATE row: 30 / 60 / UNCAPPED picks, ← → step round', () => {
+    m.showFrameRate('60');
+    m.open();
+    expect(q('.sys-row[data-row="fps"] .sys-label').textContent).toBe('FRAME RATE');
+    expect([...q('.sys-fps').children].map((w) => w.textContent)).toEqual(['30', '60', 'UNCAPPED']);
+    expect(q('[data-fps="60"]').classList.contains('on')).toBe(true);
+    q('[data-fps="uncapped"]').click();
+    expect(h.onFrameRate).toHaveBeenLastCalledWith('uncapped');
+    m.showFrameRate('uncapped');
+    expect(q('[data-fps="uncapped"]').classList.contains('on')).toBe(true);
+    expect(q('[data-fps="60"]').classList.contains('on')).toBe(false);
+    while (q('.sys-row.on').dataset.row !== 'fps') key('ArrowDown');
+    key('ArrowRight');
+    expect(h.onFrameRate).toHaveBeenLastCalledWith('30');
+    m.showFrameRate('30');
+    key('ArrowLeft');
+    expect(h.onFrameRate).toHaveBeenLastCalledWith('uncapped');
   });
 
   it('the MIRROR row: ON / OFF picks, ← → flip it', () => {
@@ -98,15 +117,15 @@ describe('SysMenu', () => {
     expect(m.el.hidden).toBe(true);
     m.open();
     expect(m.isOpen).toBe(true);
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'fps', 'link']);
     m.showModel('GLM 5.2');
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'model', 'think', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'fps', 'model', 'think', 'link']);
     expect(q('.hud-model').textContent).toBe('GLM 5.2 ›');
     expect(q('.sys-row.on').dataset.row).toBe('sound');
     expect(q('.sys-foot').textContent).toBe('← → OR SCROLL TO CHANGE · ESC CLOSES');
-    expect([...m.el.querySelectorAll('.sys-label')].map((l) => l.textContent)).toEqual(['MENU', 'SOUND', 'MUSIC', 'AMBIENT', 'TEXT', 'TEXT SIZE', 'FONT', 'CHAT KEYS', 'TIPS', 'MIRROR', 'MODEL', 'NARRATOR THINKING', 'LINK']);
+    expect([...m.el.querySelectorAll('.sys-label')].map((l) => l.textContent)).toEqual(['MENU', 'SOUND', 'MUSIC', 'AMBIENT', 'TEXT', 'TEXT SIZE', 'FONT', 'CHAT KEYS', 'TIPS', 'MIRROR', 'FRAME RATE', 'MODEL', 'NARRATOR THINKING', 'LINK']);
     m.showModel(null);
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'fps', 'link']);
   });
 
   it('sound: ten cells lit by volume, MUTED, CLICK FOR SOUND while locked', () => {
@@ -209,6 +228,8 @@ describe('SysMenu', () => {
     key('ArrowDown');
     expect(q('.sys-row.on').dataset.row).toBe('mirror');
     key('ArrowDown');
+    expect(q('.sys-row.on').dataset.row).toBe('fps');
+    key('ArrowDown');
     expect(q('.sys-row.on').dataset.row).toBe('link');
     m.showModel('GLM 5.2');
     key('ArrowUp');
@@ -302,20 +323,20 @@ describe('SysMenu', () => {
   it('no sound at all (hidden): the SOUND row goes, and the menu opens on TEXT', () => {
     m.showSound({ kind: 'hidden' });
     m.open();
-    expect(rows()).toEqual(['text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
+    expect(rows()).toEqual(['text', 'size', 'font', 'keys', 'tips', 'mirror', 'fps', 'link']);
     expect(q('.sys-row.on').dataset.row).toBe('text');
     key('ArrowUp');
     expect(q('.sys-row.on').dataset.row).toBe('text');
     m.showSound({ kind: 'on', volume: 0.5, muted: false, music: 1, ambient: 1 });
-    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
+    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'fps', 'link']);
   });
 
   it('music and ambient: own meters and percentages, only while sound plays; ← → and the wheel step them', () => {
     m.showSound({ kind: 'locked' });
     m.open();
-    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
+    expect(rows()).toEqual(['sound', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'fps', 'link']);
     m.showSound({ kind: 'on', volume: 0.6, muted: true, music: 0.3, ambient: 0.85 });
-    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'link']);
+    expect(rows()).toEqual(['sound', 'music', 'ambient', 'text', 'size', 'font', 'keys', 'tips', 'mirror', 'fps', 'link']);
     expect([...m.el.querySelectorAll('.sys-label')].slice(1, 4).map((l) => l.textContent)).toEqual(['SOUND', 'MUSIC', 'AMBIENT']);
     expect(lit('music')).toBe(3);
     expect(value('music')).toBe('30%');

@@ -1,6 +1,7 @@
 ---
 title: Cortex Meridian
 category: Tech
+section: Decks
 keys: [Meridian, Meridians, Cortex Meridian, the leash, corp deck]
 districts: []
 places: []

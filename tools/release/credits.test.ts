@@ -37,6 +37,7 @@ Replaced \`scenes/r/_music/Old.ogg\` on 2026-10-06; see \`world/splash/old.png\`
 
 - \`world/splash/pic.png\` — made by Farban
 - \`world/districts/karasu.webp\` — made by ChatGPT
+- \`world/lore/soma.webp\` — made by ChatGPT
 `;
 
 describe('uncredited', () => {
@@ -56,6 +57,8 @@ describe('uncredited', () => {
       'world/splash/splashes.json': '{}',
       'world/districts/karasu.webp': 'webp',
       'world/districts/districts.json': '{}',
+      'world/lore/soma.webp': 'webp',
+      'world/lore/soma.md': '---\ntitle: Soma\n---\nFood.\n',
     });
     writeTree(webDist, { 'sound/rain.ogg': 'ogg', 'sound/ui/click.ogg': 'ogg', 'sound/music/Theme.ogg': 'ogg', 'index.html': '' });
   });
@@ -74,6 +77,7 @@ describe('uncredited', () => {
       'web/sound/rain.ogg',
       'web/sound/ui/click.ogg',
       'world/districts/karasu.webp',
+      'world/lore/soma.webp',
       'world/splash/pic.png',
     ]);
   });

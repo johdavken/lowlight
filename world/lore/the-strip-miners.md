@@ -1,6 +1,7 @@
 ---
 title: The Strip-Miners
 category: Factions
+section: Runners
 keys: [Strip-Miners, Strip Miners, strip-miner, mercenary runners, lacquer strippers]
 districts: []
 places: []

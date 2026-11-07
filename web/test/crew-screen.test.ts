@@ -153,6 +153,7 @@ describe('the CREW screen', () => {
 describe('CREW in the room chrome', () => {
   it('Alt+K is crew; the cycle goes PEOPLE → TEXTS → QUEST → CREW → MAP', () => {
     expect(chromeKey(new KeyboardEvent('keydown', { altKey: true, code: 'KeyK', key: 'k' }), false)).toBe('crew');
+    expect(chromeKey(new KeyboardEvent('keydown', { altKey: true, code: 'KeyB', key: 'b' }), false)).toBe('book');
     expect(nextScreen('texts', 1)).toBe('quest');
     expect(nextScreen('quest', 1)).toBe('crew');
     expect(nextScreen('crew', 1)).toBe('map');
@@ -251,6 +252,19 @@ describe('ERRANDS', () => {
       h.show('assign');
       $$('.cr-errand').find((r) => $('.cr-et-title', r)!.textContent === title)!.click();
     };
+    it('COLLECT locked: says what opens it while no offer is drawn, above the other errands', async () => {
+      (await open(view({ errands: [low] }))).show('assign');
+      expect($('.cr-locked')!.textContent).toBe('COLLECT · LOCKED · REP 20 IN A DISTRICT');
+      expect($('.cr-locked')!.nextElementSibling!.textContent).toBe('LAY LOW');
+    });
+    it('COLLECT locked: gone once an offer is drawn, and the empty line covers a bare list', async () => {
+      (await open(goods())).show('assign');
+      expect($('.cr-locked')).toBeNull();
+      document.body.replaceChildren();
+      (await open(view())).show('assign');
+      expect($('.cr-locked')).toBeNull();
+      expect($('.cr-empty')!.textContent).toContain('NO ERRANDS TONIGHT');
+    });
     it('the wanted line names each Known district', async () => {
       (await open(goods())).show('assign');
       expect($('.cr-wanted')!.textContent).toBe('WANTED TONIGHT · STRAND PHARMA · KARASU DATA');
@@ -576,6 +590,7 @@ describe('ABILITIES (crew abilities spec §4)', () => {
     expect(crewDotOn({ crewLatest: 50, crewPicks: false }, 10)).toBe(true);
     expect(crewDotOn({ crewLatest: 50, crewPicks: false }, 50)).toBe(false);
     expect(crewDotOn({ crewLatest: null, crewPicks: true }, 0)).toBe(true);
+    expect(crewDotOn({ crewLatest: null, crewFree: true }, 0)).toBe(true);
   });
   it('a HIRE card shows the ability it comes with', async () => {
     const h = await open(view({ abilities: book, hires: [{ place: 'low-roller', name: 'The Low Roller', district: 'strand', cards: [{ recruit: recruit({ id: 'r-t', abilities: ['spoof'] }), cost: 100 }] }] }));

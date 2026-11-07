@@ -159,6 +159,17 @@ async function goInWith(page: Page, job: string, rid: string) {
   await expect(page.locator('.jc-head')).toHaveText(`◆ JOB · ${job.toUpperCase()}`);
   await expect(page.locator('.jc-sub')).toContainText('HEAT');
   await expect(page.locator('.ts-pitch .tb-sub')).toBeHidden();
+  // The archive opens over SETUP, not behind its cards, and Esc closes it without backing out.
+  await page.locator('.feed-root.feed-stage .feed').hover();
+  await page.mouse.wheel(0, -200);
+  await expect(page.locator('.feed-root.expanded')).toHaveCount(1);
+  {
+    const f = (await page.locator('.feed-root .feed').boundingBox())!;
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.feed-root'), [f.x + f.width / 2, f.y + 40])).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.feed-root.expanded')).toHaveCount(0);
+  await expect(page.locator('.tb-setup')).toBeVisible();
   await page.locator(`.ts-ready .tb-slot[data-id="${rid}"]`).click();
   await expect(page.locator(`.g-people .tb-slot[data-id="${rid}"]`)).toBeVisible();
   await page.screenshot({ path: 'test-results/hand-setup.png' });
@@ -178,6 +189,33 @@ async function goInWith(page: Page, job: string, rid: string) {
     })
     .toBe(true);
   await page.screenshot({ path: 'test-results/job-column.png' });
+  // Scrolling up her line opens the archive in her column, over her and over the table (playtest: it opened behind the
+  // cards); the JOB column stays where it was.
+  await page.locator('.feed-root.feed-stage .feed').hover();
+  await page.mouse.wheel(0, -200);
+  await expect(page.locator('.feed-root.expanded')).toHaveCount(1);
+  {
+    const [feed, col, middle, levers] = await Promise.all(['.feed-root .feed', '.jc', '.tb-job .tb-middle', '.tb-job .tb-levers'].map((s) => page.locator(s).boundingBox()));
+    expect(feed!.x).toBeGreaterThanOrEqual(levers!.x + levers!.width);
+    await expect(page.locator('.jc')).toBeVisible();
+    expect(col!.x + col!.width).toBeLessThanOrEqual(middle!.x);
+    // Nothing of the table sits on top of it.
+    const top = await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.feed-root'), [feed!.x + feed!.width / 2, feed!.y + feed!.height / 2]);
+    expect(top).toBe(true);
+  }
+  await page.screenshot({ path: 'test-results/job-archive.png' });
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.feed-root.expanded')).toHaveCount(0);
+  await expect(page.locator('.tb-job')).toBeVisible();
+  // A beat with no hand: the log region runs down the corner, and the column still ends over the line keys.
+  await page.locator('.tb-job .tb-bottom').evaluate((n: HTMLElement) => (n.style.display = 'none'));
+  const log = page.locator('.tb-job .tb-log');
+  await expect.poll(() => log.evaluate((n: HTMLElement) => getComputedStyle(n.closest('#game')!).getPropertyValue('--hud-log-h') === `${n.offsetHeight}px`)).toBe(true);
+  const [region, col, keys] = await Promise.all([log.boundingBox(), page.locator('.jc').boundingBox(), page.locator('.line-keys').boundingBox()]);
+  expect(region!.y + region!.height).toBeGreaterThan(keys!.y);
+  expect(col!.y + col!.height).toBeLessThanOrEqual(keys!.y);
+  await page.screenshot({ path: 'test-results/job-column-no-hand.png' });
+  await page.locator('.tb-job .tb-bottom').evaluate((n: HTMLElement) => (n.style.display = ''));
 }
 
 test('brings crew and plays a card: on a job, the preview, the call, a crew line in the debrief', async ({ page }) => {
@@ -438,10 +476,18 @@ test('Graft tips on a first job: SETUP, the first beat, the next deal; none agai
   await openSetup();
   await expect(title).toHaveText('HOW YOU GO IN');
   await page.screenshot({ path: 'test-results/tips-setup.png' });
-  // The favour and contact cards are on hold (programs spec §2.4): their tips wait with them.
-  expect(await okAll()).toEqual(['HOW YOU GO IN']);
+  // The favour and contact cards are on hold (programs spec §2.4): their tips wait with them. Everyone has a deck to load.
+  expect(await okAll()).toEqual(['HOW YOU GO IN', 'PROGRAMS']);
   await page.locator('.ts-go').click();
   await expect(page.locator('.tb-job .tb-deal .tb-card').first()).toBeVisible({ timeout: 10_000 });
+  // First on the table: the JOB column against her line, pointing at the column (it stands outside the table).
+  await expect(title).toHaveText('TWO VOICES');
+  {
+    const [box, col] = await Promise.all([tip.boundingBox(), page.locator('.jc').boundingBox()]);
+    expect(box!.x).toBeGreaterThanOrEqual(col!.x + col!.width);
+  }
+  await page.screenshot({ path: 'test-results/tips-job.png' });
+  await tip.locator('.gt-ok').click();
   await expect(title).toHaveText('THE ROLL');
   await page.screenshot({ path: 'test-results/tips-roll.png' });
   await tip.locator('.gt-ok').click();

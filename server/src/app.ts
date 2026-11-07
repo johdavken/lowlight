@@ -3,7 +3,8 @@ import { keysFor, routeFor } from './model-route';
 import { fittingPhotos } from '../../shared/photos';
 import crypto from 'node:crypto';
 import { DEFAULT_CREW_DIR, loadCrewBook } from './crew-book-load';
-import { crewView, freeDraw } from './crew-view';
+import { crewView, freeDraw, freeHireWaiting } from './crew-view';
+import type { CrewState } from '../../shared/crew-fold';
 import { jobRecruitCard, rescueOpen } from '../../shared/crew';
 import { fillRecruit, flagsOf, questKey } from '../../shared/quests';
 import { bookId } from './mission-run';
@@ -19,15 +20,15 @@ import { artNarration, scenePrompt } from './scenario';
 import { loreBlock } from '../../shared/lore';
 import { cipherNarratorBlock } from '../../shared/cipher';
 import { capAtWordBoundary } from '../../shared/persona';
-import { loreGlossary, selectLore } from '../../shared/lore';
+import { loreGlossary, selectLore, type LoreLine } from '../../shared/lore';
 import { cityPlaces } from './places';
-import { loadLoreBook } from './lore';
+import { bookPage, loadLoreBook, loreArtFile, withArt } from './lore';
 import { DEFAULT_LEADS_DIR, loadLeadBook } from './leads';
 import { DEFAULT_QUESTS_DIR, loadQuestBook } from './quests';
 import { DEFAULT_EXTRAS_DIR, extraImages, loadExtras } from './extras';
 import { DEFAULT_GEAR_DIR, loadDecks, loadPrograms, loadStock, loadWords } from './gear';
 import { DEFAULT_STATS } from '../../shared/stats';
-import { heatIn, hottest, repTier } from '../../shared/mission';
+import { heatIn, hottest, repTier, STARTER_DECK } from '../../shared/mission';
 import type { CrewView, KitView, QuestState } from '../../shared/types';
 import { extrasKnown, pickStrangerFace } from '../../shared/extras';
 import { sharedStandingReader } from './standing';
@@ -73,7 +74,7 @@ import { registerPapersRoutes } from './papers';
 import { registerMapRoute } from './map-route';
 import { registerPlaythroughRoutes } from './playthrough-routes';
 import { loadResidents, residentInfo, sceneResidents } from './residents';
-import { gameSongs } from './songs';
+import { beatSongs, districtSongFiles, gameSongs } from './songs';
 import { soundPresent } from './sound-present';
 import { createPlaythroughs } from './playthroughs';
 import { createWorld, type World } from './world';
@@ -159,7 +160,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   const originAllowed = (origin: string | undefined): boolean => originAllowedFor(origin, extraHosts);
   const packs = await loadPacks(cfg.scenesDir);
   for (const [pack, { errors }] of packs) for (const e of errors) console.warn(`[scenes/${pack}] ${e}`);
-  const cityRooms = roomRegistry(packs, (m) => console.warn(`[scenes] ${m}`));
+  const sceneWarn = (m: string) => console.warn(`[scenes] ${m}`);
+  const cityRooms = roomRegistry(packs, sceneWarn, districtSongFiles(cfg.districtsDir ?? './world/districts', cfg.scenesDir, sceneWarn));
   // Every district's scene errors, for every contact's dev panel (they all reach every room).
   const cityErrors = [...packs].filter(([d]) => d !== SPLASH_DISTRICT).flatMap(([d, { errors }]) => errors.map((e) => `[scenes/${d}] ${e}`));
 
@@ -222,11 +224,18 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   // The quest book: read once at startup, against the contacts, the map and the extras as they are now (restart after editing).
   const questBook = loadQuestBook(
     cfg.questsDir ?? DEFAULT_QUESTS_DIR,
-    { roster: new Set(records.filter(isConnected).map((r) => r.info.id)), places: places.placeIds(), extras: extrasKnown(extras), decks: new Set(decks.map((d) => d.id)) },
+    {
+      roster: new Set(records.filter(isConnected).map((r) => r.info.id)),
+      places: places.placeIds(),
+      extras: extrasKnown(extras),
+      decks: new Set(decks.map((d) => d.id)),
+      outfits: new Set(records.flatMap((r) => Object.keys(r.sprite?.outfits ?? {}).map((n) => `${r.info.id}/${n}`))),
+    },
     (m) => console.warn(m),
     leadBook,
   );
-  const lore = (sceneId: string, recent: string[], force?: readonly string[]) => selectLore(loreBook, { ...places.locate(sceneId), recent, ...(force ? { force } : {}) });
+  const lore = (sceneId: string, recent: readonly LoreLine[], force?: readonly string[], present?: readonly string[]) =>
+    selectLore(loreBook, { ...places.locate(sceneId), recent, ...(force ? { force } : {}), ...(present ? { present } : {}) });
   /** What a room's art shows: its art prompt's narration (art/scenes/<folder>.md, see artNarration), else its scene description. */
   function roomArt(folder: string, description: string | undefined): string | null {
     try {
@@ -312,20 +321,21 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   };
   /** How the strip draws someone here: a resident's look, or a contact's from the select screen's file. */
   const lookOf = (p: Present): OtherInfo => {
-    const fallback = { ...p, accent: '#7fe9ff', thumb: null, sprite: null, face: { x: 0.5, y: 0.15 }, tagline: '', facts: [] };
+    const fallback = { ...p, accent: '#7fe9ff', thumb: null, sprite: null, face: { x: 0.5, y: 0.15 }, tagline: '', bio: [], facts: [] };
     if (p.kind === 'resident') {
       const r = residents.get(p.id);
       if (!r) return fallback;
       const info = residentInfo(r);
-      return { ...p, accent: info.accent, thumb: info.thumb, sprite: info.sprite, face: r.face, tagline: '', facts: [] };
+      return { ...p, accent: info.accent, thumb: info.thumb, sprite: info.sprite, face: r.face, tagline: '', bio: [], facts: [] };
     }
     const r = records.find((x) => x.info.id === p.id);
-    return r ? { ...p, accent: r.info.accent, thumb: r.info.thumb, sprite: r.info.sprite, face: r.info.face, tagline: r.info.tagline, facts: r.info.facts } : fallback;
+    return r ? { ...p, accent: r.info.accent, thumb: r.info.thumb, sprite: r.info.sprite, face: r.info.face, tagline: r.info.tagline, bio: r.info.bio, facts: r.info.facts } : fallback;
   };
   /** The encounter narrator's few words on each other here, at most. */
   const OTHER_VOICE_MAX = 200;
   const world = createWorld({
     onClockMoved: () => void promises?.check(),
+    outfitUnlocks: (id) => records.find((r) => r.info.id === id)?.sprite?.outfitUnlocks,
     playthroughs,
     basePlayers: players,
     registry,
@@ -336,7 +346,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     contactName: (id) => records.find((r) => r.info.id === id)?.info.name ?? id,
     kitStart: (id) => {
       const info = records.find((r) => r.info.id === id)?.info;
-      return { stats: info?.stats ?? DEFAULT_STATS, deck: info?.deck ?? null };
+      return { stats: info?.stats ?? DEFAULT_STATS, deck: info?.deck ?? null, ...(decks.some((d) => d.id === STARTER_DECK) ? { pocket: STARTER_DECK } : {}) };
     },
     placeName,
     hasScene: (id) => cityRooms.has(id),
@@ -371,7 +381,19 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     roster: () =>
       records
         .filter(isConnected)
-        .map(({ info, avatarFile }) => ({ id: info.id, name: info.name, pronoun: info.pronoun, accent: info.accent, startRoom: info.startRoom, avatar: avatarFile !== null, thumb: info.thumb !== null, legacyDistrict: info.legacyDistrict, bio: info.bio, facts: info.facts })),
+        .map(({ info, avatarFile, sprite }) => ({
+          id: info.id,
+          name: info.name,
+          pronoun: info.pronoun,
+          accent: info.accent,
+          startRoom: info.startRoom,
+          avatar: avatarFile !== null,
+          thumb: info.thumb !== null,
+          legacyDistrict: info.legacyDistrict,
+          bio: info.bio,
+          facts: info.facts,
+          ...(sprite && Object.keys(sprite.outfits).length > 0 ? { wardrobe: { outfits: Object.keys(sprite.outfits).filter((n) => world.outfitOpen?.(info.id, n) ?? true), byScene: sprite.outfitByScene } } : {}),
+        })),
   });
   deck = createDeck({
     world,
@@ -514,7 +536,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
             const k = world.kitOf(pt.player)!;
             const districts = [...new Set((loreMap?.places ?? []).map((p) => p.district))];
             const draw = freeDraw({ crew: k.crew, book: crewBook, seed: crewSeed(pt.id), extras, districts, now: world.clockNow() ?? START });
-            return jobRecruitCard({ ...draw, runKey: j.runKey, title: j.title, place: j.place, district: j.district, spec: j.spec, grade: j.grade }).recruit!;
+            return jobRecruitCard({ ...draw, ...j }).recruit!;
           },
           districtName: (id) => world.districtName(id),
         },
@@ -626,9 +648,10 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
    * or missing → the default player). Null when there's nothing to say about them (no line: 'you'
    * without a persona file, or a default character that isn't in the roster).
    */
+  // Outfits as rewards: one an ending gives stays out of the wardrobe until a run has given it.
   const outfitNames = (id: string) => {
     const rec = records.find((r) => r.info.id === id);
-    return rec?.sprite ? Object.keys(rec.sprite.outfits) : [];
+    return rec?.sprite ? Object.keys(rec.sprite.outfits).filter((n) => world.outfitOpen?.(id, n) ?? true) : [];
   };
   const visitor = (as: unknown) => {
     const player = world.players.resolve(typeof as === 'string' ? as : undefined);
@@ -637,6 +660,16 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   // Lore words in the box and the quest panel (feedback 2026-10-19): each entry's keys and its hover card, street versions first.
   const glossary = loreGlossary(loreBook);
   app.get('/api/lore/glossary', async () => ({ glossary }));
+  // The lore drawer (spec 2026-11-06): the player's book, once a load; the browser matches it against the conversation.
+  const book = bookPage(loreBook, cityRooms.list().map((r) => r.id), places.locate);
+  app.get('/api/lore/book', async () => withArt(book, cfg.loreDir));
+  // An entry's picture (a corp's logo): only an entry in the player's book has one.
+  const bookIds = new Set(book.entries.map((e) => e.id));
+  app.get<{ Params: { id: string } }>('/api/lore/art/:id', async (req, reply) => {
+    const file = bookIds.has(req.params.id) ? loreArtFile(cfg.loreDir, req.params.id) : null;
+    if (!file) return reply.code(404).send({ error: 'no such picture' });
+    return reply.type('image/webp').header('cache-control', 'no-cache').send(fs.readFileSync(file));
+  });
   // Missions (spec 2026-10-18 §4): the YOU sheet's stats, heat, sol and deck for the active playthrough's player; null without one.
   app.get('/api/kit', async () => {
     const pt = world.active();
@@ -664,11 +697,25 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         stats: k.stats,
         crewLatest: k.crew.latest,
         crewPicks: k.crew.members.some((m) => m.state !== 'gone' && m.picks.length > 0),
+        crewFree: pt ? freeHireWaiting({ crew: k.crew, seed: crewSeed(pt.id), jobCards: jobCardsOf(pt.player, k.crew), now: world.clockNow() ?? START }) : false,
       } satisfies KitView,
     };
   });
   // CREW (crew spec §4): the roster, tonight's hires and errands with their odds, and the results; null without a playthrough.
   app.get('/api/crew', async () => ({ crew: crewViewNow() }));
+  /** The free cards finished jobs left (crew spec §5), up or not: CREW's HIRE tab and the word's dot. */
+  function jobCardsOf(player: string, crew: CrewState) {
+    const mapPlaces = loreMap?.places ?? [];
+    return (world.questStatus(player) ?? []).flatMap(({ id, run }) => {
+      const q = run.done && run.recruit && run.setup?.endAt !== undefined ? questBook.find((x) => x.id === bookId(id)) : undefined;
+      if (!q || !run.recruit) return [];
+      // A rescue's card (crew spec §5) is at its post's place, as its debrief drew it.
+      const place = run.spring?.place ?? q.starts;
+      const p = mapPlaces.find((x) => x.id === place);
+      const title = run.spring ? fillRecruit(q.title, crew.members.find((m) => m.recruit.id === run.spring!.recruit)?.recruit.name.split(' ')[0] ?? null) : q.title;
+      return [{ ...run.recruit, runKey: questKey(player, id), title, place, placeName: p?.name ?? place, district: places.districtOf(place) ?? 'unknown', endAt: run.contract?.closedAt ?? run.setup!.endAt! }];
+    });
+  }
   /** The CREW screen's view for the active playthrough's player (the route and the relay's checks); null without one. */
   function crewViewNow(): CrewView | null {
     const pt = world.active();
@@ -706,15 +753,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         place: (id) => mapPlaces.find((p) => p.id === id)?.name ?? id,
       },
       vouchers: vouchersNow(pt.player),
-      jobCards: (world.questStatus(pt.player) ?? []).flatMap(({ id, run }) => {
-        const q = run.done && run.recruit && run.setup?.endAt !== undefined ? questBook.find((x) => x.id === bookId(id)) : undefined;
-        if (!q || !run.recruit) return [];
-        // A rescue's card (crew spec §5) is at its post's place, as its debrief drew it.
-        const place = run.spring?.place ?? q.starts;
-        const p = mapPlaces.find((x) => x.id === place);
-        const title = run.spring ? fillRecruit(q.title, k.crew.members.find((m) => m.recruit.id === run.spring!.recruit)?.recruit.name.split(' ')[0] ?? null) : q.title;
-        return [{ runKey: questKey(pt.player, id), title, place, placeName: p?.name ?? place, district: places.districtOf(place) ?? 'unknown', spec: run.recruit.spec, grade: run.recruit.grade, endAt: run.contract?.closedAt ?? run.setup!.endAt! }];
-      }),
+      jobCards: jobCardsOf(pt.player, k.crew),
       springs: questBook.some((q) => q.spring),
       rescuing: (world.questStatus(pt.player) ?? []).flatMap(({ run }) => (run.spring && rescueOpen(run, now) ? [run.spring.recruit] : [])),
     });
@@ -753,11 +792,13 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     const persona = pt?.player === p.id ? pt.persona : undefined;
     const bio = persona ? splitBio(persona.background) : (rec?.info.bio ?? []);
     const facts = persona ? [] : (rec?.info.facts ?? []);
+    // The lore drawer's YOUR FILE (playtest 2026-11-06): what your character alone knows, never under a persona, as with the facts.
+    const secret = persona ? null : (readStandingConfig(p.id)?.secret ?? null);
     return {
       persona: {
         id: p.id,
         name: p.name,
-        sprite: p.sprite ? { url: `/api/persona/sprite?as=${encodeURIComponent(p.id)}`, crop: p.sprite.crop, ...(p.sprite.height !== undefined ? { height: p.sprite.height } : {}), ...(p.sprite.pixel ? { pixel: true } : {}) } : null,
+        sprite: p.sprite ? { url: `/api/persona/sprite?as=${encodeURIComponent(p.id)}`, crop: p.sprite.crop, ...(p.sprite.waist !== undefined ? { waist: p.sprite.waist } : {}), ...(p.sprite.pixel ? { pixel: true } : {}) } : null,
         ...(rec ? { accent: rec.info.accent } : {}),
         ...(p.tagline ? { tagline: p.tagline } : {}),
         ...(outfits.length > 0 ? { outfits } : {}),
@@ -766,6 +807,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         ...(faces.length > 0 ? { expressions: Object.fromEntries(faces.map((n) => [n, `/api/agents/${p.id}/sprite/${n}`])) } : {}),
         ...(bio.length > 0 ? { bio } : {}),
         ...(facts.length > 0 ? { facts } : {}),
+        ...(secret ? { secret } : {}),
       },
     };
   });
@@ -779,6 +821,24 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     if (outfit !== null && (typeof outfit !== 'string' || !outfitNames(pt.player).includes(outfit))) return reply.code(400).send({ error: 'unknown-outfit' });
     playthroughs.setOutfit(pt.id, outfit);
     return outfit === null ? {} : { outfit };
+  });
+  // PEOPLE's wardrobe: a contact's outfit picked for the active playthrough (null: her room dresses her again).
+  app.post<{ Params: { id: string } }>('/api/contacts/:id/outfit', async (req, reply) => {
+    if (!originAllowed(req.headers.origin)) return reply.code(403).send({ error: 'origin' });
+    const pt = world.active();
+    if (!pt) return reply.code(409).send({ error: 'no-playthrough' });
+    const body = req.body;
+    const outfit = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).outfit : undefined;
+    if (outfit !== null && (typeof outfit !== 'string' || !outfitNames(req.params.id).includes(outfit))) return reply.code(400).send({ error: 'unknown-outfit' });
+    playthroughs.setContactOutfit(pt.id, req.params.id, outfit);
+    return outfit === null ? {} : { outfit };
+  });
+  // Every contact's picked outfit in the active playthrough: the stage dresses her by it over her room's.
+  app.get('/api/playthroughs/active/contact-outfits', async (_req, reply) => {
+    const pt = world.active();
+    if (!pt) return reply.code(409).send({ error: 'no-playthrough' });
+    // A locked one (outfits as rewards) is left out: her room dresses her.
+    return Object.fromEntries(Object.entries(pt.contactOutfits ?? {}).filter(([id, o]) => world.outfitOpen?.(id, o) ?? true));
   });
   // A character's figure (the persona never changes the body): `?as=<id>` names the character,
   // whichever playthrough is active (the load screen asks for each one's); no `?as=`, the visitor's.
@@ -1080,7 +1140,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       // A few words each: a contact's tagline, a resident's voice cut short (a voice.md can run long).
       const others = rt.othersNow().map((o) => ({ name: o.name, pronoun: o.pronoun, voice: (o.kind === 'contact' ? o.tagline || o.voice : o.voice).slice(0, OTHER_VOICE_MAX) }));
       const { recent, loreRecent, stranger } = sceneNow(rows, { player: you.name, contact: rec.info.name, others: others.map((o) => o.name) });
-      const picks = selectLore(loreBook, { ...places.locate(room.id), recent: loreRecent }).picks.map((p) => p.entry);
+      const picks = selectLore(loreBook, { ...places.locate(room.id), recent: loreRecent, present: [you.name, rec.info.name, ...others.map((o) => o.name)] }).picks.map((p) => p.entry);
       // The stranger still here counts as taken: a new STRANGER card is someone else (with a face of their own).
       const reserved = [you.name, rec.info.name, ...others.map((o) => o.name), ...(stranger ? [stranger.name] : [])];
       const { timeOfDay, weather } = rt.room.state.atmosphere;
@@ -1139,7 +1199,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       const others = rt.othersNow().map((o) => ({ name: o.name, pronoun: o.pronoun, voice: (o.kind === 'contact' ? o.tagline || o.voice : o.voice).slice(0, OTHER_VOICE_MAX) }));
       const names = { player: you.name, contact: rec.info.name, others: others.map((o) => o.name) };
       const { recent, loreRecent, stranger } = sceneNow(rows, names, SUGGEST_RECENT_LINES);
-      const picks = selectLore(loreBook, { ...places.locate(room.id), recent: loreRecent }).picks.map((p) => p.entry);
+      const picks = selectLore(loreBook, { ...places.locate(room.id), recent: loreRecent, present: [names.player, names.contact, ...names.others] }).picks.map((p) => p.entry);
       const { timeOfDay, weather } = rt.room.state.atmosphere;
       return {
         player: you.name,
@@ -1180,7 +1240,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     lore: () => loreBook,
     warn: (m) => console.warn(m),
   });
-  app.get('/api/songs', async () => ({ songs: gameSongs(cfg.scenesDir) }));
+  app.get('/api/songs', async () => ({ songs: gameSongs(cfg.scenesDir), beats: beatSongs(cfg.scenesDir) }));
   // What sounds are on disk, read per request (Studio installs them while the server runs).
   const webSoundDir = cfg.webSoundDir ?? (cfg.webDist ? path.join(cfg.webDist, 'sound') : './web/public/sound');
   app.get('/api/sound-present', async () => ({ files: soundPresent(webSoundDir, cfg.scenesDir) }));

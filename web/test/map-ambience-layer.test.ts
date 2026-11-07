@@ -1,7 +1,9 @@
+import { setFramePace } from '../src/ui/frame-clock';
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CityMapData } from '../../shared/map-schema';
 import { AmbienceLayer } from '../src/ui/map/ambience-layer';
+import { GlowStamps } from '../src/ui/map/glow-stamps';
 
 /** A 2D context that records the calls it gets (jsdom has no canvas). */
 function fakeContext() {
@@ -13,6 +15,9 @@ function fakeContext() {
   });
   return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
 }
+
+/** Something for the stamps to draw on. */
+const fakeCanvas = () => ({ getContext: () => ({ createRadialGradient: () => ({ addColorStop() {} }), fillRect() {} }) }) as unknown as HTMLCanvasElement;
 
 const map = (over: Partial<NonNullable<CityMapData['ambience']>> = {}): CityMapData => ({
   version: 1,
@@ -50,6 +55,23 @@ function run(layer: AmbienceLayer, seconds: number) {
 }
 
 describe('AmbienceLayer', () => {
+  it('draws on the frame clock\'s ticks, not on every monitor frame', () => {
+    const { ctx } = fakeContext();
+    const layer = new AmbienceLayer({ context: ctx, readPixels: () => null });
+    const draw = vi.spyOn(layer, 'drawFrame');
+    setFramePace(60);
+    layer.start();
+    for (const now of [1000, 1004, 1008, 1012, 1017, 1021]) {
+      const [[id, cb]] = [...pending];
+      pending.delete(id);
+      cb(now);
+    }
+    setFramePace(0);
+    layer.stop();
+    expect(draw.mock.calls.map((c) => c[0])).toEqual([1, 1.017]);
+    expect(draw.mock.calls[1][1]).toBeCloseTo(0.017);
+  });
+
   it('draws nothing under reduced motion, and never asks for a frame', () => {
     const { ctx } = fakeContext();
     const layer = new AmbienceLayer({ reducedMotion: true, context: ctx, readPixels: () => null });
@@ -76,11 +98,11 @@ describe('AmbienceLayer', () => {
 
   it('draws signs, plumes and traffic from the map', () => {
     const { ctx, calls } = fakeContext();
-    const layer = new AmbienceLayer({ context: ctx, rand: () => 0.3, readPixels: () => null });
+    const layer = new AmbienceLayer({ context: ctx, rand: () => 0.3, readPixels: () => null, stamps: new GlowStamps(fakeCanvas) });
     layer.setMap(map(), loadedImage());
     layer.setView(CITY, { w: 1200, h: 800 });
     expect(run(layer, 2)).toBeGreaterThan(2);
-    expect(calls).toContain('arc');
+    expect(calls).toContain('drawImage');
   });
 
   it('draws the windows it found in the picture', () => {
@@ -271,9 +293,9 @@ describe('AmbienceLayer with a windows list (rendered map)', () => {
 describe('AmbienceLayer traffic heights (rendered map spec §5)', () => {
   const carYs = (lift: boolean) => {
     const ys: number[] = [];
-    const target: Record<string, unknown> = { createRadialGradient: (_x: number, y: number) => (ys.push(y), { addColorStop() {} }) };
+    const target: Record<string, unknown> = { drawImage: (_i: unknown, _x: number, y: number, _w: number, h: number) => ys.push(y + h / 2) };
     const ctx = new Proxy(target, { get: (t, k: string) => (k in t ? t[k] : () => undefined), set: (t, k: string, v) => ((t[k] = v), true) }) as unknown as CanvasRenderingContext2D;
-    const layer = new AmbienceLayer({ context: ctx, readPixels: () => null });
+    const layer = new AmbienceLayer({ context: ctx, readPixels: () => null, stamps: new GlowStamps(fakeCanvas) });
     layer.setMap(map({ signs: [], plumes: [], traffic: [{ kind: 'cars', path: [[5, 30], [40, 30]], every: 0.5, speed: 4, z: 100 }] }), loadedImage());
     layer.setLift(lift);
     layer.setView(CITY, { w: 1200, h: 800 });
@@ -288,7 +310,9 @@ describe('AmbienceLayer traffic heights (rendered map spec §5)', () => {
   it('with lift on, highway cars draw at road height', async () => {
     const { liftPct } = await import('../../shared/map-projection');
     const road = 240 - (liftPct(100) / 100) * 800;
-    for (const y of carYs(true)) expect(Math.abs(y - road)).toBeLessThan(15);
+    const ys = carYs(true);
+    expect(ys.length).toBeGreaterThan(0);
+    for (const y of ys) expect(Math.abs(y - road)).toBeLessThan(15);
   });
 
   // Blackouts phase 2 §3: windows and signs go out with their district; what moves keeps moving.

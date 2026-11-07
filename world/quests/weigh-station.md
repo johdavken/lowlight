@@ -6,6 +6,8 @@ tier: 1
 starts: long-haul
 after: null
 pitch: A driver at the counter is three tonnes over and the Spine's weigh station opens at the next junction. Get her rig past the scale tonight and she'll pay out of her bonus.
+posted-by: A long-haul driver at the counter, paying out of her bonus.
+brief: "A contractor runs the scale: weight sensors under the road, a camera on the plate and an Aegis barrier. Over the limit, they impound the rig and the driver with it."
 pay: 90-110
 ---
 
@@ -101,10 +103,11 @@ take: full
 → end
 
 ## paid-tip
-*She writes the nights on the envelope under her bonus and pays you a little extra, for later.*
+*She writes the nights on the envelope under her bonus and pays you a little extra, for later. {hire}, who runs paper for the drivers, has heard about the scale already, and stops you at the door to ask if you're taking anyone on.*
 pay: full
 take: full
 gives: recruit runner green
+hire-pitch: I've run paper past that scale for two years. You got a whole rig past it.
 → end
 
 # push-1

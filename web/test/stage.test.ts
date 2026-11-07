@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import { figureDrop } from '../src/ui/figure';
 import { Stage, outfitFor, type FigureSource } from '../src/ui/stage';
 
 let stages: Stage[] = [];
@@ -49,16 +50,45 @@ describe('Stage', () => {
     expect(right(root).dataset.pixel).toBeUndefined();
   });
 
-  it("a sprite's height sets the figure's --fig-height; a fallback stands at full height", async () => {
+  it("a sprite's waist sets the figure's --fig-drop, signed from the shared line; no waist, or a fallback, has none", async () => {
     const { root, stage } = setup((url) => url !== '/missing');
-    stage.setRight([{ ...sprite('/ember'), height: 0.86 } as FigureSource], 'Ember', '#fff');
-    stage.setLeft([sprite('/hicks')], 'Hicks', '#fff');
+    stage.setRight([{ ...sprite('/vesna'), waist: 0.322 } as FigureSource], 'Vesna', '#fff');
+    stage.setLeft([{ ...sprite('/silas'), waist: 0.431 } as FigureSource], 'Silas', '#fff');
     await flush();
-    expect(right(root).style.getPropertyValue('--fig-height')).toBe('0.86');
-    expect(left(root).style.getPropertyValue('--fig-height')).toBe('1');
-    stage.setRight([{ ...sprite('/missing'), height: 0.86 } as FigureSource, { kind: 'monogram', letter: 'E' }], 'Ember', '#fff');
+    expect(Number(right(root).style.getPropertyValue('--fig-drop'))).toBeCloseTo(figureDrop(0.322));
+    expect(Number(right(root).style.getPropertyValue('--fig-drop'))).toBeGreaterThan(0);
+    expect(Number(left(root).style.getPropertyValue('--fig-drop'))).toBeLessThan(0);
+    stage.setLeft([sprite('/unset')], 'Hae', '#fff');
+    stage.setRight([{ ...sprite('/missing'), waist: 0.322 } as FigureSource, { kind: 'monogram', letter: 'E' }], 'Ember', '#fff');
     await flush();
-    expect(right(root).style.getPropertyValue('--fig-height')).toBe('1');
+    expect(Number(left(root).style.getPropertyValue('--fig-drop'))).toBe(0);
+    expect(Number(right(root).style.getPropertyValue('--fig-drop'))).toBe(0);
+  });
+
+  it('setPull scales both figures live, and a figure set after it keeps the pull', async () => {
+    const { root, stage } = setup();
+    stage.setRight([{ ...sprite('/vesna'), waist: 0.322 } as FigureSource], 'Vesna', '#fff');
+    stage.setLeft([{ ...sprite('/silas'), waist: 0.431 } as FigureSource], 'Silas', '#fff');
+    await flush();
+    stage.setPull(0.5);
+    expect(Number(right(root).style.getPropertyValue('--fig-drop'))).toBeCloseTo(figureDrop(0.322, 0.5));
+    expect(Number(left(root).style.getPropertyValue('--fig-drop'))).toBeCloseTo(figureDrop(0.431, 0.5));
+    stage.setRight([{ ...sprite('/rue'), waist: 0.358 } as FigureSource], 'Rue', '#fff');
+    await flush();
+    expect(Number(right(root).style.getPropertyValue('--fig-drop'))).toBeCloseTo(figureDrop(0.358, 0.5));
+    stage.setPull(0);
+    expect(Number(left(root).style.getPropertyValue('--fig-drop'))).toBe(0);
+  });
+
+  it('a change of outfit or face leaves the figure where it stands', async () => {
+    const { root, stage } = setup();
+    stage.setRight([{ ...sprite('/rue'), waist: 0.358, outfits: { home: '/rue-home' }, expressions: { smile: '/rue-smile' } } as FigureSource], 'Rue', '#fff');
+    await flush();
+    const before = right(root).style.getPropertyValue('--fig-drop');
+    stage.setOutfit('right', 'home');
+    stage.setExpression('right', 'smile');
+    await flush();
+    expect(right(root).style.getPropertyValue('--fig-drop')).toBe(before);
   });
 
   it('marks the speaker and changes nothing else: no lit, dimmed or streaming look', async () => {

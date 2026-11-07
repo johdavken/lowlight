@@ -184,13 +184,13 @@ describe('loadAgents', () => {
       expect(warnings.some((w) => w.includes('sprite') && w.includes('sprite crop must have 0 ≤ top < bottom ≤ 1'))).toBe(true);
     });
 
-    it('a sprite height (how tall she stands on stage, 0.5–1) reaches her sprite ref; 1 or none sends nothing', () => {
+    it('a sprite waist reaches her sprite ref; none sends nothing', () => {
       png(path.join(charactersDir, 'nix', 'sprite.png'));
-      setChar({ sprite: { src: 'sprite.png', height: 0.86 } });
-      expect(byId('nix').info.sprite).toMatchObject({ height: 0.86 });
-      expect(byId('nix').sprite).toMatchObject({ height: 0.86 });
-      setChar({ sprite: { src: 'sprite.png', height: 1 } });
-      expect(byId('nix').info.sprite).not.toHaveProperty('height');
+      setChar({ sprite: { src: 'sprite.png', waist: 0.365 } });
+      expect(byId('nix').info.sprite).toMatchObject({ waist: 0.365 });
+      expect(byId('nix').sprite).toMatchObject({ waist: 0.365 });
+      setChar({ sprite: { src: 'sprite.png' } });
+      expect(byId('nix').info.sprite).not.toHaveProperty('waist');
     });
 
     it('a snapped sprite (sprite.pixel) reaches her sprite ref as pixel: true; anything else sends nothing', () => {
@@ -203,12 +203,12 @@ describe('loadAgents', () => {
       expect(byId('nix').info.sprite).not.toHaveProperty('pixel');
     });
 
-    it('a bad sprite height warns and stands her at full height; the sprite stays', () => {
+    it.each([[0.9], [0.1], ['high']])('a bad sprite waist (%s) warns and stands her as drawn; the sprite stays', (waist) => {
       png(path.join(charactersDir, 'nix', 'sprite.png'));
-      setChar({ sprite: { src: 'sprite.png', height: 1.4 } });
+      setChar({ sprite: { src: 'sprite.png', waist } });
       const rec = byId('nix');
       expect(rec.info.sprite).toEqual({ url: '/api/agents/nix/sprite', crop: { top: 0, bottom: 0.5 } });
-      expect(warnings.some((w) => w.includes('sprite.height'))).toBe(true);
+      expect(warnings.some((w) => w.includes('sprite.waist'))).toBe(true);
     });
 
     it('agents without a sprite have none', () => {

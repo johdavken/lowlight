@@ -8,6 +8,8 @@ with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A woman who left a Velvet house still can't work. The house kept her papers, and sends a runner to remind her.
+posted-by: Reva, one of Nix's clients.
+brief: A Velvet house is holding Reva's residency card, med file and work cert, and its runner sits at Hae's waiting for her to come and ask. Get the papers back before she goes down there alone.
 pay: 90-110
 minutes: 20
 posts: 20:00-02:00

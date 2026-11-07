@@ -15,8 +15,7 @@ import { mountLoad } from './load';
 import { MENU_CUE_URL, menuCuePlayer } from './menu-sound';
 import * as playthroughs from '../net/playthroughs';
 import './select.css';
-import { LinkPanel } from './link-panel';
-import { ModelPanel } from './model-panel';
+import { ModelBand, type BandTab } from './model-band';
 import { YouPanel } from './you-panel';
 import type { PlaythroughPersona } from '../../../shared/persona';
 import * as link from '../net/link';
@@ -45,8 +44,8 @@ export interface LandingApi {
   link(): Promise<link.LinkStatus>;
   putLink(apiKey: string, provider: link.Provider): Promise<link.LinkInfo | { error: link.LinkError }>;
   deleteLink(provider: link.Provider): Promise<void>;
-  /** The shipped picks, recent models and (with q) the catalog's matches. */
-  searchModels(q: string): Promise<link.ModelLists>;
+  /** The shipped picks, recent models and the whole catalog. */
+  browseModels(): Promise<link.ModelBrowse>;
   /** Every map district's name (the select screen's group labels). */
   districts?(): Promise<{ id: string; name: string }[]>;
 }
@@ -188,8 +187,8 @@ export function mountLanding(
   let byId = new Map<string, LandingAgent>();
   /** The model each direct AI was last given here, by id (READY shows it). */
   const picked = new Map<string, string>();
-  /** The model step's panel: LINK A MIND or her model list, for the locked AI. */
-  let panel: { kind: 'link' | 'model'; ai: string; obj: LinkPanel | ModelPanel } | null = null;
+  /** The model step's band, for the locked AI. */
+  let panel: { ai: string; obj: ModelBand } | null = null;
   /** Bumped on every panel change: a late answer for an older one is dropped. */
   let panelSeq = 0;
   /** The YOU step's panel, for the locked player (in its own host, which 1P's strip shows). */
@@ -278,11 +277,11 @@ export function mountLanding(
   };
 
 
-  /** MODEL with no panel yet: LINK A MIND when no key is linked, else her model list. */
+  /** MODEL with no band yet: it opens on KEYS when no key is linked, else on her list. */
   const syncPanel = () => {
     const s = flow?.state;
     if (!flow || !s || s.phase !== 'model' || !s.ai) {
-      // Always: a panel still loading for a step the player has left must never open.
+      // Always: a band still loading for a step the player has left must never open.
       closePanel();
       return;
     }
@@ -291,66 +290,44 @@ export function mountLanding(
     const ai = s.ai;
     const seq = ++panelSeq;
     // Her own link decides (a contact on a local endpoint needs no OpenRouter key); the OpenRouter
-    // link only fills the model list's header.
+    // link only fills the band's KEYS.
     const needsKey = isNoLink(byId.get(ai)!);
     const fallback: link.LinkStatus = { state: byId.get(ai)!.link, openrouter: { linked: !needsKey, last4: null, credit: null, state: byId.get(ai)!.link }, anthropic: UNLINKED };
     void api.link().then(
-      (info) => seq === panelSeq && !disposed && (needsKey ? openLinkPanel(ai, false) : openModelPanel(ai, info)),
-      () => seq === panelSeq && !disposed && (needsKey ? openLinkPanel(ai, false) : openModelPanel(ai, fallback)),
+      (info) => seq === panelSeq && !disposed && openBand(ai, info, { needsKey }),
+      () => seq === panelSeq && !disposed && openBand(ai, fallback, { needsKey }),
     );
   };
 
-  function openLinkPanel(ai: string, changing: boolean, previous?: link.LinkStatus, provider?: link.Provider): void {
-    closePanel();
-    const host = el('div', 'panel-host');
-    const obj = new LinkPanel(host, {
-      put: (k, p) => api.putLink(k, p),
-      changing,
-      ...(provider ? { provider } : {}),
-      onLinked: (info, p) => {
-        refreshRoster();
-        openModelPanel(ai, withLink(previous, p, info));
-      },
-      onBack: () => {
-        if (changing && previous) openModelPanel(ai, previous);
-        else {
-          closePanel();
-          flow!.back();
-          act();
-        }
-      },
-    });
-    panel = { kind: 'link', ai, obj };
-    render();
-    obj.el.querySelector('input')?.focus();
-  }
-
-  function openModelPanel(ai: string, info: link.LinkStatus): void {
+  function openBand(ai: string, info: link.LinkStatus, o: { needsKey: boolean; tab?: BandTab }): void {
     closePanel();
     render();
     const seq = panelSeq;
     const a = byId.get(ai)!;
-    // Her model as the server keeps it; unreadable, the panel offers what she runs now (KEEP).
+    // Her model as the server keeps it; unreadable, the band offers what she runs now (KEEP).
     const keep: ModelEvent = { type: 'model', model: KEEP, provider: 'openrouter', label: a.modelLabel ?? '…', choices: [], default: KEEP };
-    void api.models(ai).then(
-      (e) => e,
-      () => keep,
-    ).then((agentModels) => {
+    const models = o.needsKey ? Promise.resolve(keep) : api.models(ai).catch(() => keep);
+    void models.then((agentModels) => {
       if (seq !== panelSeq || disposed) return;
-      const obj = new ModelPanel(el('div', 'panel-host'), {
-        link: info.openrouter,
-        anthropic: info.anthropic,
+      const obj = new ModelBand(stage.el, {
+        links: { openrouter: info.openrouter, anthropic: info.anthropic },
         pronoun: a.pronoun,
         agentModels,
-        search: (q) => api.searchModels(q),
+        needsKey: o.needsKey,
+        ...(o.tab ? { tab: o.tab } : {}),
+        browse: () => api.browseModels(),
+        put: (k, p) => api.putLink(k, p),
         onPick: (id) => void choose(ai, id, agentModels),
         onBack: () => {
           closePanel();
           flow!.back();
           act();
         },
-        onChangeKey: (p) => openLinkPanel(ai, true, info, p),
-        onLink: (p) => openLinkPanel(ai, true, info, p),
+        onChange: () => render(),
+        onLinked: (linked, p) => {
+          refreshRoster();
+          openBand(ai, withLink(info, p, linked), { needsKey: false });
+        },
         onUnlink: (p) => {
           const at = panelSeq;
           const still = () => at === panelSeq && !disposed && flow?.state.phase === 'model' && flow.state.ai === ai;
@@ -358,10 +335,9 @@ export function mountLanding(
             () => {
               refreshRoster();
               if (!still()) return;
-              // The other key still linked: her list stays; none left: LINK A MIND.
+              // The other key still linked: KEYS stays; none left: the band asks for one.
               const rest = withLink(info, p, UNLINKED);
-              if (rest.state === 'no-link') openLinkPanel(ai, false);
-              else openModelPanel(ai, rest);
+              openBand(ai, rest, { needsKey: rest.state === 'no-link', tab: 'keys' });
             },
             (err: unknown) => {
               if (!still()) return;
@@ -371,7 +347,7 @@ export function mountLanding(
           );
         },
       });
-      panel = { kind: 'model', ai, obj };
+      panel = { ai, obj };
       render();
     });
   }
@@ -380,7 +356,7 @@ export function mountLanding(
   async function choose(ai: string, id: string | null, e: ModelEvent): Promise<void> {
     if (saving || leaving) return;
     const label = (m: string) => e.choices?.find((c) => c.id === m)?.label ?? m;
-    const searchLabel = id && panel?.obj instanceof ModelPanel ? panel.obj.labelFor(id) : null;
+    const searchLabel = id ? (panel?.obj.labelFor(id) ?? null) : null;
     const at = panelSeq;
     if (id !== KEEP) {
       saving = true;
@@ -489,7 +465,7 @@ export function mountLanding(
       return;
     }
     if (s.phase !== 'p1' && s.phase !== 'p2') {
-      hints.textContent = panel?.kind === 'link' ? COPY.link.hintLink : COPY.link.hint;
+      hints.textContent = panel?.obj.hint ?? COPY.link.hint;
       return;
     }
     hints.textContent = `${COPY.hintGrid} · ${COPY.hintBack}`;
@@ -530,9 +506,7 @@ export function mountLanding(
     }
     stripP2.show(s.phase === 'p1' ? null : s.phase === 'p2' ? picked(flow.idAt('p2')) : picked(s.ai), { locked: aiLocked, player: s.player });
     stripP2.setModels(stripModels());
-    stripP2.setPanel(s.phase === 'model' && panel ? panel.obj.el.parentElement : null);
-    title.textContent =
-      s.phase === 'model' ? (panel?.kind === 'link' ? COPY.link.titleLink : COPY.link.titleModel(byId.get(s.ai ?? '')?.pronoun ?? 'they')) : TITLES[s.phase];
+    title.textContent = s.phase === 'model' ? (panel?.obj.title ?? COPY.link.titleModel(byId.get(s.ai ?? '')?.pronoun ?? 'they')) : TITLES[s.phase];
     renderHints(s);
     dialError.textContent = errorText ?? '';
     backdrop();
@@ -1005,7 +979,7 @@ export async function startLanding(): Promise<void> {
       link: () => link.getLink(),
       putLink: (k, p) => link.putLink(k, p),
       deleteLink: (p) => link.deleteLink(p),
-      searchModels: (q) => link.searchModels(q),
+      browseModels: () => link.browseModels(),
       districts: async () => {
         const res = await fetch('/api/district-list', { signal: AbortSignal.timeout(2000) });
         if (!res.ok) return [];

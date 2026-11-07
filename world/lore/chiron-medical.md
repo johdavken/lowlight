@@ -1,6 +1,7 @@
 ---
 title: Chiron Medical
 category: City
+section: Corps
 keys: [Chiron, Chiron Medical, hospital, trauma card, ambulance drones, bounced, insurance]
 districts: []
 places: []

@@ -7,6 +7,8 @@ with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's hands won't stop shaking. Her script came from the Open Hand, and it wasn't what the label said.
+posted-by: Sun, a line cook and one of Nix's clients.
+brief: Sun's script from the Open Hand came out cloudy. Go down to the clinic, find out who's cutting it, and get her a clean dose tonight.
 pay: 90-110
 minutes: 20
 posts: 20:00-02:00

@@ -7,6 +7,8 @@ with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A man has a seat on tonight's last ferry and a reason to be on it. There's a Sentinel on the Ferry Stairs checking faces.
+posted-by: Ilias, one of Nix's clients.
+brief: A firm owns Ilias's contract and his face, and he has a ticket for the last ferry. Walk him down the Ferry Stairs past the Sentinel reading faces.
 pay: 90-110
 minutes: 20
 posts: 20:00-02:00

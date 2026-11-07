@@ -25,6 +25,8 @@ export interface RosterContact {
   /** Her select-screen file (bio paragraphs and facts), for her entry's file in CONTACTS. */
   bio?: string[];
   facts?: Fact[];
+  /** Her outfit names and the outfit each room puts her in (PEOPLE's wardrobe); absent without outfits. */
+  wardrobe?: { outfits: string[]; byScene: Record<string, string> };
 }
 
 /** What the playthrough's contact databases say about one contact (read-only). */
@@ -143,6 +145,19 @@ function placeOf(c: RosterContact, f: DbFacts | undefined, names: Names): string
   return saved ? completeSceneId(saved, names.hasScene ?? (() => false), c.legacyDistrict ?? null, c.startRoom) : c.startRoom;
 }
 
+/** Her wardrobe for PEOPLE: her outfits, the one picked for her (if still hers), and what `sceneId` puts her in. */
+function wardrobeOf(c: RosterContact, sceneId: string, picks: Record<string, string> | undefined): Pick<ContactEntry, 'outfits' | 'outfit' | 'sceneOutfit'> {
+  const w = c.wardrobe;
+  if (!w || w.outfits.length === 0) return {};
+  const pick = picks && Object.hasOwn(picks, c.id) ? picks[c.id] : undefined;
+  const room = Object.hasOwn(w.byScene, sceneId) ? w.byScene[sceneId] : undefined;
+  return {
+    outfits: [...w.outfits],
+    ...(pick !== undefined && w.outfits.includes(pick) ? { outfit: pick } : {}),
+    ...(room !== undefined && w.outfits.includes(room) ? { sceneOutfit: room } : {}),
+  };
+}
+
 function known(facts: Map<string, DbFacts>, pt: PlaythroughInfo, roster: RosterContact[], names: Names): ContactEntry[] {
   const nameOf = (id: string) => roster.find((c) => c.id === id)?.name ?? id;
   /** Who first introduced each contact. */
@@ -175,6 +190,7 @@ function known(facts: Map<string, DbFacts>, pt: PlaythroughInfo, roster: RosterC
         : {}),
       ...(c.bio?.length ? { bio: c.bio } : {}),
       ...(c.facts?.length ? { facts: c.facts } : {}),
+      ...wardrobeOf(c, sceneId, pt.contactOutfits),
     });
   }
   const rank = { start: 0, met: 1, knows: 2, shared: 3 };

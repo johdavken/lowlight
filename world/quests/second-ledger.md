@@ -7,6 +7,8 @@ with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's debt was sold twice. The Counting House keeps a second ledger nobody's supposed to know about.
+posted-by: Dana, one of Nix's clients.
+brief: Dana paid in full, then a second collector came with a ledger page. Two buyers, one debt. Find out at the Counting House in the Drownworks who's paying for two sets of books.
 pay: 90-110
 posts: 20:00-02:00
 trust: 1 / 1

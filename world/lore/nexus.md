@@ -1,6 +1,7 @@
 ---
 title: Nexus
 category: City
+section: Districts
 keys: [Nexus, Central Core, the Core, city core, downtown, corp headquarters]
 districts: [nexus]
 places: []

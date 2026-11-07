@@ -54,8 +54,8 @@ interface Wearer {
 
 /**
  * Everyone's entry, in line order (spec §4–5): hers (marked `self`), then the player's, then the others'.
- * Hers and the others' follow `sceneId`'s pick; the player's follows `playerOutfit` (the YOU sheet).
- * Anyone whose outfit has no line is left out.
+ * Hers and the others' follow the outfit picked for them on PEOPLE (`pick`), else `sceneId`'s; the player's
+ * follows `playerOutfit` (the YOU sheet). Anyone whose outfit has no line is left out.
  */
 export function wearingEntries(o: {
   self: Wearer;
@@ -64,10 +64,12 @@ export function wearingEntries(o: {
   playerOutfit: string | null;
   others: readonly Wearer[];
   wardrobe: (id: string) => SpriteRecord | null;
+  /** The outfit picked for a contact on PEOPLE, worn everywhere; null: her room dresses her. */
+  pick?: (id: string) => string | null;
 }): WearEntry[] {
   const inScene = (id: string) => {
     const sprite = o.wardrobe(id);
-    return wearsOf(sprite, sprite?.outfitByScene[o.sceneId]);
+    return wearsOf(sprite, o.pick?.(id) ?? sprite?.outfitByScene[o.sceneId]);
   };
   const entries: WearEntry[] = [];
   const mine = inScene(o.self.id);

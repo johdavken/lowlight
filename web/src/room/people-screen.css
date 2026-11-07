@@ -35,14 +35,23 @@
 
 /* The right side: the file, or the journal. */
 .pe-right { min-height: 0; min-width: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--screen-accent) 45%, transparent) transparent; }
-.pe-file { --c: var(--screen-accent); display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 16px 27px 14px; box-sizing: border-box; }
-.pe-top { flex: none; display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 18px; }
-/* The top of her sprite, from the head down. */
-.pe-fig { position: relative; height: 200px; overflow: hidden; background: #0b0618; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); }
-.pe-figure { position: absolute; left: 50%; top: 4px; height: 250%; max-width: none; transform: translateX(-50%); image-rendering: pixelated; }
-.pe-figure.pe-flat { inset: 0; width: 100%; height: 100%; transform: none; object-fit: cover; object-position: top; }
+.pe-file { --c: var(--screen-accent); display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 22px; height: 100%; min-height: 0; padding: 16px 27px 14px; box-sizing: border-box; }
+/* Her whole figure down the left, as tall as the column, straight on the pane; her wardrobe under it. The sprite's
+   frame is mostly empty side to side, so its full height usually fits; a wider figure (Mother Rot) is fitted by
+   fitFigure, centred on the figure, not the frame. */
+.pe-fig { display: flex; flex-direction: column; min-height: 0; }
+.pe-pic { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.pe-figure { position: absolute; bottom: 0; left: 50%; height: 100%; width: auto; max-width: none; transform: translateX(-50%); image-rendering: pixelated; }
+.pe-figure.pe-flat { inset: 0; left: 0; width: 100%; height: 100%; transform: none; object-fit: cover; object-position: top; border: 1px solid color-mix(in srgb, var(--c) 55%, transparent); box-sizing: border-box; }
 .pe-big { height: 100%; font-size: 90px; }
-.pe-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pe-wardrobe { flex: none; padding: 4px 4px 0; text-align: center; }
+.pe-ward-row { display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
+.pe-arrow { padding: 0 8px; font: 28px/1 var(--pixel); color: var(--c); background: none; border: 0; cursor: pointer; }
+.pe-arrow:hover, .pe-arrow:focus-visible { outline: none; text-shadow: 0 0 10px var(--c); }
+.pe-outfit { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 19px var(--pixel); letter-spacing: 0.16em; color: var(--pe-ink); }
+.pe-ward-sub { font: 13px var(--pixel); letter-spacing: 0.14em; color: var(--pe-dim); }
+.pe-side { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.pe-info { flex: none; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .pe-name { font: 49px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.03em; color: var(--c); }
 .pe-standing { font: 18px var(--pixel); letter-spacing: 0.2em; color: #ffc56b; }
 .pe-arrangement { font: 16px var(--pixel); letter-spacing: 0.14em; color: #ffb3a6; }

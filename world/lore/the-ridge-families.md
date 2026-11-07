@@ -1,6 +1,7 @@
 ---
 title: The Ridge Families
 category: Factions
+section: Institutions
 keys: [Ridge Families, the Families, old money, Cloudridge families, dynasties, Ridge money]
 districts: [cloudridge]
 places: []

@@ -7,12 +7,13 @@
 import { DEALT, picksFor } from '../../../../shared/costs';
 import { ALARM_MAX, ALARM_SHIFT, EFFECT_HEAT, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE, type Position } from '../../../../shared/dice';
 import { ABILITY_NERVE, APPROACH_STATS, MAX_PEOPLE, FAVOUR_HEAT, type Approach } from '../../../../shared/hand';
+import { WARY_HEAT } from '../../../../shared/heat';
 import { HEAT_MAX } from '../../../../shared/mission';
 import { HOT_LOAD_NERVE, SLOTS } from '../../../../shared/programs';
 import { el, isPhone } from './el';
 
-export type TipId = 'approach' | 'people' | 'favour' | 'contact' | 'roll' | 'position' | 'effect' | 'take' | 'alarm' | 'nerve' | 'call' | 'program' | 'tier' | 'heat' | 'costs' | 'resist' | 'armour' | 'getaway' | 'press' | 'debrief';
-export const TIP_ORDER: readonly TipId[] = ['approach', 'people', 'favour', 'contact', 'roll', 'position', 'effect', 'take', 'alarm', 'nerve', 'call', 'program', 'tier', 'heat', 'costs', 'resist', 'armour', 'getaway', 'press', 'debrief'];
+export type TipId = 'approach' | 'people' | 'favour' | 'contact' | 'job' | 'roll' | 'position' | 'effect' | 'take' | 'alarm' | 'nerve' | 'call' | 'program' | 'tier' | 'heat' | 'costs' | 'resist' | 'armour' | 'getaway' | 'press' | 'debrief';
+export const TIP_ORDER: readonly TipId[] = ['approach', 'people', 'favour', 'contact', 'job', 'roll', 'position', 'effect', 'take', 'alarm', 'nerve', 'call', 'program', 'tier', 'heat', 'costs', 'resist', 'armour', 'getaway', 'press', 'debrief'];
 export const TIPS_KEY = 'nix-room.graft-tips';
 /** How long a deal takes to settle before a callout points into it (0 with reduced motion). */
 export const SETTLE_MS = 600;
@@ -23,11 +24,15 @@ const where = (p: Position) => {
   return `${POSITION_NAMES[p]}: a 4–5 ${n ? `makes you pick ${n} cost${n > 1 ? 's' : ''}` : 'costs nothing'}`;
 };
 
-/** `below`: tried under its target first (a choice card's tips keep clear of the beat's prose above it). */
-export const TIPS: Record<TipId, { title: string; text: string; target: string; below?: true }> = {
+/**
+ * `below`: tried under its target first (a choice card's tips keep clear of the beat's prose above it). `stage`: the
+ * target stands on the game stage, outside the table (the JOB column has its own layer there). `beside`: tried at its
+ * right first (a tall column: above it is the job's title, below it the line keys).
+ */
+export const TIPS: Record<TipId, { title: string; text: string; target: string; below?: true; stage?: true; beside?: true }> = {
   approach: {
     title: 'HOW YOU GO IN',
-    text: `Each rolls +1d on its stats: QUIET ${stats('quiet')}, SMOOTH ${stats('smooth')}, HARD ${stats('hard')}. HARD starts at ALARM 1, and TAKE 1 on a job of tier 2 or more. You choose from the pitch, before you see the checks.`,
+    text: `Each rolls +1d on its stats: QUIET ${stats('quiet')}, SMOOTH ${stats('smooth')}, HARD ${stats('hard')}. HARD starts at ALARM 1, and TAKE 1 on a job of tier 2 or more. QUIET is never dealt TAKE −1 and picks ALARM +1 first. SMOOTH is never dealt NEXT ROLL SMALL and picks NEXT ROLL WORSE first. HARD is never dealt ALARM +1 and picks TAKE −1 first. You choose from the pitch, before you see the checks.`,
     target: '.ts-approach',
   },
   people: {
@@ -45,6 +50,13 @@ export const TIPS: Record<TipId, { title: string; text: string; target: string; 
     text: 'A contact who gave you a lead will help on a job, once, in their trade. Blow the job after you play them and they trust you less.',
     target: '.tb-slot[data-id^="contact:"]',
   },
+  job: {
+    title: 'TWO VOICES',
+    text: "The JOB column holds the job's written text: the pitch, each beat, the ending. It flashes NEW when the job moves on, and a contact on the line speaks in it in cyan. Your contact talks at the right, by their figure, a page at a time: Enter turns it. Scroll up on their line for everything said so far.",
+    target: '.jc',
+    stage: true,
+    beside: true,
+  },
   roll: {
     title: 'THE ROLL',
     text: 'Roll the dice shown and keep the highest. 6 is clean, 4–5 a pass at a cost, 1–3 a miss. Two 6s is a crit. With no dice you roll two and keep the lowest.',
@@ -54,7 +66,7 @@ export const TIPS: Record<TipId, { title: string; text: string; target: string; 
   position: {
     title: 'WHERE YOU STAND',
     text: `${where('dark')}. ${where('open')}. ${where('wire')}. A miss costs more.`,
-    target: '.tb-card:has(.tb-pos)',
+    target: '.tb-card:has(.tb-side-word)',
     below: true,
   },
   effect: {
@@ -81,7 +93,7 @@ export const TIPS: Record<TipId, { title: string; text: string; target: string; 
   },
   heat: {
     title: 'HEAT',
-    text: 'The ALARM you leave with becomes HEAT in the district. It cools each morning, and a crew errand can lay it low. As it climbs, jobs there turn harder, and at 6 or more every roll there is a step smaller.',
+    text: `The ALARM you leave with becomes HEAT in the district, and a hot deck adds its own on any job with a grid roll. It cools each morning by your tier there, and a crew errand can lay it low. At ${WARY_HEAT} some jobs there open warier and errands start to slip; at ${EFFECT_HEAT} every roll there is a step smaller and favours stop.`,
     target: '.tb-alarm',
   },
   program: {
@@ -96,7 +108,7 @@ export const TIPS: Record<TipId, { title: string; text: string; target: string; 
   },
   costs: {
     title: 'WHAT IT COSTS',
-    text: 'A costly roll deals what can go wrong. Pick the cost you can live with: the more dangerous the spot, the more you pick.',
+    text: 'A costly roll deals what can go wrong. Pick the cost you can live with: the more dangerous the spot, the more you pick. How you went in decides your first pick, if that cost was dealt.',
     target: '.tb-costs',
   },
   resist: {
@@ -166,21 +178,21 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
   let queue: { id: TipId; root: HTMLElement }[] = [];
   /** A target on screen: in the page, with a size (a hidden dial is neither). */
   const find = (id: TipId, root: HTMLElement) => {
-    const t = root.querySelector<HTMLElement>(TIPS[id].target);
+    const t = (TIPS[id].stage ? host : root).querySelector<HTMLElement>(TIPS[id].target);
     if (!t?.isConnected) return null;
     const r = t.getBoundingClientRect();
     return r.width > 0 || r.height > 0 ? t : null;
   };
   let current: { id: TipId; target: HTMLElement; box: HTMLElement } | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  const watch = typeof ResizeObserver === 'function' ? new ResizeObserver(() => current && place(current.box, current.target, TIPS[current.id].below)) : null;
+  const watch = typeof ResizeObserver === 'function' ? new ResizeObserver(() => current && place(current.box, current.target, TIPS[current.id])) : null;
 
   /** Host coordinates: the stage is zoomed to fit the window, so screen pixels are divided back out. */
   const scale = () => {
     const w = host.getBoundingClientRect().width;
     return host.offsetWidth > 0 && w > 0 ? w / host.offsetWidth : 1;
   };
-  const place = (box: HTMLElement, target: HTMLElement, below = false) => {
+  const place = (box: HTMLElement, target: HTMLElement, { below = false, beside = false }: { below?: boolean; beside?: boolean } = {}) => {
     const phone = isPhone(host);
     box.classList.toggle('strip', phone);
     if (phone) {
@@ -203,11 +215,9 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
     // Above, below, then beside: the first that fits without covering the target.
     const above: [number, number, string] = [cx, r.top - GAP - bh, 'above'];
     const under: [number, number, string] = [cx, r.bottom + GAP, 'below'];
-    const spots: [number, number, string][] = [
-      ...(below ? [under, above] : [above, under]),
-      [r.right + GAP, cy, 'right'],
-      [r.left - GAP - bw, cy, 'left'],
-    ];
+    const right: [number, number, string] = [r.right + GAP, cy, 'right'];
+    const left: [number, number, string] = [r.left - GAP - bw, cy, 'left'];
+    const spots: [number, number, string][] = beside ? [right, left, above, under] : [...(below ? [under, above] : [above, under]), right, left];
     const fits = ([x, y]: [number, number, string]) => x >= MARGIN && y >= MARGIN && x + bw <= W - MARGIN && y + bh <= H - MARGIN;
     const [x, y, side] = spots.find(fits) ?? [clampX(spots[0][0]), clampY(spots[0][1]), spots[0][2]];
     box.style.left = `${Math.round(x)}px`;
@@ -246,7 +256,7 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
     skip.addEventListener('click', () => setEnabled(false));
     host.append(box);
     current = { ...next, box };
-    place(box, next.target, tip.below);
+    place(box, next.target, tip);
   };
   const setEnabled = (on: boolean) => {
     if (state.off === !on) return;

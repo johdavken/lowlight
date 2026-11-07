@@ -4,7 +4,7 @@
  * choice to roll it with the card (and PUSH, if it's on). STEADY / TAKE IT, the getaway, the cover cards, WALK /
  * PRESS ON and the debrief deal here too. Story quests stay on the quest panel.
  */
-import { deckNotes, EFFECT_NAMES, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE, tradeRefusal, type Effect, type Pool, type Position, type PushMode, type Trade } from '../../../../shared/dice';
+import { CARRY_ON, deckNotes, EFFECT_NAMES, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE, tradeRefusal, type Effect, type Pool, type Position, type PushMode, type Trade } from '../../../../shared/dice';
 import type { Debrief, ProgramPreview, QuestState } from '../../../../shared/types';
 import { debriefEl } from '../debrief';
 import { landedTray, settleParked } from '../check-anim';
@@ -13,8 +13,9 @@ import { passiveLabels } from '../../ui/passive';
 import { markLore } from '../../ui/lore-hover';
 import { cardEl, mountDeal, trayHead, type TableCard } from './deal';
 import { el, isPhone, type TableCue } from './el';
+import { decodeIn, noise, scrambleIn, WAIT_CHARS } from './decode';
 import { mountHand, type HandGroup } from './hand';
-import { abilityFace, artFace, backFace, contactFace, crewFace, deckLabel, programFace, slotFace } from './faces';
+import { abilityFace, artFace, backFace, contactFace, crewFace, deckLabel, programFace, slotFace, statPicture } from './faces';
 import { abilityCard as abilityOf, MAX_CONTACTS } from '../../../../shared/hand';
 import { HOT_LOAD_NERVE } from '../../../../shared/programs';
 import { abilityInfo, choiceInfo, contactInfo, favourInfo, mountCardInfo, plainInfo, programInfo, recruitInfo, slotInfo, type Info } from './card-info';
@@ -69,6 +70,7 @@ export function tipsFor(a: Active): TipId[] {
   const callable = a.hand?.people.some((p) => !p.down && (p.free > 0 || p.risk !== null)) ?? false;
   return [
     ...(a.getaway ? (['getaway'] as const) : []),
+    'job',
     ...(checked ? (['roll', 'position'] as const) : []),
     ...(effect ? (['effect'] as const) : []),
     ...(a.take ? (['take'] as const) : []),
@@ -222,9 +224,11 @@ function cardState(pool: NonNullable<Choice['pool']>, lifted: string | null, pla
 }
 
 /**
- * A checked choice's face (mockup call-cards.html, D): its position's picture down the left, then (into the body it
- * returns, after the line the caller puts first) the flags row, the tray of dice by source with the count, and its
- * sources as tabs hanging off the foot. A lifted card shows what it would do: its dice blink in, the position moves.
+ * A checked choice's face (mockup position-cards.html, C1): a printed card like the crew's, its stat's picture, then (into
+ * the body it returns, after the line the caller puts first) the flags row, the tray of dice by source with the count, the
+ * position and effect, and its sources as tabs hanging off the foot. The position's colour edges the picture. A lifted card
+ * shows what it would do: its dice blink in, the position moves. On a phone, or asking THAT'S MY CHOICE, the picture stands
+ * down the left of a wide card (table.css).
  * The pool also reads as words for screen readers (`.tb-odds`).
  */
 function callFace(f: HTMLElement, pool: NonNullable<Choice['pool']>, lifted: string | null, play0: Side | undefined, mod: { trade: Trade | null; push: PushMode | null; prog?: ProgMod } = { trade: null, push: null }): HTMLElement {
@@ -233,8 +237,7 @@ function callFace(f: HTMLElement, pool: NonNullable<Choice['pool']>, lifted: str
   f.classList.add('tb-call');
   f.classList.toggle('none', (Boolean(lifted) && !play) || why !== null);
   f.dataset.pos = pos;
-  const side = el('span', 'tb-side');
-  side.append(piece(pos, 'tb-pos'), el('span', 'tb-side-word', POS_WORD[pos]));
+  const side = statPicture(pool.stat);
   const body = el('span', 'tb-main');
   const flags = el('span', 'tb-flags');
   if (play && play.position !== pool.position) flags.append(el('span', 'tb-tag move', `${POS_WORD[pool.position]} → ${POS_WORD[play.position]}`));
@@ -255,7 +258,10 @@ function callFace(f: HTMLElement, pool: NonNullable<Choice['pool']>, lifted: str
   tray.append(sum);
   const foot = el('span', 'tb-foot');
   foot.append(flags, tray);
-  if (effect) foot.append(el('span', `tb-eff ${effect}`, EFFECT_NAMES[effect]));
+  const say = el('span', 'tb-say');
+  say.append(el('span', 'tb-side-word', POS_WORD[pos]));
+  if (effect) say.append(el('span', `tb-eff ${effect}`, EFFECT_NAMES[effect]));
+  foot.append(say);
   const preview = play ? previewText(play.stat ?? pool.stat, pool, play) : null;
   const words = preview ?? (lifted ? `${poolText(pool)} · NO CARD HERE` : poolText(pool));
   body.append(foot, el('span', `tb-odds sr${preview ? ' preview' : ''}${lifted && !preview ? ' none' : ''}`, words));
@@ -584,9 +590,16 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
   const choiceFace = (a: Active, c: Choice): HTMLElement => {
     const f = el('span', 'tb-face');
     // After a costly roll, STEADY and TAKE IT are picture cards: the price (`STEADY (2 NERVE)`) on the chip.
-    if (c.id === '!steady' || c.id === '!take') {
+    if (c.id === '!steady' || (c.id === '!take' && c.line !== CARRY_ON)) {
       const price = /\((\d+) NERVE\)/.exec(c.line)?.[1];
       f.append(c.id === '!steady' ? artFace('steady', 'STEADY', ['NO ALARM, NO HEAT'], price ? `${price} NERVE` : undefined) : artFace('take', 'TAKE IT', ['THE COST LANDS']));
+      return f;
+    }
+    // Nothing left to pay: the smothered alarm, and no word of a cost.
+    if (c.id === '!take' && c.line === CARRY_ON) {
+      const card = artFace('steady', CARRY_ON, ['NOTHING TO PAY']);
+      card.classList.add('tb-free');
+      f.append(card);
       return f;
     }
     // WALK and PRESS ON are pictures (sheet 9), worded like the answers to a cost: the word, then what it means.
@@ -673,7 +686,9 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       const dx = b.left - now.left;
       const dy = b.top - now.top;
       if (!dx && !dy) return;
-      n.animate([{ translate: `${dx}px ${dy}px` }, { translate: '0 0' }], { duration: 350, easing: 'cubic-bezier(0.3, 0.7, 0.3, 1)' });
+      // The card also shrinks to its waiting size (table.css), from its top left corner.
+      const scale = n.classList.contains('tb-card') && now.width > 0 && now.height > 0 ? `${b.width / now.width} ${b.height / now.height}` : '1';
+      n.animate([{ translate: `${dx}px ${dy}px`, scale, transformOrigin: '0 0' }, { translate: '0 0', scale: '1', transformOrigin: '0 0' }], { duration: 350, easing: 'cubic-bezier(0.3, 0.7, 0.3, 1)' });
     });
   };
 
@@ -719,11 +734,14 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     // Where the old row stood, for a pick's slide (below), in layout pixels: the old row stays there while it fades.
     const oldAt = old ? { left: old.offsetLeft, top: old.offsetTop, width: old.offsetWidth, focus: old.dataset.focus } : null;
     const oldCards = new Map([...(old?.querySelectorAll<HTMLElement>('.tb-cost') ?? [])].map((n) => [n.dataset.cost!, n.getBoundingClientRect()] as const));
+    if (!a.costs) decoding.clear();
     if (a.costs) {
       const box = costsEl(a.costs);
       const row = deal.root.querySelector(':scope > .tb-parked');
       if (row) row.after(box);
       else deal.root.prepend(box);
+      // A new row waits for the roll's card to shrink out of its way (glide, above).
+      if (!old && !o.reduced()) box.animate([{ opacity: 0 }, { opacity: 0, offset: 0.7 }, { opacity: 1 }], { duration: 500 });
       // A fresh pick: the cards left over fade where they stood, the picked one slides to the front (playtest).
       const pick = box.dataset.focus;
       if (old && oldAt && pick && pick !== oldAt.focus && !o.reduced()) {
@@ -745,6 +763,8 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     passiveLabels(deal.root);
   };
 
+  /** Costs showing noise: each decodes once, when its line comes. */
+  const decoding = new Set<string>();
   /**
    * The dealt costs as cards: a free one picks; a settled one says how. A picked one stands alone at the front with its
    * answers branching off it as panels (TAKE IT, RESIST, FIREWALL), the rest out of the row until it's settled.
@@ -767,7 +787,16 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     const costCard = (d: (typeof c.dealt)[number]) => {
       const card = el('div', `tb-cost${d.picked ? ' picked' : ''}${d.settled ? ' settled' : ''}`);
       card.dataset.cost = d.cost;
-      card.append(el('span', 'tb-cost-tag', d.tag), el('span', `tb-cost-line${d.by === 'gm' ? ' gm' : ''}`, d.line));
+      // The GM's line is on its way: noise stands in, so the words never change under the reader, and it decodes once.
+      const held = c.writing && !d.picked;
+      const line = held ? el('span', 'tb-cost-line wait') : el('span', `tb-cost-line${d.by === 'gm' ? ' gm' : ''}`, d.line);
+      if (held) {
+        decoding.add(d.cost);
+        if (o.reduced()) line.textContent = noise(WAIT_CHARS);
+        else scrambleIn(line);
+      } else if (decoding.delete(d.cost) && !d.picked && !o.reduced()) decodeIn(line, d.line);
+      card.append(el('span', 'tb-cost-tag', d.tag), line);
+      if (d.first) card.append(el('span', 'tb-cost-first', `${active?.hand?.approach.toUpperCase() ?? ''} FIRST`));
       return card;
     };
     const open = c.dealt.find((d) => d.picked && !d.settled);
@@ -792,6 +821,8 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       box.append(row);
       return box;
     }
+    // The approach's own cost is the only first pick (approach shapes spec §1).
+    const forced = c.dealt.some((d) => d.first);
     for (const d of c.dealt) {
       const card = costCard(d);
       if (d.settled) {
@@ -799,7 +830,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
         const how = el('span', 'tb-cost-how', `${HOW[d.settled]}${nerve}`);
         if (d.faces) how.append(el('span', 'tb-cost-dice', d.faces.join(' ')));
         card.append(how);
-      } else if (picked < c.pick) {
+      } else if (picked < c.pick && (!forced || d.first)) {
         card.classList.add('pickable');
         card.tabIndex = 0;
         card.setAttribute('role', 'button');
@@ -811,7 +842,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
             send('!cost', d.cost)(e);
           }
         });
-      }
+      } else if (forced) card.classList.add('waits');
       row.append(card);
     }
     box.append(row);

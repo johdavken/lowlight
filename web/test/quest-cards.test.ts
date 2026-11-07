@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { mountQuestCards } from '../src/room/quest-cards';
+import { mountQuestCards, backToWait } from '../src/room/quest-cards';
 import { mountQuestList } from '../src/room/quest-list';
 import type { QuestState } from '../../shared/types';
 
@@ -138,6 +138,24 @@ describe('the story in the cards panel', () => {
     expect(h.querySelector('.qc-end')!.textContent).toBe('THE END');
     click(h.querySelector('.qc-close'));
     expect(h.hidden).toBe(true);
+  });
+  // A pick back to the wait left nothing on screen: the table closed, and beats stay out of the box (playtest).
+  it('an outcome before a wait stays up until closed, and says nothing has ended', () => {
+    const h = host();
+    const cards = mountQuestCards(h, { onChoose: vi.fn(), onTalk: vi.fn() });
+    cards.outcome('The Recut', '*You keep it.*');
+    expect(h.hidden).toBe(false);
+    expect(h.querySelector('.qc-story')!.textContent).toBe('You keep it.');
+    expect(h.querySelector('.qc-end')).toBeNull();
+    click(h.querySelector('.qc-close'));
+    expect(h.hidden).toBe(true);
+  });
+  it('the next ending says THE END again', () => {
+    const h = host();
+    const cards = mountQuestCards(h, { onChoose: vi.fn(), onTalk: vi.fn() });
+    cards.outcome('The Recut', '*You keep it.*');
+    cards.end('The Recut', "*It's over.*");
+    expect(h.querySelector('.qc-end')!.textContent).toBe('THE END');
   });
 });
 
@@ -398,4 +416,16 @@ describe("the stranger's face is no longer in the panel (speaker portrait, 2026-
     expect(h.querySelector('.qc-who, .qc-scene')).toBeNull();
     expect('stranger' in cards).toBe(false);
   });
+});
+
+describe('backToWait', () => {
+  const beat = { active: { id: 'j' } };
+  const none = { active: null, waiting: null };
+  const row = { id: 'r', title: 'J', text: 'x', ended: false };
+  it('a pick that left the beat for a wait', () => expect(backToWait(beat, none, row, null)).toBe(true));
+  it('not when a beat follows', () => expect(backToWait(beat, { active: { id: 'j' }, waiting: null }, row, null)).toBe(false));
+  it('not when the waiting panel will show it', () => expect(backToWait(beat, { active: null, waiting: {} }, row, null)).toBe(false));
+  it('not an ending: that has its own panel', () => expect(backToWait(beat, none, { ...row, ended: true }, null)).toBe(false));
+  it('not twice', () => expect(backToWait(beat, none, row, 'r')).toBe(false));
+  it('not with no beat before it', () => expect(backToWait({ active: null }, none, row, null)).toBe(false));
 });

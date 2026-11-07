@@ -29,7 +29,8 @@
   },
   "sprite": {
     "src": "ember-outfit-indoors.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.363
   },
   "selectExpression": "happy",
   "expressions": {
@@ -41,7 +42,11 @@
   "outfits": {
     "indoors": "ember-outfit-indoors.png",
     "outdoors": "ember-outfit-outdoors.png",
-    "home": "ember-outfit-home.png"
+    "home": "ember-outfit-home.png",
+    "tee": "ember-outfit-tee.png",
+    "overshirt": "ember-outfit-overshirt.png",
+    "sleepwear": "ember-outfit-sleepwear.png",
+    "barefoot": "ember-outfit-barefoot.png"
   },
   "outfitByScene": {
     "karasu/zhou-flat": "home",
@@ -56,7 +61,15 @@
   "outfitWears": {
     "indoors": "black halter crop top with a winged silver star, ripped black jeans over fishnets, patched denim jacket tied at the waist, wallet chain, combat boots laced pink and teal",
     "outdoors": "studded black leather jacket with a hood over a white tank, ripped black jeans over fishnets, studded belt bag, wallet chain, checkered high-tops",
-    "home": "black lace-trim camisole and black sleep shorts, fishnet tights, mismatched socks: one pink-striped, one teal with stars"
+    "home": "black lace-trim camisole and black sleep shorts, fishnet tights, mismatched socks: one pink-striped, one teal with stars",
+    "tee": "faded oversized black tee over black lace-trim sleep shorts, fishnet tights, mismatched socks: one pink-striped, one teal with stars",
+    "overshirt": "loose off-white button-down hanging open over a black lace camisole, black sleep shorts, fishnet tights, mismatched socks: one pink-striped, one teal with stars",
+    "sleepwear": "black lace-trim camisole and black sleep shorts, bare legs, mismatched socks: one pink-striped, one teal with stars",
+    "barefoot": "black lace-trim camisole and black sleep shorts, footless fishnet tights, barefoot, black-painted toenails"
+  },
+  "outfitUnlocks": {
+    "tee": { "warmth": 10 },
+    "overshirt": { "warmth": 10, "player": "hicks" }
   },
   "rooms": [
     "karasu/zhou-flat",

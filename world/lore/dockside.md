@@ -1,6 +1,7 @@
 ---
 title: Dockside
 category: City
+section: Districts
 keys: [Dockside, docks, containers, freight, cranes, port, piers, longshore]
 districts: [dockside]
 places: []

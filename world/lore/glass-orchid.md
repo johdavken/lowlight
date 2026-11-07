@@ -1,6 +1,7 @@
 ---
 title: Glass Orchid
 category: Factions
+section: Institutions
 keys: [glass orchid, the orchid]
 districts: []
 places: [glass-orchid, under-the-cat]

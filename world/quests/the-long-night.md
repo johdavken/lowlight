@@ -7,6 +7,9 @@ template: true
 starts: the-tilt
 after: null
 pitch: A high roller owes the Tilt more than he has. Collect before he's on the dawn train.
+posted-by: The Tilt's pit boss.
+brief: A high roller in a good coat, at the Tilt's bar with a ticket for the 05:40. Stay on him through the night and collect what he owes before he boards.
+known-by: [cass]
 pay: 360-440
 draw complication: none | bodyguard | already-packing
 draw roller: easy | hard

@@ -1,6 +1,7 @@
 ---
 title: The Copper-Heads
 category: Factions
+section: Runners
 keys: [Copper-Heads, Copper Heads, copperhead, copper lines, line taps]
 districts: []
 places: []

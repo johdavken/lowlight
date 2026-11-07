@@ -1,6 +1,7 @@
 ---
 title: Iron Reach
 category: City
+section: Districts
 keys: [Iron Reach, the Reach, industrial zone, factories, foundries, plants, smokestacks]
 districts: [ironreach]
 places: []

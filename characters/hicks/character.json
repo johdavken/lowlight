@@ -5,7 +5,8 @@
   "accent": "#3dff7a",
   "sprite": {
     "src": "hicks-outfit-outdoors.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.43
   },
   "tagline": "Netrunner. Old Town born. Crew of two.",
   "bio": "bio.md",
@@ -15,7 +16,7 @@
     { "label": "TELL", "value": "Smiles before he answers. Means he's already worked it out." },
     { "label": "DANGEROUS", "value": "Thick SDG file. Never took their offer." }
   ],
-  "face": { "x": 0.52, "y": 0.07 },
+  "face": { "x": 0.505, "y": 0.085 },
   "identity": "identity.md",
   "backend": {
     "provider": "openrouter",
@@ -29,33 +30,47 @@
     "strand/breakwater"
   ],
   "dice": { "bluff": 0.6, "nerve": 0.55, "suspicion": 0.35 },
-  "selectExpression": "happy",
+  "selectExpression": "smile",
   "expressions": {
-    "happy": "hicks-happy.png",
-    "concerned": "hicks-concerned.png",
-    "angry": "hicks-angry.png",
+    "smile": "hicks-smile.png",
     "annoyed": "hicks-annoyed.png"
   },
   "outfits": {
-    "home": "hicks-outfit-home.png",
     "outdoors": "hicks-outfit-outdoors.png",
-    "undies": "hicks-outfit-undies.png",
-    "indoors": "hicks-outfit-indoors.png"
+    "indoors": "hicks-outfit-indoors.png",
+    "tie": "hicks-outfit-tie.png",
+    "sleepwear": "hicks-outfit-sleepwear.png"
   },
   "outfitByScene": {
-    "karasu/hicks-room": "home",
-    "karasu/hicks-gallery": "home",
+    "karasu/hicks-room": "indoors",
+    "karasu/zhou-flat": "indoors",
+    "karasu/walk-up-landing": "indoors",
+    "karasu/nix-apartment": "indoors",
+    "karasu/cass-apartment": "indoors",
+    "karasu/sixth-floor": "indoors",
+    "karasu/ripper-clinic": "indoors",
     "karasu/lowlight-intake": "indoors",
     "karasu/the-tilt": "indoors",
     "karasu/second-socket": "indoors",
     "velvet/glass-orchid": "indoors",
-    "velvet/under-the-cat": "indoors"
+    "velvet/orchid-room": "indoors",
+    "velvet/bathhouse": "indoors",
+    "marsh/counting-house": "indoors",
+    "drownworks/pump-house-nine": "indoors",
+    "drownworks/old-intake": "indoors",
+    "strand/breakwater": "indoors",
+    "spine/listening-post": "indoors",
+    "spine/long-haul": "indoors",
+    "spine/soren-hab": "indoors",
+    "spine/rue-hab": "indoors",
+    "nexus/sdg-floor": "indoors",
+    "nexus/spectra-archive": "indoors"
   },
   "outfitWears": {
-    "home": "faded charcoal SDG tee, olive work trousers, grey trail sneakers",
-    "outdoors": "mustard-yellow hooded work jacket over a blue sweater, black cargo trousers, grey trail sneakers, black backpack, a slate under his arm",
-    "undies": "white ribbed tank top and grey boxer briefs, barefoot",
-    "indoors": "blue wool sweater, black cargo trousers, grey trail sneakers"
+    "outdoors": "long weathered brown trench coat hanging open over a stained cream shirt, dark pleated trousers, scuffed black lace-up boots",
+    "indoors": "stained cream shirt open at the neck, dark pleated trousers, scuffed black lace-up boots",
+    "tie": "clean pale shirt buttoned to the collar, narrow black tie, dark pleated trousers, scuffed black lace-up boots",
+    "sleepwear": "charcoal henley with the sleeves pushed up, loose dark drawstring sleep pants, barefoot"
   },
   "knows": {
     "nix-direct": "Hicks. Court-ordered sessions at the Intake; you signed his SDG attendance slip on paper every week. The order ran out months ago and he still climbs the stairs every week. Netrunner, dry, hard to find."

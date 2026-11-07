@@ -6,7 +6,7 @@
   "mirage": { "subtitle": "The Shelf" },
   "cloudridge": { "subtitle": "The Old Money Hills" },
   "helios": { "subtitle": "The Towers" },
-  "spine": { "subtitle": "The Road Where People Live" },
+  "spine": { "subtitle": "The Road Where People Live", "song": "Time by the Freight.ogg" },
   "ironreach": { "subtitle": "Industrial Zone" },
   "dockside": { "subtitle": "Freight Port" },
   "tidal": { "subtitle": "The Front Door" },

@@ -1,6 +1,7 @@
 ---
 title: The Hollows
 category: Factions
+section: Gangs
 keys: [Hollows, the Hollows, dead blocks, Old Town squatters, blanks, unknowns]
 districts: []
 places: []

@@ -16,7 +16,9 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
   // By entry, not place: a vouched hire (crew spec §5) is its own tab, even at a place that hires.
   // Where you stand: its own hires first, else a vouched card there (a contact's home that doesn't hire).
   const at = v.hires.findIndex((h) => h.place === v.here && !h.vouched);
-  let sel = Math.max(0, at >= 0 ? at : v.hires.findIndex((h) => h.place === v.here));
+  // A job's free hire goes first, wherever you stand: it's gone at 06:00.
+  const job = v.hires.findIndex((h) => h.cards.some((c) => c.from && 'job' in c.from));
+  let sel = Math.max(0, job >= 0 ? job : at >= 0 ? at : v.hires.findIndex((h) => h.place === v.here));
   const head = el('div', 'cr-hire-head');
   const tabs = el('div', 'cr-places');
   const places = v.hires.map((h, i) => {

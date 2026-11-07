@@ -1,7 +1,23 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CityMapData } from '../../shared/map-schema';
-import { mapIds, parseLoreFile, type LoreEntry } from '../../shared/lore';
+import { bookEntries, mapIds, parseLoreFile, type BookPage, type LoreEntry } from '../../shared/lore';
+
+/** GET /api/lore/book (lore drawer spec §7): the book as the player reads it, and where each room is. */
+export function bookPage(book: readonly LoreEntry[], roomIds: readonly string[], locate: (id: string) => { placeId: string | null; districtId: string | null }): BookPage {
+  return { entries: bookEntries(book), rooms: Object.fromEntries(roomIds.map((id) => [id, locate(id)])) };
+}
+
+/** An entry's picture, `<dir>/<id>.webp`, when it has one. Ids come from the book, never from a request alone. */
+export function loreArtFile(dir: string, id: string): string | null {
+  const file = path.join(dir, `${id}.webp`);
+  return /^[a-z0-9-]+$/.test(id) && fs.existsSync(file) ? file : null;
+}
+
+/** The page with `art` set on each entry that has a picture now: read per request, so new art shows without a restart. */
+export function withArt(page: BookPage, dir: string): BookPage {
+  return { ...page, entries: page.entries.map((e) => (loreArtFile(dir, e.id) ? { ...e, art: true as const } : e)) };
+}
 
 /**
  * The lore book: each `.md` file directly in `dir` (not `categories/`, which holds Studio's

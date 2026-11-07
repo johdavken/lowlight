@@ -1,6 +1,7 @@
 ---
 title: Mirage Heights
 category: City
+section: Districts
 keys: [Mirage Heights, the Heights, the Shelf, Shelf, government, council, courts]
 districts: [mirage]
 places: []

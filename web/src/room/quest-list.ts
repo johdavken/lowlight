@@ -47,7 +47,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls?: string, text?: 
 
 const isJob = (q: Open) => Boolean(q.mission);
 /** A board job elsewhere, as an open row for its terms. */
-const asOpen = (j: BoardJob): Open => ({ id: j.id, title: j.title, pitch: j.pitch, timed: false, mission: { pay: j.pay, ...(j.tier !== undefined ? { tier: j.tier } : {}), ...(j.range ? { range: j.range } : {}) } });
+const asOpen = (j: BoardJob): Open => ({ id: j.id, title: j.title, pitch: j.pitch, ...(j.postedBy ? { postedBy: j.postedBy } : {}), ...(j.brief ? { brief: j.brief } : {}), timed: false, mission: { pay: j.pay, ...(j.tier !== undefined ? { tier: j.tier } : {}), ...(j.range ? { range: j.range } : {}) } });
 
 /** A job's terms: MISSION · TIER 1 · 400 SOL, or a contact's client and its trust stake. */
 function terms(q: Open): string | null {
@@ -178,7 +178,7 @@ export function mountQuestList(
     if (picked === null || !keys.includes(picked)) picked = keys[0] ?? null;
 
     pane.dataset.tab = tab;
-    const head = el('div', 'ql-head', '◆ QUESTS');
+    const head = el('div', 'ql-head', '◆ JOBS');
     head.append(el('span', 'ql-esc', 'ESC'));
     const parts: HTMLElement[] = [head];
     // NERVE gone (the table spec §3): one line for the pane; the jobs grey out and START waits for 06:00.
@@ -247,7 +247,7 @@ export function mountQuestList(
     const both = stories.length > 0 && jobs.length > 0;
     for (const q of hereRows()) {
       const job = isJob(q);
-      if (both && (q === stories[0] || q === jobs[0])) out.push(el('div', 'ql-group', job ? 'JOBS · ON THE TABLE' : 'STORY'));
+      if (both && (q === stories[0] || q === jobs[0])) out.push(el('div', 'ql-group', job ? 'ON THE TABLE' : 'STORY'));
       const row = el('button', `ql-row ${job ? 'ql-job' : 'ql-story'}${q.once ? ' ql-once' : ''}`);
       row.type = 'button';
       // A job's mark is its art, else the table's card back; a story's the quest diamond.
@@ -296,6 +296,13 @@ export function mountQuestList(
     return a;
   };
 
+  /** A job's file text: who posted it, the pitch, what's involved. */
+  const filed = (o: { pitch: string | null; postedBy?: string; brief?: string }): HTMLElement[] => [
+    ...(o.postedBy ? [el('div', 'ql-postedby', `POSTED BY ${o.postedBy}`)] : []),
+    ...(o.pitch ? [el('p', 'ql-pitch', o.pitch)] : []),
+    ...(o.brief ? [el('p', 'ql-brief', o.brief)] : []),
+  ];
+
   const questFile = (q: Open): HTMLElement[] => {
     const inner = el('div', 'ql-in');
     inner.append(el('div', 'ql-file-title', q.title.toUpperCase()));
@@ -304,8 +311,7 @@ export function mountQuestList(
     if (q.timed) meta.append(el('span', 'ql-chip ql-timed', 'HAS A DEADLINE'));
     if (q.once) meta.append(el('span', 'ql-chip ql-file-once', 'ONE-OFF'));
     if (q.mission?.cased) meta.append(el('span', 'ql-chip ql-cased', 'CASED'));
-    inner.append(meta);
-    if (q.pitch) inner.append(el('p', 'ql-pitch', q.pitch));
+    inner.append(meta, ...filed(q));
     // Crew (spec 2026-10-19 §2): a SCOUT shows tonight's draws and pay.
     const sc = q.mission?.scouted;
     if (sc) {
@@ -428,8 +434,7 @@ export function mountQuestList(
     if (j.comms) meta.append(el('span', 'ql-chip', `COMMS · ${j.comms.toUpperCase()}`));
     if (j.opens) meta.append(el('span', 'ql-chip ql-timed', `POSTS AT ${j.opens}`));
     if (j.once) meta.append(el('span', 'ql-chip ql-file-once', 'ONE-OFF'));
-    inner.append(meta);
-    if (j.pitch) inner.append(el('p', 'ql-pitch', j.pitch));
+    inner.append(meta, ...filed(j));
     const goTo = el('button', 'ql-goto', 'GO THERE');
     goTo.type = 'button';
     goTo.onclick = () => {

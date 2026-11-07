@@ -1,8 +1,9 @@
 /** The city map: Lowlight at night, flat (no depth effects), shown on a CRT, with its districts and places over it. */
+import { framePace, frameTick } from './frame-clock';
 import { bugReportOpen } from './bug-report';
 import { insideBorder, parseMap, type CityMapData, type District, type Place } from '../../../shared/map-schema';
 import { AmbienceLayer } from './map/ambience-layer';
-import { CITY_VIEW, cityView, clampView, coverSize, frameView, pinchView, zoomAt, type Frame, type Point, type Size, type View } from './map/camera';
+import { CITY_VIEW, cityView, clampView, coverSize, coverView, pinchView, zoomAt, type Point, type Size, type View } from './map/camera';
 import { toScreen } from '../../../shared/map-projection';
 import { CityMap, type MapCue, type WhoIsWhere } from './map/city-map';
 import type { LitWindow } from './map/ambience';
@@ -21,7 +22,7 @@ export const PAUSE_OUT_CUE_URL = '/sound/ui/pause-out.ogg';
 export const MAP_CUE_LEVEL = 0.9;
 /** The glitch-out's length (`map-glitch-out` in style.css); the overlay hides when it ends. */
 const GLITCH_OUT_MS = 600;
-/** The camera's ease to a district (its name clicked) and back out to the city. */
+/** The camera's ease to a place and back out to the city. */
 const CAMERA_MS = 700;
 /** The picture's shape (w / h) until it has loaded. */
 const MAP_ASPECT = 3 / 2;
@@ -32,6 +33,16 @@ const TILE_MAX_SCALE = 4;
 const DEEP_MAX_SCALE = 8;
 /** A press that moves this far (stage px) is a drag, not a click. */
 const DRAG_PX = 4;
+/** How far a row clicked twice takes the camera in. */
+const PLACE_SCALE = 2;
+/** The room a picked pin keeps from the list, from the screen's edges, and from the card (stage px). */
+const CLEAR_LIST = 340;
+const CLEAR_EDGE = 60;
+const CLEAR_TOP = 90;
+const CLEAR_CARD = 40;
+/** A pin the card would cover with no city left to slide: the camera steps in this far, and puts it here on the screen. */
+const STEP_IN_SCALE = 1.35;
+const STEP_IN_AT = { x: 0.62, y: 0.4 };
 /** Ease in-out (cubic), close to the select screen's cubic-bezier(0.7, 0, 0.2, 1). */
 const ease = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
 
@@ -71,8 +82,8 @@ export interface MapPanelOptions {
 
 /**
  * The MAP overlay, filling the game stage: the HUD link toggles it. The picture covers the screen at 1×; scroll zooms
- * about the pointer and dragging moves it; a district's name eases the camera to it (map pins spec, 2026-10-30). A pin
- * opens its place's card; the arrows walk the places and Enter GOes. Esc closes the card, then zooms back out to the
+ * about the pointer and dragging moves it. The places are listed down the left, folded under their districts; a row or a
+ * pin opens the place's card in the corner, and the row again takes the camera in; the arrows walk the places and Enter GOes. Esc closes the card, then zooms back out to the
  * city, then closes the map. It glitches in each time it opens and
  * out each time it closes (neither under reduced motion), and calls `onOpen` (the panel cue). The screen sits under scanlines,
  * a rolling bar, a faint animated fuzz and a vignette, like looking at a CRT.
@@ -106,6 +117,8 @@ export class MapPanel {
   /** Where a running ease is going (null when none): Esc reads the zoom it's heading for. */
   private target: View | null = null;
   // A resize keeps the player's zoom, only clamped so the map still covers the screen.
+  /** The screen waiting on the clock for the latest view (see paceView). */
+  private viewFrame: number | null = null;
   private readonly onResize = () => this.setView(clampView(this.view, this.mapSize(), this.screenSize()));
   /** Bumped per open, so a slow load never draws over a later one. */
   private loads = 0;
@@ -151,8 +164,9 @@ export class MapPanel {
     const onTravel = opts.onTravel;
     this.city = new CityMap(this.world, {
       overlay: this.overlay,
-      onZoomTo: (f) => this.zoomToFrame(f),
-      onFocus: (p) => p && this.bringIntoView(p),
+      listed: true,
+      onFocus: (p) => p && this.keepClear(p),
+      onRevisit: (p) => this.goInTo(p),
       onCue: opts.onCue,
       reducedMotion: opts.reducedMotion,
       onTravel: onTravel
@@ -166,7 +180,7 @@ export class MapPanel {
     });
     this.screen.append(this.notice, el('div', 'map-fuzz'), el('div', 'map-scan'), el('div', 'map-roll'), el('div', 'map-vignette'));
     const head = el('header', 'map-head');
-    head.append(el('span', 'map-title', '// MAP'), el('span', 'map-hint', 'SCROLL ZOOM · DRAG MOVE · [ESC] CLOSE'));
+    head.append(el('span', 'map-hint', 'SCROLL ZOOM · DRAG MOVE · [ESC] CLOSE'));
     this.devStrip = el('div', 'map-dev');
     this.devStrip.hidden = true;
     head.append(this.devStrip);
@@ -418,6 +432,7 @@ export class MapPanel {
     window.removeEventListener('resize', this.onResize);
     this.img.removeEventListener('load', this.onResize);
     this.stopEase();
+    if (this.viewFrame !== null) cancelAnimationFrame(this.viewFrame);
     this.ambience.dispose();
     this.fx.dispose();
     this.tiles?.dispose();
@@ -478,7 +493,7 @@ export class MapPanel {
     this.stopEase();
     const px = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
     const factor = Math.exp(-Math.max(-200, Math.min(200, px)) * 0.0015);
-    this.setView(zoomAt(this.view, factor, this.screenPoint(e), this.mapSize(), this.screenSize(), this.maxScale()));
+    this.paceView(zoomAt(this.view, factor, this.screenPoint(e), this.mapSize(), this.screenSize(), this.maxScale()));
     this.keepLimit();
   }
 
@@ -516,7 +531,7 @@ export class MapPanel {
       const now = { mid: midpoint(a, b), dist: Math.hypot(b.x - a.x, b.y - a.y) };
       // Never below the scale now while the fingers are down: off a deep district the limit eases back on release
       // (keepLimit), rather than snapping between 8x and 4x as the view's middle crosses its edge.
-      this.setView(pinchView(p.view, p, now, this.mapSize(), this.screenSize(), Math.max(this.maxScale(), this.view.scale)));
+      this.paceView(pinchView(p.view, p, now, this.mapSize(), this.screenSize(), Math.max(this.maxScale(), this.view.scale)));
       return;
     }
     const d = this.drag;
@@ -531,7 +546,7 @@ export class MapPanel {
       this.startDragging(d);
     }
     const v = { ...d.view, tx: d.view.tx + (e.clientX - d.x) / z, ty: d.view.ty + (e.clientY - d.y) / z };
-    this.setView(clampView(v, this.mapSize(), this.screenSize()));
+    this.paceView(clampView(v, this.mapSize(), this.screenSize()));
   }
 
   private startDragging(d: NonNullable<MapPanel['drag']>): void {
@@ -583,23 +598,44 @@ export class MapPanel {
     this.moveCamera(w && h ? cityView(this.mapSize(), { w, h }) : CITY_VIEW);
   }
 
-  /** A district's frame, fitted and eased to (the deep-zoom limit where the frame lands on a deep district). */
-  private zoomToFrame(f: Frame): void {
-    const map = this.mapSize(), screen = this.screenSize();
-    const deep = frameView(f, map, screen, DEEP_MAX_SCALE);
-    this.moveCamera(frameView(f, map, screen, Math.min(USER_MAX_SCALE, this.maxScale(deep))));
+  /** Where `p`'s pin stands on the screen at `view`. */
+  private pinOnScreen(p: Place, view: View): Point {
+    const map = this.mapSize();
+    const [x, y] = toScreen(p.pin, this.tilesOn ? (this.tiles?.manifest?.pinHeights?.[p.id] ?? 0) : 0);
+    return { x: (x / 100) * map.w * view.scale + view.tx, y: (y / 100) * map.h * view.scale + view.ty };
   }
 
-  /** The focused place's pin, eased to the screen's middle when it's off screen (the arrows can walk to any place). */
-  private bringIntoView(p: Place): void {
-    const map = this.mapSize(), screen = this.screenSize();
-    const [x, y] = toScreen(p.pin, this.tilesOn ? (this.tiles?.manifest?.pinHeights?.[p.id] ?? 0) : 0);
-    const sx = (x / 100) * map.w * this.view.scale + this.view.tx;
-    const sy = (y / 100) * map.h * this.view.scale + this.view.ty;
-    const m = 60;
-    if (sx >= m && sx <= screen.w - m && sy >= m && sy <= screen.h - m) return;
-    const v = this.view;
-    this.moveCamera(clampView({ scale: v.scale, tx: v.tx + screen.w / 2 - sx, ty: v.ty + screen.h / 2 - sy }, map, screen));
+  /**
+   * `view` moved so `p`'s pin stands clear of the list, the screen's edges and the card in the corner, without sliding
+   * the city off the screen: a pin too near its edge for that gets the camera stepping in.
+   */
+  private clearOf(p: Place, view: View): View {
+    const screen = this.screenSize(), map = this.mapSize(), at = this.pinOnScreen(p, view);
+    const card = this.overlay.querySelector('.map-strip')?.getBoundingClientRect();
+    const box = this.screen.getBoundingClientRect(), z = this.zoom();
+    const left = card?.width ? (card.left - box.left) / z - CLEAR_CARD : screen.w;
+    const top = card?.width ? (card.top - box.top) / z - CLEAR_CARD : screen.h;
+    const dx = at.x < CLEAR_LIST ? CLEAR_LIST - at.x : at.x > screen.w - CLEAR_EDGE ? screen.w - CLEAR_EDGE - at.x : 0;
+    const dy = at.y < CLEAR_TOP ? CLEAR_TOP - at.y : at.x > left && at.y > top ? top - at.y : at.y > screen.h - CLEAR_EDGE ? screen.h - CLEAR_EDGE - at.y : 0;
+    if (!dx && !dy) return view;
+    const moved = coverView({ scale: view.scale, tx: view.tx + dx, ty: view.ty + dy }, map, screen), now = this.pinOnScreen(p, moved);
+    if (now.x <= left || now.y <= top) return moved;
+    const scale = Math.max(view.scale, STEP_IN_SCALE), flat = this.pinOnScreen(p, { scale, tx: 0, ty: 0 });
+    return coverView({ scale, tx: screen.w * STEP_IN_AT.x - flat.x, ty: screen.h * STEP_IN_AT.y - flat.y }, map, screen);
+  }
+
+  /** The picked pin moved clear, from where the camera is heading. A running ease with nothing to clear carries on; a hand on the map keeps it. */
+  private keepClear(p: Place): void {
+    if (this.drag?.moved || this.pinch) return;
+    const from = this.target ?? this.view, to = this.clearOf(p, from);
+    if (to !== from) this.moveCamera(to);
+  }
+
+  /** A row clicked twice: in to the place, its pin in the middle and clear of the card. */
+  private goInTo(p: Place): void {
+    const v = this.target ?? this.view, scale = Math.max(v.scale, PLACE_SCALE), screen = this.screenSize();
+    const at = this.pinOnScreen(p, { scale, tx: 0, ty: 0 });
+    this.moveCamera(this.clearOf(p, coverView({ scale, tx: screen.w / 2 - at.x, ty: screen.h / 2 - at.y }, this.mapSize(), screen)));
   }
 
   /** Stops a running ease where it is. */
@@ -612,24 +648,52 @@ export class MapPanel {
   private moveCamera(to: View): void {
     this.stopEase();
     const from = this.view;
-    if (this.opts.reducedMotion || (from.scale === to.scale && from.tx === to.tx && from.ty === to.ty)) return this.setView(to);
+    if (this.opts.reducedMotion || (from.scale === to.scale && from.tx === to.tx && from.ty === to.ty)) {
+      this.setView(to);
+      return this.keepLimit();
+    }
     this.target = to;
     const t0 = performance.now();
+    let shown: number | null = null;
     const step = (now: number) => {
       const k = Math.min(1, (now - t0) / CAMERA_MS);
       const e = ease(k);
       const at = (a: number, b: number) => a + (b - a) * e;
       if (k === 1) {
         this.target = null;
-        return this.setView(to);
+        this.setView(to);
+        // A pick can carry the camera off a deep-zoom district.
+        return this.keepLimit();
       }
-      this.setView({ scale: at(from.scale, to.scale), tx: at(from.tx, to.tx), ty: at(from.ty, to.ty) });
+      const tick = frameTick(now);
+      if (tick !== shown) {
+        shown = tick;
+        this.setView({ scale: at(from.scale, to.scale), tx: at(from.tx, to.tx), ty: at(from.ty, to.ty) });
+      }
       this.easing = requestAnimationFrame(step);
     };
     this.easing = requestAnimationFrame(step);
   }
 
+  /**
+   * A view that comes with every pointer event (a drag, a pinch, the wheel): the camera has it at once, the screen on the
+   * clock's next tick, so a fast mouse doesn't move the whole map more often than the rest of it draws.
+   */
+  private paceView(v: View): void {
+    if (!framePace()) return this.setView(v);
+    this.view = v;
+    if (this.viewFrame !== null) return;
+    const at = frameTick(performance.now());
+    const step = (now: number) => {
+      if (frameTick(now) === at) this.viewFrame = requestAnimationFrame(step);
+      else this.setView(this.view);
+    };
+    this.viewFrame = requestAnimationFrame(step);
+  }
+
   private setView(v: View): void {
+    if (this.viewFrame !== null) cancelAnimationFrame(this.viewFrame);
+    this.viewFrame = null;
     this.view = v;
     const map = this.mapSize();
     this.world.style.width = `${map.w}px`;

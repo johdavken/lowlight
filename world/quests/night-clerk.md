@@ -6,6 +6,8 @@ template: true
 starts: under-the-cat
 after: null
 pitch: Forty seconds of hotel camera somebody wants gone before morning.
+posted-by: A fixer under the Cat, for a guest who won't give a name.
+brief: The hotel under the Cat. Forty seconds of camera sit on a recorder in a closet upstairs. Get past the night clerk and get rid of them before morning.
 pay: 360-440
 art: night-clerk.webp
 draw complication: none | guest-in-the-corridor | second-camera
@@ -110,14 +112,14 @@ take: none
 *Two men in hotel blazers are coming up the main stair, not hurrying, talking into their collars.*
 
 - service: Get down the service stair, now. → home / caught [check reflex 50]
-- bold: Walk straight past them like a guest. → home / caught [check cool 50 · cass +10 · soren +10]
+- bold: Black out the stair lights from your deck and go past them in the dark. → home / caught [check tech 50 grid · cass +10 · soren +10]
 
 # out
 
 *The corridor's empty. The clerk is back behind his glass, watching his screen.*
 
 - service: Take the service stair down, quietly, past the laundry. → home / caught [check reflex 50]
-- front: Walk out through the lobby, nodding to the clerk. → home / caught [check cool 50 · nix-direct +10]
+- front: Loop the lobby camera on the clerk's screen and walk out behind it. → home / caught [check tech 50 grid · nix-direct +10]
 
 ## home
 *Under the Cat the rain's still coming down. Nobody follows you out.*

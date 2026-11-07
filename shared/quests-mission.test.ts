@@ -122,6 +122,20 @@ describe('crew phase 2 lines (crew spec §5)', () => {
   const withEffect = (line: string) => MISSION.replace('*Clean.*\npay: 400\n', `*Clean.*\npay: 400\n${line}\n`);
   const SPRING = MISSION.replace('starts: haes-noodles\n', 'spring: true\n').replace('*The office is two floors up', '*Get {recruit} out. The office is two floors up');
   it('reads gives: recruit muscle hand', () => expect(ok(withEffect('gives: recruit muscle hand')).outcomes.get('paid')!.effects.recruit).toEqual({ spec: 'muscle', grade: 1 }));
+  it('reads a hire the text calls he or she', () => expect(ok(withEffect('gives: recruit muscle green man')).outcomes.get('paid')!.effects.recruit).toEqual({ spec: 'muscle', grade: 0, sex: 'man' }));
+  it('reads hire-pitch: on either side of gives:', () => {
+    const want = { spec: 'muscle', grade: 1, pitch: 'I lift.' };
+    expect(ok(withEffect('gives: recruit muscle hand\nhire-pitch: I lift.')).outcomes.get('paid')!.effects.recruit).toEqual(want);
+    expect(ok(withEffect('hire-pitch: I lift.\ngives: recruit muscle hand')).outcomes.get('paid')!.effects.recruit).toEqual(want);
+  });
+  it('hire-pitch: needs gives: recruit, and a short line', () => {
+    expect(messages(withEffect('hire-pitch: I lift.')).some((m) => m.includes('hire-pitch: goes with gives: recruit'))).toBe(true);
+    expect(messages(withEffect(`gives: recruit muscle hand\nhire-pitch: ${'x'.repeat(121)}`)).some((m) => m.includes('at most 120'))).toBe(true);
+  });
+  it('{hire} needs gives: recruit on the same ending', () => {
+    expect(messages(MISSION.replace('*Clean.*\npay: 400\n', '*{hire} waits.*\npay: 400\n')).some((m) => m.includes('{hire} needs gives: recruit'))).toBe(true);
+    ok(withEffect('gives: recruit muscle hand').replace('*Clean.*', '*{hire} waits.*'));
+  });
   it('reads the grade in any case', () => expect(ok(withEffect('gives: recruit runner VET')).outcomes.get('paid')!.effects.recruit).toEqual({ spec: 'runner', grade: 3 }));
   it('rejects an unknown specialty or grade', () => {
     expect(messages(withEffect('gives: recruit chef boss')).some((m) => m.includes("can't read the effect line 'gives: recruit chef boss'"))).toBe(true);

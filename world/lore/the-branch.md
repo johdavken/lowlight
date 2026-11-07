@@ -1,6 +1,7 @@
 ---
 title: SDG's plainclothes
 category: Factions
+section: Institutions
 keys: [case officer, case officers, SDG plainclothes, plainclothes branch]
 districts: []
 places: []

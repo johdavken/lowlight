@@ -53,7 +53,26 @@ export interface StandingMove {
 
 export interface StoredStanding extends StandingValues {
   moves: StandingMove[];
+  /** The highest trust and warmth she has reached (outfits by standing): an unlock stays once reached. Absent on older values. */
+  peak?: StandingValues;
 }
+
+/** Where she has been at her warmest and most trusting: the stored peak, else her values now (an older save), else the start. */
+export function peakOf(stored: StoredStanding | null, start: StandingValues): StandingValues {
+  if (!stored) return { ...start };
+  return stored.peak ?? { trust: stored.trust, warmth: stored.warmth };
+}
+
+/** An outfit opened by standing (character.json `outfitUnlocks`): each threshold her peak must reach, and the one player it's for. */
+export interface OutfitUnlock {
+  trust?: number;
+  warmth?: number;
+  player?: string;
+}
+
+/** Whether `peak` reaches every threshold in `rule` (the player is the caller's to check). */
+export const unlockMet = (rule: OutfitUnlock, peak: StandingValues): boolean =>
+  (rule.trust === undefined || peak.trust >= rule.trust) && (rule.warmth === undefined || peak.warmth >= rule.warmth);
 
 /** A character's `standing` block, as the game uses it. */
 export interface StandingConfig {
@@ -248,7 +267,9 @@ export function parseStored(json: string | null): StoredStanding | null {
     const moves = v.moves.filter(
       (m): m is StandingMove => isObject(m) && typeof m.messageId === 'string' && typeof m.take === 'number' && typeof m.trust === 'number' && typeof m.warmth === 'number' && typeof m.reason === 'string' && typeof m.at === 'number',
     );
-    return { trust: clamp(v.trust), warmth: clamp(v.warmth), moves };
+    const p = v.peak;
+    const peak = isObject(p) && typeof p.trust === 'number' && typeof p.warmth === 'number' ? { trust: clamp(p.trust), warmth: clamp(p.warmth) } : undefined;
+    return { trust: clamp(v.trust), warmth: clamp(v.warmth), moves, ...(peak ? { peak } : {}) };
   } catch {
     return null;
   }
@@ -259,10 +280,14 @@ const clamp = (v: number) => Math.max(STANDING.min, Math.min(STANDING.max, v));
 /** One move on top of the stored standing (or the start, before the first): clamped, the last moves kept. */
 export function applyMove(cur: StoredStanding | null, start: StandingValues, move: StandingMove): StoredStanding {
   const from = cur ?? { ...start, moves: [] };
+  const trust = clamp(from.trust + move.trust);
+  const warmth = clamp(from.warmth + move.warmth);
+  const was = peakOf(cur, start);
   return {
-    trust: clamp(from.trust + move.trust),
-    warmth: clamp(from.warmth + move.warmth),
+    trust,
+    warmth,
     moves: [...from.moves, move].slice(-STANDING.history),
+    peak: { trust: Math.max(was.trust, trust), warmth: Math.max(was.warmth, warmth) },
   };
 }
 

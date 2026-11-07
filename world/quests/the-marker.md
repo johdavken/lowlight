@@ -7,6 +7,8 @@ with: [nix-direct]
 starts: lowlight-intake
 after: null
 pitch: A client's son put his residency card down as a marker at the Low Roller. The house won't give it back.
+posted-by: Otto, one of Nix's clients.
+brief: The Low Roller keeps its markers in the cage until the debt's paid, and the debt grows by the week. Without the card, Otto's son can't work, rent or leave.
 pay: 90-110
 posts: 20:00-02:00
 trust: 1 / 1

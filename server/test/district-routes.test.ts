@@ -74,6 +74,14 @@ describe('GET /api/districts/:id', () => {
     expect((await a.inject('/api/district-art/strand')).statusCode).toBe(404);
   });
 
+  it('a district there only for its song is no problem', async () => {
+    fs.writeFileSync(path.join(dir, 'districts.json'), JSON.stringify({ karasu: { song: 'Road.ogg' } }));
+    const { a, warn } = await app();
+    const res = await a.inject({ url: '/api/districts/karasu' });
+    expect('subtitle' in res.json()).toBe(false);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('broken districts.json gives no subtitle and warns', async () => {
     fs.writeFileSync(path.join(dir, 'districts.json'), JSON.stringify({ karasu: { subtitle: 5 } }));
     const { a, warn } = await app();

@@ -3,10 +3,12 @@
  * signs, steam and smoke, traffic. It runs only between start() and stop(), skips hidden tabs, draws nothing
  * under reduced motion, and leaves out what's off screen. The model is ambience.ts.
  */
+import { frameTick } from '../frame-clock';
 import type { CityMapData } from '../../../../shared/map-schema';
 import { liftPct } from '../../../../shared/map-projection';
 import { PlumeRun, TRAIN_CARS, TRAIN_GAP, TrafficRun, puffLook, scatterWindows, signLevel, windowLevel, windowShown, type LitWindow } from './ambience';
 import type { View } from './camera';
+import { GlowStamps } from './glow-stamps';
 import type { Darkness } from './blackout-layer';
 import { MAP_H, MAP_W } from '../../../../shared/map-projection';
 import { ownerAt } from '../../../../shared/district-lookup';
@@ -39,6 +41,8 @@ export interface AmbienceLayerOpts {
   rand?: () => number;
   /** For tests: how the picture's pixels are read (otherwise through a scratch canvas). */
   readPixels?: (img: HTMLImageElement) => Pixels | null;
+  /** For tests: the stamps it draws with (jsdom has no canvas to make them on). */
+  stamps?: GlowStamps;
 }
 
 export class AmbienceLayer {
@@ -46,6 +50,7 @@ export class AmbienceLayer {
   /** Asked for on first use (never under reduced motion), so a layer that never draws never makes a context. */
   private context: CanvasRenderingContext2D | null | undefined;
   private readonly rand: () => number;
+  private readonly stamps: GlowStamps;
   private map: CityMapData | null = null;
   private windows: LitWindow[] = [];
   private traffic = new TrafficRun([], Math.random);
@@ -73,6 +78,7 @@ export class AmbienceLayer {
     this.canvas.className = 'map-amb';
     this.context = opts.context;
     this.rand = opts.rand ?? Math.random;
+    this.stamps = opts.stamps ?? new GlowStamps();
   }
 
   private get ctx(): CanvasRenderingContext2D | null {
@@ -209,13 +215,18 @@ export class AmbienceLayer {
     this.canvas.remove();
   }
 
+  /** The clock tick last drawn. */
+  private tick: number | null = null;
+
   private readonly loop = (now: number) => {
     if (!this.running) return;
-    if (document.visibilityState !== 'hidden') {
-      const dt = this.last === null ? 0 : (now - this.last) / 1000;
-      this.drawFrame(now / 1000, dt);
+    const tick = frameTick(now);
+    if (document.visibilityState === 'hidden') this.last = now;
+    else if (tick !== this.tick) {
+      this.tick = tick;
+      this.drawFrame(now / 1000, this.last === null ? 0 : (now - this.last) / 1000);
+      this.last = now;
     }
-    this.last = now;
     this.frame = requestAnimationFrame(this.loop);
   };
 
@@ -234,15 +245,8 @@ export class AmbienceLayer {
     const seen = (x: number, y: number, m = MARGIN) => x > -m && y > -m && x < this.w + m && y < this.h + m;
     const glow = (x: number, y: number, r: number, color: string, a: number) => {
       if (a <= 0.01 || r <= 0) return;
-      const grad = g.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, color);
-      grad.addColorStop(0.25, color);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
       g.globalAlpha = Math.min(1, a);
-      g.fillStyle = grad;
-      g.beginPath();
-      g.arc(x, y, r, 0, Math.PI * 2);
-      g.fill();
+      this.stamps.draw(g, 'glow', color, x, y, r, this.dpr);
     };
     this.clear(g);
     let n = 0;
@@ -261,16 +265,9 @@ export class AmbienceLayer {
       const r = Math.max(1.2, sz(0.18));
       if (w.dims) {
         if (v <= 0) continue;
-        const R = r * 1.8;
-        const grad = g.createRadialGradient(X, Y, 0, X, Y, R);
-        grad.addColorStop(0, 'rgba(8,5,16,1)');
-        grad.addColorStop(1, 'rgba(8,5,16,0)');
         g.globalCompositeOperation = 'source-over';
         g.globalAlpha = v * 0.55;
-        g.fillStyle = grad;
-        g.beginPath();
-        g.arc(X, Y, R, 0, Math.PI * 2);
-        g.fill();
+        this.stamps.draw(g, 'dim', '', X, Y, r * 1.8, this.dpr);
       } else {
         g.globalCompositeOperation = 'lighter';
         glow(X, Y, r * 3, w.color, v * 0.9);
@@ -303,14 +300,8 @@ export class AmbienceLayer {
       const look = puffLook(q);
       const r = sz(look.r);
       if (!seen(X, Y, r + MARGIN) || look.alpha <= 0) continue;
-      const grad = g.createRadialGradient(X, Y, 0, X, Y, r);
-      grad.addColorStop(0, look.color);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
       g.globalAlpha = look.alpha;
-      g.fillStyle = grad;
-      g.beginPath();
-      g.arc(X, Y, r, 0, Math.PI * 2);
-      g.fill();
+      this.stamps.draw(g, 'puff', look.color, X, Y, r, this.dpr);
       n++;
     }
 

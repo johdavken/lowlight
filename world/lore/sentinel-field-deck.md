@@ -1,6 +1,7 @@
 ---
 title: Sentinel Field Decks
 category: Tech
+section: Decks
 keys: [field deck, Sentinel field deck, SDG deck, breaker deck, military deck]
 districts: []
 places: []

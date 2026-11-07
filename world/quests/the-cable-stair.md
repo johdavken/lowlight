@@ -6,6 +6,8 @@ tier: 1
 starts: long-haul
 after: null
 pitch: A hanger family's rent went up the cable stair under Pylon Forty and never reached the landlord. The family says someone on the stair took it. Oksana wants it found first.
+posted-by: Oksana, for a hanger family.
+brief: A kid from the hangers is waiting at the Long Haul with a rent book and a page torn out. Her father paid on the cable stair. Find out where the money went.
 pay: 90-110
 once: true
 ---
@@ -96,10 +98,11 @@ take: part
 - round: Go round by the girders and come out by Oksana's instead. → home / stopped [check reflex 45, clock +20m]
 
 ## home
-*The kid counts it twice on Oksana's counter, then takes it up the stair herself. Oksana puts a glass of tea in front of you and a fold of notes under it from the hangers' tab.*
+*The kid counts it twice on Oksana's counter, then takes it up the stair herself. Oksana puts a glass of tea in front of you and a fold of notes under it from the hangers' tab. {hire} has been at the end of the counter since you came in, and asks who you run for. Nobody, you say. "Then you'll want someone who knows the stairs."*
 pay: full
 take: full
 gives: recruit runner hand
+hire-pitch: The landlord's man has never once caught me on that stair.
 → end
 
 ## stopped

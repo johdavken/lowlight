@@ -340,7 +340,7 @@ describe('CONTACTS', () => {
     expect($$('.pe-bio p', file()).map((p) => p.textContent)).toEqual(['Cass Arden, 31.', 'Keeps the peace.']);
     expect(file().querySelector('.pe-facts dt')!.textContent).toBe('TELL');
     expect(file().querySelector('.pe-facts dd')!.textContent).toBe('Slides a drink.');
-    const sub = file().querySelector('.pe-top')!.nextElementSibling!.firstElementChild!;
+    const sub = file().querySelector('.pe-info')!.nextElementSibling!.firstElementChild!;
     expect(sub.className).toBe('pe-sub');
     expect(sub.textContent).toBe('FILE');
   });
@@ -400,6 +400,63 @@ describe('CONTACTS', () => {
     fig()!.dispatchEvent(new Event('error'));
     expect(fig()).toBeNull();
     expect(file().querySelector('.pe-mono')!.textContent).toBe('N');
+  });
+
+  describe('her wardrobe', () => {
+    const ember = () => contact({ id: 'ember', name: 'Ember', outfits: ['indoors', 'home'], sceneOutfit: 'indoors' });
+    const mountWith = (c: ContactEntry, onOutfit = vi.fn()) => {
+      document.body.replaceChildren(contactsTab([c], [], { current: 'ember', dev: false, pick: vi.fn(), onOutfit }));
+      return onOutfit;
+    };
+    const img = () => file().querySelector('.pe-figure') as HTMLImageElement;
+    const label = () => file().querySelector('.pe-outfit')!.textContent;
+    const sub = () => file().querySelector('.pe-ward-sub')!.textContent;
+    const arrow = (name: string) => file().querySelector<HTMLButtonElement>(`.pe-arrow[aria-label="${name} outfit"]`)!;
+
+    it('AUTO shows what her room puts her on; ‹ › step her outfits and say so', () => {
+      const onOutfit = mountWith(ember());
+      expect(label()).toBe('AUTO');
+      expect(sub()).toBe('THE ROOM PICKS · 1/3');
+      expect(img().getAttribute('src')).toBe('/api/agents/ember/outfit/indoors');
+      arrow('Next').click();
+      expect(label()).toBe('INDOORS');
+      arrow('Next').click();
+      expect(label()).toBe('HOME');
+      expect(sub()).toBe('WORN EVERYWHERE · 3/3');
+      expect(img().getAttribute('src')).toBe('/api/agents/ember/outfit/home');
+      arrow('Next').click();
+      expect(label()).toBe('AUTO');
+      expect(onOutfit.mock.calls).toEqual([
+        ['ember', 'indoors'],
+        ['ember', 'home'],
+        ['ember', null],
+      ]);
+    });
+
+    it('opens on her pick, and keeps it when her file is drawn again', () => {
+      mountWith({ ...ember(), outfit: 'home' });
+      expect(label()).toBe('HOME');
+      arrow('Previous').click();
+      expect(label()).toBe('INDOORS');
+      $('.pe-tile')!.click();
+      expect(label()).toBe('INDOORS');
+    });
+
+    it('a refused pick puts the last one back', async () => {
+      mountWith(ember(), vi.fn().mockRejectedValue(new Error('no')));
+      arrow('Next').click();
+      expect(label()).toBe('INDOORS');
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(label()).toBe('AUTO');
+    });
+
+    it('no outfits, no wardrobe; AUTO with no room pick is her plain sprite', () => {
+      mountWith(contact({ id: 'rot', name: 'Rot' }));
+      expect(file().querySelector('.pe-wardrobe')).toBeNull();
+      mountWith({ ...ember(), sceneOutfit: undefined });
+      expect(img().getAttribute('src')).toBe('/api/agents/ember/sprite');
+    });
   });
 
   it("a contact you've only heard of says who told you", () => {
@@ -529,8 +586,8 @@ describe('main.ts wires PEOPLE', () => {
     const main = readFileSync('web/src/main.ts', 'utf8');
     expect(main).not.toContain('people?.close()');
     expect(main.match(/requestClose\(/g)!.length).toBeGreaterThanOrEqual(4);
-    // The MAP link switches through switchTo, which asks PEOPLE first.
-    expect(main).toMatch(/if \(cur === 'people' && !people\?\.requestClose\(true\)\) return;/);
+    // The MAP link switches through switchTo, whose closeScreen asks PEOPLE first.
+    expect(main).toMatch(/if \(cur === 'people' && !people\?\.requestClose\(true\)\) return false;/);
   });
 
   it('GO closes PEOPLE first, so a refusal ("Wait for…") shows in the room, not under the screen', async () => {

@@ -135,9 +135,11 @@ Made by Farban on suno.com while subscribed to the **Pro** plan, which grants co
 | `scenes/marsh/_music/Drowned.ogg` | The Counting House's song (Mother Rot, the Marsh); also in the intro shuffle | Suno · "Drowned" · song ID `7ae6ce59-1702-4a7d-81d6-34e8cad7ed68` (https://suno.com/song/7ae6ce59-1702-4a7d-81d6-34e8cad7ed68) · style prompt not recorded | Full 3:43 track, loudness-matched to the other songs (−16 LUFS integrated, two-pass linear, −1.5 dBTP), 48 kHz Opus 128 kbps OGG |
 | `scenes/drownworks/_music/Clean Water.ogg` | Pump House Nine's song (Ines, Drownworks); also in the intro shuffle | Suno · "Clean Water" · song ID `65758cfc-39cb-4612-94ef-5eb7003bf4cf` (https://suno.com/song/65758cfc-39cb-4612-94ef-5eb7003bf4cf) · created 2026-10-14 from the prompts in `art/pump-house-nine/song-prompt.md` | Full 3:44 track, converted by Studio's ADD SONG (−16 LUFS integrated), 48 kHz Opus OGG |
 | `scenes/spine/_music/Forty and Forty-One.ogg` | Rue's theme: her hab under the Spine; also in the intro shuffle | Suno · "Forty and Forty-One" · song ID `2eafb8bf-fe89-473b-abe5-93ee13bdbe91` (https://suno.com/song/2eafb8bf-fe89-473b-abe5-93ee13bdbe91) · created 2026-10-29 from the prompt in `art/rue-hab/song-prompt.md` | Full 3:07 track at −16 LUFS integrated (two-pass linear), 48 kHz Opus 128 kbps OGG |
+| `scenes/spine/_music/Time by the Freight.ogg` | The Spine's default song: every Spine room without songs of its own; also in the intro shuffle | Suno · "Time by the Freight" (Remastered) · song ID `63133a87-201b-43aa-9007-bde1922c61b6` (https://suno.com/song/63133a87-201b-43aa-9007-bde1922c61b6) · created 2026-11-06 from the prompt in `art/the-spine/song-prompt.md` | Full 3:47 track at −16 LUFS integrated (Studio's song conversion), 48 kHz Opus 128 kbps OGG |
+| `scenes/nexus/_beats/Spectra Says Reel.ogg` | The Recut's `reel` beat, and `turn` if the song is left playing: a beat track, not in the intro shuffle | Suno · "Spectra Says" (Fairy Dust's song in the story) · song ID `0d766ec5-0254-439d-8ed7-5bea8cd9194d` (https://suno.com/song/0d766ec5-0254-439d-8ed7-5bea8cd9194d) | 0:25 to 2:03 of the 2:28 track, worn down in ffmpeg: mono, 380 Hz to 3 kHz, wow and flutter, bit crush, generated static and crackle, fading down to the static at both ends so it loops. −25 LUFS, 48 kHz Opus 48 kbps OGG |
 | `scenes/karasu/_music/No Business Inside.ogg` | The Tilt's song (Cass's bar, the Ribbon); also in the intro shuffle | Suno · "No Business Inside" · song ID `2d0bd953-f34a-49ca-9bba-5c208513a0d9` (https://suno.com/song/2d0bd953-f34a-49ca-9bba-5c208513a0d9) · created 2026-10-29 from the prompt in `art/the-tilt/song-prompt.md` · instrumental | Full 2:43 track at −16 LUFS integrated (two-pass linear), 48 kHz Opus 128 kbps OGG |
 
-Added 2026-10-05; 2026-10-10 (`What Hae Serves.ogg` and `Neon City at 2 a (Remastered).ogg`, both in the game since 2026-10-07/08); 2026-10-10 (`fast-drying-lacquer.ogg`, gig runs; `Fast Drying Lacquer.ogg` in the intro shuffle; Neon City renamed `No Light in Lowlight.ogg`); 2026-10-10 (`glass-floor.ogg`, Slip); 2026-10-13 (`Glass Floor (Glass Door Remix).ogg`, the menu theme since 2026-10-12); 2026-10-14 (`Drowned.ogg`, the Counting House; `Clean Water.ogg`, Pump House Nine); 2026-10-29 (`Forty and Forty-One.ogg`, Rue's hab; `No Business Inside.ogg`, the Tilt); 2026-11-02 (`Glass Floor.ogg`, the menu theme; `on-the-wire.ogg`, the Graft table).
+Added 2026-10-05; 2026-10-10 (`What Hae Serves.ogg` and `Neon City at 2 a (Remastered).ogg`, both in the game since 2026-10-07/08); 2026-10-10 (`fast-drying-lacquer.ogg`, gig runs; `Fast Drying Lacquer.ogg` in the intro shuffle; Neon City renamed `No Light in Lowlight.ogg`); 2026-10-10 (`glass-floor.ogg`, Slip); 2026-10-13 (`Glass Floor (Glass Door Remix).ogg`, the menu theme since 2026-10-12); 2026-10-14 (`Drowned.ogg`, the Counting House; `Clean Water.ogg`, Pump House Nine); 2026-10-29 (`Forty and Forty-One.ogg`, Rue's hab; `No Business Inside.ogg`, the Tilt); 2026-11-02 (`Glass Floor.ogg`, the menu theme; `on-the-wire.ogg`, the Graft table); 2026-11-06 (`Spectra Says Reel.ogg`, The Recut; `Time by the Freight.ogg`, the Spine's default).
 
 ## Images: ChatGPT
 
@@ -178,8 +180,16 @@ Made by Farban in ChatGPT (OpenAI image generation; each file's C2PA manifest na
 | `world/quests/**` | Quest pictures | ChatGPT · 2026-10-16 | none |
 | `characters/nix-direct/photos/*` | Nix's photos on the deck (photos spec 2026-10-23) | ChatGPT · 2026-10-23 (Farban) · masters in `art/photos/` | Resized to 1024 px tall, WebP |
 | `web/public/lowlight-logo.{svg,webp}`, `art/lowlight/*`, `art/patreon/*` | The Lowlight logo, and the Patreon page art | ChatGPT · 2026-10-11 to 2026-10-12 (confirmed by Farban 2026-10-23) | Logo traced or exported for the web |
+| `world/lore/sentinel-defense-group.webp` | The Sentinel Defense Group logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/sentinel-defense-group.png` | Cropped to the logo, 691×200, WebP |
+| `world/lore/aegis-solutions.webp` | The Aegis Solutions logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/aegis-solutions.png` | Cropped to the logo, 605×200, WebP |
+| `world/lore/chiron-medical.webp` | The Chiron Medical logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/chiron-medical.png` | Cropped to the logo, 816×200, WebP |
+| `world/lore/miragen-pharmaceuticals.webp` | The MiraGen Pharmaceuticals logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/miragen-pharmaceuticals.png` | Cropped to the logo, 410×320, WebP |
+| `world/lore/spectra-broadcast-network.webp` | The Spectra Broadcast Network logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/spectra-broadcast-network.png` | Cropped to the logo, 538×200, WebP |
+| `world/lore/soma.webp` | The Soma logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/soma.png` | Cropped to the logo, 669×200, WebP |
+| `world/lore/voltaic-logistics.webp` | The Voltaic Logistics logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/voltaic-logistics.png` | Cropped to the logo, 1002×200, WebP |
+| `world/lore/titan.webp` | The Titan logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/titan.png` | Cropped to the logo, 324×320, WebP |
 
-Added 2026-10-10; 2026-10-12 (characters, rooms, map, app icon); 2026-10-23 (the later cast, the other rooms and re-arts, extras, quests, logo and Patreon art, from the licensing audit).
+Added 2026-10-10; 2026-10-12 (characters, rooms, map, app icon); 2026-10-23 (the later cast, the other rooms and re-arts, extras, quests, logo and Patreon art, from the licensing audit); 2026-11-07 (corp logos).
 
 ## Fonts
 
@@ -203,6 +213,7 @@ Thank you to everyone on Patreon who backs Lowlight.
 | File | Used for | Source | Edits |
 |---|---|---|---|
 | `web/public/deck/cortex-global.webp`, `web/public/icons/relay-{180,192,512}.png` | The Cortex Global logo: the deck's boot screen, and the globe alone as the deck's home-screen icon | Made by Farban, 2026-10-23 · original `art/cortex/cortex-global-logo.png` | Cropped to the logo; the icons are the globe on #0b0712 at 62 % |
+| `world/lore/cortex-global.webp` | The Cortex Global logo over its entry in the lore book | Made by Farban, 2026-10-23 · original `art/cortex/cortex-global-logo.png` | Cropped to the logo, 714×200, WebP |
 
 Added 2026-10-23.
 

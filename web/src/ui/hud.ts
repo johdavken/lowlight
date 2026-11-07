@@ -7,6 +7,7 @@ import { SysMenu } from './sys-menu';
 import type { TextSpeed } from './typing';
 import type { ChatKeys } from './chat-keys';
 import type { ChatFont } from './chat-font';
+import type { FrameRate } from './frame-rate';
 
 const CLOCK_MS = 30_000;
 
@@ -63,10 +64,12 @@ export class Hud {
   private readonly people = this.screen('hud-people', 'PEOPLE', 'P');
   /** TEXTS (in-game texts spec §2): the deck in the room; Alt+X, as Alt+T is the title. */
   private readonly tx = this.screen('hud-tx', 'TEXTS', 'X');
-  private readonly quest = this.screen('hud-quest', 'QUEST', 'Q');
+  private readonly quest = this.screen('hud-quest', 'JOBS', 'Q');
   /** CREW (crew spec §4): the roster, tonight's errands and hires. */
   private readonly crew = this.screen('hud-crew', 'CREW', 'K');
   private readonly map = this.screen('hud-map', 'MAP', null, 'MAP');
+  /** BOOK (lore drawer spec 2026-11-06): not a screen, a drawer beside the scene; its word lights apart from setOpen's six. */
+  private readonly book = this.screen('hud-book', 'BOOK', 'B');
   private onSave: (() => void) | null = null;
   /** Whose reply is streaming (SAVE then reads WAIT FOR <NAME> and doesn't open), or null. */
   private saveBusy: string | null = null;
@@ -87,6 +90,7 @@ export class Hud {
   private chatKeys: ((k: ChatKeys) => void) | null = null;
   private tips: { onTips(on: boolean): void; onTipsAgain(): void } | null = null;
   private mirror: ((on: boolean) => void) | null = null;
+  private frameRate: ((r: FrameRate) => void) | null = null;
   private onModel: (() => void) | null = null;
   private thinking: ((t: NarratorThinking) => void) | null = null;
   private readonly timer: ReturnType<typeof setInterval>;
@@ -144,6 +148,7 @@ export class Hud {
       onTips: (on) => this.tips?.onTips(on),
       onTipsAgain: () => this.tips?.onTipsAgain(),
       onMirror: (on) => this.mirror?.(on),
+      onFrameRate: (r) => this.frameRate?.(r),
       onModel: () => this.onModel?.(),
       onThinking: (t) => this.thinking?.(t),
       onOpenChange: (open) => this.sys.setAttribute('aria-expanded', String(open)),
@@ -185,7 +190,7 @@ export class Hud {
     this.texts.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') this.openNotice();
     });
-    right.append(this.texts, this.notice, ...[this.you, this.people, this.tx, this.quest, this.crew, this.map].map((s) => s.el), this.sys);
+    right.append(this.texts, this.notice, ...[this.you, this.people, this.tx, this.quest, this.crew, this.map, this.book].map((s) => s.el), this.sys);
 
     this.bar.className = 'hud-bar';
     this.bar.dataset.fit = 'full';
@@ -234,7 +239,7 @@ export class Hud {
   /** The screens' words with their Alt letter underlined, or (from the `short` step) just the letter; SAVE busy reads WAIT FOR <NAME>. */
   private labels(): void {
     const short = this.bar.dataset.fit === 'short';
-    for (const s of [this.you, this.people, this.tx, this.quest, this.crew, this.map]) {
+    for (const s of [this.you, this.people, this.tx, this.quest, this.crew, this.map, this.book]) {
       if (short) s.el.textContent = s.short;
       else if (s.key && s.word.includes(s.key)) {
         const at = s.word.indexOf(s.key);
@@ -329,7 +334,35 @@ export class Hud {
   /** Lights the open screen's word (YOU, PEOPLE, TEXTS, QUEST, CREW or MAP) in SYS's blue; null: none open. */
   setOpen(screen: 'you' | 'people' | 'texts' | 'quest' | 'crew' | 'map' | null): void {
     for (const [s, k] of [[this.you, 'you'], [this.people, 'people'], [this.tx, 'texts'], [this.quest, 'quest'], [this.crew, 'crew'], [this.map, 'map']] as const) s.el.classList.toggle('open', k === screen);
+    if (screen !== null) this.onScreen?.();
   }
+
+  /** SYS is open, and has the keys. */
+  get sysOpen(): boolean {
+    return this.menu.isOpen;
+  }
+
+  /** Shows BOOK: opens or closes the lore drawer. */
+  setBook(onClick: () => void): void {
+    this.button(this.book, onClick, 'Book (Alt+B)');
+  }
+
+  /** The number beside BOOK (style.css draws it, so the word's letters can change under it); 0 shows none. */
+  setBookCount(n: number): void {
+    if (n > 0) this.book.el.dataset.count = String(n);
+    else delete this.book.el.dataset.count;
+  }
+
+  /** Lights BOOK while the drawer is open. */
+  setBookOpen(on: boolean): void {
+    this.book.el.classList.toggle('open', on);
+  }
+
+  /** Hears a screen open (setOpen with one of the six): the drawer goes. */
+  onScreenOpen(fn: () => void): void {
+    this.onScreen = fn;
+  }
+  private onScreen: (() => void) | null = null;
 
   /** Shows TEXTS (opens the deck in the room). */
   setTextsScreen(onClick: () => void): void {
@@ -381,7 +414,7 @@ export class Hud {
 
   /** QUEST's click (the list of quests that can start here, quest lines spec §3); shown only by setQuestShown. */
   setQuest(onClick: () => void): void {
-    this.button(this.quest, onClick, 'Quests here (Alt+Q)');
+    this.button(this.quest, onClick, 'Jobs (Alt+Q)');
     this.setQuestShown(false);
   }
 
@@ -468,6 +501,15 @@ export class Hud {
 
   showMirror(on: boolean): void {
     this.menu.showMirror(on);
+  }
+
+  /** SYS → FRAME RATE: what a pick does (main.ts saves it and caps the renderer). */
+  setFrameRateControl(onPick: (r: FrameRate) => void): void {
+    this.frameRate = onPick;
+  }
+
+  showFrameRate(r: FrameRate): void {
+    this.menu.showFrameRate(r);
   }
 
   /** SYS → NARRATOR THINKING: what a pick does (main.ts saves it on the server). Shown with the MODEL row. */

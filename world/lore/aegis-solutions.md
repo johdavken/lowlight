@@ -1,6 +1,7 @@
 ---
 title: Aegis Solutions
 category: City
+section: Corps
 keys: [Aegis, Aegis Solutions, security contractor, private security]
 districts: []
 places: []

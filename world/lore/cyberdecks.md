@@ -1,7 +1,8 @@
 ---
 title: Cyberdecks
 category: Tech
-keys: [deck, decks, cyberdeck, cyberdecks, rig, deck shop, buying a deck]
+section: Decks
+keys: [decks, cyberdeck, cyberdecks, rig, deck shop, buying a deck]
 districts: []
 places: []
 always: false

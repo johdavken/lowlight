@@ -93,7 +93,7 @@ test('keyboard only: any key, then Enter through player, AI and JACK IN reaches 
   for (let i = 0; i < (alpha - cass + order.length) % order.length; i++) await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Enter');
   await expect(phase(page)).toHaveAttribute('data-phase', 'model');
-  await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+  await expect(page.locator('.model-band .mp-row.on')).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
   await page.keyboard.press('Enter');
@@ -772,7 +772,7 @@ test('songs: a room shuffles its songs with a pause; a shared song carries on', 
 });
 
 // Nix's room is shared by every test that drives her, so the map's test lives here, where tests run one at a time.
-test('map: opens on the whole city with your pin lit and no card; a pin opens its card; a district name zooms; Esc steps back out, then closes', async ({ page }) => {
+test('map: opens on the whole city with your pin lit and no card; a pin opens its card; a row twice goes in; Esc steps back out, then closes', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -799,10 +799,10 @@ test('map: opens on the whole city with your pin lit and no card; a pin opens it
   await expect(page.locator('.map-world')).toHaveAttribute('style', /scale\(1\)/);
   await expect(page.locator('.city-map .pin.here')).toHaveCount(1);
   await expect(page.locator('.map-notice')).toBeHidden();
-  // The CRT (scanlines, fuzz, roll, vignette) is drawn over the map and the card, as on a real screen.
+  // The CRT (scanlines, fuzz, roll) is drawn over the map and the card, as on a real screen.
   const z = await page.evaluate(() => {
     const zi = (sel: string) => Number(getComputedStyle(document.querySelector(sel)!).zIndex) || 0;
-    return { city: Math.max(zi('.map-world'), zi('.map-overlay-host')), crt: Math.min(zi('.map-scan'), zi('.map-fuzz'), zi('.map-roll'), zi('.map-vignette')) };
+    return { city: Math.max(zi('.map-world'), zi('.map-overlay-host')), crt: Math.min(zi('.map-scan'), zi('.map-fuzz'), zi('.map-roll')) };
   });
   expect(z.crt).toBeGreaterThan(z.city);
 
@@ -826,8 +826,7 @@ test('map: opens on the whole city with your pin lit and no card; a pin opens it
   const vpin = page.locator(`.city-map .pin[data-place="${velvet.id}"]`);
   // Pins are 0×0 boxes with a pseudo-element diamond, which Playwright counts as unhoverable: the pointer event itself.
   await vpin.dispatchEvent('mouseenter');
-  await expect(vpin.locator('.map-ntag .nm')).toHaveText(velvet.name);
-  await expect(vpin.locator('.map-ntag .nm')).toBeVisible();
+  await expect(page.locator(`.map-places .thr.hot[data-district="velvet"]`)).toHaveCount(1);
   // A drag goes past the city's edge onto the grid (spec 2026-10-28 §2, §3). After the glitch-in: its clip-path hides
   // parts of the screen from the pointer while it plays.
   await page.locator('.map-screen').evaluate((s) =>
@@ -856,23 +855,25 @@ test('map: opens on the whole city with your pin lit and no card; a pin opens it
   await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: false });
   expect((await view())[2]).toBeGreaterThan(1);
 
-  // Zoomed in, the pins carry their names (map pins spec §2).
   await expect(page.locator('.city-map.far')).toHaveCount(0);
-  await expect(page.locator('.city-map .pin.here .map-ntag')).toBeVisible();
 
   // Esc: the card goes, then the camera eases back out to the city, then the map closes.
   await page.keyboard.press('Escape');
   await expect(page.locator('.map-strip')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await view())[2]).toBeCloseTo(1, 2);
-  // A district's name eases the camera to it (map pins spec §3).
-  // A real click where the Marsh's name is printed (mid-screen, clear of the HUD): on the painting its border lies
-  // over the name and frames the same district.
-  const marsh = (await page.locator('svg.city-names text.dname[data-id="marsh"]').boundingBox())!;
-  await page.mouse.click(marsh.x + marsh.width / 2, marsh.y + marsh.height / 2);
+  // A row picks its place; the same row again takes the camera in. The district's name folds its rows.
+  const tilt = page.locator('.map-places .row[data-place="the-tilt"]');
+  await tilt.click();
+  await expect(page.locator('.map-strip .t')).toHaveText('THE TILT');
+  await tilt.click();
   await expect.poll(async () => (await view())[2]).toBeGreaterThan(1.5);
   await page.keyboard.press('Escape');
+  await expect(page.locator('.map-strip')).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await expect.poll(async () => (await view())[2]).toBeCloseTo(1, 2);
+  await page.locator('.map-places .thr[data-district="karasu"] .group').click();
+  await expect(tilt).toBeHidden();
   await expect(page.locator('#map')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(page.locator('#map')).toBeHidden();
@@ -932,7 +933,7 @@ test('map travel: GO walks you both to the stall and she answers; her walk-up is
 
   await page.locator('.hud-map').click();
   // GO (or the invite lock) rides on the picked pin's name tag.
-  const strip = page.locator('.pin.focus .map-go');
+  const strip = page.locator('.map-strip .map-go');
   await page.locator('.city-map .pin[data-place="nix-walk-up"]').dispatchEvent('click');
   // The pin is the landing outside her door: anyone can go; her apartment past it is hers to invite you into.
   await expect(strip.locator('.invite')).toHaveCount(0);
@@ -1014,7 +1015,7 @@ test('persona: play Nix as Vee — the room names you Vee and her turn says who 
   await page.locator(`.tile[data-id="${SECOND.id}"]`).click();
   await expect(phase(page)).toHaveAttribute('data-phase', /model|ready/);
   if ((await phase(page).getAttribute('data-phase')) === 'model') {
-    await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+    await expect(page.locator('.model-band .mp-row.on')).toBeVisible();
     await page.keyboard.press('Enter');
   }
   await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
@@ -1045,7 +1046,7 @@ test('the YOU panel: QUEST’s box, Hicks whole on the left, every page fits at 
   await page.locator(`.tile[data-id="${SECOND.id}"]`).click();
   await expect(phase(page)).toHaveAttribute('data-phase', /model|ready/);
   if ((await phase(page).getAttribute('data-phase')) === 'model') {
-    await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+    await expect(page.locator('.model-band .mp-row.on')).toBeVisible();
     await page.keyboard.press('Enter');
   }
   await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
@@ -1089,7 +1090,7 @@ test('the PEOPLE panel: QUEST’s box, the roster beside the file, JOURNAL for t
   await page.locator(`.tile[data-id="${SECOND.id}"]`).click();
   await expect(phase(page)).toHaveAttribute('data-phase', /model|ready/);
   if ((await phase(page).getAttribute('data-phase')) === 'model') {
-    await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+    await expect(page.locator('.model-band .mp-row.on')).toBeVisible();
     await page.keyboard.press('Enter');
   }
   await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
@@ -1139,7 +1140,7 @@ test('YOU sheet wardrobe: ← dresses Hicks in another outfit, in the room too, 
   await page.locator(`.tile[data-id="${SECOND.id}"]`).click();
   await expect(phase(page)).toHaveAttribute('data-phase', /model|ready/);
   if ((await phase(page).getAttribute('data-phase')) === 'model') {
-    await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+    await expect(page.locator('.model-band .mp-row.on')).toBeVisible();
     await page.keyboard.press('Enter');
   }
   await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
@@ -1178,18 +1179,18 @@ test('YOU sheet wardrobe: ← dresses Hicks in another outfit, in the room too, 
   await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('OUTDOORS');
   await expect(page.locator('.cs-wardrobe')).not.toHaveClass(/planned/);
   await page.keyboard.press('ArrowLeft');
-  await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('HOME');
-  await expect(page.locator('.character-sheet .cs-img')).toHaveAttribute('src', '/api/agents/hicks/outfit/home');
-  await expect(art).toHaveAttribute('style', /\/api\/agents\/hicks\/outfit\/home/);
+  await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('SLEEPWEAR');
+  await expect(page.locator('.character-sheet .cs-img')).toHaveAttribute('src', '/api/agents/hicks/outfit/sleepwear');
+  await expect(art).toHaveAttribute('style', /\/api\/agents\/hicks\/outfit\/sleepwear/);
   await page.keyboard.press('Escape');
   await expect(page.locator('.character-sheet')).toHaveCount(0);
   // Saved in the playthrough: a reload still wears it.
-  await expect.poll(async () => ((await (await page.request.get('/api/persona')).json()) as { persona: { outfit?: string } }).persona.outfit).toBe('home');
+  await expect.poll(async () => ((await (await page.request.get('/api/persona')).json()) as { persona: { outfit?: string } }).persona.outfit).toBe('sleepwear');
   await page.reload();
   await page.waitForFunction(() => window.__nixRoom !== undefined);
-  await expect(art).toHaveAttribute('style', /\/api\/agents\/hicks\/outfit\/home/);
+  await expect(art).toHaveAttribute('style', /\/api\/agents\/hicks\/outfit\/sleepwear/);
   await page.keyboard.press('Alt+KeyY');
-  await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('HOME');
+  await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('SLEEPWEAR');
 });
 
 // The rendered map (spec 2026-10-25 §5): fixture tiles served by the browser; the e2e servers themselves answer no
@@ -1232,14 +1233,11 @@ test('map on rendered tiles: zoom into Karasu past 4x, an 8x tile loads, the Int
   await expect(page.locator('img.map-img')).toBeHidden();
   const pin = page.locator('.city-map .pin[data-place="lowlight-intake"]');
   await expect(pin).toHaveCount(1);
-  // Every pin is on top of the tiles, not hidden under the sharper levels' images. Far out a name shows on hover:
-  // hover one (not yours, which has its own z-index) so its tag is there to test.
-  await page.locator('.city-map .pin[data-place="second-socket"]').dispatchEvent('mouseenter');
+  // Every pin is on top of the tiles, not hidden under the sharper levels' images: one that isn't yours, which has its own z-index.
   await expect
     .poll(() => page.locator('.city-map .pin[data-place="second-socket"]').evaluate((el) => {
-      // The pin's name tag (the pin itself has no size): whatever is on top there must be part of the city layer.
-      const tag = el.querySelector('.map-ntag') as HTMLElement;
-      const r = tag.getBoundingClientRect();
+      // The pin's target (the pin itself has no size): whatever is on top there must be part of the city layer.
+      const r = el.querySelector('.hit')!.getBoundingClientRect();
       const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return !!top && !!top.closest('.city-map');
     }))

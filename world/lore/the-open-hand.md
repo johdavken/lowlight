@@ -1,7 +1,8 @@
 ---
 title: The Open Hand
 category: Places
-keys: [The Open Hand, Open Hand, the ripperdoc, ripperdoc, the chair, ripper]
+section: Karasu
+keys: [The Open Hand, Open Hand, the ripperdoc, ripperdoc, ripper]
 districts: []
 places: [the-open-hand]
 always: false

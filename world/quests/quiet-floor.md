@@ -7,6 +7,8 @@ template: true
 starts: under-the-cat
 after: null
 pitch: A Cortex auditor sleeps on the hotel's top floor with his work slate on the nightstand. Somebody wants a copy, not the slate.
+posted-by: A fixer under the Cat, for a buyer with a grudge against Cortex.
+brief: The top floor of the hotel under the Cat. Get into the auditor's suite while he sleeps, copy his slate and leave it exactly where it lay.
 pay: 360-440
 draw complication: none | auditor-awake | floor-guard
 draw guard: easy | hard
@@ -106,7 +108,7 @@ take: part
 
 *The lobby, and the bar full of people with key cards. One of them isn't drinking.*
 
-- lift: Cross the lobby like a guest going out for cigarettes. → gone / made [check cool 50 · cass +10]
+- lift: Clone a key card off the bar's reader and take the guest door out. → gone / made [check tech 50 grid · cass +10]
 - bar: Go out through the kitchens while the shift changes. → gone / made [check reflex 50 · hicks +10]
 
 ## gone

@@ -71,7 +71,7 @@ describe('job front matter', () => {
   });
 });
 
-import { beatText, holds, isLegacyRoll, isOldRun, parseCondition, parseRun, questBlock, questRowText, type CondCtx } from './quests';
+import { beatText, beatViews, heardAt, holds, isLegacyRoll, isOldRun, parseCondition, parseRun, questBlock, questRowText, type CondCtx } from './quests';
 import { DEFAULT_STATS } from './stats';
 
 describe('the run on the table (spec 2026-10-29)', () => {
@@ -284,6 +284,39 @@ describe('job lines are not quest lines', () => {
     expect(b.startsWith('[job — ')).toBe(true);
     expect(b).toContain('the [job — ');
     expect(b).not.toContain('[quest');
+  });
+});
+
+describe('who a job line is told to (playtest: she answered as the player)', () => {
+  const flat = (s: string) => s.replace(/\s+/g, ' ').trim();
+  it('says who "you" is in a job line or a quest line', () => {
+    expect(questRowText({ title: 'Run Sheet', text: 'You take it.', run: 'run-sheet@0' }, flat, 'Soren')).toBe('[job — Run Sheet (told to Soren, so "you" here is Soren): You take it.]');
+    expect(questRowText({ title: 'Paper Trail', text: 'Rain.' }, flat, 'Soren')).toBe('[quest — Paper Trail (told to Soren, so "you" here is Soren): Rain.]');
+  });
+  it('a beat she only hears reaches her as what she heard, never as what the player saw', () => {
+    const line = questRowText({ title: 'Run Sheet', text: 'A branch stamp.', run: 'run-sheet@0', heard: 'You stop. "What is it?"' }, flat, 'Soren');
+    expect(line).toBe(`[job — Run Sheet (told to Soren, so "you" here is Soren; you weren't there, and this is all you heard on the line): You stop. "What is it?"]`);
+  });
+  it('what she heard is the pick and the marked words', () => {
+    expect(heardAt({ onLine: ['"Why stop?"', '"What is it?"'] }, 'You stop.')).toBe('You stop. "Why stop?" "What is it?"');
+    expect(heardAt({ onLine: ['"Why stop?"'] })).toBe('"Why stop?"');
+    expect(heardAt({})).toBe('Nothing came over the line.');
+  });
+  it("the beat block tells the beat the same way when it isn't the turn's own line", () => {
+    const q = ok(JOB);
+    const beat = { ...q.beats.get('door')!.at(-1)!, room: 'spine/long-haul', text: 'A branch stamp.', onLine: ['"What is it?"'] };
+    const told = questBlock(q, beat, ctx(), flat, false, 'Soren');
+    expect(told).toContain(`Where it stands (told to Soren, so "you" here is Soren; you weren't there, and this is all you heard on the line): "What is it?"\n`);
+    expect(told).not.toContain('branch');
+    const onComms = questBlock(q, { ...beat, room: undefined, onComms: true }, ctx(), flat, false, 'Soren');
+    expect(onComms).toContain("you weren't there");
+  });
+  it('a beat\'s views read the same in the block and on their own', () => {
+    const q = ok(TRAIL.replace('starts: lowlight-intake', 'starts: haes-noodles'));
+    const beat = q.beats.get('sentinel')![0];
+    const views = beatViews(beat, ctx({ trust: 'high' }));
+    expect(views).toBe('Paper burns. A Sentinel made you the old offer again this week.');
+    expect(questBlock(q, beat, ctx({ trust: 'high' }), flat)).toContain(` What you think: ${views}\n`);
   });
 });
 

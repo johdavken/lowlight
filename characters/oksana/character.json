@@ -6,7 +6,8 @@
   "voice": "voice.md",
   "sprite": {
     "src": "oksana-outfit-work.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.335
   },
   "expressions": {
     "smile": "oksana-smile.png",

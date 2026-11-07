@@ -5,6 +5,8 @@ kind: mission
 spring: true
 after: null
 pitch: SDG has {recruit} on a holding floor in the Sentinel Tower. Their people know a clerk, a door and a shift change. Walk them out on paper.
+posted-by: "{recruit}'s cousin."
+brief: Holding floor nine in the Sentinel Tower, before they're processed at four. The way through is a clerk, a door and a shift change, and {recruit}'s cousin has all three.
 minutes: 20
 ---
 

@@ -11,11 +11,11 @@ import type { Deck } from '../../shared/gear';
 import type { Program } from '../../shared/programs';
 import type { RoomRegistry } from './rooms';
 import { completeOnce, completeOnceWithUsage, NARRATOR_MAX_TOKENS, NARRATOR_TEMPERATURE } from './scenario';
-import { RESIDUAL_TEMPERATURE, RESIDUAL_TIMEOUT_MS, ResidualRunner, plansApply, promisesApply } from './residual-runner';
+import { RESIDUAL_TEMPERATURE, RESIDUAL_TIMEOUT_MS, ResidualRunner, plansApply, promisesApply, witnessSceneFor, type WitnessScene } from './residual-runner';
 import type { CompletionMessage } from './turn';
 import { GM_TEMPERATURE } from './gm';
 import type { CostId } from '../../shared/costs';
-import type { LoreSelection } from '../../shared/lore';
+import type { LoreLine, LoreSelection } from '../../shared/lore';
 import type { LeadsForTurn } from '../../shared/leads';
 import { parseMap } from '../../shared/map-schema';
 import fs from 'node:fs';
@@ -46,7 +46,7 @@ import type { SceneRegistry } from './scenes';
 import { dispatchTool, type ToolContext } from './tools';
 import type { CheckpointPort } from './world';
 import { nowOf, standingControl, storedStanding, trustControl } from './standing';
-import { bandOf, standingBlock } from '../../shared/standing';
+import { bandOf, standingBlock, unlockMet, type StandingValues } from '../../shared/standing';
 import { cipherBlock } from '../../shared/cipher';
 import { flagsOf, PICK_CHECK_MAX_TOKENS, PICK_RECENT_LINES, pickCheckMessages, type QuestEntry } from '../../shared/quests';
 import type { Extra } from '../../shared/extras';
@@ -157,7 +157,7 @@ export interface RuntimeOptions {
   /** The contacts she could introduce (share_contact), and whom the player already knows. */
   contacts?: ToolContext['contacts'];
   /** The lore book's entries for a turn (see ChatRelayDeps.lore). */
-  lore?: (sceneId: string, recent: string[], force?: readonly string[]) => LoreSelection;
+  lore?: (sceneId: string, recent: readonly LoreLine[], force?: readonly string[], present?: readonly string[]) => LoreSelection;
   /** Her leads for a turn with `player` (see ChatRelayDeps.leads). */
   leads?: (contactId: string, player: string, recent: string[], replaced: readonly string[]) => LeadsForTurn;
   /** Quest lines (spec 2026-10-16): the book, and the map place a room's scene stands at. */
@@ -224,6 +224,15 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
   });
   const journal = new Journal(db);
   const cp = opts.checkpoints;
+  /** Outfits by standing: a move that first takes her peak over an outfit's line says so to that player (never on herself). */
+  const outfitPeak = (player: string, before: StandingValues, after: StandingValues) => {
+    if (player === id) return;
+    for (const [name, rule] of Object.entries(rec.sprite?.outfitUnlocks ?? {})) {
+      if (rule.player !== undefined && rule.player !== player) continue;
+      if (unlockMet(rule, before) || !unlockMet(rule, after) || cp?.outfitOpen?.(id, name) === false) continue;
+      hub.emit({ type: 'notice', text: `// NEW OUTFIT · ${rec.info.name.toUpperCase()} · ${name.toUpperCase()} (PEOPLE → WARDROBE)` }, player);
+    }
+  };
   if (cp) {
     room.onChange((c) => {
       // A rebuild restoring another scene moves the playthrough there; it's no journey, so no checkpoint.
@@ -331,7 +340,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
     const gone = before === null ? [] : present(before).filter((p) => !now.some((n) => n.id === p.id));
     return [...now, ...gone].map(voiceOf);
   };
-  const look = (p: Present): OtherInfo => opts.lookOf?.(p) ?? { ...p, accent: '#7fe9ff', thumb: null, sprite: null, face: { x: 0.5, y: 0.15 }, tagline: '', facts: [] };
+  const look = (p: Present): OtherInfo => opts.lookOf?.(p) ?? { ...p, accent: '#7fe9ff', thumb: null, sprite: null, face: { x: 0.5, y: 0.15 }, tagline: '', bio: [], facts: [] };
   /** The clock of her latest settled reply to the pair her tabs follow; null when none. */
   const lastReplyClock = (): number | null =>
     db.recentMessages(relay.activePlayer, 20, 'scene').findLast((m) => m.role === 'agent' && m.status !== 'streaming' && m.clock !== undefined)?.clock ?? null;
@@ -404,6 +413,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             config: () => cp.standingConfig(id),
             shared: () => cp.sharedStanding(),
             inCharacter: () => relay.activeInCharacter,
+            onPeak: outfitPeak,
           }),
         }
       : {}),
@@ -417,7 +427,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
   // The Residual (spec 2026-10-15): her bookkeeping, one call on her model after each reply, in a playthrough.
   /** Rewinds so far: a delayed end-of-scene save made before one is called off. */
   let rewinds = 0;
-  const standingFor = (p: string) => (cp && cp.standingStart(id, p) !== null ? standingControl({ db, player: () => p, start: (q) => cp.standingStart(id, q), config: () => cp.standingConfig(id), shared: () => cp.sharedStanding() }) : null);
+  const standingFor = (p: string) => (cp && cp.standingStart(id, p) !== null ? standingControl({ db, player: () => p, start: (q) => cp.standingStart(id, q), config: () => cp.standingConfig(id), shared: () => cp.sharedStanding(), onPeak: outfitPeak }) : null);
   // Photos on the deck (spec 2026-10-23): what fits her now, from where her schedule has her, and a sent photo's caption.
   const photoCaption = (photoId: string) => rec.photos?.find((p) => p.id === photoId)?.caption ?? null;
   // At the turn's own clock (a promised text is stamped when it came due, mid review I2), else now.
@@ -425,6 +435,17 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
     const clock = at ?? cp?.clockNow() ?? null;
     if (!cp || clock === null || !rec.photos?.length) return [];
     return fittingPhotos(rec.photos, photoMoment(rec.sprite, cp.placeAt(id, clock), clock));
+  };
+  // Who else was in the scene as the turn ends (witness lines spec §1).
+  const witnessScene = (p: string, r: { id: string; take: number }): WitnessScene | null => {
+    const reply = db.getMessage(p, r.id);
+    const line = reply?.replyTo ? db.getMessage(p, reply.replyTo) : undefined;
+    return witnessSceneFor({ reply, line, comms: relay.commsNow(p)?.on === true, beatRoom: relay.questState(p).active?.room, beatComms: relay.questState(p).active?.comms === true, scene: room.state.sceneId, present: present(reply?.clock ?? null), voices: cp?.voices(id) ?? [] });
+  };
+  // Her `[you were there: …]` line now (witness lines spec §3).
+  const witnessedNow = (p: string): string | null => {
+    const now = cp?.clockNow() ?? null;
+    return cp && now !== null ? cp.witnessedLine(p, id, now) : null;
   };
   const residual =
     direct && cp && modelStore
@@ -454,6 +475,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
               recorded: (title) => relay.leadRecorded(p, title),
             };
           },
+          remembered: witnessedNow,
           // Her plans: in a stamped in-character turn, not on comms (spec 2026-10-21 §4, §5).
           plan: (p, r) => {
             const reply = db.getMessage(p, r.id);
@@ -619,13 +641,22 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
         }
       : {}),
     // A job's trust stake (Intake board spec §2): a standing move in a playthrough, for its player.
-    ...(cp ? { trust: trustControl({ db, name: rec.info.name, start: (p) => cp.standingStart(id, p), config: () => cp.standingConfig(id), shared: () => cp.sharedStanding() }) } : {}),
+    ...(cp ? { trust: trustControl({ db, name: rec.info.name, start: (p) => cp.standingStart(id, p), config: () => cp.standingConfig(id), shared: () => cp.sharedStanding(), onPeak: outfitPeak }) } : {}),
     backend,
     photosNow,
     photoCaption,
     // Ties: her line on the player from his background, while it applies (read every turn).
     tie: (p) => cp?.tieFor(id, p) ?? null,
     // The story clock: each turn's row is stamped with it, and every tab hears it move.
+    ...(cp ? { witnessedLine: witnessedNow } : {}),
+    ...(cp
+      ? {
+          witnessedScene: (p: string) => {
+            const now = cp.clockNow();
+            return now !== null ? cp.witnessedScene(p, id, now) : null;
+          },
+        }
+      : {}),
     ...(cp ? { cutPower: (rowId: string, at: number) => cp.cutPower(id, rowId, at, room.state.sceneId), cityLine: (clock: number) => {
       const p = cp.powerOf(room.state.sceneId, clock);
       return p.outage ? cityLine(cp.districtName(p.district), p.outage.from) : null;
@@ -713,11 +744,11 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
         }
       : {}),
     others: othersAt,
-    // Outfit wears (spec 2026-10-19 §4): hers and the others' follow the scene, the player's the YOU sheet.
+    // Outfit wears (spec 2026-10-19 §4): hers and the others' follow PEOPLE's pick, else the scene; the player's the YOU sheet.
     ...(opts.wardrobe
       ? {
           wearing: (player: Player, others: readonly OtherVoice[]) =>
-            wearingEntries({ self: { id, name, pronoun: rec.info.pronoun }, sceneId: room.state.sceneId, player, playerOutfit: cp?.outfitOf?.(player.id) ?? null, others, wardrobe: opts.wardrobe! }),
+            wearingEntries({ self: { id, name, pronoun: rec.info.pronoun }, sceneId: room.state.sceneId, player, playerOutfit: cp?.outfitOf?.(player.id) ?? null, others, wardrobe: opts.wardrobe!, pick: (who) => cp?.contactOutfitOf?.(who) ?? null }),
         }
       : {}),
     presence: (before, after) =>
@@ -726,7 +757,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
       ? {
           onTurnEnd: ({ player, mode, ok, reply }: { player: string; mode: string | undefined; ok: boolean; reply: { id: string; take: number } | null }) => {
             // A text (deck spec §3) has no "here": you aren't together, so her going plan always stands.
-            if (residual && ok && reply && mode !== 'ooc') residual.afterTurn(player, reply, mode === 'end' ? 'end' : 'turn', mode === 'text' ? undefined : room.state.sceneId);
+            if (residual && ok && reply && mode !== 'ooc') residual.afterTurn(player, reply, mode === 'end' ? 'end' : 'turn', mode === 'text' ? undefined : room.state.sceneId, mode === 'end' ? null : witnessScene(player, reply));
             // A text (deck spec §2) never moves you: no turnEnded (it would put you in her room), no save of its own;
             // but a save queued while it typed is taken now (mid review I1).
             if (mode === 'text') {

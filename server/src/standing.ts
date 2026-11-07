@@ -8,6 +8,7 @@ import {
   DEFAULT_SHARED_STANDING,
   parseSharedStanding,
   parseStored,
+  peakOf,
   standingKey,
   wordFor,
   type SharedStanding,
@@ -92,11 +93,11 @@ export function moveStanding(
   cfg: StandingConfig | null,
   shared: SharedStanding,
   move: StandingMove,
-): { before: string; after: string } {
+): { before: string; after: string; peak: { before: StandingValues; after: StandingValues } } {
   const now = currentStanding(db, player, start, cfg, shared);
   const next = applyMove(now.stored, start, move);
   db.setMeta(standingKey(player), JSON.stringify(next));
-  return { before: now.word, after: wordFor(next, cfg, shared) };
+  return { before: now.word, after: wordFor(next, cfg, shared), peak: { before: peakOf(now.stored, start), after: peakOf(next, start) } };
 }
 
 /** What the shift_standing tool reaches (ToolContext.standing). */
@@ -124,6 +125,8 @@ export function standingControl(o: {
   now?: () => number;
   /** False on an out-of-character turn (default: always in character). */
   inCharacter?: () => boolean;
+  /** A move landed: her peak on `player` before and after (outfits by standing). */
+  onPeak?: (player: string, before: StandingValues, after: StandingValues) => void;
 }): StandingControl {
   return {
     applies: () => (o.inCharacter?.() ?? true) && o.start(o.player()) !== null,
@@ -144,7 +147,9 @@ export function standingControl(o: {
       const answered = at > 0 ? all[at - 1].id : null;
       const trust = answered && stored?.moves.some((x) => x.job && x.messageId === answered) ? 0 : m.trust;
       if (trust === 0 && m.warmth === 0) return 'already';
-      return moveStanding(o.db, player, start, cfg, shared, { ...m, trust, at: (o.now ?? Date.now)(), messageId, take });
+      const r = moveStanding(o.db, player, start, cfg, shared, { ...m, trust, at: (o.now ?? Date.now)(), messageId, take });
+      o.onPeak?.(player, r.peak.before, r.peak.after);
+      return { before: r.before, after: r.after };
     },
     repliesSinceMove(messageId) {
       const player = o.player();
@@ -184,6 +189,8 @@ export function trustControl(o: {
   config: () => StandingConfig | null;
   shared: () => SharedStanding;
   now?: () => number;
+  /** A move landed: her peak on `player` before and after (outfits by standing). */
+  onPeak?: (player: string, before: StandingValues, after: StandingValues) => void;
 }): TrustControl {
   return {
     preview(player, delta) {
@@ -204,7 +211,8 @@ export function trustControl(o: {
       const start = o.start(player);
       if (start === null || delta === 0) return;
       const take = o.db.stamp?.().take ?? 0;
-      moveStanding(o.db, player, start, o.config(), o.shared(), { trust: delta, warmth: 0, reason, at: (o.now ?? Date.now)(), messageId, take, job: true });
+      const r = moveStanding(o.db, player, start, o.config(), o.shared(), { trust: delta, warmth: 0, reason, at: (o.now ?? Date.now)(), messageId, take, job: true });
+      o.onPeak?.(player, r.peak.before, r.peak.after);
     },
   };
 }

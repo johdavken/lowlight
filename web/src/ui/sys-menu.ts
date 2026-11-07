@@ -1,6 +1,6 @@
 /**
  * The SYS dropdown under the HUD's SYS button (spec 2026-10-15): volume, music, ambient, text speed,
- * text size, font, chat keys, tips, mirror, her model, narrator thinking and the link, one row each. While it's open its keys are taken from the chat prompt: ↑ ↓ pick a row,
+ * text size, font, chat keys, tips, mirror, frame rate, her model, narrator thinking and the link, one row each. While it's open its keys are taken from the chat prompt: ↑ ↓ pick a row,
  * ← → (or the wheel) change it, Enter mutes or opens the MODEL menu, Esc closes. Text goes in
  * through textContent only.
  */
@@ -9,8 +9,9 @@ import type { SoundView } from './hud';
 import type { TextSpeed } from './typing';
 import type { ChatKeys } from './chat-keys';
 import { CHAT_FONT_FAMILY, CHAT_FONT_LABEL, type ChatFont } from './chat-font';
+import { FRAME_RATES, type FrameRate } from './frame-rate';
 
-export type SysRow = 'pause' | 'sound' | 'music' | 'ambient' | 'text' | 'size' | 'font' | 'keys' | 'tips' | 'mirror' | 'model' | 'think' | 'link';
+export type SysRow = 'pause' | 'sound' | 'music' | 'ambient' | 'text' | 'size' | 'font' | 'keys' | 'tips' | 'mirror' | 'fps' | 'model' | 'think' | 'link';
 
 export interface SysMenuHandlers {
   /** MENU: the pause menu, for a pointer or a phone (Esc opens it from the keyboard); SYS closes first. */
@@ -38,6 +39,8 @@ export interface SysMenuHandlers {
   onTipsAgain(): void;
   /** MIRROR: her figure on the stage flipped to face the other way, or not. */
   onMirror(on: boolean): void;
+  /** FRAME RATE: a word picked (a click, or ← → stepping to the next one). */
+  onFrameRate(r: FrameRate): void;
   /** Opens the MODEL menu (SYS has closed by then). */
   onModel(): void;
   /** NARRATOR THINKING: a word picked (a click, or ← → stepping to the next one). */
@@ -86,6 +89,8 @@ export class SysMenu {
   private tipsOn = true;
   private readonly mirror = el('span', 'sys-value sys-keys sys-mirror');
   private mirrorOn = false;
+  private readonly fps = el('span', 'sys-value sys-keys sys-fps');
+  private frameRate: FrameRate = '60';
   private readonly model = el('span', 'sys-value hud-model');
   private readonly think = el('span', 'sys-value sys-keys sys-think');
   private thinking: NarratorThinking = 'auto';
@@ -166,6 +171,16 @@ export class SysMenu {
       this.mirror.append(w);
     }
     const mirror = this.row('mirror', 'MIRROR', this.mirror);
+    for (const r of FRAME_RATES) {
+      const w = el('i', '', r.toUpperCase());
+      w.dataset.fps = r;
+      w.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.h.onFrameRate(r);
+      });
+      this.fps.append(w);
+    }
+    const fps = this.row('fps', 'FRAME RATE', this.fps);
     const model = this.row('model', 'MODEL', this.model);
     for (const t of NARRATOR_THINKING) {
       const w = el('i', '', t.toUpperCase());
@@ -181,7 +196,7 @@ export class SysMenu {
     const pause = this.row('pause', 'MENU', this.pauseValue);
     pause.hidden = true;
     pause.addEventListener('click', () => this.pause());
-    this.rows = { pause, sound, music, ambient, text, size, font, keys, tips, mirror, model, think, link };
+    this.rows = { pause, sound, music, ambient, text, size, font, keys, tips, mirror, fps, model, think, link };
     model.hidden = think.hidden = music.hidden = ambient.hidden = true;
     sound.addEventListener('click', () => this.h.onMute());
     model.addEventListener('click', () => {
@@ -194,7 +209,7 @@ export class SysMenu {
     text.addEventListener('wheel', (e) => this.wheel(e, (d) => this.h.onTextStep(d)), { passive: false });
     size.addEventListener('wheel', (e) => this.wheel(e, (d) => this.h.onSizeStep(d)), { passive: false });
     font.addEventListener('wheel', (e) => this.wheel(e, (d) => this.h.onFontStep(d)), { passive: false });
-    this.el.append(pause, sound, music, ambient, text, size, font, keys, tips, mirror, model, think, link, el('div', 'sys-foot', '← → OR SCROLL TO CHANGE · ESC CLOSES'));
+    this.el.append(pause, sound, music, ambient, text, size, font, keys, tips, mirror, fps, model, think, link, el('div', 'sys-foot', '← → OR SCROLL TO CHANGE · ESC CLOSES'));
     // Clicks inside stay inside: the document's click closes SYS (and the MODEL menu).
     this.el.addEventListener('click', (e) => e.stopPropagation());
     // Listening from the start (the HUD is built before the dice table or any panel), so while open
@@ -272,6 +287,12 @@ export class SysMenu {
   showMirror(on: boolean): void {
     this.mirrorOn = on;
     for (const w of this.mirror.children) w.classList.toggle('on', (w as HTMLElement).dataset.mirror === (on ? 'on' : 'off'));
+  }
+
+  /** Lights the FRAME RATE word in use. */
+  showFrameRate(r: FrameRate): void {
+    this.frameRate = r;
+    for (const w of this.fps.children) w.classList.toggle('on', (w as HTMLElement).dataset.fps === r);
   }
 
   showTextSize(percent: number): void {
@@ -372,6 +393,11 @@ export class SysMenu {
       else this.h.onTipsAgain();
     } else if (this.focus === 'mirror') {
       if (d !== 0) this.h.onMirror(!this.mirrorOn);
+    } else if (this.focus === 'fps') {
+      if (d !== 0) {
+        const n = FRAME_RATES.length;
+        this.h.onFrameRate(FRAME_RATES[(FRAME_RATES.indexOf(this.frameRate) + d + n) % n]);
+      }
     } else if (this.focus === 'think') {
       if (d !== 0) {
         const n = NARRATOR_THINKING.length;

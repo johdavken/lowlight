@@ -1,6 +1,7 @@
 ---
 title: Old Town
-category: City
+category: Places
+section: Karasu
 keys: [Old Town, the habs, habs, abandoned blocks, squatters, unknowns, reconstruction]
 districts: [karasu]
 places: []

@@ -7,6 +7,8 @@ with: [silas]
 starts: zhou-flat
 after: null
 pitch: One episode of an old detective show, and the ninety seconds after the director yelled cut. Somebody will pay for the reel. Somebody else already has a flag on the man who found it.
+posted-by: Silas, with a buyer behind him.
+brief: The original reel, and a flag on Silas for finding it. Crew do the groundwork first, then comes one long night.
 pay: 1000-1200
 night: +72h
 fallout: +48h
@@ -187,6 +189,7 @@ view silas: You are, in fact, almost sure about the band. You will not say so un
 → back
 
 # night
+comms: yes
 
 *Nexus, late, and the signs on the towers don't go off for anyone. Spectra's archive sits on six floors nobody's ever been sent a brochure for. Silas is in your ear. He has the building's plans on paper, and he's reading them to you whether you asked or not.*
 
@@ -210,6 +213,7 @@ view silas: You're on the line from the twins' place with paper plans and a cold
 → lift
 
 # lift
+comms: yes
 
 *The freight lift's at the end of a corridor that smells of carpet. The archive is the thirty-first floor to the thirty-sixth. Silas says it's rated for four tonnes and hasn't been inspected since before you were born, and that this isn't relevant, and then he says it again.*
 
@@ -271,7 +275,7 @@ take: part
 
 # reel
 room: nexus/spectra-archive
-song: Fairy Dust
+song: Spectra Says Reel
 
 *There's a viewer on the bench for checking stock. You have to know it's the right one. You thread it, and the bar comes up, rain on the window and the man in the long coat, and behind him on a stage the size of a door there are four kids with broken amps and glitter on them, and the singer's screaming half the words.*
 
@@ -298,7 +302,7 @@ view silas: You've just heard the song and then you've just seen what you got fl
 
 stranger: The night clerk — old, a cardigan over a shirt and tie, a lanyard that says M. Reyes
 face: local-nexus-03
-song: Fairy Dust if played=yes
+song: Spectra Says Reel if played=yes
 room: nexus/spectra-archive
 
 *He's standing at the end of the aisle with a flask of tea. You have never seen his face. Everyone in Lowlight knows the voice. They've had it in their homes for thirty years, tired and kind and owing money to the wrong people.*
@@ -330,6 +334,7 @@ view silas: You are hearing Anton Greer's voice in your ear, the real one, and y
 → down
 
 # down
+comms: yes
 
 *Something on the thirty-first floor has woken up. The lift's lit, and it isn't coming for you. There's a stairwell Silas has on paper and nobody's used since it was built.*
 
@@ -352,6 +357,7 @@ take: part
 → street
 
 # street
+comms: yes
 
 *The dock, and the rain, and the signs. Between you and the street there's a van with Spectra's eye on the side and a crew getting out of it, and they've got lights. Whatever happens next will be very well shot.*
 
@@ -371,6 +377,7 @@ view silas: You've got a street camera feed and you wish you didn't. Tell them w
 → last
 
 # last if turn=whole
+comms: yes
 
 *The Spine, and a man at the barrier who's been told to stop a tin. He doesn't know what's in it. He's got a Sentinel's shoulders and a very long shift behind him. On the line Silas says, {{"I'd like to be able to tell you that's a coincidence."}}*
 
@@ -380,6 +387,7 @@ view silas: You've gone quiet and exact. The reel's nearly out.
 - past: Go through him. → home-whole / caught [check body 50]
 
 # last if turn=cut
+comms: yes
 
 *The Spine, and a man at the barrier who's been told to stop a tin. He doesn't know what's in it. There's less in it than there was. On the line Silas says nothing for once, and you can hear what he isn't saying.*
 
@@ -389,6 +397,7 @@ view silas: You know what they did up there. You're not going to say anything ab
 - past: Go through him. → home-cut / caught [check body 50]
 
 # last
+comms: yes
 
 *The Spine, and a man at the barrier who's been told to stop a tin. He doesn't know what's in it. Then he looks past you at the old man, who's taken off his glasses, and something happens in his face. He's trying to think where he's heard that cough.*
 
@@ -498,9 +507,10 @@ guest-note: I was right. Fairy Dust played the bar in that Halloran episode. I s
 → end
 
 ## done-out
-*"The trouble with the early seasons," says the man at the table, and Silas sits down to listen. There's someone waiting on the landing already, a friend of Greer's, an old set hand who can talk their way past anything and wants work.*
+*"The trouble with the early seasons," says the man at the table, and Silas sits down to listen. {hire} is waiting on the landing already, a friend of Greer's, an old set hand who can talk their way past anything and wants work.*
 guest-note: I was right. Fairy Dust played the bar in that Halloran episode. I saw the raw reel myself and Dead Air ran the whole song. Anton Greer, the real one, is alive and hiding on our couch, and he remembers the band.
 gives: recruit face HAND
+hire-pitch: Thirty years on sets. I've talked my way past every door in this city, and most of them were painted on.
 → end
 
 ## done-whole

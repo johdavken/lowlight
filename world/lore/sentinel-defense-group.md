@@ -1,6 +1,7 @@
 ---
 title: Sentinel Defense Group
 category: City
+section: Corps
 keys: [SDG, Sentinel, Sentinel Defense Group, Sentinels, private intelligence, police, the tide]
 districts: []
 places: []

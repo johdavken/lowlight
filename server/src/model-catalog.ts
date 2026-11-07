@@ -64,7 +64,7 @@ function cachedCatalog(fetchList: () => Promise<Map<string, ModelChoice> | null>
   };
 }
 
-/** GET {baseUrl}/models, cached for an hour; prices per token × 1e6. */
+/** GET {baseUrl}/models, cached for an hour, without the models that can't call tools; prices per token × 1e6. */
 export function createModelCatalog(opts: { baseUrl: string; apiKey: () => string | null; fetchImpl?: typeof fetch; now?: () => number; timeoutMs?: number }): ModelCatalog {
   const fetchImpl = opts.fetchImpl ?? fetch;
   const perMillion = (v: unknown): number | null => {
@@ -79,15 +79,18 @@ export function createModelCatalog(opts: { baseUrl: string; apiKey: () => string
         signal: AbortSignal.timeout(opts.timeoutMs ?? CATALOG_TIMEOUT_MS),
       });
       if (!res.ok) return null;
-      const body = (await res.json()) as { data?: { id?: unknown; name?: unknown; pricing?: { prompt?: unknown; completion?: unknown } }[] };
+      const body = (await res.json()) as { data?: { id?: unknown; name?: unknown; pricing?: { prompt?: unknown; completion?: unknown }; context_length?: unknown; supported_parameters?: unknown }[] };
       const byId = new Map<string, ModelChoice>();
       for (const m of body.data ?? []) {
         if (typeof m.id !== 'string') continue;
+        // A contact acts through tools: a model that says it can't call them isn't offered. One that doesn't say is.
+        if (Array.isArray(m.supported_parameters) && !m.supported_parameters.includes('tools')) continue;
         byId.set(m.id, {
           id: m.id,
           label: modelLabel(m.id, typeof m.name === 'string' ? m.name : undefined),
           priceIn: perMillion(m.pricing?.prompt),
           priceOut: perMillion(m.pricing?.completion),
+          ...(typeof m.context_length === 'number' && m.context_length > 0 ? { context: m.context_length } : {}),
         });
       }
       return byId;
@@ -156,7 +159,10 @@ export function createModelPicker(opts: {
   return {
     async event() {
       const current = (opts.shown ?? ((id: string) => id))(opts.store.get());
-      const ids = [...new Set([opts.defaultModel, ...opts.curated(), current])];
+      // A pick or recent the list no longer has can't be chosen, so it isn't offered; with the list down, all are.
+      const listed = await opts.catalog.list();
+      const offered = opts.curated().filter((id) => listed === null || listed.some((m) => m.id === id));
+      const ids = [...new Set([opts.defaultModel, ...offered, current])];
       const choices = (await Promise.all(ids.map(choiceFor))).map((c): ModelChoice => (opts.via?.(c.id) ? { ...c, via: 'anthropic' } : c));
       return {
         type: 'model',
@@ -170,7 +176,8 @@ export function createModelPicker(opts: {
       };
     },
     async choose(id) {
-      if (id !== null && !(await opts.catalog.get(id))) return 'unknown-model';
+      // Her current model may have left the list (or lack tools): keeping it isn't a new pick.
+      if (id !== null && id !== opts.store.get() && !(await opts.catalog.get(id))) return 'unknown-model';
       opts.store.set(id);
       return null;
     },

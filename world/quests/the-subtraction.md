@@ -7,6 +7,8 @@ with: [mother-rot]
 starts: counting-house
 after: null
 pitch: One line in a ledger nobody reads. Four hundred sol, and he's paying more than that to collect it.
+posted-by: Mother Rot
+brief: One old debt from his ledger, and he wants it closed. Crew do the groundwork first, then comes one long night.
 pay: 1000-1200
 night: +72h
 fallout: +48h
@@ -423,14 +425,18 @@ view mother-rot: She's home. You mean it. This is the best outcome anyone could 
 → end
 
 ## done-go
-*He tells you. It isn't sol. It'll keep. Going down the stairs you pass a net-mender from the Bell Street cut coming up with nothing in her hands. She looks at you and says there's someone who'd work for you, if you're the one who lost that woman in the pipes.*
+*He tells you. It isn't sol. It'll keep. Going down the stairs you pass a net-mender from the Bell Street cut coming up with nothing in her hands. She looks at you and says {hire} would work for you, if you're the one who lost that woman in the pipes.*
 gives: recruit ears HAND
+hire-pitch: The Bell Street cut talks to me. If you can lose someone in the pipes, you can use what it says.
+gives: outfit hicks tie
 → end
 
 ## done-keep
 *The lights of the Strand come on across the water. Neither of you says anything else, and the broth goes cold.*
+gives: outfit hicks tie
 → end
 
 ## done-finish
 *The ledger's shut. The money's good, and it's on time. Everything about him is on time.*
+gives: outfit hicks tie
 → end

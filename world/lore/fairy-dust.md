@@ -1,6 +1,7 @@
 ---
 title: Fairy Dust
 category: Culture
+section: Entertainment
 keys: [Fairy Dust, the band, glitter-punk, Moth]
 districts: []
 places: []

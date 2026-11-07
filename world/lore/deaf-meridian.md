@@ -1,6 +1,7 @@
 ---
 title: Deaf Meridians
 category: Tech
+section: Decks
 keys: [deaf Meridian, deaf deck, deafened, pulled chip, check-in chip]
 districts: []
 places: []

@@ -3,6 +3,7 @@
  * into the tiles. Rain that follows the city's weather, fine grain, a soft vignette and a slight colour fringe at the edges.
  * One canvas over the map, under the band and strip; nothing at all under reduced motion.
  */
+import { frameTick } from '../frame-clock';
 import type { Weather } from '../../../../shared/types';
 
 /** Streaks for a weather and level over an area (css px²): none unless it's raining. */
@@ -39,12 +40,19 @@ export class ScreenFx {
     this.drops = [];
   }
 
+  /** The clock tick last drawn. */
+  private tick: number | null = null;
+
   start(): void {
     if (this.running || this.opts.reducedMotion) return;
     this.running = true;
     const step = (now: number) => {
       if (!this.running) return;
-      this.drawFrame(now / 1000);
+      const tick = frameTick(now);
+      if (tick !== this.tick) {
+        this.tick = tick;
+        this.drawFrame(now / 1000);
+      }
       this.frame = requestAnimationFrame(step);
     };
     this.frame = requestAnimationFrame(step);

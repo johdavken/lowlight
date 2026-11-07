@@ -31,7 +31,8 @@
   },
   "sprite": {
     "src": "soren-outfit-work.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.417
   },
   "expressions": {
     "smile": "soren-smile.png",

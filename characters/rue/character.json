@@ -31,7 +31,8 @@
   },
   "sprite": {
     "src": "rue-outfit-work.png",
-    "pixel": true
+    "pixel": true,
+    "waist": 0.358
   },
   "expressions": {
     "smile": "rue-smile.png",

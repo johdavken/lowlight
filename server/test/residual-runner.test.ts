@@ -778,7 +778,7 @@ describe('cipher in the turn run (cipher spec §2.3–2.4)', () => {
     await r.wait();
     expect(calls[0].messages[1].content).toContain('[cipher: T1 · The stall is a drop. · comes out when you see the drop]');
     const evs = parseCipherEvents(db.getMeta(cipherKey(P)));
-    expect(evs).toEqual([expect.objectContaining({ t: 'clue', id: 'nix-1', messageId: a1.id, place: 'karasu/noodle-stall', onPage: true })]);
+    expect(evs).toEqual([expect.objectContaining({ t: 'clue', id: 'nix-1', messageId: a1.id, place: 'karasu/noodle-stall', onPage: true, replies: 7 })]);
     expect(logs.at(-1)).toContain('1 clue');
     const a0 = db.allMessages(P)[0];
     db.cutAfter(P, a0.id);
@@ -841,7 +841,7 @@ describe('the cipher run (cipher spec §2.2)', () => {
     expect(call.maxTokens).toBe(1200);
     const evs = parseCipherEvents(db.getMeta(cipherKey(P)));
     expect(evs.map((e) => e.t)).toEqual(['run', 'truth']);
-    expect(evs[1]).toMatchObject({ id: `nix-${a1.id}.0-1`, kind: 'place', knownBy: ['hae'] });
+    expect(evs[1]).toMatchObject({ id: `nix-${a1.id}.0-1`, kind: 'place', knownBy: ['hae'], replies: 6 });
     const row = db.residualRuns(5).find((x) => x.kind === 'cipher')!;
     expect(row.applied).toEqual([`truth nix-${a1.id}.0-1 (place)`]);
     expect(row.refused).toEqual(['truths[1]: knownBy: the player']);

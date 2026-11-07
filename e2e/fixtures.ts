@@ -197,8 +197,8 @@ export async function dialIn(page: Page, ai: string, player = 'hicks'): Promise<
   await page.locator(`.tile[data-id="${ai}"]`).click();
   await expect(p).toHaveAttribute('data-phase', /model|ready/);
   if ((await p.getAttribute('data-phase')) === 'model') {
-    // The model step's panel: her current model is the highlighted row; Enter keeps it.
-    await expect(page.locator('.model-panel .mp-row.on')).toBeVisible();
+    // The model step's band: her current model is the highlighted row; Enter keeps it.
+    await expect(page.locator('.model-band .mp-row.on')).toBeVisible();
     await page.keyboard.press('Enter');
   }
   await expect(p).toHaveAttribute('data-phase', 'ready');
@@ -313,4 +313,34 @@ export async function settleCostStep(page: Page): Promise<boolean> {
     return true;
   }
   return false;
+}
+
+/**
+ * The moment on the job table stands clear of its neighbours and of itself: every call card, its tabs, the waiting card, the
+ * stamp and its line and the costs against the hand, the levers and the JOB column, then each other. `label` names the step.
+ */
+export async function expectTableClear(page: Page, label: string): Promise<void> {
+  const hits = await page.evaluate(() => {
+    const shown = (e: Element) => {
+      const r = e.getBoundingClientRect();
+      let n: Element | null = e;
+      for (; n; n = n.parentElement) if (getComputedStyle(n).opacity === '0' || getComputedStyle(n).visibility === 'hidden') return false;
+      return r.width > 0 && r.height > 0;
+    };
+    const boxes = (sel: string) => [...document.querySelectorAll(sel)].filter(shown).map((e) => ({ name: sel, r: e.getBoundingClientRect() }));
+    const moment = ['.tb-deal > .tb-card', '.tb-deal > .tb-card .tb-src', '.tb-parked > .tb-card', '.tb-roll .qc-stamp', '.tb-roll .qc-says', '.tb-costs'].flatMap(boxes);
+    const around = ['.tb-hand', '.tb-levers', '.jc'].flatMap(boxes);
+    const meets = (a: DOMRect, b: DOMRect) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    const out: string[] = [];
+    for (const m of moment) for (const n of around) if (meets(m.r, n.r)) out.push(`${m.name} on ${n.name}`);
+    moment.forEach((m, i) => {
+      for (const n of moment.slice(i + 1)) {
+        // A tab belongs to its card, and the stamp's line sits under the stamp.
+        if (m.name !== n.name && n.name.includes(m.name)) continue;
+        if (meets(m.r, n.r) && !(m.name === '.tb-deal > .tb-card' && n.name === '.tb-deal > .tb-card .tb-src')) out.push(`${m.name} on ${n.name}`);
+      }
+    });
+    return out;
+  });
+  expect(hits, label).toEqual([]);
 }

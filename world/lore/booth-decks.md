@@ -1,6 +1,7 @@
 ---
 title: Booth Decks
 category: Tech
+section: Decks
 keys: [booth deck, booth decks, rented deck, deck booth, back booth, by the hour]
 districts: []
 places: []

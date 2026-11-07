@@ -1,6 +1,7 @@
 ---
 title: The Spine
 category: City
+section: Districts
 keys: [the Spine, Spine, superhighway, under the Spine, Spiners, pylons]
 districts: [spine]
 places: []

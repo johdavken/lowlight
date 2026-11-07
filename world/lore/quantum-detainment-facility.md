@@ -1,6 +1,7 @@
 ---
 title: Quantum Detainment Facility
-category: City
+category: Places
+section: Elsewhere
 keys: [QDF, the Q, Quantum Detainment Facility, prison, detainment]
 districts: [tidal]
 places: []

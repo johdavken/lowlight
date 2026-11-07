@@ -1,6 +1,8 @@
 ---
 title: Lowlight slang
 category: City
+section: Slang
+only: model
 keys: []
 districts: []
 places: []

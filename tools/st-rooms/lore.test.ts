@@ -14,10 +14,18 @@ describe('worldInfoFrom', () => {
     const dir = path.join(__dirname, '../../world/lore');
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort().map((f) => ({ name: f, text: fs.readFileSync(path.join(dir, f), 'utf8') }));
     const wi = worldInfoFrom(files);
-    // One entry per file, however many there are (new lore mustn't break this test).
-    expect(files.length).toBeGreaterThan(0);
-    expect(Object.keys(wi.entries)).toHaveLength(files.length);
+    // One entry per file the model reads, however many there are (new lore mustn't break this test).
+    const read = files.filter((f) => !/^only: book$/m.test(f.text));
+    expect(read.length).toBeGreaterThan(0);
+    expect(Object.keys(wi.entries)).toHaveLength(read.length);
     for (const e of Object.values(wi.entries)) expect(e.content.length).toBeGreaterThan(0);
+  });
+
+  it('leaves out book-only entries, numbering the rest without a gap; the model\'s own stay', () => {
+    const text = (only: string) => `---\ntitle: ${only}\nonly: ${only}\nkeys: [k]\ndistricts: []\nplaces: []\nalways: false\n---\nBody.\n`;
+    const wi = worldInfoFrom([{ name: 'a.md', text: text('book') }, { name: 'b.md', text: text('model') }]);
+    expect(Object.keys(wi.entries)).toEqual(['0']);
+    expect(wi.entries['0']).toMatchObject({ uid: 0, displayIndex: 0, comment: 'model' });
   });
 
   const file = (category: string, extra = '') => `---\ntitle: T\ncategory: ${category}\nkeys: [k]\ndistricts: []\nplaces: []\nalways: false\n${extra}---\nBody.\n`;

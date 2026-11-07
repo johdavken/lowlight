@@ -70,6 +70,7 @@
     "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "jsdom": "^26.0.0",
+    "marked": "18.1.1",
     "sharp": "0.35.5",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",

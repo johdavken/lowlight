@@ -98,27 +98,37 @@ shows there once you've learned it.
   <img src="docs/readme/shot-job.webp" alt="A job at the Intake: a collector on the stairs, choices with their odds, ALARM, EDGE, HEAT and PAY above" width="49%">
 </p>
 
-- **Quests** are written stories with real choices. A card comes up under the HUD and you talk it over with
-  your contact first: each of them sees the options their own way, and some won't argue the ones they can't
-  see.
 - **Jobs** are one night's work off a board or from a fixer, tiered by how much the district trusts you. Your
-  stats, your deck and your crew set the odds; EDGE buys a reroll. They pay in sol and cost you heat, and both
-  are counted district by district. Nix's own clients bring jobs to the Intake, with her trust as the stake.
-- **Big jobs** take several nights: legwork at the places they name, clues, your read on what's really going
-  on, and two or three ways in.
+  stats, your deck and your crew set the odds. They pay in sol and cost you heat, and both are counted district
+  by district. Nix's own clients bring jobs to the Intake, with her trust as the stake.
 
 <p align="center">
-  <img src="docs/readme/gigs.webp" alt="Three gig screens: papers on the desk, a grid run on a deck, and a slip across a club floor" width="100%">
+  <img src="docs/readme/gigs.webp" alt="The Graft table: a beat's cards, the dice, and TAKE, ALARM and NERVE above" width="100%">
 </p>
 
-**Gigs** are the part you play with your hands, and where a big job ends up:
+**Graft** is the job game, and every job ends up there. It's played at a table of cards with dice, using rules
+adapted from Blades in the Dark:
 
-- **Papers:** a desk, a client, and tonight's customs rules. Build them an identity out of permits, stamps
-  and letters that gets past the clerk, before the risk adds up.
-- **Grid:** jack in and work a network node by node toward the target. Probe what you can't see, spend RAM
-  to break lacquer, keep away from sentries, and pull the take before the trace finishes you.
-- **Slip:** cross a floor plan past guards and cameras a step at a time. Wait, hide, make a noise, jam a
-  camera with your kit, and get out with heat at zero if you can.
+- **Setup:** choose how you go in: QUIET, SMOOTH or HARD. Your approach adds a die on its stats and decides how
+  things go wrong. Bring up to three crew, and load programs into your deck's slots.
+- **Beats:** a job is a run of beats, and each one deals cards. A card can be a check you roll, a terminal you
+  crack word by word, or something that just happens. Your stat sets the dice, and your approach, crew, deck and
+  programs add to them. You keep the highest die: a 6 is clean, a 4–5 gets it done at a cost, and 1–3 is a miss.
+- **Position and effect:** before you roll, you see where you stand: in the dark, in the open, or on the wire.
+  Position sets how many costs land on you, and effect sets how much a pass gets you. Go SAFE or BOLD to trade
+  one for the other.
+- **Costs:** a bad roll deals costs, and you pick which ones you take: ALARM up, the next roll worse or smaller,
+  or take lost. You can eat a cost, RESIST it with NERVE, or burn a FIREWALL to cancel it.
+- **The clocks:** TAKE is what you walk out with. ALARM runs to 4, and at 4 you're running for the exit. NERVE
+  pays for PUSH, crew abilities and RESIST, and it comes back at 06:00.
+- **Crew:** each recruit gets one free call on their own stat, plus the abilities you slotted before you went in.
+- **The end:** TAKE sets the pay, and the ALARM you leave with turns into heat in that district. A clean, messy
+  or blown job moves your rep. After a good take you can PRESS ON for more.
+- **Contracts:** once you're Trusted, a job becomes one contact's work over several nights. Your crew does
+  groundwork first, then you play the night itself, and the fallout comes after.
+
+**Papers** are still a gig: a desk, a client, and tonight's customs rules. Build them an identity out of
+permits, stamps and letters that gets past the clerk, before the risk adds up.
 
 ### The YOU panel
 

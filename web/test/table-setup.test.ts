@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mountSetup } from '../src/room/table/setup';
 import type { SetupOffer } from '../../shared/types';
-import { TIPS } from '../src/room/table/tips';
+import { tipText } from '../src/room/table/tips';
 
 const OFFER: SetupOffer = {
   district: 'karasu',
@@ -107,7 +107,7 @@ describe('the setup card', () => {
     };
     expect(offered(OFFER)).not.toContain('contact');
     expect(offered({ ...OFFER, contacts: [{ id: 'cass', name: 'Cass Okafor', accent: '#fff', portrait: null, spec: 'fence' }] })).toEqual(['approach', 'people', 'favour', 'contact']);
-    expect(TIPS.contact.text).toBe('A contact who gave you a lead will help on a job, once, in their trade. Blow the job after you play them and they trust you less.');
+    expect(tipText('contact')).toBe('A contact who gave you a lead will help on a job, once, in their trade. BLOWN Blow the job after you play them and they trust you less.');
   });
 
   it('no contacts: two empty pockets, no CONTACTS row, nothing locked as SPEC 3', () => {
@@ -282,7 +282,7 @@ describe('SETUP with the deck (programs spec §2.4)', () => {
     };
     expect(offered(DECKED)).toEqual(['approach', 'people', 'program']);
     expect(offered({ ...DECKED, deck: null, programs: undefined })).toEqual(['approach', 'people']);
-    expect(TIPS.program.text).toBe('Your deck has 1, 2, 2 or 3 slots by its quality. Load programs here, free: they stay loaded for the job. Loading one mid-job costs 1 NERVE, and below the job\'s tier the lacquer notices each run: ALARM +1.');
+    expect(tipText('program')).toBe('Load programs here, free: they stay loaded for the job. SLOTS 1, 2, 2 or 3, by your deck\'s quality. MID-JOB Loading one costs 1 NERVE. BELOW TIER Below the job\'s tier the lacquer notices each run: ALARM +1.');
   });
 
   it('a tap outside the cards closes the tray', () => {

@@ -221,6 +221,42 @@ Open http://localhost:5173, pick who you play and who you call, and enter your k
 screen. [docs/BUILDING.md](docs/BUILDING.md) covers the desktop app, the city map's tiles, the tests and
 where your saves live.
 
+### On Windows
+
+The [itch.io build](https://lowlightgame.itch.io/lowlight) needs none of this. To run the source instead:
+
+1. Install **Node.js 24 or newer** from [nodejs.org](https://nodejs.org) (the LTS installer is fine) and
+   **Git** from [git-scm.com](https://git-scm.com/download/win). Or, from a terminal:
+
+   ```powershell
+   winget install OpenJS.NodeJS.LTS
+   winget install Git.Git
+   ```
+
+   Close and reopen the terminal afterwards so it finds `node`, `npm` and `git`.
+
+2. Get the game and its packages (PowerShell or Command Prompt):
+
+   ```powershell
+   git clone https://github.com/johdavken/lowlight.git
+   cd lowlight
+   npm ci
+   ```
+
+3. Start it, then open http://localhost:5173 in your browser:
+
+   ```powershell
+   npm run dev
+   ```
+
+   Leave that window open while you play; Ctrl+C stops the game. Next time, `cd lowlight` and `npm run dev`
+   again. Your saves stay in the `data` folder inside `lowlight`.
+
+To update, run `git pull` and then `npm ci` in the same folder.
+
+If PowerShell says *running scripts is disabled on this system* when you type `npm`, use Command Prompt
+instead, or type `npm.cmd` in place of `npm`.
+
 ## What's in here
 
 | Folder | What it holds |

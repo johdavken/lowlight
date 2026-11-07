@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import { start } from './start';
 
+// `npm start` passes --production rather than NODE_ENV=production in the script: that syntax fails in cmd and
+// PowerShell. Either way, the built web app in dist/web is served.
+if (process.argv.includes('--production')) process.env.NODE_ENV = 'production';
+
 async function main(): Promise<void> {
   const server = await start(process.env);
 

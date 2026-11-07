@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mountTips, SETTLE_MS, TIP_ORDER, TIPS, TIPS_KEY, type Tips } from '../src/room/table/tips';
+import { mountTips, SETTLE_MS, TIP_ORDER, TIPS, TIPS_KEY, tipText, type Tips } from '../src/room/table/tips';
 import { SLOTS } from '../../shared/programs';
-import { ALARM_MAX, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE } from '../../shared/dice';
+import { ALARM_MAX, ALARM_SHIFT, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE } from '../../shared/dice';
 import { APPROACH_STATS, FAVOUR_HEAT, MAX_PEOPLE } from '../../shared/hand';
 
 const rect = (left: number, top: number, width: number, height: number) =>
@@ -65,6 +65,27 @@ describe('Graft tips', () => {
     mount().offer(['take'], root);
     vi.advanceTimersByTime(SETTLE_MS);
     expect(shown()).toBeNull();
+  });
+
+  it('a tip reads as a dossier: the gist, then labels down the left; the HUD words in their colours', () => {
+    target('tb-alarm');
+    mount().offer(['alarm'], root);
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect(shown()!.querySelector('.gt-gist')?.textContent).toBe('Costs fill it.');
+    expect([...shown()!.querySelectorAll('.gt-label')].map((n) => n.textContent)).toEqual([`AT ${ALARM_SHIFT}`, `FULL · ${ALARM_MAX}`]);
+    expect([...shown()!.querySelectorAll('.gt-row-text')].map((n) => n.textContent)).toEqual(['Every card is one step worse.', 'GET OUT.']);
+    ok();
+    mount().offer(['heat'], root);
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect([...shown()!.querySelectorAll('.gt-gist .gt-lit')].map((n) => `${n.className}:${n.textContent}`)).toEqual(['gt-lit gt-alarm:ALARM', 'gt-lit gt-heat:HEAT']);
+  });
+
+  it('a tip with no rows is its gist alone', () => {
+    target('tb-take');
+    mount().offer(['take'], root);
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect(shown()!.querySelector('.gt-rows')).toBeNull();
+    expect(shown()!.querySelector('.gt-gist')?.textContent).toBe('Good rolls fill it. When the job ends, it sets your pay.');
   });
 
   it('TWO VOICES points at the JOB column on the stage, outside the table, before the roll', () => {
@@ -266,31 +287,31 @@ describe('Graft tips', () => {
 
   it('the PROGRAMS tip reads the slots; FIREWALL reads as a program (programs spec §2.6)', () => {
     expect(TIPS.program.title).toBe('PROGRAMS');
-    expect(TIPS.program.text).toContain(`${SLOTS[1]}, ${SLOTS[2]}, ${SLOTS[3]} or ${SLOTS[4]}`);
-    expect(TIPS.program.text).toContain('ALARM +1');
-    expect(TIPS.program.text).toContain('lacquer');
-    expect(TIPS.armour.text).toBe('FIREWALL cancels one cost, then burns out. Its slot stays full.');
+    expect(tipText('program')).toContain(`${SLOTS[1]}, ${SLOTS[2]}, ${SLOTS[3]} or ${SLOTS[4]}`);
+    expect(tipText('program')).toContain('ALARM +1');
+    expect(tipText('program')).toContain('lacquer');
+    expect(tipText('armour')).toBe('FIREWALL cancels one cost, then burns out. Its slot stays full.');
     expect(TIP_ORDER.indexOf('program')).toBe(TIP_ORDER.indexOf('call') + 1);
   });
 
   it('the text reads the rules', () => {
     // RESIST's price by its dice (roll lifecycle spec §1.3), and NERVE naming it.
-    expect(TIPS.resist.text).toContain('a 6 costs nothing, a 4–5 one NERVE, lower two');
-    expect(TIPS.nerve.text).toContain('RESIST up to 2');
+    expect(tipText('resist')).toContain('6 Costs nothing. 4–5 One NERVE. LOWER Two NERVE.');
+    expect(tipText('nerve')).toContain('RESIST Up to 2');
     // What the reviewer caught: HARD's TAKE 1 starts at tier 2; a 0d roll keeps the lowest; a fence's TAKE +1 isn't on a GET OUT; a call in the dark is +1d.
-    expect(TIPS.approach.text).toContain('on a job of tier 2 or more');
-    expect(TIPS.roll.text).toContain('keep the lowest');
-    expect(TIPS.people.text).toContain('unless you GET OUT');
-    expect(TIPS.call.text).toContain('+1d if you’re already in the dark');
-    expect(TIPS.favour.text).toContain(`${FAVOUR_HEAT}`);
-    expect(TIPS.nerve.text).toContain(`${PUSH_NERVE}`);
-    expect(TIPS.press.text).toContain(`${PRESS_NERVE} NERVE`);
-    expect(TIPS.people.text).toContain(`${MAX_PEOPLE}`);
-    for (const p of ['dark', 'open', 'wire'] as const) expect(TIPS.position.text).toContain(POSITION_NAMES[p]);
-    expect(TIPS.position.text).toContain('a 4–5 makes you pick 1 cost');
-    expect(TIPS.alarm.text).toContain('GET OUT');
-    expect(TIPS.alarm.text).toContain(`${ALARM_MAX}`);
-    for (const stats of Object.values(APPROACH_STATS)) for (const s of stats) expect(TIPS.approach.text).toContain(s.toUpperCase());
+    expect(tipText('approach')).toContain('on a job of tier 2 or more');
+    expect(tipText('roll')).toContain('keep the lowest');
+    expect(tipText('people')).toContain('unless you GET OUT');
+    expect(tipText('call')).toContain('+1d if you’re already in the dark');
+    expect(tipText('favour')).toContain(`${FAVOUR_HEAT}`);
+    expect(tipText('nerve')).toContain(`${PUSH_NERVE}`);
+    expect(tipText('press')).toContain(`${PRESS_NERVE} NERVE`);
+    expect(tipText('people')).toContain(`${MAX_PEOPLE}`);
+    for (const p of ['dark', 'open', 'wire'] as const) expect(tipText('position')).toContain(POSITION_NAMES[p]);
+    expect(tipText('position')).toContain('A 4–5 makes you pick 1 cost');
+    expect(tipText('alarm')).toContain('GET OUT');
+    expect(tipText('alarm')).toContain(`${ALARM_MAX}`);
+    for (const stats of Object.values(APPROACH_STATS)) for (const s of stats) expect(tipText('approach')).toContain(s.toUpperCase());
   });
 
   it('the callout sits over the table (24) but under the full screens (29) and the HUD (30)', () => {

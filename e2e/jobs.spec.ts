@@ -98,6 +98,14 @@ test('buy a burner, blow a job, use the burner: the halved loss and the tier lin
   await page.locator('.tb-card[data-choice="kick"]').click();
   await expect(page.locator('.tb-card[data-choice="!burner"] .tb-line')).toHaveText('USE BURNER (−5 INSTEAD OF −10)', { timeout: 10_000 });
   await expect(page.locator('.tb-head .tb-flag.red')).toHaveText('BLOWN');
+  // The hand steps away while cover is the only choice: the BLOWN preview under the cards isn't drawn over (playtest).
+  await expect(page.locator('.tb-job .tb-hand')).toBeHidden();
+  {
+    const preview = page.locator('.tb-extra .db');
+    await expect(preview).toBeVisible();
+    const b = (await preview.boundingBox())!;
+    expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.tb-extra'), [b.x + b.width / 2, b.y + b.height - 12])).toBe(true);
+  }
   await page.screenshot({ path: 'test-results/jobs-cover.png' });
   await page.locator('.tb-card[data-choice="!burner"]').click();
 

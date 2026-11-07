@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "concurrently \"tsx watch server/src/main.ts\" \"vite\"",
     "build": "vite build",
-    "start": "NODE_ENV=production tsx server/src/main.ts",
+    "start": "tsx server/src/main.ts --production",
     "test": "vitest run",
     "e2e": "playwright test",
     "e2e:failed": "playwright test --last-failed",

@@ -1,0 +1,19 @@
+# Every text file checks out with LF, Windows included: the content parsers (quests, lore, crew errands…) read
+# LF lines, and Git for Windows' default (core.autocrlf=true) would hand them CRLF.
+* text=auto eol=lf
+
+# Binaries, named so no guess touches them.
+*.png binary
+*.PNG binary
+*.jpg binary
+*.webp binary
+*.ogg binary
+*.mp3 binary
+*.wav binary
+*.woff2 binary
+*.psd binary
+*.kra binary
+*.glb binary
+*.blend binary
+*.ico binary
+*.db binary

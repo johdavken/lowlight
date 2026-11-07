@@ -162,6 +162,19 @@ describe('a job on the table', () => {
     expect(choice('!press').querySelector('.tb-panel-sub')!.textContent).toBe('RISK IT · 1 NERVE');
   });
 
+  it('a blown job waiting on cover puts the hand away: its BLOWN preview has the room, not under the cards (playtest)', () => {
+    const { t } = mount();
+    t.show(A);
+    expect($('.tb-hand').hidden).toBe(false);
+    const blown = { text: 'Two men are waiting.', debrief: { tier: 'blown', checks: [], sol: 0, heat: { district: 'karasu', delta: 2 }, rep: { district: 'karasu', before: 30, after: 18 } } } as NonNullable<Active['blown']>;
+    t.show({ ...A, beat: 'blown', choices: [{ id: '!burner', line: 'USE BURNER (−6 INSTEAD OF −12)' }, { id: '!take', line: 'TAKE IT' }], blown });
+    expect($('.tb-extra .db')).not.toBeNull();
+    expect($('.tb-hand').hidden).toBe(true);
+    // Back on a beat with checks (a rewind), the hand comes back.
+    t.show(A);
+    expect($('.tb-hand').hidden).toBe(false);
+  });
+
   it('the debrief deals as a card; CLOSE closes the table', () => {
     const { t } = mount();
     t.show(A);

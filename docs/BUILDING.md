@@ -17,6 +17,8 @@ npm run dev
 
 Then open http://localhost:5173. The game server runs on port 7700 behind Vite.
 
+The same commands work on Windows, in cmd, PowerShell or Git Bash. The repository's `.gitattributes` keeps every text file's line endings as LF, whatever Git's own setting, because the content files are read line by line.
+
 To run the built game from one server instead:
 
 ```bash

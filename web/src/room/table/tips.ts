@@ -21,122 +21,234 @@ export const SETTLE_MS = 600;
 const stats = (a: Approach) => APPROACH_STATS[a].map((s) => s.toUpperCase()).join(' · ');
 const where = (p: Position) => {
   const n = picksFor('cost', p, DEALT);
-  return `${POSITION_NAMES[p]}: a 4–5 ${n ? `makes you pick ${n} cost${n > 1 ? 's' : ''}` : 'costs nothing'}`;
+  return [POSITION_NAMES[p], n ? `A 4–5 makes you pick ${n} cost${n > 1 ? 's' : ''}.` : 'A 4–5 costs nothing.'] as const;
 };
 
 /**
- * `below`: tried under its target first (a choice card's tips keep clear of the beat's prose above it). `stage`: the
- * target stands on the game stage, outside the table (the JOB column has its own layer there). `beside`: tried at its
- * right first (a tall column: above it is the job's title, below it the line keys).
+ * A tip as a dossier (mockup tip-boxes.html A, picked 2026-11-07): a title, one line that says what the thing is
+ * (`gist`), then labelled rows. `below`: tried under its target first (a choice card's tips keep clear of the beat's
+ * prose above it). `stage`: the target stands on the game stage, outside the table (the JOB column has its own layer
+ * there). `beside`: tried at its right first (a tall column: above it is the job's title, below it the line keys).
  */
-export const TIPS: Record<TipId, { title: string; text: string; target: string; below?: true; stage?: true; beside?: true }> = {
+export interface Tip {
+  title: string;
+  gist: string;
+  rows?: readonly (readonly [string, string])[];
+  target: string;
+  below?: true;
+  stage?: true;
+  beside?: true;
+}
+
+export const TIPS: Record<TipId, Tip> = {
   approach: {
     title: 'HOW YOU GO IN',
-    text: `Each rolls +1d on its stats: QUIET ${stats('quiet')}, SMOOTH ${stats('smooth')}, HARD ${stats('hard')}. HARD starts at ALARM 1, and TAKE 1 on a job of tier 2 or more. QUIET is never dealt TAKE −1 and picks ALARM +1 first. SMOOTH is never dealt NEXT ROLL SMALL and picks NEXT ROLL WORSE first. HARD is never dealt ALARM +1 and picks TAKE −1 first. You choose from the pitch, before you see the checks.`,
+    gist: 'Pick from the pitch, before you see the checks. Each way rolls +1d on its own stats.',
+    rows: [
+      ['QUIET', `+1d ${stats('quiet')}. Never dealt TAKE −1; picks ALARM +1 first.`],
+      ['SMOOTH', `+1d ${stats('smooth')}. Never dealt NEXT ROLL SMALL; picks NEXT ROLL WORSE first.`],
+      ['HARD', `+1d ${stats('hard')}. Starts at ALARM 1, and TAKE 1 on a job of tier 2 or more. Never dealt ALARM +1; picks TAKE −1 first.`],
+    ],
     target: '.ts-approach',
   },
   people: {
     title: 'WHO YOU BRING',
-    text: `Up to ${MAX_PEOPLE}. A runner, face, ears or muscle plays on a check; a fence plays at the end (TAKE +1, unless you GET OUT). Whoever you bring shares the job's fate.`,
+    gist: `Up to ${MAX_PEOPLE}. Whoever you bring shares the job's fate.`,
+    rows: [
+      ['ON A CHECK', 'A runner, face, ears or muscle.'],
+      ['AT THE END', 'A fence: TAKE +1, unless you GET OUT.'],
+    ],
     target: '.ts-ready',
   },
   favour: {
     title: 'A FAVOUR',
-    text: `+1d once, on any check. Needs the district to know you and its heat under ${FAVOUR_HEAT}; a job that ends BLOWN after you called it costs rep there.`,
+    gist: '+1d once, on any check.',
+    rows: [
+      ['NEEDS', `The district to know you, and its heat under ${FAVOUR_HEAT}.`],
+      ['BLOWN', 'A job that ends BLOWN after you called it costs rep there.'],
+    ],
     target: '.tb-slot[data-id="favour"]',
   },
   contact: {
     title: 'A CONTACT',
-    text: 'A contact who gave you a lead will help on a job, once, in their trade. Blow the job after you play them and they trust you less.',
+    gist: 'A contact who gave you a lead will help on a job, once, in their trade.',
+    rows: [['BLOWN', 'Blow the job after you play them and they trust you less.']],
     target: '.tb-slot[data-id^="contact:"]',
   },
   job: {
     title: 'TWO VOICES',
-    text: "The JOB column holds the job's written text: the pitch, each beat, the ending. It flashes NEW when the job moves on, and a contact on the line speaks in it in cyan. Your contact talks at the right, by their figure, a page at a time: Enter turns it. Scroll up on their line for everything said so far.",
+    gist: 'Words come from two places during a job.',
+    rows: [
+      ['JOB', "The job's written text: the pitch, each beat, the ending. It flashes NEW when the job moves on; a contact on the line speaks here in cyan."],
+      ['THEM', 'Your contact, at the right by their figure, a page at a time. Enter turns the page.'],
+      ['SCROLL UP', 'On their line: everything said so far.'],
+    ],
     target: '.jc',
     stage: true,
     beside: true,
   },
   roll: {
     title: 'THE ROLL',
-    text: 'Roll the dice shown and keep the highest. 6 is clean, 4–5 a pass at a cost, 1–3 a miss. Two 6s is a crit. With no dice you roll two and keep the lowest.',
+    gist: 'Roll the dice shown and keep the highest.',
+    rows: [
+      ['6', 'Clean.'],
+      ['4–5', 'A pass, at a cost.'],
+      ['1–3', 'A miss.'],
+      ['TWO 6s', 'A crit.'],
+      ['NO DICE', 'Roll two and keep the lowest.'],
+    ],
     target: '.tb-card:has(.tb-odds)',
     below: true,
   },
   position: {
     title: 'WHERE YOU STAND',
-    text: `${where('dark')}. ${where('open')}. ${where('wire')}. A miss costs more.`,
+    gist: 'Where you stand sets what a pass at a cost costs. A miss costs more.',
+    rows: [where('dark'), where('open'), where('wire')],
     target: '.tb-card:has(.tb-side-word)',
     below: true,
   },
   effect: {
     title: 'EFFECT',
-    text: `How much a pass fills TAKE: SMALL, FAIR or BIG. BOLD trades a step of safety for more, SAFE the other way, and PUSH can buy a step. Heat ${EFFECT_HEAT} or more, or an outclassed deck, makes it smaller.`,
+    gist: 'How much a pass fills TAKE: SMALL, FAIR or BIG.',
+    rows: [
+      ['BOLD', 'Trades a step of safety for a step more.'],
+      ['SAFE', 'Trades a step more for a step of safety.'],
+      ['PUSH', 'Can buy a step.'],
+      ['SMALLER', `HEAT ${EFFECT_HEAT} or more, or an outclassed deck.`],
+    ],
     target: '.tb-card .tb-eff',
     below: true,
   },
-  take: { title: 'TAKE', text: 'Good rolls fill it. When the job ends, it sets your pay.', target: '.tb-take' },
+  take: { title: 'TAKE', gist: 'Good rolls fill it. When the job ends, it sets your pay.', target: '.tb-take' },
   alarm: {
     title: 'ALARM',
-    text: `Costs fill it. At ${ALARM_SHIFT} every card is one step worse; full at ${ALARM_MAX} means GET OUT.`,
+    gist: 'Costs fill it.',
+    rows: [
+      [`AT ${ALARM_SHIFT}`, 'Every card is one step worse.'],
+      [`FULL · ${ALARM_MAX}`, 'GET OUT.'],
+    ],
     target: '.tb-alarm',
   },
   nerve: {
     title: 'NERVE',
-    text: `PUSH (+1d or a step of effect) costs ${PUSH_NERVE}, an ability ${ABILITY_NERVE}, RESIST up to 2. It refills at 06:00; at 0, no new job tonight.`,
+    gist: 'What you spend to bend a job your way.',
+    rows: [
+      ['PUSH', `${PUSH_NERVE}: +1d, or a step of effect.`],
+      ['ABILITY', `${ABILITY_NERVE}.`],
+      ['RESIST', 'Up to 2.'],
+      ['REFILLS', 'At 06:00. At 0, no new job tonight.'],
+    ],
     target: '.tb-nerve',
   },
   call: {
     title: 'CALL THEM IN',
-    text: 'Lift their card, then pick a choice. On their own stat they move you a step out of danger (+1d if you’re already in the dark); anywhere else +1d. The first call is free; calling them again risks them.',
+    gist: 'Lift their card, then pick a choice.',
+    rows: [
+      ['THEIR STAT', 'A step out of danger (+1d if you’re already in the dark).'],
+      ['ELSEWHERE', '+1d.'],
+      ['AGAIN', 'The first call is free; calling them again risks them.'],
+    ],
     target: '.g-people .tb-slot[data-state="up"]',
   },
   heat: {
     title: 'HEAT',
-    text: `The ALARM you leave with becomes HEAT in the district, and a hot deck adds its own on any job with a grid roll. It cools each morning by your tier there, and a crew errand can lay it low. At ${WARY_HEAT} some jobs there open warier and errands start to slip; at ${EFFECT_HEAT} every roll there is a step smaller and favours stop.`,
+    gist: 'The ALARM you leave with becomes HEAT in the district.',
+    rows: [
+      ['ALSO', 'A hot deck adds its own on any job with a grid roll.'],
+      ['COOLS', 'Each morning, by your tier there. A crew errand can lay it low.'],
+      [`AT ${WARY_HEAT}`, 'Some jobs there open warier, and errands start to slip.'],
+      [`AT ${EFFECT_HEAT}`, 'Every roll there is a step smaller, and favours stop.'],
+    ],
     target: '.tb-alarm',
   },
   program: {
     title: 'PROGRAMS',
-    text: `Your deck has ${SLOTS[1]}, ${SLOTS[2]}, ${SLOTS[3]} or ${SLOTS[4]} slots by its quality. Load programs here, free: they stay loaded for the job. Loading one mid-job costs ${HOT_LOAD_NERVE} NERVE, and below the job's tier the lacquer notices each run: ALARM +1.`,
+    gist: 'Load programs here, free: they stay loaded for the job.',
+    rows: [
+      ['SLOTS', `${SLOTS[1]}, ${SLOTS[2]}, ${SLOTS[3]} or ${SLOTS[4]}, by your deck's quality.`],
+      ['MID-JOB', `Loading one costs ${HOT_LOAD_NERVE} NERVE.`],
+      ['BELOW TIER', "Below the job's tier the lacquer notices each run: ALARM +1."],
+    ],
     target: ".g-deck .tb-slot[data-id^='slot:']",
   },
   tier: {
     title: 'TIER',
-    text: 'From tier 2 the job fights back: every roll fills less TAKE, unless a recruit of the grade named here takes it, or a program runs on a deck of the quality named here.',
+    gist: 'From tier 2 the job fights back: every roll fills less TAKE.',
+    rows: [['UNLESS', 'A recruit of the grade named here takes it, or a program runs on a deck of the quality named here.']],
     target: '.ts-tierline',
   },
   costs: {
     title: 'WHAT IT COSTS',
-    text: 'A costly roll deals what can go wrong. Pick the cost you can live with: the more dangerous the spot, the more you pick. How you went in decides your first pick, if that cost was dealt.',
+    gist: 'A costly roll deals what can go wrong. Pick the cost you can live with.',
+    rows: [
+      ['HOW MANY', 'The more dangerous the spot, the more you pick.'],
+      ['FIRST PICK', 'How you went in decides it, if that cost was dealt.'],
+    ],
     target: '.tb-costs',
   },
   resist: {
     title: 'RESIST',
-    text: 'RESIST always works. Your EDGE dice set the price: a 6 costs nothing, a 4–5 one NERVE, lower two.',
+    gist: 'RESIST always works. Your EDGE dice set the price.',
+    rows: [
+      ['6', 'Costs nothing.'],
+      ['4–5', 'One NERVE.'],
+      ['LOWER', 'Two NERVE.'],
+    ],
     target: '.tb-cost-btn.resist',
   },
-  armour: {
-    title: 'FIREWALL',
-    text: 'FIREWALL cancels one cost, then burns out. Its slot stays full.',
-    target: '.tb-cost-btn.armour',
-  },
+  armour: { title: 'FIREWALL', gist: 'FIREWALL cancels one cost, then burns out. Its slot stays full.', target: '.tb-cost-btn.armour' },
   getaway: {
     title: 'GET OUT',
-    text: "ALARM is full. One roll to get clear; what you've taken is paid at part.",
+    gist: 'ALARM is full. One roll to get clear.',
+    rows: [['PAID', "What you've taken is paid at part."]],
     target: '.tb-deal .tb-card',
   },
   press: {
     title: 'PRESS ON?',
-    text: `Risk what's in hand for more, or walk with it. PRESS ON costs ${PRESS_NERVE} NERVE.`,
+    gist: "Risk what's in hand for more, or walk with it.",
+    rows: [['PRESS ON', `Costs ${PRESS_NERVE} NERVE.`]],
     target: '.tb-card[data-choice="!press"]',
   },
   debrief: {
     title: 'THE DEBRIEF',
-    text: 'How it ended, what your crew got out of it, and what changed in rep and heat.',
+    gist: 'How it ended, what your crew got out of it, and what changed in rep and heat.',
     target: '.tb-debrief',
   },
 };
+
+/** A tip's words in one line (the gist, then each row as LABEL text): for tests and anything that wants it plain. */
+export function tipText(id: TipId): string {
+  const t = TIPS[id];
+  return [t.gist, ...(t.rows ?? []).map(([k, v]) => `${k} ${v}`)].join(' ');
+}
+
+/** The HUD's words in their own colours: ALARM red, TAKE amber, NERVE cyan, HEAT hot (with a number after, if any). */
+const LIT = /\b(ALARM|TAKE|NERVE|HEAT)\b(?: [+−-]?\d+\+?)?/g;
+function litNodes(text: string): Node[] {
+  const out: Node[] = [];
+  let at = 0;
+  for (const m of text.matchAll(LIT)) {
+    if (m.index > at) out.push(document.createTextNode(text.slice(at, m.index)));
+    out.push(el('span', `gt-lit gt-${m[1].toLowerCase()}`, m[0]));
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) out.push(document.createTextNode(text.slice(at)));
+  return out;
+}
+
+/** The box's words: the gist, and the rows as a list of labels and lines. */
+export function tipBody(tip: Tip): HTMLElement[] {
+  const gist = el('p', 'gt-gist');
+  gist.append(...litNodes(tip.gist));
+  if (!tip.rows?.length) return [gist];
+  const dl = el('dl', 'gt-rows');
+  for (const [k, v] of tip.rows) {
+    const dd = el('dd', 'gt-row-text');
+    dd.append(...litNodes(v));
+    dl.append(el('dt', 'gt-label', k), dd);
+  }
+  return [gist, dl];
+}
 
 export interface Tips {
   offer(ids: TipId[], root: HTMLElement): void;
@@ -246,7 +358,7 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
     const ok = el('button', 'gt-ok', 'GOT IT');
     const skip = el('button', 'gt-skip', 'SKIP TIPS');
     ok.type = skip.type = 'button';
-    box.append(el('i', 'gt-arrow'), el('b', 'gt-title', tip.title), el('p', 'gt-text', tip.text), el('div', 'gt-row'));
+    box.append(el('i', 'gt-arrow'), el('b', 'gt-title', tip.title), ...tipBody(tip), el('div', 'gt-row'));
     box.lastElementChild!.append(skip, ok);
     ok.addEventListener('click', () => {
       if (!state.seen.includes(next.id)) state.seen.push(next.id);

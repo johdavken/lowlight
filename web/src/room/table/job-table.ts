@@ -871,7 +871,9 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     pushBtn.hidden = !canPush;
     showPush();
     showTrade();
-    hand.root.hidden = !a.hand;
+    // A blown job waiting on cover (USE BURNER / TAKE IT) plays nothing from the hand: it steps away, as at the debrief,
+    // so the BLOWN preview below the cards has the room (playtest: it ran under the hand).
+    hand.root.hidden = !a.hand || Boolean(a.blown);
     settleFan();
     if (a.hand) {
       hand.show(handGroups(a.hand, (a.nerve?.left ?? 0) - (pushMode ? PUSH_NERVE : 0), progState()), { dealIn: dealtFor !== a.id && !o.reduced() });

@@ -453,10 +453,20 @@
 
 /* Graft tips (tips.ts): one callout at a time, pointing at the piece it explains. Only it takes the pointer. Over the
    table (24), under the full screens (29) and the HUD with SYS (30). */
-.gt-tip { position: absolute; z-index: 26; width: 300px; max-width: calc(100% - 16px); padding: 10px 12px; background: rgba(12, 6, 22, 0.96); border: 1px solid var(--user); box-shadow: 0 0 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(127, 233, 255, 0.25); color: #cfeff7; pointer-events: auto; animation: tb-deal 200ms ease-out both; }
+.gt-tip { position: absolute; z-index: 26; width: 330px; max-width: calc(100% - 16px); padding: 12px 14px 10px; background: rgba(10, 5, 20, 0.97); border: 1px solid var(--user); border-left-width: 3px; box-shadow: 0 0 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(127, 233, 255, 0.25); color: #cfeff7; pointer-events: auto; animation: tb-deal 200ms ease-out both; }
 .gt-tip.strip { left: 16px; right: 16px; bottom: calc(var(--feed-bottom, 70px) + var(--box-h, 216px) + 210px); width: auto; max-width: none; }
-.gt-title { display: block; font: 13px var(--pixel); letter-spacing: 0.16em; color: var(--user); }
-.gt-text { margin: 6px 0 8px; font: 13px/1.45 var(--mono); }
+.gt-title { display: block; font: 22px/1 var(--pixel); letter-spacing: 0.16em; color: var(--user); }
+/* The dossier (mockup tip-boxes.html A, 2026-11-07): one white line that says what it is, then amber labels down the
+   left, like the select screen's file. The HUD's words keep their own colours. */
+.gt-gist { margin: 6px 0 10px; font: 600 14px/1.4 var(--mono); color: #fff; }
+.gt-rows { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 0 0 10px; padding-top: 8px; border-top: 1px solid rgba(127, 233, 255, 0.2); }
+.gt-label { max-width: 96px; font: 15px/1.2 var(--pixel); letter-spacing: 0.12em; color: #ffc56b; }
+.gt-row-text { margin: 0; font: 12.5px/1.42 var(--mono); }
+.gt-lit { white-space: nowrap; }
+.gt-alarm { color: #ff5d6c; }
+.gt-take { color: #ffb347; }
+.gt-nerve { color: var(--user); }
+.gt-heat { color: #ff8a5c; }
 .gt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .gt-ok,
 .gt-skip { font: 12px var(--pixel); letter-spacing: 0.14em; background: none; border: 0; color: #cfeff7; cursor: pointer; padding: 2px 4px; }

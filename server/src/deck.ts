@@ -227,10 +227,12 @@ export function createDeck(deps: DeckDeps): Deck {
         const first = await deps.runtime(contact);
         if (!first) return fail('unknown');
         if (wrongPlace(first)) return fail(wrongWhy);
+        const generation = deps.world.generation?.() ?? 0;
         if (!(await free(first))) return fail('busy');
-        // The world may have moved on while it waited (final review I3, #6): a LOAD, or you walked in on her.
+        // The world may have moved on while it waited (final review I3, #6): a LOAD (in place: same id, new generation),
+        // or you walked in on her.
         const now = deps.world.active();
-        if (!now || now.id !== pt.id) return fail('save-changed');
+        if (!now || now.id !== pt.id || (deps.world.generation?.() ?? 0) !== generation) return fail('save-changed');
         const entry = known().find((k) => k.id === contact);
         const rt = entry ? await deps.runtime(contact) : null;
         if (!entry || !rt) return fail('unknown');

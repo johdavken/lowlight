@@ -84,8 +84,10 @@ function fakeApi() {
     removePlaythrough: vi.fn(async () => undefined),
     rename: vi.fn(async (id: string, name: string) => playthrough({ id, name })),
     renameSave: vi.fn(async (id: string, name: string) => ({ ...saves.find((x) => x.id === id)!, name })),
+    star: vi.fn(async (id: string, on: boolean) => playthrough({ id, ...(on ? { starred: true as const } : {}) })),
+    branchSave: vi.fn(async (_id: string, name: string) => playthrough({ id: 'pt-8', name, location: { contactId: 'nix', sceneId: 'ribbon/noodle-stall' } })),
   } as unknown as PlaythroughApi &
-    Record<'listPlaythroughs' | 'listSaves' | 'activate' | 'loadSave' | 'removeSave' | 'removePlaythrough' | 'rename' | 'renameSave', ReturnType<typeof vi.fn>>;
+    Record<'listPlaythroughs' | 'listSaves' | 'activate' | 'loadSave' | 'removeSave' | 'removePlaythrough' | 'rename' | 'renameSave' | 'star' | 'branchSave', ReturnType<typeof vi.fn>>;
 }
 
 const MAP = { places: [{ id: 'stall', name: 'Noodle stall', scene: 'ribbon/noodle-stall' }, { id: 'apt', name: "Nix's apartment", scene: 'ribbon/nix-apartment' }] };
@@ -143,8 +145,112 @@ describe('load screen', () => {
     expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-1');
     expect(pts().map((p) => p.querySelector('.chip')?.textContent ?? null)).toEqual(['ACTIVE', null, null]);
     expect(pts().map((p) => p.querySelector('.pt-ago')!.textContent)).toEqual(['2h ago', '1d ago', '5d ago']);
-    expect([...document.querySelectorAll('.ld-pts > .ld-acts .ld-btn')].map((b) => b.textContent)).toEqual(['✎ RENAME', '✕ DELETE']);
+    expect([...document.querySelectorAll('.ld-pts > .ld-acts .ld-btn')].map((b) => b.textContent)).toEqual(['☆ STAR', '✎ RENAME', '✕ DELETE']);
     expect(t('.ld-file')).toContain('1 save · 2 auto');
+  });
+
+  /** 3 starred, then 12 more, an hour apart (pt-s0.. then pt-g0..); the newest unstarred is active. */
+  function many(api = fakeApi()) {
+    const starred = [0, 1, 2].map((i) => ({ ...playthrough({ id: `pt-s${i}`, name: `Kept ${i}`, starred: true, updatedAt: NOW - (20 + i) * HOUR }), contacts: 1 }));
+    const rest = Array.from({ length: 12 }, (_, i) => ({ ...playthrough({ id: `pt-g${i}`, name: `Game ${i}`, updatedAt: NOW - i * HOUR }), contacts: 1 }));
+    api.listPlaythroughs.mockResolvedValue({ active: 'pt-g0', playthroughs: [...starred, ...rest] });
+    return api;
+  }
+  const heads = () => [...document.querySelectorAll<HTMLElement>('.load-screen .ld-pts .ld-ghead')].map((h) => h.textContent);
+
+  it('groups the games under ★ KEPT, RECENT and OLDER; OLDER is closed', async () => {
+    await mount(many());
+    // A 10-row window, headers included: the top of the list first.
+    expect(heads()).toEqual(['★ KEPT', 'RECENT']);
+    expect(pts().map((p) => p.dataset.id)).toEqual(['pt-s0', 'pt-s1', 'pt-s2', ...Array.from({ length: 5 }, (_, i) => `pt-g${i}`)]);
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g0');
+    for (let i = 0; i < 8; i++) key('ArrowRight');
+    expect(heads()).toEqual(['RECENT', 'OLDER (4)']);
+    expect(pts().map((p) => p.dataset.id)).not.toContain('pt-g8');
+  });
+
+  it('O opens and closes OLDER; ←→ skips headers and stops on a closed OLDER', async () => {
+    await mount(many());
+    for (let i = 0; i < 7; i++) key('ArrowRight');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g7');
+    key('ArrowRight');
+    expect(q('.ld-pts .pt.on')).toBeNull();
+    expect(q('.ld-pts .ld-ghead.on')!.textContent).toBe('OLDER (4)');
+    expect(t('.ld-saves')).toBe('[O] OPEN OLDER (4)');
+    key('ArrowRight');
+    expect(q('.ld-pts .ld-ghead.on')).not.toBeNull();
+    key('o');
+    // Opened from its stop: on OLDER's first game, and its games are stops now.
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g8');
+    for (let i = 0; i < 3; i++) key('ArrowRight');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g11');
+    for (let i = 0; i < 5; i++) key('ArrowLeft');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g6');
+    for (let i = 0; i < 7; i++) key('ArrowLeft');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-s2');
+    key('O');
+    expect(pts().map((p) => p.dataset.id)).not.toContain('pt-g11');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-s2');
+  });
+
+  it('Enter on a closed OLDER opens it; so does a click on its header', async () => {
+    await mount(many());
+    for (let i = 0; i < 8; i++) key('ArrowRight');
+    key('Enter');
+    expect(pts().map((p) => p.dataset.id)).toContain('pt-g8');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g8');
+    key('o');
+    q('.ld-pts .ld-ghead.ld-older')!.click();
+    expect(pts().map((p) => p.dataset.id)).toContain('pt-g8');
+  });
+
+  it('S stars the selected game and moves it to ★ KEPT; S again unstars (the STAR button too)', async () => {
+    const api = many();
+    api.star.mockImplementation(async (id: string, on: boolean) => ({ ...playthrough({ id, name: 'Game 0', updatedAt: NOW }), ...(on ? { starred: true } : {}) }));
+    await mount(api);
+    key('s');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.star).toHaveBeenLastCalledWith('pt-g0', true);
+    expect(pts()[0]!.dataset.id).toBe('pt-g0');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g0');
+    expect(t('.ld-pts > .ld-acts .ld-star')).toBe('★ UNSTAR');
+    q('.ld-pts > .ld-acts .ld-star')!.click();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.star).toHaveBeenLastCalledWith('pt-g0', false);
+    expect(pts()[0]!.dataset.id).toBe('pt-s0');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g0');
+  });
+
+  it("the first game of a group keeps its group's header in the window", async () => {
+    const api = many();
+    api.star.mockImplementation(async (id: string, on: boolean) => ({ ...playthrough({ id, name: 'Game 9', updatedAt: NOW }), ...(on ? { starred: true } : {}) }));
+    await mount(api);
+    for (let i = 0; i < 8; i++) key('ArrowRight');
+    key('o');
+    key('ArrowRight');
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g9');
+    key('s');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-g9');
+    expect(heads()[0]).toBe('★ KEPT');
+  });
+
+  it('the star tip shows until a game is starred, then never again', async () => {
+    localStorage.removeItem('nix-room.load-star-hint');
+    await mount();
+    expect(t('.load-tip')).toBe('S stars a game you want to keep. The rest fold into OLDER.');
+    key('s');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(t('.load-tip')).toBe('');
+    expect(localStorage.getItem('nix-room.load-star-hint')).toBe('done');
+    handles.splice(0).forEach((h) => h.destroy());
+    await mount();
+    expect(t('.load-tip')).toBe('');
+    localStorage.removeItem('nix-room.load-star-hint');
+    handles.splice(0).forEach((h) => h.destroy());
+    await mount(many());
+    // A game already starred: no tip.
+    expect(t('.load-tip')).toBe('');
   });
 
   it('a fork and a branch say where they came from', async () => {
@@ -241,18 +347,127 @@ describe('load screen', () => {
     expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-2');
   });
 
-  it('Enter on a save: FORK HERE, then loadSave and nav after JACK_MS', async () => {
+  it('Enter on a save: LOAD, then loadSave and nav after JACK_MS', async () => {
     const api = fakeApi();
     const deps = await mount(api);
     key('ArrowDown');
     key('Enter');
     expect(deps.sound).toHaveBeenCalledWith('confirm');
-    expect(t('.jack-in')).toBe('FORK HERE');
+    expect(t('.jack-in')).toBe('LOAD');
     expect(q('.jack-in')!.classList.contains('on')).toBe(true);
     expect(api.loadSave).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(JACK_MS);
     expect(api.loadSave).toHaveBeenCalledWith('s-man');
     expect(deps.nav).toHaveBeenCalledWith('/room/nix');
+  });
+
+  it('B on a save opens the BRANCH prompt with the default name; Enter calls branchSave and goes to the new game', async () => {
+    const api = fakeApi();
+    const deps = await mount(api);
+    key('ArrowDown');
+    key('b');
+    const field = document.querySelector<HTMLInputElement>('.save-card .sc-field')!;
+    expect(document.querySelector('.save-card .sc-title')!.textContent).toBe('BRANCH');
+    // pt-2 is already a branch of pt-1.
+    expect(field.value).toBe('Hicks — Oct 7 — branch 2');
+    // Keys typed in the field don't reach LOAD (s would star).
+    field.value = 'Side road';
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 's', cancelable: true }));
+    expect(api.star).not.toHaveBeenCalled();
+    enterIn(field, 'Enter');
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api.branchSave).toHaveBeenCalledWith('s-man', 'Side road');
+    expect(deps.nav).toHaveBeenCalledWith('/room/nix');
+    expect(document.querySelector('.save-card')).toBeNull();
+  });
+
+  it('B on NOW does nothing', async () => {
+    const api = fakeApi();
+    await mount(api);
+    key('b');
+    expect(document.querySelector('.save-card')).toBeNull();
+  });
+
+  it('Esc in the BRANCH prompt cancels with no call, and LOAD stays', async () => {
+    const api = fakeApi();
+    const deps = await mount(api);
+    key('ArrowDown');
+    key('B');
+    key('Escape');
+    expect(document.querySelector('.save-card')).toBeNull();
+    expect(api.branchSave).not.toHaveBeenCalled();
+    expect(deps.back).not.toHaveBeenCalled();
+    key('ArrowDown');
+    expect(on()).toBe(ids()[2]);
+  });
+
+  it('each branched game shows "branch of <name>" under its name, by the live name; a deleted parent shows forkedFrom.name', async () => {
+    const api = fakeApi();
+    const child = playthrough({ id: 'pt-4', name: 'Side', updatedAt: NOW - 3 * HOUR, forkedFrom: { playthrough: 'pt-gone', save: 's-x', name: 'Old name' } });
+    api.listPlaythroughs.mockResolvedValueOnce({
+      active: 'pt-1',
+      playthroughs: [{ ...active, name: 'Main', contacts: 1 }, { ...truth, contacts: 1 }, { ...child, contacts: 1 }],
+    });
+    await mount(api);
+    const from = (id: string) => q(`.pt[data-id="${id}"] .pt-from`)?.textContent ?? null;
+    expect(from('pt-1')).toBeNull();
+    expect(from('pt-2')).toBe('branch of Main');
+    expect(from('pt-4')).toBe('branch of Old name');
+  });
+
+  describe('DELETE OLDER', () => {
+    function olderApi() {
+      const api = fakeApi();
+      const rest = Array.from({ length: 12 }, (_, i) => ({ ...playthrough({ id: `pt-g${i}`, name: `Game ${i}`, updatedAt: NOW - i * HOUR }), contacts: 1 }));
+      api.listPlaythroughs.mockResolvedValue({ active: 'pt-g0', playthroughs: rest });
+      return api;
+    }
+
+    it('asks, then deletes each OLDER game in turn', async () => {
+      const api = olderApi();
+      await mount(api);
+      expect(q('.ld-delete-older')).toBeNull();
+      for (let i = 0; i < 8; i++) key('ArrowRight');
+      key('o');
+      q('.ld-delete-older')!.click();
+      expect(t('.load-under')).toContain('DELETE 4 OLDER GAMES? Starred and recent ones stay.');
+      q('.load-under .ld-no')!.click();
+      expect(api.removePlaythrough).not.toHaveBeenCalled();
+      q('.ld-delete-older')!.click();
+      q('.load-under .ld-yes')!.click();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.removePlaythrough.mock.calls.map((c) => c[0])).toEqual(['pt-g8', 'pt-g9', 'pt-g10', 'pt-g11']);
+      expect(q('.ld-ghead.ld-older')).toBeNull();
+      expect(pts().map((p) => p.dataset.id)).toHaveLength(8);
+    });
+
+    it('closing OLDER while DELETE OLDER asks calls the question off: a stray y deletes nothing', async () => {
+      const api = olderApi();
+      await mount(api);
+      for (let i = 0; i < 8; i++) key('ArrowRight');
+      key('o');
+      q('.ld-delete-older')!.click();
+      expect(t('.load-under')).toContain('DELETE 4 OLDER GAMES?');
+      q('.ld-ghead.ld-older')!.click();
+      key('y');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.removePlaythrough).not.toHaveBeenCalled();
+      expect(t('.load-under')).not.toContain('DELETE 4 OLDER GAMES?');
+    });
+
+    it('stops at the first failure and says which', async () => {
+      const api = olderApi();
+      api.removePlaythrough.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new ApiError(500, 'disk'));
+      await mount(api);
+      for (let i = 0; i < 8; i++) key('ArrowRight');
+      key('o');
+      q('.ld-delete-older')!.click();
+      key('y');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(api.removePlaythrough).toHaveBeenCalledTimes(2);
+      expect(t('.load-error')).toBe("// COULDN'T DELETE Game 9 — disk");
+      expect(q('.ld-ghead.ld-older')!.firstChild!.textContent).toBe('OLDER (3)');
+    });
   });
 
   it('Enter on NOW of a non-active playthrough: JACK IN, activate, then its room', async () => {
@@ -503,6 +718,7 @@ describe('load screen', () => {
       playthroughs: Array.from({ length: 25 }, (_, i) => ({ ...playthrough({ id: `p${i}`, name: `Run ${i}`, updatedAt: NOW - i * HOUR }), contacts: 1 })),
     });
     await mount(api);
+    key('o');
     for (let i = 0; i < 20; i++) key('ArrowRight');
     await vi.advanceTimersByTimeAsync(0);
     expect(q('.ld-pts .pt.on')!.dataset.id).toBe('p20');

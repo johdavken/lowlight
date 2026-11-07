@@ -771,6 +771,8 @@ export interface PlaythroughInfo {
   outages?: Outage[];
   /** Walked out on their own (go solo): between scenes, with no one. `location` still names the last contact's room. Absent: with someone. */
   solo?: boolean;
+  /** Starred on LOAD (★ KEPT): a game you want to keep track of. Absent: not starred. */
+  starred?: true;
   /** The outfit the player wears (the YOU sheet's wardrobe), one of their character's outfits. Absent: the plain sprite. */
   outfit?: string;
   /** Contact id → the outfit picked for her on PEOPLE → FILE, worn everywhere; a contact not listed is dressed by her room (`outfitByScene`). */
@@ -826,7 +828,8 @@ export interface ContactEntry {
   sceneOutfit?: string;
 }
 
-export type SaveTrigger = 'manual' | 'end' | 'travel' | 'rewind';
+/** `load`: BEFORE LOAD, where you were just before a load (load in place spec §2). */
+export type SaveTrigger = 'manual' | 'end' | 'travel' | 'rewind' | 'load';
 
 /** A snapshot of a playthrough: manual (named, kept) or an automatic checkpoint (pruned). */
 export interface SaveInfo {

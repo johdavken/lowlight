@@ -135,6 +135,44 @@ describe('checkpoints', () => {
     expect(saves().some((x) => x.trigger === 'end')).toBe(false);
   });
 
+  it('END then LOAD before the Residual answers: the delayed end save never lands in the loaded game (load in place review I2)', async () => {
+    const { built, pt, rt, saves, ws, or } = await start();
+    const keep = built.playthroughs.save(pt.id, { kind: 'manual', trigger: 'manual', name: 'Keep', location: null, timeOfDay: null, participants: [], lastLine: null }, new Map());
+    if (keep === 'unchanged') throw new Error('expected a save');
+    or.residual.delayMs = 1_500;
+    const s = await socket(`${ws}/ws/nix`);
+    await until(() => !rt.relay.busy);
+    s.send({ type: 'user_message', text: '', mode: 'end' });
+    await until(() => rt.db.recentMessages(pt.player).some((m) => m.role === 'agent' && m.mode === 'end' && m.status === 'ok') && !rt.relay.busy);
+    // Straight to the world (the route would wait for the Residual first): the load lands while it still runs.
+    expect('busy' in built.world.load(keep.id)).toBe(false);
+    await new Promise((r) => setTimeout(r, 2_500));
+    expect(saves().map((x) => x.trigger)).toEqual(['load', 'manual']);
+  });
+
+  it('the load route waits for a running Residual, so BEFORE LOAD holds its bookkeeping (load in place review I1)', async () => {
+    const { built, cfg, pt, rt, saves, ws, or } = await start();
+    const keep = built.playthroughs.save(pt.id, { kind: 'manual', trigger: 'manual', name: 'Keep', location: null, timeOfDay: null, participants: [], lastLine: null }, new Map());
+    if (keep === 'unchanged') throw new Error('expected a save');
+    or.residual.json = { choices: [{ message: { content: '{"notes":[],"recap":"Held for BEFORE LOAD."}' } }] };
+    or.residual.delayMs = 800;
+    const s = await socket(`${ws}/ws/nix`);
+    await until(() => !rt.relay.busy);
+    const n = rt.db.recentMessages(pt.player).filter((m) => m.role === 'agent' && m.status === 'ok').length;
+    s.send({ type: 'user_message', text: 'hello' });
+    await until(() => rt.db.recentMessages(pt.player).filter((m) => m.role === 'agent' && m.status === 'ok').length === n + 1 && !rt.relay.busy);
+    const r = await built.app.inject({ method: 'POST', url: `/api/saves/${keep.id}/load`, headers: { origin: 'http://localhost:5173' } });
+    expect(r.statusCode).toBe(200);
+    const before = saves().find((x) => x.trigger === 'load')!;
+    const copy = new DatabaseSync(saveDb(cfg, pt.id, before.id), { readOnly: true });
+    try {
+      const row = copy.prepare('SELECT v FROM meta WHERE k = ?').get(`recap.${pt.player}.text`) as { v: string } | undefined;
+      expect(row?.v).toBe('Held for BEFORE LOAD.');
+    } finally {
+      copy.close();
+    }
+  });
+
   it('map travel checkpoints the room you left', async () => {
     const { rt, saves, ws } = await start();
     const s = await socket(`${ws}/ws/nix`);

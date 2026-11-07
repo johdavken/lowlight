@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createPlaythroughs, type LiveDbs, type SaveRequest } from '../src/playthroughs';
+import type { SaveInfo } from '../../shared/types';
 import { tempDir } from './fixtures/temp-dir';
 
 const NOW = new Date(2026, 9, 7, 21, 40).getTime();
@@ -215,6 +216,265 @@ describe('playthroughs', () => {
     for (const gone of cps.slice(0, 5)) expect(names).not.toContain((gone as { name: string }).name);
     expect(names).toContain('c5');
     expect(names[0]).toBe('c14');
+  });
+
+  it('a load checkpoint is written even when nothing changed', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const cp = req({ kind: 'checkpoint', trigger: 'load', name: 'Before loading x' });
+    expect(pts.save(pt.id, cp, fakeDbs({ nix: [4, 1] }))).not.toBe('unchanged');
+    expect(pts.save(pt.id, cp, fakeDbs({ nix: [4, 1] }))).not.toBe('unchanged');
+    expect(pts.saves(pt.id)).toHaveLength(2);
+  });
+
+  it('keeps 3 load checkpoints, outside the cap of 10', () => {
+    let t = NOW;
+    const { pts } = make({ now: () => t });
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    for (let i = 0; i < 12; i++) {
+      t += 1000;
+      pts.save(pt.id, req({ kind: 'checkpoint', trigger: 'travel', name: `t${i}` }), fakeDbs({ nix: [i + 1, 0] }));
+      if (i % 3 === 0 || i === 11) {
+        t += 1000;
+        pts.save(pt.id, req({ kind: 'checkpoint', trigger: 'load', name: `l${i}` }), fakeDbs({ nix: [i + 1, 0] }));
+      }
+    }
+    const all = pts.saves(pt.id);
+    expect(all.filter((s) => s.trigger === 'travel')).toHaveLength(10);
+    expect(all.filter((s) => s.trigger === 'load').map((s) => s.name)).toEqual(['l11', 'l9', 'l6']);
+  });
+
+  it('11 travel checkpoints never prune a load one', () => {
+    let t = NOW;
+    const { pts } = make({ now: () => t });
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    pts.save(pt.id, req({ kind: 'checkpoint', trigger: 'load', name: 'kept' }), fakeDbs({ nix: [0, 0] }));
+    for (let i = 0; i < 11; i++) {
+      t += 1000;
+      pts.save(pt.id, req({ kind: 'checkpoint', trigger: 'travel', name: `t${i}` }), fakeDbs({ nix: [i + 1, 0] }));
+    }
+    expect(pts.saves(pt.id).map((s) => s.name)).toContain('kept');
+  });
+
+  it('keep protects the save being loaded from the load cap', () => {
+    let t = NOW;
+    const { pts } = make({ now: () => t });
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const load = (name: string, keep?: string) => {
+      t += 1000;
+      return pts.save(pt.id, req({ kind: 'checkpoint', trigger: 'load', name }), fakeDbs({ nix: [1, 0] }), keep) as { id: string };
+    };
+    const oldest = load('l0');
+    load('l1');
+    load('l2');
+    load('l3', oldest.id);
+    expect(pts.saves(pt.id).map((s) => s.name)).toEqual(['l3', 'l2', 'l1', 'l0']);
+    load('l4');
+    expect(pts.saves(pt.id).map((s) => s.name)).toEqual(['l4', 'l3', 'l2']);
+  });
+
+  it('setStarred sets and clears; updatedAt stays', () => {
+    let t = NOW;
+    const { pts } = make({ now: () => t });
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    t += 5000;
+    pts.setStarred(pt.id, true);
+    expect(pts.get(pt.id)!.starred).toBe(true);
+    expect(pts.get(pt.id)!.updatedAt).toBe(NOW);
+    pts.setStarred(pt.id, false);
+    expect('starred' in pts.get(pt.id)!).toBe(false);
+  });
+
+  it('fork takes the given name', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const s = pts.save(pt.id, req({ name: 'Keep' }), fakeDbs({ nix: [1, 1] })) as { id: string };
+    const f = pts.fork(s.id, 'Main — branch 2');
+    expect(f.name).toBe('Main — branch 2');
+    expect(f.forkedFrom).toMatchObject({ playthrough: pt.id, save: s.id, name: 'Keep' });
+  });
+
+  describe('restore (load in place)', () => {
+    /** A game with save A (nix:a), then story moved on: save B (nix:b), an outfit, a star, a new name, cass met. */
+    function moved() {
+      let t = NOW;
+      const m = make({ now: () => t });
+      const { pts } = m;
+      const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+      fs.mkdirSync(path.join(pts.charsDir(pt.id), 'nix'), { recursive: true });
+      fs.writeFileSync(path.join(pts.charsDir(pt.id), 'nix', 'identity.md'), 'override at A');
+      t += 1000;
+      const a = pts.save(pt.id, req({ name: 'A', location: { contactId: 'nix', sceneId: 'karasu/noodle-stall' } }), fakeDbs({ nix: [1, 0] }, 'a')) as SaveInfo;
+      fs.writeFileSync(path.join(pts.charsDir(pt.id), 'nix', 'identity.md'), 'override later');
+      fs.writeFileSync(path.join(pts.charsDir(pt.id), 'nix', 'room.db'), 'live');
+      fs.mkdirSync(path.join(pts.charsDir(pt.id), 'cass'), { recursive: true });
+      fs.writeFileSync(path.join(pts.charsDir(pt.id), 'cass', 'room.db'), 'cass live');
+      pts.touch(pt.id, { contactId: 'cass', sceneId: 'karasu/rooftop' });
+      pts.setOutfit(pt.id, 'home');
+      pts.setStarred(pt.id, true);
+      pts.rename(pt.id, 'Main');
+      t += 1000;
+      const b = pts.save(pt.id, req({ name: 'B' }), fakeDbs({ nix: [2, 0] }, 'b')) as SaveInfo;
+      t += 1000;
+      return { ...m, pt, a, b, later: () => (t += 1000) };
+    }
+    const read = (f: string) => fs.readFileSync(f, 'utf8');
+
+    it('restore puts the game back to the save', () => {
+      const { pts, pt, a, b } = moved();
+      const before = pts.get(pt.id)!;
+      const r = pts.restore(a.id);
+      expect(read(path.join(pts.charsDir(pt.id), 'nix', 'room.db'))).toBe('nix:a');
+      expect(r).toEqual(pts.get(pt.id));
+      expect(r).toMatchObject({ id: pt.id, name: 'Main', createdAt: before.createdAt, forkedFrom: null, seed: before.seed, starred: true });
+      expect(r.location).toEqual({ contactId: 'nix', sceneId: 'karasu/noodle-stall' });
+      expect('outfit' in r).toBe(false);
+      expect(r.updatedAt).toBeGreaterThan(before.updatedAt);
+      expect(pts.saves(pt.id).map((s) => s.id)).toEqual([b.id, a.id]);
+    });
+
+    it('restore drops contacts met after the save', () => {
+      const { pts, pt, a } = moved();
+      pts.restore(a.id);
+      expect(fs.existsSync(path.join(pts.charsDir(pt.id), 'cass'))).toBe(false);
+    });
+
+    it('restore copies identity overrides from the save', () => {
+      const { pts, pt, a } = moved();
+      pts.restore(a.id);
+      expect(read(path.join(pts.charsDir(pt.id), 'nix', 'identity.md'))).toBe('override at A');
+    });
+
+    it('restore clears story fields the snapshot lacks', () => {
+      const { pts, pt, a } = moved();
+      pts.setOutages(pt.id, [{ contact: 'nix', from: 1, to: 2, by: 'narrator' } as never]);
+      pts.setContactOutfit(pt.id, 'nix', 'work');
+      pts.setSolo(pt.id, true);
+      pts.setClockFloor(pt.id, 900);
+      const live = JSON.parse(read(path.join(pts.charsDir(pt.id), '..', 'playthrough.json')));
+      live.persona = { name: 'Later', bio: 'x', facts: [] };
+      fs.writeFileSync(path.join(pts.charsDir(pt.id), '..', 'playthrough.json'), JSON.stringify(live));
+      const r = pts.restore(a.id);
+      for (const k of ['outages', 'contactOutfits', 'solo', 'persona', 'clockFloor', 'outfit']) expect(k in r, k).toBe(false);
+    });
+
+    it('restore takes solo from the save', () => {
+      const { pts, pt } = moved();
+      const s = pts.save(pt.id, req({ name: 'solo one', solo: true }), fakeDbs({ nix: [3, 0] })) as SaveInfo;
+      pts.setSolo(pt.id, false);
+      expect(pts.restore(s.id).solo).toBe(true);
+    });
+
+    it('restore of an unknown save throws and changes nothing', () => {
+      const { pts, pt } = moved();
+      const before = pts.get(pt.id);
+      expect(() => pts.restore('sv-20261007-zzzz')).toThrow(/no save/);
+      expect(pts.get(pt.id)).toEqual(before);
+      expect(read(path.join(pts.charsDir(pt.id), 'nix', 'room.db'))).toBe('live');
+    });
+
+    it('a rename that fails mid-swap rolls back in place, whichever rename it is', () => {
+      for (const failing of [1, 2, 3]) {
+        const { pts, pt, a } = moved();
+        const d = path.join(pts.charsDir(pt.id), '..');
+        const real = fs.renameSync;
+        let n = 0;
+        const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+          if (++n === failing) throw Object.assign(new Error('EINVAL busy'), { code: 'EINVAL' });
+          return real(from, to);
+        });
+        try {
+          expect(() => pts.restore(a.id), `rename ${failing}`).toThrow('EINVAL busy');
+        } finally {
+          spy.mockRestore();
+        }
+        expect(read(path.join(d, 'chars', 'nix', 'room.db')), `rename ${failing}`).toBe('live');
+        expect(pts.get(pt.id)!.name, `rename ${failing}`).toBe('Main');
+        expect(fs.existsSync(path.join(d, 'chars.old')), `rename ${failing}`).toBe(false);
+        expect(fs.existsSync(path.join(d, 'restore.tmp')), `rename ${failing}`).toBe(false);
+      }
+    });
+
+    it('a busy rename (EPERM, EBUSY) is tried again before the restore gives up', () => {
+      const { pts, pt, a } = moved();
+      const real = fs.renameSync;
+      let n = 0;
+      const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (++n <= 2) throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' });
+        return real(from, to);
+      });
+      try {
+        pts.restore(a.id);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(read(path.join(pts.charsDir(pt.id), 'nix', 'room.db'))).toBe('nix:a');
+    });
+
+    it('a cleanup that fails after the swap still counts as loaded', () => {
+      const { pts, pt, a } = moved();
+      const real = fs.rmSync;
+      const spy = vi.spyOn(fs, 'rmSync').mockImplementation((p, o) => {
+        if (String(p).endsWith('chars.old')) throw new Error('EPERM');
+        return real(p, o);
+      });
+      try {
+        expect(pts.restore(a.id).id).toBe(pt.id);
+      } finally {
+        spy.mockRestore();
+      }
+      expect(read(path.join(pts.charsDir(pt.id), 'nix', 'room.db'))).toBe('nix:a');
+    });
+
+    it('a game whose unfinished load cannot be put right is warned about; the rest still open', () => {
+      const { root, pts } = make();
+      const bad = pts.create({ player: 'hicks', startContact: 'nix' });
+      const good = pts.create({ player: 'hicks', startContact: 'nix' });
+      fs.renameSync(path.join(root, bad.id, 'chars'), path.join(root, bad.id, 'chars.old'));
+      const real = fs.renameSync;
+      const spy = vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+        if (String(from).includes(bad.id) && String(from).endsWith('chars.old')) throw Object.assign(new Error('EINVAL locked'), { code: 'EINVAL' });
+        return real(from, to);
+      });
+      const warn = vi.fn();
+      try {
+        const again = createPlaythroughs(root, () => NOW, () => 'zzzz', warn);
+        expect(again.get(good.id)).not.toBeNull();
+      } finally {
+        spy.mockRestore();
+      }
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining(`playthrough ${bad.id}: an unfinished load couldn't be put right`));
+    });
+
+    it('a swap interrupted at each step is finished or rolled back on open', () => {
+      const states: { name: string; build: (d: string) => void; expect: 'old' | 'new' }[] = [
+        { name: 'staging only', expect: 'old', build: (d) => stage(d) },
+        { name: 'chars moved aside, staged not in', expect: 'old', build: (d) => { stage(d); fs.renameSync(path.join(d, 'chars'), path.join(d, 'chars.old')); } },
+        { name: 'chars in, json staged', expect: 'new', build: (d) => { stage(d); fs.renameSync(path.join(d, 'chars'), path.join(d, 'chars.old')); fs.renameSync(path.join(d, 'restore.tmp', 'chars'), path.join(d, 'chars')); } },
+        { name: 'chars moved aside, an empty chars/ made since, staged not in', expect: 'old', build: (d) => { stage(d); fs.renameSync(path.join(d, 'chars'), path.join(d, 'chars.old')); fs.mkdirSync(path.join(d, 'chars', 'nix'), { recursive: true }); fs.writeFileSync(path.join(d, 'chars', 'nix', 'room.db'), 'empty'); } },
+        { name: 'both in, old left', expect: 'new', build: (d) => { stage(d); fs.renameSync(path.join(d, 'chars'), path.join(d, 'chars.old')); fs.renameSync(path.join(d, 'restore.tmp', 'chars'), path.join(d, 'chars')); fs.renameSync(path.join(d, 'restore.tmp', 'playthrough.json'), path.join(d, 'playthrough.json')); fs.rmSync(path.join(d, 'restore.tmp'), { recursive: true }); } },
+      ];
+      function stage(d: string) {
+        fs.mkdirSync(path.join(d, 'restore.tmp', 'chars', 'nix'), { recursive: true });
+        fs.writeFileSync(path.join(d, 'restore.tmp', 'chars', 'nix', 'room.db'), 'new');
+        const info = JSON.parse(read(path.join(d, 'playthrough.json')));
+        fs.writeFileSync(path.join(d, 'restore.tmp', 'playthrough.json'), JSON.stringify({ ...info, name: 'NEW' }));
+      }
+      for (const st of states) {
+        const { root, pts } = make();
+        const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+        const d = path.join(root, pt.id);
+        fs.mkdirSync(path.join(d, 'chars', 'nix'), { recursive: true });
+        fs.writeFileSync(path.join(d, 'chars', 'nix', 'room.db'), 'old');
+        st.build(d);
+        const again = createPlaythroughs(root, () => NOW, () => 'zzzz', () => {});
+        const db = read(path.join(d, 'chars', 'nix', 'room.db'));
+        const name = again.get(pt.id)!.name;
+        expect([db, name], st.name).toEqual(st.expect === 'old' ? ['old', pt.name] : ['new', 'NEW']);
+        expect(fs.existsSync(path.join(d, 'chars.old')), st.name).toBe(false);
+        expect(fs.existsSync(path.join(d, 'restore.tmp')), st.name).toBe(false);
+      }
+    });
   });
 
   it('failed copy removes the half-written save', () => {

@@ -1,6 +1,6 @@
 # Licensing audit
 
-An audit of everything Lowlight ships, made on 2026-10-23 before the SillyTavern package goes public and before Lowlight itself is open-sourced. Updated 2026-10-29: ElevenLabs takes and CC0 Glitch Noises files replaced every Sonniss, Bleeoop and JDSherbert sound (8b937cff to 9257d3af), so nothing restricted ships any more, and the public repo is exported from the private one. The sources are `sounds/CREDITS.md`, the image masters in `art/`, `node_modules`, and the git history.
+An audit of everything Lowlight ships, made on 2026-10-23 before the SillyTavern package goes public and before Lowlight itself is open-sourced. Updated 2026-10-29: ElevenLabs takes and CC0 Glitch Noises files replaced every Sonniss, Bleeoop and JDSherbert sound (5b68454b to 3fdecb32), so nothing restricted ships any more, and the public repo is exported from the private one. The sources are `sounds/CREDITS.md`, the image masters in `art/`, `node_modules`, and the git history.
 
 ## Decisions (Farban, 2026-10-23)
 
@@ -58,7 +58,7 @@ Since 2026-10-28 every shipped sound is CC0, generated on ElevenLabs, or a Suno 
 
 ## Appendix: every audio file
 
-Regenerated 2026-10-28 from `sounds/CREDITS.md` and the export's `audioStatus`, after the last restricted sounds were replaced (9257d3af).
+Regenerated 2026-10-28 from `sounds/CREDITS.md` and the export's `audioStatus`, after the last restricted sounds were replaced (3fdecb32).
 
 | Status | Files |
 |---|---|

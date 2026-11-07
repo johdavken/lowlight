@@ -58,9 +58,9 @@ async function threeReplies(page: Page): Promise<string> {
   return first;
 }
 
-/** Opens the archive and clicks `label` on line `id` (accepting its confirm). */
+/** Opens the archive and clicks `label` on line `id` (accepting its confirm, for one that asks). */
 async function archiveControl(page: Page, id: string, label: string): Promise<void> {
-  page.once('dialog', (d) => void d.accept());
+  if (label !== 'BRANCH HERE') page.once('dialog', (d) => void d.accept());
   await page.locator('textarea').first().focus();
   await page.keyboard.press('PageUp');
   const line = page.locator(`.msg[data-id="${id}"]`);
@@ -83,7 +83,13 @@ test('branch from an early line', async ({ page }) => {
   const original = await activeId(page);
 
   await archiveControl(page, first, 'BRANCH HERE');
-  await expect(page.locator('.feed-notice')).toContainText('// BRANCHED — ', { timeout: 10_000 });
+  // BRANCH HERE asks for a name first (load in place §3), starting from `<game> — branch N`.
+  const field = page.locator('.save-card .sc-field');
+  await expect(field).toBeFocused();
+  await expect(field).toHaveValue(/ — branch \d+$/);
+  await field.fill('Branch e2e');
+  await field.press('Enter');
+  await expect(page.locator('.feed-notice')).toContainText('// BRANCHED — Branch e2e', { timeout: 10_000 });
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   const branch = await activeId(page);
   expect(branch).not.toBe(original);
@@ -99,8 +105,9 @@ test('branch from an early line', async ({ page }) => {
   expect(pts.find((p) => p.id === branch)!.forkedFrom).toMatchObject({ playthrough: original, message: { contactId: DIRECT.id, messageId: first } });
   await toTitle(page);
   await pickTitle(page, 'load');
-  // The branch is the newest, so selected: its file says where it came from.
+  // The branch is active, so selected: its file and its row say where it came from.
+  const originalName = pts.find((p) => p.id === original)!.name;
   await expect(page.locator(`.load-screen .pt[data-id="${branch}"]`)).toBeVisible();
-  await expect(page.locator(`.load-screen .pt[data-id="${original}"]`)).toBeVisible();
+  await expect(page.locator(`.load-screen .pt[data-id="${branch}"] .pt-from`)).toHaveText(`branch of ${originalName}`);
   await expect(page.locator('.load-screen .ld-from')).toContainText('branched from');
 });

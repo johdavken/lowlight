@@ -44,12 +44,16 @@ export const listSaves = (id: string) => call<SaveInfo[]>('GET', `${pt(id)}/save
 /** A manual save; from a contact's room (`contactId`), it's at her room and the playthrough moves there. */
 export const saveNow = (id: string, name: string, contactId?: string) =>
   call<SaveInfo>('POST', `${pt(id)}/saves`, contactId === undefined ? { name } : { name, contactId });
-/** Forks the save into a new playthrough, now active. */
+/** LOAD: the save's playthrough goes back to it, now active (load in place). */
 export const loadSave = (saveId: string) => call<PlaythroughInfo>('POST', `${save(saveId)}/load`);
+/** B on a save: a copy of it as a new playthrough named `name`, now active. */
+export const branchSave = (saveId: string, name: string) => call<PlaythroughInfo>('POST', `${save(saveId)}/branch`, { name });
+/** ★ on LOAD: stars or unstars a playthrough. */
+export const star = (id: string, on: boolean) => call<PlaythroughInfo>('PATCH', pt(id), { starred: on });
 export const removeSave = (saveId: string) => call<void>('DELETE', save(saveId));
 export const renameSave = (saveId: string, name: string) => call<SaveInfo>('PATCH', save(saveId), { name });
 /** BRANCH HERE: the story from this line of `contactId`'s chat, as a new playthrough, now active. */
-export const branchFrom = (contactId: string, messageId: string) => call<PlaythroughInfo>('POST', '/api/branch', { contactId, messageId });
+export const branchFrom = (contactId: string, messageId: string, name: string) => call<PlaythroughInfo>('POST', '/api/branch', { contactId, messageId, name });
 /** The contacts the player knows in the active playthrough (§7). */
 export const contacts = () => call<ContactEntry[]>('GET', '/api/playthroughs/active/contacts');
 export const leads = () => call<LeadView[]>('GET', '/api/playthroughs/active/leads');

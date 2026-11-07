@@ -283,7 +283,7 @@ describe('crew across rewind and branch', () => {
     // Whatever the roll (it's seeded by the playthrough id), after the landing the send has happened.
     expect(s.built.world.kitOf(s.pt.player, 1200 + 5 * 60)!.crew.members[0].log).toHaveLength(1);
     s.db.close();
-    const r = s.built.world.branch('nix', 'n10');
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     const m = s.built.world.kitOf(s.pt.player, 1200 + 5 * 60)!.crew.members[0];
     expect(m).toMatchObject({ state: 'ready', log: [] });
@@ -293,7 +293,7 @@ describe('crew across rewind and branch', () => {
     const s = await start();
     hireThenSend(s.db, s.pt.player);
     s.db.close();
-    const r = s.built.world.branch('nix', 'n30');
+    const r = s.built.world.branch('nix', 'n30', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     expect(s.built.world.kitOf(s.pt.player, 1200 + 5 * 60)!.crew.members.map((m) => m.recruit.id)).toEqual(['r-juno']);
   });

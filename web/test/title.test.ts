@@ -123,12 +123,34 @@ describe('title menu', () => {
     key('ArrowRight');
     expect(focused()).toBe('load');
     expect(deps.sound).toHaveBeenCalledWith('move');
-    expect(under()).toBe('2 PLAYTHROUGHS');
-    expect(p1('.dh')).toBe('// PLAYTHROUGHS');
-    expect([...document.querySelectorAll('.title-menu .fighter.p1 .pt b')].map((b) => b.textContent)).toEqual(['Hicks — Oct 7', 'Imported – cass']);
+    expect(under()).toBe('2 GAMES');
     key('Enter');
     expect(deps.onLoad).toHaveBeenCalledTimes(1);
     expect(deps.onNewGame).not.toHaveBeenCalled();
+  });
+
+  it('on LOAD the card lists starred games and the count, not every game', async () => {
+    const others = [
+      playthrough({ id: 'pt-2', name: 'Main Rue Game', starred: true }),
+      playthrough({ id: 'pt-3', name: 'Soren run', starred: true }),
+      playthrough({ id: 'pt-4', name: 'Test one' }),
+      playthrough({ id: 'pt-5', name: 'Test two' }),
+      playthrough({ id: 'pt-6', name: 'Test three' }),
+    ];
+    await mount(fakeApi({ others }));
+    key('ArrowRight');
+    expect(under()).toBe('5 GAMES');
+    expect(p1('.dh')).toBe('// KEPT');
+    expect([...document.querySelectorAll('.title-menu .fighter.p1 .pt b')].map((b) => b.textContent)).toEqual(['Main Rue Game', 'Soren run']);
+    expect(p2('.dh')).toBe('// HOW LOAD WORKS');
+    expect(text('.fighter.p2')).toContain('Loading goes back to the save. Where you were is kept as BEFORE LOAD.');
+  });
+
+  it('with none starred, the LOAD card says how to star', async () => {
+    await mount(fakeApi({ others: [playthrough(), playthrough({ id: 'pt-2', name: 'Imported – cass' })] }));
+    key('ArrowRight');
+    expect(document.querySelectorAll('.title-menu .fighter.p1 .pt')).toHaveLength(0);
+    expect(text('.fighter.p1')).toContain('S on LOAD stars a game you want to keep');
   });
 
   it('all four tiles fit the band at once: REPORT A BUG is never cut off', async () => {

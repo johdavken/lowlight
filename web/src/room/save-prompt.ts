@@ -57,21 +57,26 @@ export function openSavePrompt(
     onClose?(): void;
     snapshot?: SaveSnapshot;
     reducedMotion?: boolean;
+    /** The card's title (default SAVE); BRANCH HERE and B on LOAD name a branch with it. */
+    title?: string;
+    /** The word on Enter in the hint (default SAVE). */
+    action?: string;
   },
 ): void {
   const box = el('div', 'save-card');
   if (!o.reducedMotion) box.classList.add('sc-glitch-in');
   box.setAttribute('role', 'dialog');
-  box.setAttribute('aria-label', 'Save');
+  const title = o.title ?? 'SAVE';
+  box.setAttribute('aria-label', title.charAt(0) + title.slice(1).toLowerCase());
   const field = el('input', 'sc-field');
   field.type = 'text';
   field.maxLength = NAME_MAX;
   field.value = o.defaultName;
-  field.setAttribute('aria-label', 'Save name');
+  field.setAttribute('aria-label', `${title.charAt(0) + title.slice(1).toLowerCase()} name`);
   const error = el('div', 'error');
   const body = el('div', 'sc-body');
   const s = o.snapshot;
-  body.append(el('div', 'sc-title', 'SAVE'));
+  body.append(el('div', 'sc-title', title));
   if (s) {
     const meta = [s.place, s.time, s.them ? `with ${s.withName}` : null].filter(Boolean).join(' · ');
     const strip = saveStrip({ scene: s.scene, you: s.you, them: s.them, name: field.value, meta });
@@ -81,7 +86,7 @@ export function openSavePrompt(
     field.addEventListener('input', () => (name.textContent = field.value));
     body.append(strip);
   }
-  body.append(field, error, el('div', 'sc-hint', '[ENTER] SAVE · [ESC] CANCEL'));
+  body.append(field, error, el('div', 'sc-hint', `[ENTER] ${o.action ?? 'SAVE'} · [ESC] CANCEL`));
   box.append(body, el('div', 'sc-scan'));
   host.append(box);
   field.focus();

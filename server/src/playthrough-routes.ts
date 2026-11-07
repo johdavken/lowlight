@@ -73,11 +73,16 @@ export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pt
     return 'busy' in r ? busy(reply, r.busy) : r;
   });
 
+  // RENAME and ★ STAR (load in place spec §4): either or both.
   app.patch<{ Params: { id: string } }>('/api/playthroughs/:id', sameOrigin, async (req, reply) => {
-    const name = cleanName(field(req.body, 'name'));
+    const rawName = field(req.body, 'name');
+    const starred = field(req.body, 'starred');
+    if ((rawName === undefined && starred === undefined) || (starred !== undefined && typeof starred !== 'boolean')) return reply.code(400).send({ error: 'bad-request' });
+    const name = rawName === undefined ? undefined : cleanName(rawName);
     if (name === null) return reply.code(400).send({ error: 'bad-name' });
     if (!pts.get(req.params.id)) return notFound(reply);
-    pts.rename(req.params.id, name);
+    if (name !== undefined) pts.rename(req.params.id, name);
+    if (starred !== undefined) pts.setStarred(req.params.id, starred);
     return pts.get(req.params.id);
   });
 
@@ -106,11 +111,23 @@ export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pt
     return 'busy' in saved ? busy(reply, saved.busy) : saved;
   });
 
+  // LOAD: the save's playthrough goes back to it (load in place spec §2).
   app.post<{ Params: { saveId: string } }>('/api/saves/:saveId/load', sameOrigin, async (req, reply) => {
+    // The bookkeeping of her last reply goes into BEFORE LOAD, not lost with the closed room (review I1).
+    await world.settled();
+    const r = notFoundOn(reply, () => world.load(req.params.saveId));
+    if (r === undefined) return reply;
+    return 'busy' in r ? busy(reply, r.busy) : r;
+  });
+
+  // B on a save: a copy of it as a new playthrough, named, activated; the one it came from stays.
+  app.post<{ Params: { saveId: string } }>('/api/saves/:saveId/branch', sameOrigin, async (req, reply) => {
+    const name = cleanName(field(req.body, 'name'));
+    if (name === null) return reply.code(400).send({ error: 'bad-name' });
     // Refused up front too, so a busy world never forks a copy it would only throw away.
     const streaming = world.busy();
     if (streaming) return busy(reply, streaming);
-    const fork = notFoundOn(reply, () => pts.fork(req.params.saveId));
+    const fork = notFoundOn(reply, () => pts.fork(req.params.saveId, name));
     if (!fork) return reply;
     const r = world.activate(fork.id);
     if ('busy' in r) {
@@ -126,7 +143,9 @@ export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pt
     const contactId = field(req.body, 'contactId');
     const messageId = field(req.body, 'messageId');
     if (typeof contactId !== 'string' || typeof messageId !== 'string') return reply.code(404).send({ error: 'no such line' });
-    const r = world.branch(contactId, messageId);
+    const name = cleanName(field(req.body, 'name'));
+    if (name === null) return reply.code(400).send({ error: 'bad-name' });
+    const r = world.branch(contactId, messageId, name);
     if (r === 'unknown') return reply.code(404).send({ error: 'no such line' });
     return 'busy' in r ? busy(reply, r.busy) : r;
   });

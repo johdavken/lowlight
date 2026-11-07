@@ -7,8 +7,10 @@ import { parsePersona, type PlaythroughPersona } from '../../shared/persona';
 import { currentSceneId } from '../../shared/scene-aliases';
 import { copyIdentityOverrides } from './playthrough-identity';
 
-/** Checkpoints kept per playthrough; manual saves are never pruned. */
+/** Checkpoints kept per playthrough (BEFORE LOAD ones aside); manual saves are never pruned. */
 export const CHECKPOINT_CAP = 10;
+/** BEFORE LOAD checkpoints kept per playthrough, on top of CHECKPOINT_CAP (load in place spec §2). */
+export const LOAD_KEEP = 3;
 
 export type SaveRequest = Omit<SaveInfo, 'id' | 'playthrough' | 'at' | 'fingerprint'>;
 /** The open contact databases, by contact id. Contacts that aren't open aren't snapshotted. */
@@ -48,10 +50,20 @@ export interface Playthroughs {
   lobbyCharsDir(): string;
   /** Newest first. */
   saves(id: string): SaveInfo[];
-  /** A checkpoint whose fingerprint matches the newest save's writes nothing. */
-  save(id: string, o: SaveRequest, dbs: LiveDbs): SaveInfo | 'unchanged';
-  /** Copies a save into a new playthrough. */
-  fork(saveId: string): PlaythroughInfo;
+  /** A checkpoint whose fingerprint matches the newest save's writes nothing. `keep`: a save this call never prunes (the one being loaded). */
+  save(id: string, o: SaveRequest, dbs: LiveDbs, keep?: string): SaveInfo | 'unchanged';
+  /** Copies a save into a new playthrough named `name` (without one: `<save name> (branch)`). */
+  fork(saveId: string, name?: string): PlaythroughInfo;
+  /**
+   * Load in place (spec 2026-11-07 §2 step 4): the playthrough that holds the save becomes as of it. Its databases,
+   * identity overrides and story fields are the save's; its id, name, createdAt, forkedFrom, seed, star and saves
+   * stay. Crash-safe: staged in restore.tmp/, finished or rolled back on the next open. Doesn't activate it.
+   */
+  restore(saveId: string): PlaythroughInfo;
+  /** A save and the playthrough that holds it. Throws `no save` (none) or `has no playthrough.json` (no snapshot to load). */
+  findSave(saveId: string): { save: SaveInfo; playthrough: PlaythroughInfo };
+  /** Stars or unstars a playthrough on LOAD; updatedAt stays. */
+  setStarred(id: string, on: boolean): void;
   /**
    * Copies live playthrough `id`'s databases (each with vacuumInto) into a new playthrough described
    * by `info` (not activated, no saves). A failure removes the new folder and rethrows.
@@ -75,6 +87,20 @@ function writeJsonAtomic(file: string, value: unknown): void {
   const tmp = `${file}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
   fs.renameSync(tmp, file);
+}
+
+/** Windows refuses a rename while something (a virus scan, the indexer) has the file open: try a few times first. */
+function renameRetry(from: string, to: string): void {
+  for (let i = 0; ; i++) {
+    try {
+      fs.renameSync(from, to);
+      return;
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (i >= 4 || (code !== 'EPERM' && code !== 'EBUSY' && code !== 'EACCES')) throw err;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (i + 1));
+    }
+  }
 }
 
 function readJson(file: string): unknown {
@@ -176,6 +202,37 @@ export function createPlaythroughs(
     return isRecord(v) && typeof v.active === 'string' ? v.active : null;
   };
   const writeActive = (id: string | null) => writeJsonAtomic(indexFile, { active: id });
+
+  /**
+   * A restore cut short (load in place spec §2), by a crash or a rename that failed: once the staged chars/ has
+   * moved in, it's finished (the staged playthrough.json goes in too); until then the old chars/ goes back, over
+   * anything made in its place meanwhile (a room opened on the empty folder).
+   */
+  const recoverSwap = (d: string) => {
+    const old = path.join(d, 'chars.old');
+    const stage = path.join(d, 'restore.tmp');
+    if (fs.existsSync(old)) {
+      const movedIn = !fs.existsSync(path.join(stage, 'chars')) && fs.existsSync(path.join(d, 'chars'));
+      if (movedIn) {
+        const json = path.join(stage, 'playthrough.json');
+        if (fs.existsSync(json)) renameRetry(json, path.join(d, 'playthrough.json'));
+        fs.rmSync(old, { recursive: true, force: true });
+      } else {
+        fs.rmSync(path.join(d, 'chars'), { recursive: true, force: true });
+        renameRetry(old, path.join(d, 'chars'));
+      }
+    }
+    fs.rmSync(stage, { recursive: true, force: true });
+  };
+  // One game that can't be put right (a locked file) is warned about; the rest still open.
+  for (const e of fs.readdirSync(root, { withFileTypes: true })) {
+    if (!e.isDirectory() || !PT_ID.test(e.name)) continue;
+    try {
+      recoverSwap(path.join(root, e.name));
+    } catch (err) {
+      warn(`playthrough ${e.name}: an unfinished load couldn't be put right: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
 
   // An index naming a playthrough that's gone (deleted by hand, say) would strand the title.
   const opened = readActive();
@@ -291,6 +348,13 @@ export function createPlaythroughs(
       });
     },
 
+    setStarred(id, on) {
+      update(id, (info) => {
+        if (on) info.starred = true;
+        else delete info.starred;
+      });
+    },
+
     setSolo(id, solo) {
       update(id, (info) => {
         if (solo) info.solo = true;
@@ -320,12 +384,12 @@ export function createPlaythroughs(
 
     saves,
 
-    save(id, o, dbs) {
+    save(id, o, dbs, keep) {
       if (!get(ptId(id))) throw new Error('no-playthrough');
       const fingerprint: SaveInfo['fingerprint'] = {};
       for (const [contact, db] of dbs) fingerprint[contact] = db.fingerprint();
-      // A rewind's checkpoint is always written: REWIND HERE promises one, by name, to load back.
-      if (o.kind === 'checkpoint' && o.trigger !== 'rewind') {
+      // A rewind's checkpoint is always written: REWIND HERE promises one, by name, to load back. So is BEFORE LOAD.
+      if (o.kind === 'checkpoint' && o.trigger !== 'rewind' && o.trigger !== 'load') {
         const newest = saves(id)[0];
         // Walking out or back in changes nothing in the databases, but it is still a different moment.
         // A WAIT changes no database but is still a later moment (its clock).
@@ -351,14 +415,18 @@ export function createPlaythroughs(
       }
 
       if (o.kind === 'checkpoint') {
-        for (const old of saves(id).filter((s) => s.kind === 'checkpoint').slice(CHECKPOINT_CAP)) {
+        // BEFORE LOAD ones are capped on their own, so a night's travel never pushes out the way back.
+        const isLoad = o.trigger === 'load';
+        const same = saves(id).filter((s) => s.kind === 'checkpoint' && (s.trigger === 'load') === isLoad);
+        for (const old of same.slice(isLoad ? LOAD_KEEP : CHECKPOINT_CAP)) {
+          if (old.id === keep) continue;
           fs.rmSync(path.join(savesDir(id), old.id), { recursive: true, force: true });
         }
       }
       return info;
     },
 
-    fork(saveId) {
+    fork(saveId, name) {
       const found = locate(saveId);
       if (!found) throw new Error(`no save '${saveId}'`);
       const save = asSave(readJson(path.join(found.dir, 'save.json')), saveId)!;
@@ -370,7 +438,7 @@ export function createPlaythroughs(
       const info: PlaythroughInfo = {
         ...snapshot,
         id,
-        name: `${save.name} (branch)`,
+        name: name ?? `${save.name} (branch)`,
         createdAt: at,
         updatedAt: at,
         forkedFrom: { playthrough: found.playthrough, save: saveId, name: save.name },
@@ -390,6 +458,79 @@ export function createPlaythroughs(
       } catch (err) {
         fs.rmSync(target, { recursive: true, force: true });
         throw err;
+      }
+      return info;
+    },
+
+    findSave(saveId) {
+      const found = locate(saveId);
+      if (!found) throw new Error(`no save '${saveId}'`);
+      const save = asSave(readJson(path.join(found.dir, 'save.json')), saveId)!;
+      if (!asPlaythrough(readJson(path.join(found.dir, 'playthrough.json')), found.playthrough)) throw new Error(`save '${saveId}' has no playthrough.json`);
+      return { save, playthrough: get(found.playthrough)! };
+    },
+
+    restore(saveId) {
+      const found = locate(saveId);
+      if (!found) throw new Error(`no save '${saveId}'`);
+      const save = asSave(readJson(path.join(found.dir, 'save.json')), saveId)!;
+      const snapshot = asPlaythrough(readJson(path.join(found.dir, 'playthrough.json')), found.playthrough);
+      if (!snapshot) throw new Error(`save '${saveId}' has no playthrough.json`);
+      const live = get(found.playthrough)!;
+      // The story as the save has it; who the playthrough is (and your star) as it is now.
+      const info: PlaythroughInfo = {
+        ...snapshot,
+        id: live.id,
+        name: live.name,
+        createdAt: live.createdAt,
+        updatedAt: now(),
+        forkedFrom: live.forkedFrom,
+        seed: live.seed ?? live.id,
+        location: save.location ?? snapshot.location,
+      };
+      delete info.starred;
+      if (live.starred) info.starred = true;
+      delete info.solo;
+      if (save.solo) info.solo = true;
+
+      const d = dir(live.id);
+      const stage = path.join(d, 'restore.tmp');
+      fs.rmSync(stage, { recursive: true, force: true });
+      try {
+        fs.mkdirSync(path.join(stage, 'chars'), { recursive: true });
+        fs.cpSync(path.join(found.dir, 'chars'), path.join(stage, 'chars'), { recursive: true });
+        fs.writeFileSync(path.join(stage, 'playthrough.json'), JSON.stringify(info, null, 2));
+      } catch (err) {
+        fs.rmSync(stage, { recursive: true, force: true });
+        throw err;
+      }
+      // From here a crash is finished or rolled back on the next open, and a failed rename right here (recoverSwap).
+      fs.mkdirSync(path.join(d, 'chars'), { recursive: true });
+      try {
+        renameRetry(path.join(d, 'chars'), path.join(d, 'chars.old'));
+        renameRetry(path.join(stage, 'chars'), path.join(d, 'chars'));
+        renameRetry(path.join(stage, 'playthrough.json'), file(live.id));
+      } catch (err) {
+        // Back to the game as it was, unless the last rename is all that's left (then it's done): never half of each.
+        try {
+          if (fs.existsSync(path.join(stage, 'playthrough.json')) && !fs.existsSync(path.join(stage, 'chars'))) {
+            // The new chars/ is in but its playthrough.json isn't: undo the chars/ move rather than finish.
+            fs.rmSync(path.join(d, 'chars'), { recursive: true, force: true });
+            renameRetry(path.join(d, 'chars.old'), path.join(d, 'chars'));
+            fs.rmSync(stage, { recursive: true, force: true });
+          } else recoverSwap(d);
+        } catch (undo) {
+          warn(`playthrough ${live.id}: a failed load couldn't be undone; the next start will try: ${undo instanceof Error ? undo.message : String(undo)}`);
+        }
+        throw err;
+      }
+      // Loaded: a leftover that won't go is only tidying (the next start clears it).
+      for (const left of [path.join(d, 'chars.old'), stage]) {
+        try {
+          fs.rmSync(left, { recursive: true, force: true });
+        } catch (err) {
+          warn(`playthrough ${live.id}: ${path.basename(left)} left after a load: ${err instanceof Error ? err.message : String(err)}`);
+        }
       }
       return info;
     },

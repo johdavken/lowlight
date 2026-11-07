@@ -80,7 +80,7 @@ describe('the kit across the playthrough', () => {
     nix.setReplyStamp(null);
     expect(s.built.world.kitOf(player)!.kit.sol).toBe(400);
     nix.close();
-    const r = s.built.world.branch('nix', 'n10');
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     expect(s.built.world.kitOf(player)!.kit.sol).toBe(0);
   });

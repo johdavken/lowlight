@@ -12,6 +12,24 @@ dist/
 test-results/
 playwright-report/
 art/work/
+# The art store (tools/art/store.ts): art binaries and Studio's work live outside the repo, in the folder
+# .art-store names. What stays under art/ is text: scene specs, style, palette, notes, studio-character.json.
+.art-store
+art/**/*.[pP][nN][gG]
+art/**/*.[wW][eE][bB][pP]
+art/**/*.[jJ][pP][gG]
+art/**/*.[jJ][pP][eE][gG]
+art/**/*.[gG][iI][fF]
+art/**/*.[kK][rR][aA]
+art/**/*.[pP][sS][dD]
+art/**/*.[wW][oO][fF][fF][22]
+# Mockup images live in the art store too (<store>/docs/…); the public README's stay.
+docs/**/*.[pP][nN][gG]
+docs/**/*.[wW][eE][bB][pP]
+docs/**/*.[jJ][pP][gG]
+docs/**/*.[jJ][pP][eE][gG]
+docs/**/*.[gG][iI][fF]
+!docs/readme/**
 data/
 
 # Legacy files left by the multi-agent migration (Nix's old room DB and its WAL/SHM)
@@ -22,7 +40,7 @@ persona/*
 !persona/persona.example.json
 .worktrees/
 
-# Krita backups and autosaves (the .kra itself is committed)
+# Krita backups and autosaves
 *.kra~
 *-autosave.kra
 

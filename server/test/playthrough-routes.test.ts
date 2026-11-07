@@ -411,21 +411,101 @@ describe('playthrough routes', () => {
     expect((await api('GET', '/api/playthroughs/pt-20260101-zzzz/saves')).status).toBe(404);
   });
 
-  it('load forks and activates; source untouched', async () => {
+  /** A chat line in nix's room of the active playthrough. */
+  async function line(built: Awaited<ReturnType<typeof start>>['built'], id: string, ts: number) {
+    const pt = built.world.active()!;
+    (await built.runtime('nix'))!.db.insertMessage(pt.player, { id, role: 'user', text: id, toolLines: [], ts, status: 'ok' });
+  }
+  async function lines(built: Awaited<ReturnType<typeof start>>['built']) {
+    const pt = built.world.active()!;
+    return (await built.runtime('nix'))!.db.allMessages(pt.player).map((m) => m.id);
+  }
+
+  it('load goes back in the same game', async () => {
     const { api, built } = await start();
     const src = built.world.active()!;
+    await line(built, 'early', 1);
     const save = (await api('POST', `/api/playthroughs/${src.id}/saves`, { name: 'Keep' })).body;
+    await line(built, 'later', 2);
+    const count = built.playthroughs.list().length;
     const r = await api('POST', `/api/saves/${save.id}/load`);
     expect(r.status).toBe(200);
-    expect(r.body.id).not.toBe(src.id);
-    expect(r.body.forkedFrom).toMatchObject({ playthrough: src.id, save: save.id });
-    expect(built.world.active()!.id).toBe(r.body.id);
-    expect(built.playthroughs.get(src.id)).toEqual(src);
-    expect(built.playthroughs.saves(src.id).map((x) => x.id)).toEqual([save.id]);
+    expect(r.body.id).toBe(src.id);
+    expect(built.world.active()!.id).toBe(src.id);
+    expect(built.playthroughs.list().length).toBe(count);
+    expect(await lines(built)).toEqual(['early']);
+    expect(built.playthroughs.saves(src.id)[0]).toMatchObject({ kind: 'checkpoint', trigger: 'load', name: 'Before loading Keep' });
     expect((await api('POST', '/api/saves/sv-20260101-zzzz/load')).status).toBe(404);
   });
 
-  it('load while busy is 409 and leaves no fork', async () => {
+  it('loading BEFORE LOAD brings the later story back', async () => {
+    const { api, built } = await start();
+    const src = built.world.active()!;
+    await line(built, 'early', 1);
+    const save = (await api('POST', `/api/playthroughs/${src.id}/saves`, { name: 'Keep' })).body;
+    await line(built, 'later', 2);
+    await api('POST', `/api/saves/${save.id}/load`);
+    const before = built.playthroughs.saves(src.id)[0]!;
+    expect((await api('POST', `/api/saves/${before.id}/load`)).status).toBe(200);
+    expect(await lines(built)).toEqual(['early', 'later']);
+  });
+
+  it("loading another game's save switches to it; the first game is unchanged", async () => {
+    const { api, built, cfg } = await start();
+    const b = built.world.active()!;
+    await line(built, 'b1', 1);
+    const save = (await api('POST', `/api/playthroughs/${b.id}/saves`, { name: 'B save' })).body;
+    const a = (await api('POST', '/api/playthroughs', { player: b.player, startContact: 'nix' })).body;
+    await line(built, 'a1', 1);
+    const aInfo = built.playthroughs.get(a.id);
+    expect((await api('POST', `/api/saves/${save.id}/load`)).status).toBe(200);
+    expect(built.world.active()!.id).toBe(b.id);
+    expect(built.playthroughs.get(a.id)).toEqual(aInfo);
+    // BEFORE LOAD belongs to the game loaded into, not the one left.
+    expect(built.playthroughs.saves(a.id)).toEqual([]);
+    expect(built.playthroughs.saves(b.id).map((x) => x.trigger)).toEqual(['load', 'manual']);
+    const db = openDb(path.join(cfg.playthroughsDir, a.id, 'chars', 'nix', 'room.db'), { defaultPlayer: a.player });
+    try {
+      expect(db.allMessages(a.player).map((m) => m.id)).toEqual(['a1']);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('load closes the open room first, and tells it where to go', async () => {
+    const s = await start();
+    const src = s.built.world.active()!;
+    const save = (await s.api('POST', `/api/playthroughs/${src.id}/saves`, { name: 'Keep' })).body;
+    const ws = new WebSocket(`ws://127.0.0.1:${s.port}/ws/nix?token=${TOKEN}`, { headers: { Origin: 'http://localhost:5173' } });
+    ws.on('error', () => {});
+    cleanups.push(() => ws.close());
+    const got: { type: string }[] = [];
+    let closed = false;
+    ws.on('message', (d) => got.push(JSON.parse(String(d))));
+    ws.on('close', () => (closed = true));
+    await new Promise<void>((r) => ws.on('open', () => r()));
+    const rt = (await s.built.runtime('nix'))!;
+    expect((await s.api('POST', `/api/saves/${save.id}/load`)).status).toBe(200);
+    await until(() => closed);
+    expect(got).toContainEqual(expect.objectContaining({ type: 'world-changed', playthrough: src.id, location: save.location }));
+    // The room open before the load is closed, not the one serving the game now.
+    expect(await s.built.runtime('nix')).not.toBe(rt);
+  });
+
+  it('loading the oldest of 3 BEFORE LOAD saves works', async () => {
+    const { api, built } = await start();
+    const src = built.world.active()!;
+    await line(built, 'one', 1);
+    const keep = (await api('POST', `/api/playthroughs/${src.id}/saves`, { name: 'Keep' })).body;
+    for (let i = 0; i < 3; i++) await api('POST', `/api/saves/${keep.id}/load`);
+    const loads = built.playthroughs.saves(src.id).filter((x) => x.trigger === 'load');
+    expect(loads).toHaveLength(3);
+    const oldest = loads.at(-1)!;
+    expect((await api('POST', `/api/saves/${oldest.id}/load`)).status).toBe(200);
+    expect(await lines(built)).toEqual(['one']);
+  });
+
+  it('load while busy is 409 and writes nothing', async () => {
     const s = await start({ hold: true });
     const src = s.built.world.active()!;
     const save = (await s.api('POST', `/api/playthroughs/${src.id}/saves`, { name: 'Keep' })).body;
@@ -433,11 +513,39 @@ describe('playthrough routes', () => {
     const before = s.built.playthroughs.list().length;
     expect(await s.api('POST', `/api/saves/${save.id}/load`)).toEqual({ status: 409, body: { error: 'busy', contact: 'nix' } });
     expect(s.built.playthroughs.list().length).toBe(before);
+    expect(s.built.playthroughs.saves(src.id).map((x) => x.id)).toEqual([save.id]);
     expect(s.built.world.active()!.id).toBe(src.id);
     expect(await s.api('POST', `/api/playthroughs/${src.id}/saves`, { name: 'x' })).toEqual({ status: 409, body: { error: 'busy', contact: 'nix' } });
     expect(await s.api('POST', '/api/playthroughs', { player: src.player, startContact: 'nix' })).toEqual({ status: 409, body: { error: 'busy', contact: 'nix' } });
+    expect(await s.api('POST', `/api/saves/${save.id}/branch`, { name: 'b' })).toEqual({ status: 409, body: { error: 'busy', contact: 'nix' } });
     s.release();
     await until(() => !rt.relay.busy);
+  });
+
+  it('B on a save makes a named copy', async () => {
+    const { api, built } = await start();
+    const src = built.world.active()!;
+    const save = (await api('POST', `/api/playthroughs/${src.id}/saves`, { name: 'Keep' })).body;
+    expect(await api('POST', `/api/saves/${save.id}/branch`, { name: ' ' })).toEqual({ status: 400, body: { error: 'bad-name' } });
+    const r = await api('POST', `/api/saves/${save.id}/branch`, { name: 'Main — branch 2' });
+    expect(r.status).toBe(200);
+    expect(r.body.id).not.toBe(src.id);
+    expect(r.body.name).toBe('Main — branch 2');
+    expect(r.body.forkedFrom).toMatchObject({ playthrough: src.id, save: save.id });
+    expect(built.world.active()!.id).toBe(r.body.id);
+    expect(built.playthroughs.get(src.id)).toEqual(src);
+    expect((await api('POST', '/api/saves/sv-20260101-zzzz/branch', { name: 'x' })).status).toBe(404);
+  });
+
+  it('star and unstar', async () => {
+    const { api, built } = await start();
+    const id = built.world.active()!.id;
+    expect((await api('PATCH', `/api/playthroughs/${id}`, { starred: true })).body.starred).toBe(true);
+    expect('starred' in (await api('PATCH', `/api/playthroughs/${id}`, { starred: false })).body).toBe(false);
+    expect(await api('PATCH', `/api/playthroughs/${id}`, {})).toEqual({ status: 400, body: { error: 'bad-request' } });
+    expect(await api('PATCH', `/api/playthroughs/${id}`, { starred: 'yes' })).toEqual({ status: 400, body: { error: 'bad-request' } });
+    const both = await api('PATCH', `/api/playthroughs/${id}`, { name: 'Kept', starred: true });
+    expect(both.body).toMatchObject({ name: 'Kept', starred: true });
   });
 
   it('delete save removes it', async () => {
@@ -856,7 +964,7 @@ describe('the story clock', () => {
       await move('karasu/lowlight-intake');
       rt.room.applyPreset({ name: 'storm' }, 'dev');
       expect(s.built.world.active()!.weather).toEqual({ weather: 'rain', level: 1 });
-      const b = s.built.world.branch('nix', line.id);
+      const b = s.built.world.branch('nix', line.id, 'A branch');
       if (b === 'unknown' || 'busy' in b) throw new Error('branch failed');
       const branched = (await s.built.runtime('nix'))!;
       await new Promise((r) => setTimeout(r, 0));
@@ -896,7 +1004,7 @@ describe('the story clock', () => {
     expect(await clock(s)).toBe(1270);
     await rt.relay.rewind(player, first.id);
     expect(await clock(s)).toBe(1270);
-    const b = s.built.world.branch('nix', first.id);
+    const b = s.built.world.branch('nix', first.id, 'A branch');
     if (b === 'unknown' || 'busy' in b) throw new Error('branch failed');
     expect(await clock(s)).toBe(1205);
   });
@@ -1300,7 +1408,7 @@ describe('schedules', () => {
     for (const [id, clock] of [['u1', 1205], ['u2', 1210]] as const) rt.db.insertMessage(player, { id, role: 'user', text: 'hi', toolLines: [], ts: clock, status: 'ok', clock });
     s.built.world.setLocation('cass');
     expect(s.built.world.active()!.parted?.nix).toBe(1210);
-    const b = s.built.world.branch('nix', 'u2');
+    const b = s.built.world.branch('nix', 'u2', 'A branch');
     if (b === 'unknown' || 'busy' in b) throw new Error('branch failed');
     expect(s.built.world.active()!.parted?.nix).toBe(1210);
     const rt2 = (await s.built.runtime('nix'))!;

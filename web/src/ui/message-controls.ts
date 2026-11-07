@@ -12,7 +12,6 @@ export type ControlAction =
   | { kind: 'edit'; id: string; text: string };
 
 export const REWIND_CONFIRM = 'Rewind to here? Every line after it is deleted. A checkpoint is saved first.';
-export const BRANCH_CONFIRM = 'Branch from here? A new playthrough starts at this line. This one stays in LOAD.';
 
 type Place = 'latest' | 'archive';
 
@@ -40,9 +39,8 @@ function editable(m: ChatMessage): boolean {
   return !(m.role === 'user' && (m.mode === 'travel' || m.mode === 'gig' || m.mode === 'dice'));
 }
 
-const branch = (m: ChatMessage, act: (a: ControlAction) => void) => () => {
-  if (window.confirm(BRANCH_CONFIRM)) act({ kind: 'branch', id: m.id });
-};
+/** No confirm: the room asks for the branch's name, and Esc there cancels. */
+const branch = (m: ChatMessage, act: (a: ControlAction) => void) => () => act({ kind: 'branch', id: m.id });
 
 /** What the latest line offers (her latest, or the player's when the story ends on it): the box row and the line stack both build from this. */
 export function latestActions(m: ChatMessage, act: (a: ControlAction) => void, startEdit: () => void): LineAction[] {

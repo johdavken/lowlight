@@ -10,6 +10,7 @@ import { parseArgs } from 'node:util';
 import { BUILD_STEPS, runBuild, runGuide, runPromote, type Step } from './pipeline';
 import { loadArtSpec, readSpecPack } from './spec';
 import { SceneRegistry } from '../../server/src/scenes';
+import { artWork } from './store';
 
 const USAGE = 'usage: npm run art -- <scene> (--stage guide | --stage build [--from <step>] [--force] [--overwrite-glow] | --promote)';
 
@@ -39,8 +40,9 @@ async function main(): Promise<void> {
   } else if (values.stage === 'guide') {
     await runGuide({ scene });
   } else if (values.stage === 'build') {
-    if (!fs.existsSync(path.join('art', 'work', scene, 'master.png'))) {
-      throw new Error(`no master.png — run --stage guide, make the image in ChatGPT, save it to art/work/${scene}/master.png`);
+    const master = path.join(artWork(), scene, 'master.png');
+    if (!fs.existsSync(master)) {
+      throw new Error(`no master.png — run --stage guide, make the image in ChatGPT, save it to ${master}`);
     }
     await runBuild({ scene, from: values.from as Step | undefined, force: values.force, overwriteGlow: values['overwrite-glow'] });
   } else {

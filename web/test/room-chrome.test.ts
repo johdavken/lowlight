@@ -78,6 +78,19 @@ describe('room chrome: HUD buttons', () => {
 });
 
 describe('room chrome: save card', () => {
+  it('a BRANCH card reads BRANCH in its title, label and hint; the defaults read SAVE', () => {
+    openSavePrompt(document.body, { defaultName: 'Main — branch 1', save: vi.fn(async () => {}), title: 'BRANCH', action: 'BRANCH' });
+    expect(document.querySelector('.save-card .sc-title')!.textContent).toBe('BRANCH');
+    expect(document.querySelector('.save-card')!.getAttribute('aria-label')).toBe('Branch');
+    expect(document.querySelector('.save-card .sc-hint')!.textContent).toBe('[ENTER] BRANCH · [ESC] CANCEL');
+    expect(document.querySelector<HTMLInputElement>('.save-card .sc-field')!.value).toBe('Main — branch 1');
+    document.body.innerHTML = '';
+    openSavePrompt(document.body, { defaultName: 'x', save: vi.fn(async () => {}) });
+    expect(document.querySelector('.save-card .sc-title')!.textContent).toBe('SAVE');
+    expect(document.querySelector('.save-card')!.getAttribute('aria-label')).toBe('Save');
+    expect(document.querySelector('.save-card .sc-hint')!.textContent).toBe('[ENTER] SAVE · [ESC] CANCEL');
+  });
+
   it('save prompt prefilled, Enter calls save with edited name', async () => {
     const save = vi.fn(async () => {});
     openSavePrompt(document.body, { defaultName: "Nix's apartment, night", save });

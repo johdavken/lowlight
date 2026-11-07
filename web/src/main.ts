@@ -83,6 +83,7 @@ import { createDealer } from './room/encounter-dealer';
 import { TurnTracker } from './ui/turn-state';
 import { chromeKey, lastAgent, listenChromeKeys, markSkipIntro, reloadOnRestore, playerFromSearch, rememberAgent, routeFromPath, shouldPause, setFlash, showRoomNotice, takeFlash, takeSkipIntro, worldChangedPath } from './room/identity';
 import { openSavePrompt, saveFailure } from './room/save-prompt';
+import { branchName } from '../../shared/branch-name';
 import { sceneDir } from './scene-paths';
 import { listenScreenCycle, type CycleScreen } from './room/screen-cycle';
 import { crewDotOn, crewSeen, openCrew, type CrewHandle, type CrewTab } from './room/crew-screen';
@@ -236,21 +237,50 @@ function startRoom(agentId: string): void {
         socket.send({ type: 'edit_message', messageId: a.id, text: a.text });
         momentMoved();
         return;
-      case 'branch':
-        // The world switches to the new playthrough: the room reloads into it, on this line.
-        branching = true;
-        updateBusy();
-        branchFrom(agentId, a.id)
-          .then((info) => {
-            setFlash(`// BRANCHED — ${info.name}`);
-            leave(worldChangedPath(info.location), { branched: true });
+      case 'branch': {
+        // The world switches to the new playthrough: the room reloads into it, on this line. Named first (load in place §3).
+        if (chromeOpen || branching) return;
+        chromeOpen = true;
+        const line = a.id;
+        listPlaythroughs()
+          .then((list) => {
+            const here = list.playthroughs.find((p) => p.id === list.active);
+            if (!here) {
+              chromeOpen = false;
+              return leave('/');
+            }
+            openSavePrompt(gameRoot(), {
+              defaultName: branchName(here, list.playthroughs),
+              title: 'BRANCH',
+              action: 'BRANCH',
+              reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+              onClose: () => (chromeOpen = false),
+              save: async (name) => {
+                branching = true;
+                updateBusy();
+                try {
+                  const info = await branchFrom(agentId, line, name);
+                  setFlash(`// BRANCHED — ${info.name}`);
+                  leave(worldChangedPath(info.location), { branched: true });
+                } catch (err) {
+                  branching = false;
+                  updateBusy();
+                  if (err instanceof ApiError && err.error === 'busy') {
+                    feed.showNotice(waitFor(err.contact));
+                    return;
+                  }
+                  if (err instanceof ApiError && err.error === 'bad-name') throw new Error('// NAME IT — 1 TO 80 CHARACTERS');
+                  throw new Error(`// CAN'T BRANCH — ${reason(err)}`);
+                }
+              },
+            });
           })
           .catch((err: unknown) => {
-            branching = false;
-            updateBusy();
-            feed.showNotice(err instanceof ApiError && err.error === 'busy' ? waitFor(err.contact) : `// CAN'T BRANCH — ${reason(err)}`);
+            chromeOpen = false;
+            feed.showNotice(`// CAN'T BRANCH — ${reason(err)}`);
           });
         return;
+      }
       case 'delete': {
         const copy = feed.get(a.id);
         socket.send({ type: 'delete_message', messageId: a.id });

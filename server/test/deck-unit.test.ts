@@ -24,7 +24,8 @@ function setup(o: { busyFor?: number; sendText?: (text: string) => Promise<{ ok:
     retry: vi.fn(async () => ({ ok: true })),
   };
   const rt = { relay, db: { recentMessages: () => [], getMessage: () => undefined } } as unknown as AgentRuntime;
-  const world = { active: () => pt, contacts: () => o.contacts ?? [NIX], whereNow: () => null, clockNow: () => 1200 } as unknown as World;
+  let generation = 0;
+  const world = { active: () => pt, contacts: () => o.contacts ?? [NIX], whereNow: () => null, clockNow: () => 1200, generation: () => generation } as unknown as World;
   const deps: DeckDeps = { world, runtime: o.runtime ?? (async () => rt), minded: () => true, pronoun: () => 'she', placeName: (s) => s, waitMs: 200, pollMs: 10, ...(o.lastText ? { lastText: o.lastText } : {}) };
   const deck = createDeck(deps);
   const ws = Object.assign(new EventEmitter(), { readyState: 1, OPEN: 1, out: [] as DeckServerEvent[], send(s: string) { this.out.push(JSON.parse(s)); } });
@@ -33,6 +34,8 @@ function setup(o: { busyFor?: number; sendText?: (text: string) => Promise<{ ok:
   return {
     deck, ws, client, relay, sent,
     setPt: (p: Partial<PlaythroughInfo>) => (pt = { ...pt, ...p }),
+    /** A LOAD in place: the same playthrough, a new moment. */
+    loadInPlace: () => generation++,
     setBusy: (ms: number) => (busyUntil = Date.now() + ms),
     of: <T extends DeckServerEvent['type']>(t: T) => ws.out.filter((e): e is Extract<DeckServerEvent, { type: T }> => e.type === t),
   };
@@ -75,6 +78,16 @@ describe('the deck server under load (final review I2, I3)', () => {
     s.client({ type: 'deck_send', contact: 'nix', text: 'hey', localId: 'L1' });
     await settle(20);
     s.setPt({ id: 'pt-2' });
+    await settle();
+    expect(s.sent).toEqual([]);
+    expect(s.of('deck_error')[0]).toMatchObject({ error: 'save-changed', localId: 'L1' });
+  });
+
+  it('a LOAD into the same playthrough while a text waits: it is not sent into the loaded story (load in place review)', async () => {
+    const s = setup({ busyFor: 60 });
+    s.client({ type: 'deck_send', contact: 'nix', text: 'hey', localId: 'L1' });
+    await settle(20);
+    s.loadInPlace();
     await settle();
     expect(s.sent).toEqual([]);
     expect(s.of('deck_error')[0]).toMatchObject({ error: 'save-changed', localId: 'L1' });

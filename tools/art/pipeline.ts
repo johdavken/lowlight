@@ -13,6 +13,7 @@ import { writePng } from './image';
 import { buildSceneJson, installBuild, promoteScene, sceneSoundFiles } from './install';
 import { loadMaster } from './master';
 import { loadArtSpec, readSpecPack, type ArtSpec } from './spec';
+import { artWork } from './store';
 
 export const BUILD_STEPS = ['depth', 'split', 'fill', 'pixel', 'glow', 'install'] as const;
 export type Step = (typeof BUILD_STEPS)[number];
@@ -27,7 +28,7 @@ interface Common {
 const PALETTE_FILE = fileURLToPath(new URL('../palette.json', import.meta.url));
 
 function paths(root: string, scene: string) {
-  const work = path.join(root, 'art', 'work', scene);
+  const work = path.join(artWork(root), scene);
   const spec = path.join(root, 'art', 'scenes', `${scene}.md`);
   return {
     scenesDir: path.join(root, 'scenes', fs.existsSync(spec) ? readSpecPack(spec) : 'karasu'),
@@ -120,7 +121,7 @@ export async function runBuild(
   log(`installed scenes/${spec.target} — restart the dev server, then switch to it in the dev panel to compare`);
 }
 
-/** `--promote`: the art scene replaces the original (the old one is moved into art/work, not deleted). */
+/** `--promote`: the art scene replaces the original (the old one is moved into the art store's work/, not deleted). */
 export function runPromote(opts: Common & { target: string }): void {
   const root = opts.root ?? process.cwd();
   const p = paths(root, opts.scene);

@@ -111,6 +111,8 @@ export interface AgentRuntime {
   probe(): Promise<LinkState>;
   /** The key changed: forget every cached status and recheck (her tabs see the new link). */
   resetProbe(): Promise<void>;
+  /** Resolves once her Residual has finished its bookkeeping, or after `ms` (RESIDUAL_WAIT_MS by default). */
+  settle?(ms?: number): Promise<void>;
   close(): void;
 }
 
@@ -769,7 +771,8 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             const ptAtEnd = cp.active?.()?.id ?? null;
             const rewindsAtEnd = rewinds;
             const save = () => {
-              if (rewinds !== rewindsAtEnd || (cp.active?.()?.id ?? null) !== ptAtEnd) return;
+              // Closed: the world moved on (a LOAD keeps the playthrough's id, so the id alone can't tell).
+              if (closed || rewinds !== rewindsAtEnd || (cp.active?.()?.id ?? null) !== ptAtEnd) return;
               cp.checkpoint({ trigger: 'end', contactId: id, name: `Talk with ${name} ended` });
             };
             if (mode === 'end' && ok) {
@@ -927,8 +930,11 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
       relay.clearAuthFailed();
       await runtime.checkHealth();
     },
+    settle: (ms) => residual?.wait(ms) ?? Promise.resolve(),
     close() {
       closed = true;
+      // Its bookkeeping is for a story that's gone: stop paying for it.
+      residual?.abortAll();
       db.close();
     },
   };

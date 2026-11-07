@@ -159,15 +159,13 @@ describe('edit, delete, rewind', () => {
     confirm.mockRestore();
   });
 
-  it('BRANCH HERE confirms with BRANCH_CONFIRM, on the latest line and in the archive; a declined confirm sends nothing', () => {
+  it('BRANCH HERE sends the branch with no confirm (the name prompt asks), on the latest line and in the archive', () => {
     const { root, feed, actions } = setup(story());
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
-    click(root, 'a2', 'BRANCH HERE');
-    expect(actions).toEqual([]);
-    expect(confirm).toHaveBeenCalledWith('Branch from here? A new playthrough starts at this line. This one stays in LOAD.');
+    const confirm = vi.spyOn(window, 'confirm');
     click(root, 'a2', 'BRANCH HERE');
     feed.expand();
     click(root, 'u1', 'BRANCH HERE');
+    expect(confirm).not.toHaveBeenCalled();
     expect(actions).toEqual([
       { kind: 'branch', id: 'a2' },
       { kind: 'branch', id: 'u1' },

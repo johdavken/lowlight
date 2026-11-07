@@ -224,24 +224,26 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
     deps.backdrop(null);
   }
 
+  /** LOAD's card (load in place spec §4): the games you starred and the rule, not the list LOAD itself shows. */
   function renderLoad(): void {
     fighter(p1, undefined);
     fighter(p2, undefined);
-    // The list is something to read: the 1P strip stays lit (only FORK waits).
+    // A card to read: the 1P strip stays lit.
     p1.el.classList.remove('waiting');
+    const kept = list.filter((p) => p.starred);
     p1.setFile({
-      name: 'Saves',
-      tagline: 'Newest first',
-      head: '// PLAYTHROUGHS',
-      rows: list.map((p) => ({ row: { id: p.id, text: p.name, aside: ago(p.updatedAt) } })),
+      name: 'Kept',
+      tagline: 'Starred games',
+      head: '// KEPT',
+      rows: kept.length > 0 ? kept.map((p) => ({ row: { id: p.id, text: p.name, aside: ago(p.updatedAt) } })) : [{ p: 'S on LOAD stars a game you want to keep' }],
     });
     p2.setFile({
-      name: 'Fork',
-      tagline: 'Loading never overwrites',
+      name: 'Load',
+      tagline: 'Back in the same game',
       head: '// HOW LOAD WORKS',
-      rows: [{ p: 'Pick a save; a new playthrough starts there.' }, { p: 'The original stays as it was.' }],
+      rows: [{ p: 'Loading goes back to the save. Where you were is kept as BEFORE LOAD.' }, { p: 'B on a save branches a new game.' }],
     });
-    under.textContent = `${list.length} PLAYTHROUGHS`;
+    under.textContent = `${list.length} GAMES`;
     deps.backdrop(null);
   }
 

@@ -233,7 +233,16 @@ export interface World extends CheckpointPort {
    * `contactId`'s chat — every contact cut at that line's time, state rebuilt — and activated. The
    * one it came from is never written. Refused while a turn streams; 'unknown' for a line that isn't there.
    */
-  branch(contactId: string, messageId: string): PlaythroughInfo | { busy: string } | 'unknown';
+  branch(contactId: string, messageId: string, name: string): PlaythroughInfo | { busy: string } | 'unknown';
+  /**
+   * LOAD (load in place spec §2): the playthrough that holds `saveId` goes back to it and is active. Where it was is
+   * saved first as BEFORE LOAD. Refused while a turn streams, before anything is written; throws `no save` for none.
+   */
+  load(saveId: string): PlaythroughInfo | { busy: string };
+  /** Resolves once every open room's Residual has finished (each up to its wait): a LOAD's BEFORE LOAD then holds it. */
+  settled(): Promise<void>;
+  /** Goes up on every switch of playthrough and every LOAD: a wait that spans one can tell (a LOAD keeps the id). */
+  generation?(): number;
 }
 
 /** A branch's `forkedFrom.message.excerpt` keeps this many characters of the line. */
@@ -337,6 +346,8 @@ export function createWorld(deps: {
   const runtimeOf = (id: string) => registry.all().find((rt) => rt.id === id);
   /** The checkpoint waiting for the turn in progress to end. */
   let pending: Checkpoint | null = null;
+  /** Up on every switch and LOAD (World.generation). */
+  let generation = 0;
 
   /** Whose `Name:` paragraphs a reply may end on: every resident, and every contact (someone here), never the player. */
   const speakerNames = (pt: PlaythroughInfo): string[] =>
@@ -394,6 +405,7 @@ export function createWorld(deps: {
     const streaming = busy();
     if (streaming) return { busy: streaming };
     pending = null;
+    generation++;
     for (const rt of registry.all()) rt.hub.emit({ type: 'world-changed', playthrough: info.id, location: info.location, ...(info.solo ? { solo: true } : {}) });
     registry.reset();
     playthroughs.setActive(info.id);
@@ -463,8 +475,31 @@ export function createWorld(deps: {
     };
   }
 
-  function write(pt: PlaythroughInfo, contactId: string, trigger: SaveTrigger, name: string): SaveInfo | 'unchanged' {
-    return withDbs(pt, (dbs) => playthroughs.save(pt.id, request(pt, dbs, contactId, trigger, name), dbs as LiveDbs));
+  function write(pt: PlaythroughInfo, contactId: string, trigger: SaveTrigger, name: string, keep?: string): SaveInfo | 'unchanged' {
+    return withDbs(pt, (dbs) => playthroughs.save(pt.id, request(pt, dbs, contactId, trigger, name), dbs as LiveDbs, keep));
+  }
+
+  /**
+   * Synchronous end to end: no tab can open a room between closing them and swapping the files (an open file
+   * would block the swap on Windows, and a room opened on the old files would outlive the load).
+   */
+  function load(saveId: string): PlaythroughInfo | { busy: string } {
+    const streaming = busy();
+    if (streaming) return { busy: streaming };
+    const { save, playthrough: game } = playthroughs.findSave(saveId);
+    const name = `Before loading ${save.name}`;
+    const at = game.location?.contactId ?? game.startContact;
+    // In the game you're in, its open rooms know where everyone is now; in another, they'd be the wrong game's.
+    const here = playthroughs.active()?.id === game.id;
+    if (here) write(game, at, 'load', name, saveId);
+    const location = save.location ?? game.location;
+    for (const rt of registry.all()) rt.hub.emit({ type: 'world-changed', playthrough: game.id, location, ...(save.solo ? { solo: true } : {}) });
+    registry.reset();
+    pending = null;
+    generation++;
+    playthroughs.setActive(game.id);
+    if (!here) write(game, at, 'load', name, saveId);
+    return playthroughs.restore(saveId);
   }
 
   /** Never throws: a failed checkpoint is logged and told to her tabs, and play goes on. */
@@ -800,7 +835,7 @@ export function createWorld(deps: {
     runtimeOf(id)?.storyMood.check('turn', pt.player);
   }
 
-  function branch(contactId: string, messageId: string): PlaythroughInfo | { busy: string } | 'unknown' {
+  function branch(contactId: string, messageId: string, name: string): PlaythroughInfo | { busy: string } | 'unknown' {
     const streaming = busy();
     if (streaming) return { busy: streaming };
     const pt = playthroughs.active();
@@ -811,7 +846,7 @@ export function createWorld(deps: {
       if (!at) return 'unknown';
       // Copied first, cut in the copy: the playthrough it comes from is never written.
       const info = playthroughs.copyLive(pt.id, dbs as LiveDbs, {
-        name: `${pt.name} — branch`,
+        name,
         player: pt.player,
         startContact: pt.startContact,
         forkedFrom: { playthrough: pt.id, message: { contactId, messageId, excerpt: Array.from(at.text.trim()).slice(0, BRANCH_EXCERPT_MAX).join("") }, name: pt.name },
@@ -906,6 +941,11 @@ export function createWorld(deps: {
 
   const api: World = {
     branch,
+    load,
+    generation: () => generation,
+    settled: async () => {
+      await Promise.all(registry.all().map((rt) => rt.settle?.()));
+    },
     active: () => playthroughs.active(),
     // A pick of an outfit still locked (outfits as rewards) is no pick: the plain sprite, or her room's.
     outfitOf(player) {

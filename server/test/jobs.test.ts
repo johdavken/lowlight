@@ -3379,6 +3379,22 @@ describe("a roll's life, phase 1 (roll lifecycle spec §1)", () => {
     await flush();
     expect(pend(t).dealt!.every((c) => c.by === 'written')).toBe(true);
   });
+  it('a GM answering after the room closed (a LOAD) is dropped quietly, hold timer too: no unhandled error (load in place review I2)', async () => {
+    const timers = vi.spyOn(globalThis, 'setTimeout');
+    let answer!: (v: { text: string }) => void;
+    const gm = { complete: vi.fn(() => new Promise<{ text: string }>((r) => (answer = r))) };
+    const t = await at({ rolls: [5], gm });
+    await go(t.relay, 'door', 'talk');
+    const hold = timers.mock.calls.find((c) => c[1] === GM_HOLD_MS)![0] as () => void;
+    timers.mockRestore();
+    const tags = pend(t).dealt!.map((c) => COSTS[c.cost].tag);
+    dbs.splice(dbs.indexOf(t.db), 1);
+    t.db.close();
+    answer({ text: JSON.stringify({ lines: Object.fromEntries(tags.map((tag) => [tag, 'The street shifts around you here.'])) }) });
+    await flush();
+    await flush();
+    expect(() => hold()).not.toThrow();
+  });
   it('no GM: nothing says writing', async () => {
     const t = await at({ rolls: [5] });
     await go(t.relay, 'door', 'talk');

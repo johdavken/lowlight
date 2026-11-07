@@ -36,7 +36,7 @@ async function room(page: Page): Promise<{ greetingId: string; errors: string[] 
   const greetingId = (await page.locator('.msg.agent.s-ok').last().getAttribute('data-id'))!;
   // A branch from her greeting to play in; the room reloads itself into it.
   const reloaded = page.waitForEvent('load');
-  const r = await page.request.post('/api/branch', { data: { contactId: DIRECT.id, messageId: greetingId } });
+  const r = await page.request.post('/api/branch', { data: { contactId: DIRECT.id, messageId: greetingId, name: 'Crew e2e' } });
   expect(r.status()).toBe(200);
   await reloaded;
   await page.waitForFunction(() => window.__nixRoom !== undefined);

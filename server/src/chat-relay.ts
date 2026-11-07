@@ -2000,7 +2000,7 @@ export class ChatRelay {
       const key = questKey(this.pair(), status.id);
       this.deps.db.setMeta(key, JSON.stringify({ ...run1, kit: [...(run1.kit ?? []), ...events], pending: parked, at: Date.now() }));
       // The GM first, so the state that shows the costs already says it's writing.
-      if (dealt.length && this.deps.gm) void this.fillGm(this.deps.gm, key, this.pid, q, beat, choice, parked, { filled, size: jobTakeSize(q) });
+      if (dealt.length && this.deps.gm) this.fillGmQuietly(this.deps.gm, key, this.pid, q, beat, choice, parked, { filled, size: jobTakeSize(q) });
       this.emitQuestState();
       return OK;
     }
@@ -2269,7 +2269,7 @@ export class ChatRelay {
     const run: QuestRun = { ...run0, kit: [...(run0.kit ?? []), ...(nerve ? [{ at, nerve, ...(lift ? { lift } : {}) }] : [])], pending: next, at: Date.now() };
     if (kind === 'take-hit') return this.landDealt(q, beat, { ...status, run }, ctx);
     this.deps.db.setMeta(key, JSON.stringify(run));
-    if (redealt && this.deps.gm) void this.fillGm(this.deps.gm, key, this.pid, q, beat, choice, next, { filled, size: jobTakeSize(q) });
+    if (redealt && this.deps.gm) this.fillGmQuietly(this.deps.gm, key, this.pid, q, beat, choice, next, { filled, size: jobTakeSize(q) });
     this.emitQuestState();
     return OK;
   }
@@ -2402,6 +2402,14 @@ export class ChatRelay {
    * yet picked, if the same roll is still waiting; a pick keeps the line it showed. `writing` holds the cards' lines back
    * meanwhile, up to GM_HOLD_MS; a later answer is dropped, so a line never changes once it shows.
    */
+  /**
+   * fillGm in the background. Its room can close while the GM writes (a LOAD, a switch of playthrough): the late
+   * answer then has no database to read, and is dropped instead of an unhandled rejection taking the server down.
+   */
+  private fillGmQuietly(...a: Parameters<ChatRelay['fillGm']>): void {
+    this.fillGm(...a).catch((err: unknown) => console.warn(`[gm] lines dropped: ${err instanceof Error ? err.message : String(err)}`));
+  }
+
   private async fillGm(gm: GmComplete, key: string, player: string, q: QuestEntry, beat: Beat, choice: Choice, parked: DicePending, take: { filled: number; size: number }): Promise<void> {
     const tag = `${player}|${parked.at}`;
     const me = Symbol(tag);
@@ -2409,7 +2417,12 @@ export class ChatRelay {
     const done = () => {
       if (this.gmWriting.get(tag) !== me) return;
       this.gmWriting.delete(tag);
-      this.emitQuestState(player);
+      // A timer: a closed room's throw here would be uncaught.
+      try {
+        this.emitQuestState(player);
+      } catch (err) {
+        console.warn(`[gm] state not sent: ${err instanceof Error ? err.message : String(err)}`);
+      }
     };
     const hold = setTimeout(done, GM_HOLD_MS);
     const costs = parked.dealt!.map((d) => d.cost);

@@ -107,9 +107,9 @@ describe('world.branch', () => {
     const { nix, cass } = seed(s);
     nix.close();
     cass.close();
-    const r = s.built.world.branch('nix', 'n10');
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
-    expect(r.name).toBe(`${s.pt.name} — branch`);
+    expect(r.name).toBe('A branch');
     expect(r.forkedFrom).toEqual({ playthrough: s.pt.id, message: { contactId: 'nix', messageId: 'n10', excerpt: 'Rain again. You came anyway.' }, name: s.pt.name });
     expect(s.built.world.active()!.id).toBe(r.id);
     const bNix = s.open(r.id, 'nix');
@@ -125,7 +125,7 @@ describe('world.branch', () => {
     cass.close();
     const cut = (contact: string, row: string | null, district: string) => ({ district, from: 1, to: 91, by: 'narrator' as const, contact, row });
     s.built.playthroughs.setOutages(s.pt.id, [cut('nix', 'n10', 'karasu'), cut('nix', 'n30', 'velvet'), cut('cass', 'c20', 'marsh'), cut('nix', null, 'tidal')]);
-    const r = s.built.world.branch('nix', 'n10');
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     expect(s.built.playthroughs.get(r.id)!.outages?.map((o) => o.district)).toEqual(['karasu', 'tidal']);
     // The playthrough it came from is never written.
@@ -145,7 +145,7 @@ describe('world.branch', () => {
     rt.room.setScene({ id: 'karasu/ribbon-rooftop' }, 'agent');
     rt.db.setReplyStamp(null);
     expect(rt.room.state.sceneId).toBe('karasu/ribbon-rooftop');
-    const r = s.built.world.branch('nix', 'n10');
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     expect(r.location).toEqual({ contactId: 'nix', sceneId: startRoom });
   });
@@ -156,7 +156,7 @@ describe('world.branch', () => {
     nix.close();
     cass.close();
     s.built.world.goSolo();
-    const r = s.built.world.branch('nix', 'n10');
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     expect(s.built.world.active()!.solo).toBeUndefined();
   });
@@ -169,7 +169,7 @@ describe('world.branch', () => {
     const nix = s.open(made.id, 'nix');
     nix.insertMessage(s.pt.player, line('v10', 10));
     nix.close();
-    const r = s.built.world.branch('nix', 'v10');
+    const r = s.built.world.branch('nix', 'v10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     expect(r.persona).toEqual(persona);
     expect(r.outfit).toBe('home');
@@ -183,7 +183,7 @@ describe('world.branch', () => {
     nix.insertMessage(s.pt.player, line('n51', 51, 'agent', 'Goodnight.'));
     nix.close();
     cass.close();
-    const r = s.built.world.branch('nix', 'n10');
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
     if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
     const rt = (await s.built.runtime('nix'))!;
     expect(rt.db.allMessages(s.pt.player).map((m) => m.id)).toEqual(['scene-1', 'n10']);
@@ -197,7 +197,7 @@ describe('world.branch', () => {
     const { nix, cass } = seed(s);
     nix.close();
     cass.close();
-    const r = s.built.world.branch('nix', 'n10') as { id: string };
+    const r = s.built.world.branch('nix', 'n10', 'A branch') as { id: string };
     expect(s.open(r.id, 'nix').sharedContacts(s.pt.player)).toEqual([]);
     expect(s.open(s.pt.id, 'nix').sharedContacts(s.pt.player).map((c) => c.contactId)).toEqual(['cass']);
   });
@@ -210,7 +210,7 @@ describe('world.branch', () => {
     cass.setReplyStamp(null);
     nix.close();
     cass.close();
-    const r = s.built.world.branch('nix', 'n30') as { id: string };
+    const r = s.built.world.branch('nix', 'n30', 'A branch') as { id: string };
     expect(s.open(r.id, 'cass').leadsGiven(s.pt.player)).toEqual([]);
     expect(s.open(s.pt.id, 'cass').leadsGiven(s.pt.player).map((l) => l.id)).toEqual(['teo-debt']);
   });
@@ -220,7 +220,7 @@ describe('world.branch', () => {
     const { nix, cass } = seed(s);
     nix.close();
     cass.close();
-    const r = s.built.world.branch('nix', 'n10') as { id: string; location: unknown };
+    const r = s.built.world.branch('nix', 'n10', 'A branch') as { id: string; location: unknown };
     expect(r.location).toEqual({ contactId: 'nix', sceneId: 'karasu/lowlight-intake' });
     expect(s.open(r.id, 'nix').loadRoom()!.sceneId).toBe('karasu/lowlight-intake');
   });
@@ -232,7 +232,7 @@ describe('world.branch', () => {
     cass.close();
     const dir = path.join(s.cfg.playthroughsDir, s.pt.id);
     const before = hashTree(dir);
-    s.built.world.branch('nix', 'n10');
+    s.built.world.branch('nix', 'n10', 'A branch');
     expect(hashTree(dir)).toEqual(before);
   });
 
@@ -249,7 +249,7 @@ describe('world.branch', () => {
     const rt = (await s.built.runtime('cass'))!;
     await until(() => rt.relay.busy);
     const folders = fs.readdirSync(s.cfg.playthroughsDir).length;
-    expect(s.built.world.branch('nix', 'n10')).toEqual({ busy: 'cass' });
+    expect(s.built.world.branch('nix', 'n10', 'A branch')).toEqual({ busy: 'cass' });
     expect(fs.readdirSync(s.cfg.playthroughsDir).length).toBe(folders);
   });
 
@@ -274,7 +274,7 @@ describe('world.branch', () => {
     // Written now (after Nix's line), outside a reply: stamped to Cass's older line.
     cassAgain.insertNote(player, { id: 'n2', text: 'by hand, later', pinned: false, createdAt: now, updatedAt: now, editedBy: 'user', about: 'you' });
     cassAgain.close();
-    const r = s.built.world.branch('nix', 'n1') as { id: string };
+    const r = s.built.world.branch('nix', 'n1', 'A branch') as { id: string };
     const bCass = s.open(r.id, 'cass');
     expect(bCass.listNotes(player).map((n) => n.id)).toEqual(['n1']);
     expect(bCass.allMessages(player).map((m) => m.id)).toEqual(['c1']);
@@ -286,7 +286,7 @@ describe('world.branch', () => {
     nix.insertMessage(s.pt.player, line('n10', 10));
     nix.close();
     s.built.playthroughs.touch(s.pt.id, { contactId: 'cass', sceneId: 'karasu/noodle-stall' });
-    const r = s.built.world.branch('nix', 'n10') as { location: unknown };
+    const r = s.built.world.branch('nix', 'n10', 'A branch') as { location: unknown };
     expect(r.location).toEqual({ contactId: 'nix', sceneId: 'karasu/lowlight-intake' });
   });
 
@@ -295,7 +295,7 @@ describe('world.branch', () => {
     const nix = s.open(s.pt.id, 'nix');
     nix.insertMessage(s.pt.player, line('n10', 10, 'agent', `${'x'.repeat(59)}🌧️ rain`));
     nix.close();
-    const r = s.built.world.branch('nix', 'n10') as { forkedFrom: { message: { excerpt: string } } };
+    const r = s.built.world.branch('nix', 'n10', 'A branch') as { forkedFrom: { message: { excerpt: string } } };
     const excerpt = r.forkedFrom.message.excerpt;
     expect(Array.from(excerpt)).toHaveLength(60);
     expect(excerpt.endsWith('🌧')).toBe(true);
@@ -307,8 +307,8 @@ describe('world.branch', () => {
     const { nix, cass } = seed(s);
     nix.close();
     cass.close();
-    expect(s.built.world.branch('nix', 'nope')).toBe('unknown');
-    expect(s.built.world.branch('nobody', 'n10')).toBe('unknown');
+    expect(s.built.world.branch('nix', 'nope', 'A branch')).toBe('unknown');
+    expect(s.built.world.branch('nobody', 'n10', 'A branch')).toBe('unknown');
   });
 });
 
@@ -333,15 +333,23 @@ describe('POST /api/branch', () => {
     const { nix, cass } = seed(s);
     nix.close();
     cass.close();
-    const r = await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'n10' });
+    const r = await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'n10', name: 'Night one — branch 1' });
     expect(r.status).toBe(200);
-    expect(r.body).toMatchObject({ name: `${s.pt.name} — branch`, location: { contactId: 'nix' } });
+    expect(r.body).toMatchObject({ name: 'Night one — branch 1', location: { contactId: 'nix' } });
     expect(s.built.world.active()!.id).toBe(r.body.id);
+  });
+
+  it('branch without a name is 400 bad-name', async () => {
+    const s = await start();
+    const count = s.built.playthroughs.list().length;
+    expect(await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'n10' })).toEqual({ status: 400, body: { error: 'bad-name' } });
+    expect(await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'n10', name: '  ' })).toEqual({ status: 400, body: { error: 'bad-name' } });
+    expect(s.built.playthroughs.list().length).toBe(count);
   });
 
   it('404 no such line', async () => {
     const s = await start();
-    const r = await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'nope' });
+    const r = await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'nope', name: 'x' });
     expect(r).toEqual({ status: 404, body: { error: 'no such line' } });
   });
 
@@ -357,7 +365,7 @@ describe('POST /api/branch', () => {
     ws.send(JSON.stringify({ type: 'user_message', text: 'hi' }));
     const rt = (await s.built.runtime('nix'))!;
     await until(() => rt.relay.busy);
-    const r = await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'n10' });
+    const r = await s.api('POST', '/api/branch', { contactId: 'nix', messageId: 'n10', name: 'Night one — branch 1' });
     expect(r).toEqual({ status: 409, body: { error: 'busy', contact: 'nix' } });
   });
 

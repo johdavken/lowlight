@@ -18,7 +18,7 @@ test.beforeEach(async ({ page }) => {
   await skipSplash(page);
 });
 
-test('new game, save, talk, load forks back', async ({ page }) => {
+test('new game, save, talk, load goes back in the same game, BEFORE LOAD comes forward again', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
 
@@ -58,23 +58,23 @@ test('new game, save, talk, load forks back', async ({ page }) => {
   await expect(save).toHaveClass(/\bon\b/);
   await page.keyboard.press('Enter');
 
-  // The fork: the line before the save is there, the later one isn't.
+  // Back in the same game: the line before the save is there, the later one isn't.
   await inRoomWith(page, DIRECT.id, 'EARLY-LINE');
   await expect(page.locator('#feed')).not.toContainText('LATER-LINE');
-  const forked = await activeId(page);
-  expect(forked).not.toBe(original);
+  expect(await activeId(page)).toBe(original);
 
-  // The original is still in LOAD, and continuing it brings the later line back.
+  // Where you were is kept as BEFORE LOAD; loading it brings the later line back, still the same game.
   await page.locator('.hud-back').click();
   await toTitle(page);
   await pickTitle(page, 'load');
-  // The fork is active (and newest), so selected: its file says where it came from.
-  await expect(load.locator(`.pt.on[data-id="${forked}"]`)).toBeVisible();
-  await expect(load.locator('.ld-from')).toContainText('forked from');
-  const row = load.locator(`.pt[data-id="${original}"]`);
-  for (let i = 0; i < 25 && !(await row.evaluate((n) => n.classList.contains('on'))); i++) await page.keyboard.press('ArrowRight');
-  await expect(row).toHaveClass(/\bon\b/);
-  await expect(load.locator('.ss[data-id="now"].on')).toBeVisible();
+  await expect(load.locator(`.pt.on[data-id="${original}"]`)).toBeVisible();
+  const after = (await (await page.request.get(`/api/playthroughs/${original}/saves`)).json()) as { id: string; name: string; trigger: string }[];
+  const back = after.find((s) => s.trigger === 'load')!;
+  expect(back.name).toBe(`Before loading ${before.name}`);
+  const backStrip = load.locator(`.ss[data-id="${back.id}"]`);
+  await expect(backStrip.locator('.ss-kind')).toHaveText('⤺ BEFORE LOAD');
+  for (let i = 0; i < 25 && !(await backStrip.evaluate((n) => n.classList.contains('on'))); i++) await page.keyboard.press('ArrowDown');
+  await expect(backStrip).toHaveClass(/\bon\b/);
   await page.keyboard.press('Enter');
   await inRoomWith(page, DIRECT.id, 'LATER-LINE');
   expect(await activeId(page)).toBe(original);

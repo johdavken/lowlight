@@ -507,6 +507,28 @@ describe('the committed cast', () => {
   });
 });
 
+describe('playable and discover: who select offers (select leads spec §1)', () => {
+  const link = { identity: 'identity.md', backend: { provider: 'openrouter', model: 'z-ai/glm-5.2' } };
+  it('reads playable and discover; absent reads false', () => {
+    direct('s-lead', { name: 'Lead', playable: true, ...link });
+    direct('s-found', { name: 'Found', discover: true, ...link });
+    direct('s-plain', { name: 'Plain', ...link });
+    expect(['s-lead', 's-found', 's-plain'].map((id) => byId(id).info.playable)).toEqual([true, false, false]);
+    expect(['s-lead', 's-found', 's-plain'].map((id) => byId(id).info.discover)).toEqual([false, true, false]);
+  });
+
+  it('a mindless character reads them too', () => {
+    fs.writeFileSync(path.join(charactersDir, 'alpha', 'character.json'), JSON.stringify({ playable: true, discover: true }));
+    expect(byId('alpha').info).toMatchObject({ playable: true, discover: true });
+    expect(byId('beta').info).toMatchObject({ playable: false, discover: false });
+  });
+
+  it('a value that isn\'t true reads false, and she still loads', () => {
+    direct('s-odd', { name: 'Odd', playable: 'yes', discover: 1, ...link });
+    expect(byId('s-odd').info).toMatchObject({ name: 'Odd', playable: false, discover: false });
+  });
+});
+
 describe('group: where she belongs on the select screen', () => {
   it('her own group wins, else her first room\'s district, else none for the neutral rooms', () => {
     direct('g-own', { name: 'Own', rooms: ['default/workspace'], group: 'karasu', identity: 'identity.md', backend: { provider: 'openrouter', model: 'z-ai/glm-5.2' } });

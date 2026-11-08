@@ -22,6 +22,8 @@ export interface RosterContact {
   thumb?: boolean;
   /** Her old pack: completes a saved room id from before rooms (as her room does). */
   legacyDistrict?: string | null;
+  /** Found in play (select leads spec §3): off Around Lowlight until known. */
+  discover?: boolean;
   /** Her select-screen file (bio paragraphs and facts), for her entry's file in CONTACTS. */
   bio?: string[];
   facts?: Fact[];
@@ -219,6 +221,16 @@ export function knownContacts(
  */
 export function aroundContacts(charsDir: string, pt: PlaythroughInfo, roster: RosterContact[], names: Names): AroundEntry[] {
   return contactsAndAround(charsDir, pt, roster, names).around;
+}
+
+/**
+ * AROUND LOWLIGHT as the player sees it (select leads spec §3): a discover contact stays off it until a lead
+ * the player holds names her (`heard`: its `to:` ids). Met, tied or shared, she's a known contact already.
+ * Only the list is filtered: GO, a rumor's GO TO and walking in still reach her (spec §2).
+ */
+export function foundOnly(around: AroundEntry[], roster: RosterContact[], heard: ReadonlySet<string>): AroundEntry[] {
+  const hidden = new Set(roster.filter((c) => c.discover && !heard.has(c.id)).map((c) => c.id));
+  return around.filter((e) => !hidden.has(e.contactId));
 }
 
 function strangersOf(facts: Map<string, DbFacts>, pt: PlaythroughInfo, roster: RosterContact[], names: Names, known: ContactEntry[]): AroundEntry[] {

@@ -23,7 +23,7 @@ import type { AroundEntry, ChatMessage, ChatMode, ContactEntry, HeldLead, LeadVi
 import { strangerAt } from '../../shared/encounter';
 import { speakerBeats } from '../../shared/beats';
 import type { PlaythroughPersona } from '../../shared/persona';
-import { contactsAndAround, hasRow, knownContacts, placesOf, readPlanMeta, type RosterContact } from './contacts';
+import { contactsAndAround, foundOnly, hasRow, knownContacts, placesOf, readPlanMeta, type RosterContact } from './contacts';
 import { guestWords } from './residual';
 import { whoIsHere } from './others';
 import { openDb, type Db } from './db';
@@ -758,6 +758,13 @@ export function createWorld(deps: {
     return contactsAndAround(playthroughs.charsDir(pt.id), pt, deps.roster(), namesOf(pt));
   }
 
+  /** Who a lead the player holds points to (select leads spec §3): a discover contact named so shows in AROUND LOWLIGHT (only that list reads it). */
+  function heardOf(pt: PlaythroughInfo): Set<string> {
+    const book = deps.leadBook?.() ?? [];
+    const to = new Map(book.map((e) => [e.id, e.to]));
+    return new Set(readHeldLeads(playthroughs.charsDir(pt.id), pt.player, book).flatMap((h) => (to.has(h.id) ? [to.get(h.id)!] : [])));
+  }
+
   /** City weather (spec §5): you're with her and in her room (on comms her room is far from you: it neither gives nor takes). */
   /** Whether turns are happening with contact `id` (her room follows the story): where you are, or, before a first turn has set that, the contact you started with (live check, blackouts phase 3). */
   function playingWith(pt: PlaythroughInfo, id: string): boolean {
@@ -1038,7 +1045,8 @@ export function createWorld(deps: {
       const pt = playthroughs.active();
       if (!pt) throw new Error('no-playthrough');
       try {
-        return people(pt).around;
+        // The list hides discover contacts not yet found; setLocation and contacts() still see them (spec §2, §3).
+        return foundOnly(people(pt).around, deps.roster(), heardOf(pt));
       } catch (err) {
         console.error(`[playthrough] around unreadable: ${err instanceof Error ? err.message : String(err)}`);
         return [];

@@ -591,3 +591,144 @@ describe('grouped by district (spec 2026-10-25)', () => {
     expect(at(f)).toBe('ember'); // c2 → c2
   });
 });
+
+// Select leads spec §4: a grid per step. a and b are leads (playable), c a plain contact, d found in
+// play (discover); e, f and g plain too, so the 2P grid has more tiles than the 1P one.
+describe('a grid per step', () => {
+  const entry = (id: string, more: Partial<RosterEntry> = {}): RosterEntry => ({ id, name: id.toUpperCase(), connected: true, backend: 'direct', link: 'ok', ...more });
+  const cast: RosterEntry[] = [
+    entry('a', { playable: true }),
+    entry('b', { playable: true }),
+    entry('c'),
+    entry('d', { discover: true }),
+    entry('e'),
+    entry('f'),
+    entry('g'),
+  ];
+  const make = (rng?: () => number) => createFlow(cast, { columns: 6, rng });
+  const toP2 = (flow: ReturnType<typeof make>, player: 'a' | 'b' = 'a') => {
+    flow.hover(flow.grids.p1.tiles.indexOf(player));
+    flow.lock();
+    flow.chooseYou(null);
+  };
+
+  it('1P holds ? and the playable ones; 2P everyone but the discover one', () => {
+    const flow = make();
+    expect(flow.grids.p1.tiles).toEqual([RANDOM, 'a', 'b']);
+    expect(flow.grids.p2.tiles).toEqual([RANDOM, 'a', 'b', 'c', 'e', 'f', 'g']);
+  });
+
+  it('with no playable anywhere, both grids are the whole roster', () => {
+    const flow = makeFlow();
+    expect(flow.grids.p1.tiles).toEqual(expectedTiles);
+    expect(flow.grids.p2.tiles).toEqual(expectedTiles);
+  });
+
+  it('shown(): 1P through p1 and you, 2P from p2 on; back from p2 shows 1P again', () => {
+    const flow = make();
+    expect(flow.shown()).toBe('p1');
+    flow.hover(1);
+    flow.lock();
+    expect(flow.state.phase).toBe('you');
+    expect(flow.shown()).toBe('p1');
+    expect(flow.tiles).toEqual(flow.grids.p1.tiles);
+    flow.chooseYou(null);
+    expect(flow.shown()).toBe('p2');
+    expect(flow.tiles).toEqual(flow.grids.p2.tiles);
+    flow.hover(flow.grids.p2.tiles.indexOf('c'));
+    flow.lock();
+    expect(flow.state.phase).toBe('model');
+    expect(flow.shown()).toBe('p2');
+    flow.chooseModel();
+    expect(flow.shown()).toBe('p2');
+    flow.back();
+    flow.back();
+    expect(flow.state.phase).toBe('p2');
+    flow.back();
+    expect(flow.state.phase).toBe('you');
+    expect(flow.shown()).toBe('p1');
+  });
+
+  it('? at 1P draws only from the leads; ? at 2P from every contact on it', () => {
+    const flow = make(() => 0.99);
+    flow.lock(); // cursor starts on ?
+    expect(flow.state.player).toBe('b');
+    flow.chooseYou(null);
+    flow.hover(0);
+    flow.lock();
+    expect(flow.state.ai).toBe('g');
+  });
+
+  it('locking a player with no remembered match puts the 2P cursor on her 2P tile', () => {
+    const flow = make();
+    toP2(flow, 'b');
+    expect(flow.state.cursor.p2).toBe(flow.grids.p2.tiles.indexOf('b'));
+    expect(flow.idAt('p2')).toBe('b');
+  });
+
+  it('hover beyond the shown grid is ignored at 1P and picks the 2P tile at 2P (Review Focus 2)', () => {
+    const flow = make();
+    flow.hover(5);
+    expect(flow.state.cursor.p1).toBe(0);
+    toP2(flow);
+    flow.hover(5);
+    expect(flow.state.cursor.p2).toBe(5);
+    expect(flow.idAt('p2')).toBe('f');
+  });
+
+  it('moving at 1P wraps within the 1P grid', () => {
+    const flow = make();
+    flow.move('left');
+    expect(flow.state.cursor.p1).toBe(2);
+    expect(flow.idAt('p1')).toBe('b');
+  });
+
+  it('marks(): the live cursor at 1P; at 2P the locked player on her 2P tile and the 2P cursor', () => {
+    const flow = make();
+    flow.hover(2);
+    expect(flow.marks()).toEqual({ p1: 2, p2: null });
+    toP2(flow, 'a');
+    flow.hover(4);
+    expect(flow.marks()).toEqual({ p1: flow.grids.p2.tiles.indexOf('a'), p2: 4 });
+  });
+
+  it('begin: a remembered player not on 1P starts on ?; a remembered contact not on 2P follows the lock', () => {
+    const flow = make();
+    flow.begin({ player: 'c', ai: 'd' });
+    expect(flow.state.cursor.p1).toBe(0);
+    toP2(flow, 'b');
+    expect(flow.idAt('p2')).toBe('b');
+  });
+
+  it('begin: a remembered lead and contact start on their own tiles', () => {
+    const flow = make();
+    flow.begin({ player: 'b', ai: 'e' });
+    expect(flow.idAt('p1')).toBe('b');
+    flow.lock();
+    flow.chooseYou(null);
+    expect(flow.idAt('p2')).toBe('e');
+  });
+
+  it('resume an old save played as a non-lead: locked by id, marked on 2P, back to 1P lands on ? (Review Focus 4)', () => {
+    const flow = make();
+    flow.resume({ player: 'c', ai: 'a' });
+    expect(flow.state.phase).toBe('ready');
+    expect(flow.state.player).toBe('c');
+    expect(flow.marks().p1).toBe(flow.grids.p2.tiles.indexOf('c'));
+    flow.back(); // ready → model (direct)
+    flow.back(); // model → p2
+    flow.back(); // p2 → you
+    flow.back(); // you → p1
+    expect(flow.state.phase).toBe('p1');
+    expect(flow.state.cursor.p1).toBe(0);
+    expect(flow.idAt('p1')).toBe(RANDOM);
+  });
+
+  it('resume with a contact not on 2P opens on 2P, the player locked, the cursor on her tile', () => {
+    const flow = make();
+    flow.resume({ player: 'a', ai: 'd' });
+    expect(flow.state.phase).toBe('p2');
+    expect(flow.state.player).toBe('a');
+    expect(flow.idAt('p2')).toBe('a');
+  });
+});

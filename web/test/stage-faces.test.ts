@@ -26,11 +26,23 @@ describe('stageFaces', () => {
     expect(stageFaces(line({ actions: 'I grin' }), { her: [], you: [] })).toEqual({ right: null, left: null });
   });
 
-  it("others' and strangers' pages, and no line, change no face", () => {
+  it("others' and strangers' pages, and no line, set no face of their own", () => {
     const faces = { her: ['happy'], you: ['happy'] };
     expect(stageFaces(line({ speaker: 'other', otherId: 'hae', actions: 'She grins' }), faces)).toEqual({ right: null, left: null });
     expect(stageFaces(line({ speaker: 'stranger', actions: 'He grins' }), faces)).toEqual({ right: null, left: null });
     expect(stageFaces(null, faces)).toEqual({ right: null, left: null });
+  });
+
+  it('a face holds while the other speaks, from their own last line', () => {
+    const faces = { her: ['happy', 'tired'], you: ['smile'] };
+    expect(stageFaces(line({ actions: 'I nod', held: { user: { actions: 'I grin' } } }), faces)).toEqual({ right: null, left: 'smile' });
+    expect(stageFaces(line({ role: 'user', speaker: 'user', actions: '', held: { contact: { actions: 'I grin' } } }), faces)).toEqual({ right: 'happy', left: null });
+    expect(stageFaces(line({ role: 'user', speaker: 'user', actions: '', held: { contact: { actions: 'I sit', expression: 'tired' } } }), faces).right).toBe('tired');
+    expect(stageFaces(line({ speaker: 'other', otherId: 'hae', held: { contact: { actions: 'I grin' }, user: { actions: 'I grin' } } }), faces)).toEqual({ right: 'happy', left: 'smile' });
+  });
+
+  it('her own next line sets her face, even back to neutral', () => {
+    expect(stageFaces(line({ actions: 'I set the mug down', held: { contact: { actions: 'I grin' } } }), { her: ['happy'], you: [] }).right).toBeNull();
   });
 
   it("whose face: his laugh in her reply isn't hers; your line counts I and bare verbs only", () => {

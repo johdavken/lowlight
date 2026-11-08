@@ -8,6 +8,7 @@ import type { CrewMember, CrewResult } from './crew-fold';
 import type { DiceSettings } from './dice/opponent';
 import type { Stats } from './stats';
 import type { CostId } from './costs';
+import type { DeckTrait } from './gear';
 import type { ProgramKind } from './programs';
 import type { Effect, Pool, Position } from './dice';
 import type { Roll } from './quests';
@@ -354,7 +355,7 @@ export interface QuestState {
   rumors?: { id: string; line: string; place: string; placeName: string; contact: string; contactName: string; here: boolean; leaving: string | null; /** A lead's contract you can't take yet: the rep it needs. */ needs?: number }[];
   boards?: { place: string; name: string; jobs: { id: string; title: string; pitch: string | null; postedBy?: string; brief?: string; art?: string; tier?: number; pay: number | null; range?: [number, number]; with?: string; opens?: string; comms?: string; once?: true }[] }[];
   /** The fixer at a board (small jobs spec §5): its stock, each item buyable, above your tier there, or more than your sol. */
-  fixer?: { place: string; items: { id: string; name: string; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: number; state: 'ok' | 'locked' | 'short' | 'owned' }[] };
+  fixer?: { place: string; items: { id: string; name: string; kind: 'deck' | 'cover'; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: 1 | 2 | 3 | 4; /** A deck's heat and traits. */ heat?: number; traits?: DeckTrait[]; state: 'ok' | 'locked' | 'short' | 'owned' }[] };
 }
 
 /** No quest lines to show. */
@@ -869,6 +870,10 @@ export interface AgentInfo {
   legacyDistrict: string | null;
   /** Where she belongs on the select screen: a district id (her `group`, else her first room's); null in the neutral rooms. */
   group: string | null;
+  /** Pickable at 1P (select leads spec §1). When no character has it, everyone is. */
+  playable?: boolean;
+  /** Found in play: never on select, off Around Lowlight until known (select leads spec §1, §3). */
+  discover?: boolean;
   connected: boolean;
   /** A character that runs on a model directly, or a mindless character with no runtime. */
   backend: 'direct' | 'none';

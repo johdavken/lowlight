@@ -356,7 +356,7 @@ function startRoom(agentId: string): void {
     if (c) stage.setSpeaker(c.speaker === 'user' ? 'left' : c.speaker === 'contact' && !beatRoom ? 'right' : null);
     whosHere.speaking(partySpeaker(c, partyStranger));
     // Faces from actions (spec 2026-10-20): hers from her *actions* on the page showing (else the reply's
-    // stored face), yours from your line's; each neutral while the other speaks.
+    // stored face), yours from your line's; each holds while the other speaks (CurrentLine.held).
     currentLine = c;
     applyFaces();
   });

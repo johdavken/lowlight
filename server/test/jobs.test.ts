@@ -5,7 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { ContactCard, QuestState, ServerEvent } from '../../shared/types';
+import type { ChatMessage, ContactCard, QuestState, ServerEvent } from '../../shared/types';
 import type { TurnRequest } from '../src/backend';
 import { ChatRelay, type ChatRelayDeps } from '../src/chat-relay';
 import { fakeBackend, reply } from './fixtures/backend';
@@ -1290,9 +1290,9 @@ describe('jobs: the fixer', () => {
     expect(relay.questState('hicks').fixer).toEqual({
       place: 'haes-noodles',
       items: [
-        { id: 'pocket-deck', name: 'Pocket deck', price: 600, tier: 1, quality: 1, state: 'short' },
-        { id: 'burner', name: 'Burner', price: 500, tier: 2, state: 'ok' },
-        { id: 'fall-guy', name: 'Fall guy', price: 1000, tier: 3, state: 'locked' },
+        { id: 'pocket-deck', name: 'Pocket deck', kind: 'deck', price: 600, tier: 1, quality: 1, heat: 0, traits: [], state: 'short' },
+        { id: 'burner', name: 'Burner', kind: 'cover', price: 500, tier: 2, state: 'ok' },
+        { id: 'fall-guy', name: 'Fall guy', kind: 'cover', price: 1000, tier: 3, state: 'locked' },
       ],
     });
   });
@@ -4656,7 +4656,7 @@ describe('a contract (tier 3 contracts spec §2)', () => {
   });
   it('the offer gets no setting-out note; the night does', async () => {
     const t = await start();
-    const note = (t.relay as unknown as { missionNote(r: unknown): string | null }).missionNote.bind(t.relay);
+    const note = (r: unknown) => t.relay['jobs'].missionNote(r as ChatMessage);
     expect(note({ quest: { id: 'the-contract', beat: 'offer', run: t.id } })).toBeNull();
     await toNight(t);
     await t.relay.startQuest('hicks', 'the-contract', go);
@@ -4666,7 +4666,7 @@ describe('a contract (tier 3 contracts spec §2)', () => {
     const t = await start();
     await t.pick('offer', 'take');
     await t.relay.walkAway('hicks', 'the-contract');
-    expect((t.relay as unknown as { jobsWithLine(): string | null }).jobsWithLine()).toBeNull();
+    expect(t.relay['jobs'].jobsWithLine()).toBeNull();
   });
   describe('The Subtraction, end to end', () => {
     const REAL = job(fs.readFileSync('world/quests/the-subtraction.md', 'utf8').replace('with: [mother-rot]', 'with: [nix-direct]').replace('starts: counting-house', 'starts: haes-noodles'), 'the-subtraction');

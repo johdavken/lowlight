@@ -1,6 +1,7 @@
 {
   "name": "Soren",
   "pronoun": "he",
+  "playable": true,
   "description": "Case officer in SDG's plainclothes branch; bought at nineteen, buys runners now. Lives under the Spine's deck on Pylon Forty. Quiet, polite, hard to read.",
   "accent": "#8fa3b8",
   "tagline": "SDG case officer. Bought at nineteen. Lives under the road.",

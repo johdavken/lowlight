@@ -113,6 +113,60 @@ describe("Soren's arc", () => {
   });
 });
 
+describe('lead openings', () => {
+  const read = (id: string) => {
+    const r = parseQuestFile(id, fs.readFileSync(`world/quests/${id}.md`, 'utf8'), { roster: null, places: null });
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    return r;
+  };
+  /** The shape every opening shares (spec 2026-11-07-lead-openings): structure only, never prose, so Studio edits keep it green. */
+  const opening = (id: string, o: { lead: string; contact: string; starts: string; rooms: string[]; recruit: { spec: string; grade: number; sex?: string } }) => {
+    const r = read(id);
+    const e = r.entry;
+    expect(r.warnings).toEqual([]);
+    expect([e.kind, e.tier, e.for, e.with, e.starts, e.once, e.template]).toEqual(['mission', 1, o.lead, [o.contact], o.starts, true, true]);
+    const beats = [...e.beats.values()].flat();
+    for (const b of beats) expect(b.views.map((v) => v.contact), `${b.id} has a view for ${o.contact}`).toContain(o.contact);
+    const rooms = new Set(beats.flatMap((b) => (b.room ? [b.room] : [])));
+    expect([...rooms].sort()).toEqual([...o.rooms].sort());
+    for (const room of rooms) expect(fs.existsSync(`scenes/${room}/scene.json`)).toBe(true);
+    expect([...e.outcomes.values()].some((x) => x.effects.recruit && x.effects.recruit.spec === o.recruit.spec && x.effects.recruit.grade === o.recruit.grade && x.effects.recruit.sex === o.recruit.sex)).toBe(true);
+    // A blown night leaves its mark: the last rolled beat's fail leads to a no-roll beat whose every pick sets a flag.
+    const rolled = beats.filter((b) => b.id !== 'getaway' && b.choices.some((c) => c.check));
+    const last = rolled[rolled.length - 1]!;
+    const fail = e.outcomes.get(last.choices.find((c) => c.fail)!.fail!)!;
+    const after = e.beats.get(fail.to)![0]!;
+    expect(after.choices.every((c) => !c.check && c.tags.some((t) => t.kind === 'set'))).toBe(true);
+    return { entry: e, text: fs.readFileSync(`world/quests/${id}.md`, 'utf8') };
+  };
+  it('Nix knows Ember by sight, with no standing of her own yet', () => {
+    // A tie's numbers seed the contact's standing toward the player (world.ts tieStarts), and Nix has never spoken to her.
+    const ember = JSON.parse(fs.readFileSync('characters/ember/character.json', 'utf8'));
+    expect(typeof ember.knows['nix-direct']).toBe('string');
+  });
+  it("Rue's Run Sheet is hers, with Soren, and agrees with his", () => {
+    const { text } = opening('run-sheet-rue', { lead: 'rue', contact: 'soren', starts: 'soren-hab', rooms: ['spine/long-haul'], recruit: { spec: 'muscle', grade: 0, sex: 'man' } });
+    // The same night as Soren's Run Sheet: the rig ahead of her father's is the same rig in both files, whatever either calls it next.
+    const rig = (s: string) => /Kestrel (\d{4}), the rig ahead/.exec(s)?.[1];
+    expect(rig(text)).toBeDefined();
+    expect(rig(text)).toBe(rig(fs.readFileSync('world/quests/run-sheet.md', 'utf8')));
+  });
+  it("Found is Hicks's, with Ember on his ear", () => {
+    const { text } = opening('found', { lead: 'hicks', contact: 'ember', starts: 'zhou-flat', rooms: ['karasu/dead-blocks', 'karasu/sixth-floor'], recruit: { spec: 'ears', grade: 0 } });
+    // Wren stays closed (his identity): the job names that he runs alone, never the breakup.
+    expect(text).not.toMatch(/breakup|broke up/i);
+  });
+  // A getaway's outcomes must end the job, so a mark that holds however it goes is set on its cards.
+  const getawaySets = (id: string) => read(id).entry.beats.get('getaway')![0]!.choices.map((c) => c.tags.flatMap((t) => (t.kind === 'set' ? [`${t.name}=${t.value}`] : [])));
+  it('a getaway out of Found leaves Pell on the list, and one out of Signed leaves the sparkle in the log', () => {
+    for (const sets of getawaySets('found')) expect(sets).toContain('pell=listed');
+    for (const sets of getawaySets('signed')) expect(sets).toContain('spark=left');
+  });
+  it("Signed is Ember's, with Hicks on her ear", () => {
+    opening('signed', { lead: 'ember', contact: 'hicks', starts: 'the-tilt', rooms: ['velvet/under-the-cat'], recruit: { spec: 'face', grade: 0, sex: 'man' } });
+  });
+});
+
 describe("a guest's abilities", () => {
   it('are all in the real book, or their cards would quietly be missing', () => {
     const ids = loadCrewBook('./world/crew', () => {}).abilities.map((a) => a.id);

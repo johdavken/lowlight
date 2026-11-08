@@ -4,6 +4,7 @@
  */
 import { topRowFor } from './roster-grid';
 import './band.css';
+import { glyphSvg, type GlyphName } from './glyphs';
 
 export const BAND_GAP = 6;
 /** Each tile glitches in this long after the one before it. */
@@ -12,7 +13,7 @@ const STAGGER_MS = 40;
 export interface BandTile {
   id: string;
   name: string;
-  art: { kind: 'face' | 'room'; src: string } | { kind: 'mosaic'; srcs: string[] } | { kind: 'mark'; text: string };
+  art: { kind: 'face' | 'room'; src: string } | { kind: 'glyph'; glyph: GlyphName } | { kind: 'mark'; text: string };
   /** The corner tag (▶ NOW green, the save icons amber). */
   tag?: { text: string; now?: boolean };
 }
@@ -26,14 +27,11 @@ const el = (tag: string, cls: string, text?: string) => {
 
 function buildArt(art: BandTile['art']): HTMLElement {
   if (art.kind === 'mark') return el('div', 'tile-mark', art.text);
-  if (art.kind === 'mosaic') {
-    const grid = el('div', 'tile-mosaic');
-    for (const src of art.srcs.slice(0, 4)) {
-      const i = el('i', '');
-      i.style.backgroundImage = `url("${src}")`;
-      grid.append(i);
-    }
-    return grid;
+  if (art.kind === 'glyph') {
+    const mark = el('div', 'tile-mark tile-glyph');
+    mark.dataset.glyph = art.glyph;
+    mark.append(glyphSvg(art.glyph));
+    return mark;
   }
   if (art.kind === 'face') {
     const face = el('div', 'tile-face');

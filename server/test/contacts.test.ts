@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import type { PlaythroughInfo, RoomState } from '../../shared/types';
-import { aroundContacts, contactsAndAround, knownContacts, placesOf, type RosterContact } from '../src/contacts';
+import { aroundContacts, contactsAndAround, foundOnly, knownContacts, placesOf, type RosterContact } from '../src/contacts';
 import { openDb, type Db } from '../src/db';
 import { tempDir } from './fixtures/temp-dir';
 
@@ -113,6 +113,41 @@ describe('aroundContacts', () => {
     const chars = tempDir('contacts-');
     withDb(chars, 'cass', (db) => db.insertMessage('hicks', { id: 'r', role: 'agent', text: 'Hi.', toolLines: [], ts: 2, status: 'ok', mode: 'greet' }));
     expect(aroundContacts(chars, playthrough(), roster, { ...names, ties: { vee: 't' } })).toEqual([]);
+  });
+});
+
+describe('a discover contact (select leads spec §3)', () => {
+  const roster: RosterContact[] = [...ROSTER, { id: 'ines', name: 'Ines', pronoun: 'she', accent: '#2fbfa5', startRoom: 'drownworks/pump-house-nine', discover: true }];
+  const around = (chars: string, heard: ReadonlySet<string> = new Set()) => foundOnly(aroundContacts(chars, playthrough(), roster, names), roster, heard).map((e) => e.contactId);
+
+  it('Around leaves out a discover contact never met', () => {
+    expect(around(tempDir('contacts-'))).toEqual(['cass', 'vee']);
+  });
+
+  it('a discover contact shows in Around once a held lead names her', () => {
+    expect(around(tempDir('contacts-'), new Set(['ines']))).toEqual(['cass', 'vee', 'ines']);
+  });
+
+  it('the strangers list itself keeps her: walking in on her still works', () => {
+    expect(aroundContacts(tempDir('contacts-'), playthrough(), roster, names).map((e) => e.contactId)).toEqual(['cass', 'vee', 'ines']);
+  });
+
+  it('a discover contact met, tied or shared is in known, not Around', () => {
+    const met = tempDir('contacts-');
+    withDb(met, 'ines', (db) => db.insertMessage('hicks', { id: 'r', role: 'agent', text: 'Pumps first.', toolLines: [], ts: 2, status: 'ok', mode: 'greet' }));
+    const both = contactsAndAround(met, playthrough(), roster, names);
+    expect(both.known.find((c) => c.id === 'ines')?.status).toBe('met');
+    expect(both.around.map((e) => e.contactId)).not.toContain('ines');
+
+    const tied = contactsAndAround(tempDir('contacts-'), playthrough(), roster, { ...names, ties: { ines: 'the Works' } });
+    expect(tied.known.find((c) => c.id === 'ines')?.status).toBe('knows');
+    expect(tied.around.map((e) => e.contactId)).not.toContain('ines');
+
+    const shared = tempDir('contacts-');
+    withDb(shared, 'cass', (db) => db.shareContact({ contactId: 'ines', player: 'hicks', messageId: 'm', how: null, at: 1 }));
+    const viaCass = contactsAndAround(shared, playthrough(), roster, names);
+    expect(viaCass.known.find((c) => c.id === 'ines')?.status).toBe('shared');
+    expect(viaCass.around.map((e) => e.contactId)).not.toContain('ines');
   });
 });
 

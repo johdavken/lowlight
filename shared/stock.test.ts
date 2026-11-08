@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { buyEvent, canBuy, parseFixer, parseStock, type StockItem } from './stock';
+import { buyEvent, canBuy, gearRule, gearStat, parseFixer, parseStock, type StockItem } from './stock';
 
 const DECKS = new Set(['dock-slate', 'pocket-deck', 'deaf-meridian', 'stall-build', 'meridian', 'field-deck', 'chrome-deck']);
 const item = (id: string, price: number, tier: 1 | 2 | 3 | 4, kind: 'deck' | 'cover' = 'deck'): StockItem => ({ id, kind, price, tier });
@@ -50,5 +50,27 @@ describe('fixer stock', () => {
     expect(canBuy({ item: item('burner', 500, 2, 'cover'), sol: 9999, tier: 1 })).toBe('locked');
     expect(canBuy({ item: item('burner', 500, 2, 'cover'), sol: 499, tier: 2 })).toBe('short');
     expect(canBuy({ item: item('burner', 500, 2, 'cover'), sol: 500, tier: 3 })).toBe('ok');
+  });
+});
+
+describe('gear words on the shelf', () => {
+  it('a deck: quality, slots, heat and traits; cover is used up', () => {
+    expect(gearStat({ kind: 'deck', id: 'chrome-deck', quality: 4, heat: 1, traits: ['hidden', 'chrome'] })).toBe('Q4 · 3 SLOTS · HEAT 1 · HIDDEN · CHROME');
+    expect(gearStat({ kind: 'deck', id: 'dock-slate', quality: 1, heat: 0, traits: [] })).toBe('Q1 · 1 SLOT · HEAT 0');
+    expect(gearStat({ kind: 'cover', id: 'fall-guy' })).toBe('COVER · USED UP');
+  });
+
+  it('the rule: slots, heat unless hidden, each trait; each cover', () => {
+    expect(gearRule({ kind: 'deck', id: 'chrome-deck', quality: 4, heat: 1, traits: ['hidden', 'chrome'] })).toBe(
+      '3 program slots. Hidden: no deck heat. Chrome: RESIST rolls one more die on a grid check.',
+    );
+    expect(gearRule({ kind: 'deck', id: 'dock-slate', quality: 1, heat: 0, traits: [] })).toBe('1 program slot. No deck heat.');
+    expect(gearRule({ kind: 'cover', id: 'burner' })).toBe("A blown job's rep loss is halved. Used up.");
+    expect(gearRule({ kind: 'cover', id: 'fall-guy' })).toBe("A blown job costs no rep; the fixer takes half the job's pay from your sol. Used up.");
+  });
+
+  it('every deck and cover sold has a picture in web/public/gear', () => {
+    const decks = fs.readFileSync('world/gear/decks.md', 'utf8').match(/^id: .+$/gm)!.map((l) => l.slice(4).trim());
+    for (const id of [...decks, 'burner', 'fall-guy']) expect(fs.existsSync(`web/public/gear/${id}.webp`), id).toBe(true);
   });
 });

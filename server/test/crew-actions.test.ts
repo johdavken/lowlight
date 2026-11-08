@@ -142,7 +142,8 @@ describe('crew actions through the relay', () => {
 
   it("a crew action re-sends the job list: its SETUP cards list who's ready (the hand)", () => {
     const t = relayWith();
-    const sent = vi.spyOn(t.relay, 'emitQuestState');
+    // The crew action runs in the job runner, which re-sends through its own emitQuestState.
+    const sent = vi.spyOn(t.relay['jobs'], 'emitQuestState');
     t.relay.crew('hicks', { do: 'hire', recruit: firstCard(t.view()).recruit!.id });
     expect(sent).toHaveBeenCalled();
     const away = relayWith({ here: 'pump-house-nine' });

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatMessage } from '../../shared/types';
-import { actionSpans, Feed, portrait2x } from '../src/ui/feed';
+import { actionSpans, Feed, portrait2x, type CurrentLine } from '../src/ui/feed';
 import { mountInput } from '../src/ui/input';
 
 function msg(over: Partial<ChatMessage> & Pick<ChatMessage, 'id'>): ChatMessage {
@@ -2021,9 +2021,9 @@ describe('current line actions (faces from actions)', () => {
     );
     allFeeds.push(feed);
     feed.setAgentName('Nix');
-    const seen: Array<{ speaker: string; actions: string }> = [];
+    const seen: Array<{ speaker: string; actions: string; held?: CurrentLine['held'] }> = [];
     feed.onCurrent((c) => {
-      if (c) seen.push({ speaker: c.speaker, actions: c.actions });
+      if (c) seen.push({ speaker: c.speaker, actions: c.actions, ...(c.held ? { held: c.held } : {}) });
     });
     return { feed, seen };
   }
@@ -2101,6 +2101,59 @@ describe('current line actions (faces from actions)', () => {
     expect(seen.at(-1)!.speaker).toBe('other');
     expect(seen.at(-1)!.actions).toContain('She glares');
     expect(seen.at(-1)!.actions).not.toContain('grin');
+  });
+
+  describe('faces hold while the other speaks', () => {
+    it('her reply carries your last line; your line carries hers', () => {
+      const { feed, seen } = actionsFeed();
+      feed.upsert(msg({ id: 'a1', text: '*She smiles.* Hey.', expression: 'tired' }));
+      feed.upsert(msg({ id: 'u1', role: 'user', text: '*I grin* hi' }));
+      expect(seen.at(-1)!.held).toEqual({ contact: { actions: 'She smiles.', expression: 'tired' } });
+      feed.upsert(msg({ id: 'a2', text: 'Sit.' }));
+      expect(seen.at(-1)!.held).toEqual({ user: { actions: 'I grin' } });
+    });
+
+    it('OOC and failed lines are skipped; a move or her greeting ends the hold', () => {
+      const { feed, seen } = actionsFeed();
+      feed.setHistory([
+        msg({ id: 'u1', role: 'user', text: '*I grin*' }),
+        msg({ id: 'u2', role: 'user', text: 'brb', mode: 'ooc' }),
+        msg({ id: 'u3', role: 'user', text: '*I frown*', status: 'failed' }),
+        msg({ id: 'a1', text: 'Back.' }),
+      ]);
+      expect(seen.at(-1)!.held).toEqual({ user: { actions: 'I grin' } });
+      feed.upsert(msg({ id: 'g1', text: '*She waves.*', mode: 'greet' }));
+      expect(seen.at(-1)!.held).toBeUndefined();
+      feed.upsert(msg({ id: 'u4', role: 'user', text: 'Hey.' }));
+      expect(seen.at(-1)!.held).toEqual({ contact: { actions: 'She waves.' } });
+      feed.upsert(msg({ id: 't1', role: 'user', text: 'Rooftop', mode: 'travel' }));
+      feed.upsert(msg({ id: 'a2', text: 'Cold up here.', mode: 'travel' }));
+      expect(seen.at(-1)!.held).toBeUndefined();
+    });
+
+    it('her replies to quest beats count; your quest beats do not', () => {
+      const { feed, seen } = actionsFeed();
+      feed.setHistory([
+        msg({ id: 'u1', role: 'user', text: '*I grin*' }),
+        msg({ id: 'a1', text: '*She smiles.*' }),
+        msg({ id: 'q1', role: 'user', text: '*I frown* You take the stairs.', mode: 'quest' }),
+        msg({ id: 'a2', text: '*She nods.*', mode: 'quest' }),
+        msg({ id: 'u2', role: 'user', text: 'Done.' }),
+      ]);
+      expect(seen.at(-1)!.held).toEqual({ contact: { actions: 'She nods.' } });
+      feed.upsert(msg({ id: 'a3', text: 'Good.' }));
+      expect(seen.at(-1)!.held).toEqual({ user: { actions: '' } });
+    });
+
+    it("another's page holds her earlier beat on the same reply", () => {
+      const { feed, seen } = actionsFeed({ measure: { a1: { content: 100, beats: [50, 50] } } });
+      feed.setOthers([HAE]);
+      feed.upsert(msg({ id: 'u1', role: 'user', text: '*I nod*' }));
+      feed.upsert(msg({ id: 'a1', text: '*I grin.*\n\nHae: *She glares.*' }));
+      feed.advance();
+      expect(seen.at(-1)!.speaker).toBe('other');
+      expect(seen.at(-1)!.held).toEqual({ contact: { actions: 'I grin.' }, user: { actions: 'I nod' } });
+    });
   });
 });
 

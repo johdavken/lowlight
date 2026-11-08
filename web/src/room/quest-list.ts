@@ -7,6 +7,7 @@
  */
 import type { LeadView, LooseEndsView, QuestState } from '../../../shared/types';
 import { onClickAway } from '../ui/click-away';
+import { gearRule, gearStat } from '../../../shared/stock';
 import { looseEndsTab } from './quest-loose-ends';
 import './quest-list.css';
 
@@ -169,7 +170,7 @@ export function mountQuestList(
   const hereRows = () => [...state.open.filter((q) => !isJob(q)), ...state.open.filter(isJob)];
 
   /** The rows of the tab up, by the key `picked` holds. */
-  const rowKeys = (): string[] => (tab === 'here' ? hereRows().map((q) => q.id) : tab === 'away' ? awayRows(state).map((a) => a.key) : tab === 'rumors' ? (state.rumors ?? []).map((r) => r.id) : tab === 'leads' ? leadRows().map((l) => l.id) : []);
+  const rowKeys = (): string[] => (tab === 'here' ? hereRows().map((q) => q.id) : tab === 'away' ? awayRows(state).map((a) => a.key) : tab === 'rumors' ? (state.rumors ?? []).map((r) => r.id) : tab === 'leads' ? leadRows().map((l) => l.id) : tab === 'fixer' ? (state.fixer?.items ?? []).map((i) => i.id) : []);
 
   const render = () => {
     const shown = tabs();
@@ -502,20 +503,49 @@ export function mountQuestList(
     return inner;
   };
 
-  // The fixer at a board (small jobs spec §5): BUY at your tier there with the sol for it.
+  // The fixer at a board (small jobs spec §5), as a shelf (mock docs/mockups/fixer-gear.html, A): each item a 3:4
+  // card from web/public/gear/, its name and numbers over the picture's empty foot, the price and BUY under it, the
+  // picked item's rule below the row. BUY at your tier there with the sol for it.
   const fixerFile = (): HTMLElement => {
     const box = el('div', 'ql-fixer');
-    for (const item of state.fixer?.items ?? []) {
-      const row = el('div', `ql-row ql-item ${item.state}`);
-      const text = el('div', 'ql-text');
-      text.append(el('span', 'ql-item-name', [item.name, ...(item.quality ? [`Q${item.quality}`] : []), `${item.price} SOL`].join(' · ')));
-      if (item.state !== 'ok') text.append(el('div', 'ql-item-why', item.state === 'locked' ? `TIER ${item.tier}` : item.state === 'owned' ? 'YOU HAVE ONE' : 'NOT ENOUGH SOL'));
-      const buy = el('button', 'ql-buy', 'BUY');
-      buy.type = 'button';
-      buy.disabled = item.state !== 'ok';
-      buy.onclick = () => o.onBuy?.(item.id);
-      row.append(text, buy);
-      box.append(row);
+    const items = state.fixer?.items ?? [];
+    const shelf = el('div', 'ql-shelf');
+    for (const item of items) {
+      const card = el('div', `ql-item ${item.state}${item.id === picked ? ' ql-picked' : ''}`);
+      card.dataset.item = item.id;
+      const pic = el('button', 'ql-gear');
+      pic.type = 'button';
+      pic.setAttribute('aria-pressed', String(item.id === picked));
+      const img = el('img');
+      img.src = `/gear/${item.id}.webp`;
+      img.alt = '';
+      // No picture for it yet: the panel's hatch.
+      img.onerror = () => img.replaceWith(el('span', 'ql-noart'));
+      const words = el('span', 'ql-gear-words');
+      words.append(el('span', 'ql-item-name', item.name.toUpperCase()), el('span', 'ql-item-stat', gearStat(item)));
+      pic.append(img, words);
+      pic.onclick = () => {
+        picked = item.id;
+        render();
+      };
+      const foot = el('div', 'ql-gear-foot');
+      foot.append(el('span', 'ql-item-price', `${item.price} SOL`));
+      if (item.state !== 'ok') foot.append(el('span', 'ql-item-why', item.state === 'locked' ? `TIER ${item.tier}` : item.state === 'owned' ? 'YOU HAVE ONE' : 'NOT ENOUGH SOL'));
+      else {
+        const buy = el('button', 'ql-buy', 'BUY');
+        buy.type = 'button';
+        buy.onclick = () => o.onBuy?.(item.id);
+        foot.append(buy);
+      }
+      card.append(pic, foot);
+      shelf.append(card);
+    }
+    box.append(shelf);
+    const it = items.find((i) => i.id === picked);
+    if (it) {
+      const rule = el('div', 'ql-gear-rule');
+      rule.append(el('span', 'ql-gear-rule-name', it.name.toUpperCase()), el('p', 'ql-brief', gearRule(it)));
+      box.append(rule);
     }
     return box;
   };

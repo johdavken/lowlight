@@ -498,6 +498,29 @@ describe("ability cards: index tabs under the recruit that turn their card over 
     choice('sit').click();
     expect(onChoose).toHaveBeenLastCalledWith('sit', { card: 'dez/cool-head' });
   });
+  it('a redraw mid-turn lets the turn run on: the back still comes up, then the ability', () => {
+    vi.useFakeTimers();
+    const { t } = mount();
+    const a = withAbilities(three);
+    t.show(a);
+    glyph('dez/cool-head').click();
+    expect(up()).toBe('BACK');
+    t.show(a);
+    expect(up()).toBe('BACK');
+    vi.advanceTimersByTime(1000);
+    expect(up()).toBe('dez/cool-head');
+  });
+  it('with a deck carried, turning a lifted recruit over still shows the back (playtest: the lift redrew the hand)', () => {
+    vi.useFakeTimers();
+    const { t } = mount();
+    const a = withAbilities(three);
+    t.show({ ...a, hand: { ...a.hand!, pockets: { deck: { name: 'D', quality: 2, skin: 'green' }, slots: 2, dead: false, loaded: [], catalog: [] } } });
+    slot('dez').click();
+    glyph('dez/cool-head').click();
+    expect(up()).toBe('BACK');
+    vi.advanceTimersByTime(1000);
+    expect(up()).toBe('dez/cool-head');
+  });
   it('turning the card over drops a lift from the side that was up', () => {
     vi.useFakeTimers();
     const { t } = mount();

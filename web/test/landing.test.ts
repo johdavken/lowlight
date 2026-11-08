@@ -1295,3 +1295,75 @@ describe('select by district (spec 2026-10-25)', () => {
     expect([...document.querySelectorAll('.tile-group')].map((l) => l.textContent)).toEqual(['KARASU', 'DROWNWORKS', 'SPINE']); // one tile each: no leading THE
   });
 });
+
+// Select leads spec §4: the grid shows the step's own characters. Dixie and Hicks are leads, Nix a
+// plain contact, Case found in play.
+describe('a grid per step on the screen', () => {
+  const leads: AgentsResponse = {
+    agents: [
+      agent({ id: 'hicks', name: 'Hicks', backend: 'none', playable: true }),
+      agent({ id: 'dixie', name: 'Dixie', modelLabel: 'GLM 5.2', connected: true, link: 'ok', playable: true }),
+      agent({ id: 'nix', name: 'Nix', modelLabel: 'GLM 5.2', connected: true, link: 'ok' }),
+      agent({ id: 'case', name: 'Case', modelLabel: 'GLM 5.2', connected: true, link: 'ok', discover: true }),
+    ],
+  };
+  const named = () => tileIds().filter((id) => id !== '?random');
+  const lockedP1 = () => [...document.querySelectorAll<HTMLElement>('.tile.locked-p1')].map((t) => t.dataset.id);
+
+  it('1P shows ? and the playable ones; after YOU the grid holds every contact but the discover one', async () => {
+    await mount({ data: leads });
+    expect(phase()).toBe('p1');
+    expect(named()).toEqual(['dixie', 'hicks']);
+    keys('ArrowRight', 'Enter', 'Enter'); // dixie, YOU → PLAY AS DIXIE
+    expect(phase()).toBe('p2');
+    expect(named()).toEqual(['dixie', 'nix', 'hicks']);
+    expect(lockedP1()).toEqual(['dixie']);
+  });
+
+  it('Esc from p2 back to YOU puts the 1P grid back, green mark on the locked player (Review Focus 3)', async () => {
+    await mount({ data: leads });
+    keys('ArrowRight', 'ArrowRight', 'Enter', 'Enter'); // hicks, PLAY AS HICKS
+    expect(phase()).toBe('p2');
+    key('Escape');
+    expect(phase()).toBe('you');
+    expect(named()).toEqual(['dixie', 'hicks']);
+    expect(lockedP1()).toEqual(['hicks']);
+  });
+
+  it('a mouse parked over the grid does not move the 2P cursor when the swap puts another tile under it', async () => {
+    await mount({ data: leads });
+    const move = (x: number, y: number) => window.dispatchEvent(new MouseEvent('mousemove', { clientX: x, clientY: y }));
+    const enter = (id: string) => document.querySelector(`.tile[data-id="${id}"]`)!.dispatchEvent(new MouseEvent('mouseenter'));
+    move(10, 10);
+    enter('hicks'); // the mouse rests on Hicks at 1P
+    expect(hot()).toEqual(['hicks']);
+    keys('Enter', 'Enter'); // lock Hicks, play as him: the 2P grid
+    expect(phase()).toBe('p2');
+    expect(hot()).toEqual(['hicks']);
+    // The swap puts Nix under the resting mouse: the browser's own enter (and a same-spot move) changes nothing.
+    move(10, 10);
+    enter('nix');
+    expect(hot()).toEqual(['hicks']);
+    // A real move onto another tile: the browser fires mouseover and mouseenter before mousemove, so the
+    // first tile entered counts.
+    const tile = document.querySelector('.tile[data-id="nix"]')!;
+    tile.dispatchEvent(new MouseEvent('mouseover', { clientX: 40, clientY: 12, bubbles: true }));
+    enter('nix');
+    expect(hot()).toEqual(['nix']);
+  });
+
+  it('the link poll at p2 marks offline tiles on the 2P grid, and they stay marked across a swap (Review Focus 1)', async () => {
+    const down: AgentsResponse = { agents: leads.agents.map((a) => (a.id === 'nix' ? { ...a, connected: false } : a)) };
+    const agents = vi.fn().mockResolvedValueOnce(leads).mockResolvedValue(down);
+    await mount({ agents });
+    keys('ArrowRight', 'Enter', 'Enter'); // dixie, on to p2
+    expect(document.querySelector('.tile[data-id="nix"]')!.classList.contains('offline')).toBe(false);
+    await tick(POLL_MS);
+    expect(document.querySelector('.tile[data-id="nix"]')!.classList.contains('offline')).toBe(true);
+    key('Escape'); // YOU: the 1P grid
+    expect(document.querySelector('.tile[data-id="nix"]')).toBeNull();
+    key('Enter'); // back to p2
+    expect(phase()).toBe('p2');
+    expect(document.querySelector('.tile[data-id="nix"]')!.classList.contains('offline')).toBe(true);
+  });
+});

@@ -10,7 +10,7 @@
     "dev": "concurrently \"tsx watch server/src/main.ts\" \"vite\"",
     "build": "vite build",
     "start": "tsx server/src/main.ts --production",
-    "test": "vitest run",
+    "test": "nice -n 10 vitest run",
     "e2e": "playwright test",
     "e2e:failed": "playwright test --last-failed",
     "e2e:game": "playwright test --project chromium",

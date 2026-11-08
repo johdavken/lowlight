@@ -88,44 +88,55 @@ test('quest waits: HAND parks the story until morning at the Intake; WAIT UNTIL 
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   await awaitGreeting(page);
   const greetingId = (await page.locator('.msg.agent.s-ok').last().getAttribute('data-id'))!;
+  // She answers every beat, and the server turns a pick, WAIT UNTIL or CONTINUE away while she's still answering
+  // ("wait for her to finish"). The cards show before her answer, which under load can come seconds later: each step
+  // waits for her answer to the last one.
+  const replies = page.locator('.msg.agent.s-ok');
+  let answered = await replies.count();
+  const herAnswer = async () => {
+    answered += 1;
+    await expect(replies).toHaveCount(answered, { timeout: 10_000 });
+  };
 
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Paper Trail');
   await expect(page.locator('.qc-card')).toHaveCount(3, { timeout: 10_000 });
+  await herAnswer();
   await page.locator('.qc-card[data-choice="hand"]').click();
 
   // The story waits: no cards, the next step, where and by when.
   await expect(page.locator('.qc-next')).toHaveText('The Sentinel said morning. Be at the Intake.', { timeout: 10_000 });
   await expect(page.locator('.qc-card')).toHaveCount(0);
   await expect(page.locator('.qc-when')).toContainText('by 12:00');
+  await herAnswer();
 
   // WAIT UNTIL 06:00 in the panel: the return plays, in its version for those who handed the page over.
   await expect(page.locator('.qc-wait')).toHaveText('WAIT UNTIL 06:00');
   await page.locator('.qc-wait').click();
   await expect(page.locator('.qc-card')).toHaveCount(2, { timeout: 10_000 });
   await expect(page.locator('.qc-story')).toContainText('Venn is back, with the page.');
+  await herAnswer();
   await page.locator('.qc-card[data-choice="out2"]').click();
   await expect(page.locator('.qc-end')).toBeVisible({ timeout: 10_000 });
   // The ending row has no stranger: his bust goes and the line takes its room back.
   await expect(page.locator('.sp-portrait')).toHaveCount(0);
   await expect(page.locator('#feed')).not.toHaveClass(/has-portrait/);
+  await herAnswer();
   await page.locator('.qc-close').click();
 
   // A ready wait: CONTINUE plays the next beat.
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Ready Test');
   await expect(page.locator('.qc-card')).toHaveCount(2, { timeout: 10_000 });
-  const replies = page.locator('.msg.agent.s-ok');
-  const picked = await replies.count();
+  await herAnswer();
   await page.locator('.qc-card[data-choice="go"]').click();
   await expect(page.locator('.qc-continue')).toBeVisible({ timeout: 10_000 });
-  // GO's beat gets its own reply; under load it lands after CONTINUE shows, so count after it.
-  await expect(replies).toHaveCount(picked + 1, { timeout: 10_000 });
-  const continued = await replies.count();
+  // GO's beat gets its own answer; under load it lands after CONTINUE shows.
+  await herAnswer();
   await page.locator('.qc-continue').click();
   await expect(page.locator('.qc-story')).toContainText('The second beat.', { timeout: 10_000 });
-  // Her reply to the beat finishes before the rewind: one sent mid-turn is refused (busy) and the reply lands after it.
-  await expect(replies).toHaveCount(continued + 1, { timeout: 10_000 });
+  // Her answer to the beat finishes before the rewind: one sent mid-turn is refused (busy) and the answer lands after it.
+  await herAnswer();
   expect(errors).toEqual([]);
   await send(page, { type: 'rewind', messageId: greetingId });
   await expect(page.locator('.msg.agent.s-ok').last()).toHaveAttribute('data-id', greetingId, { timeout: 10_000 });

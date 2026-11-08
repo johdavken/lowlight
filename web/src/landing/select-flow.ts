@@ -7,6 +7,15 @@ import { layoutTiles, orderTiles, RANDOM, stepVertical, type Layout } from './di
 
 export type Phase = 'p1' | 'you' | 'p2' | 'model' | 'ready';
 
+/** A select step's grid: 1P (who you play) or 2P (your contact). */
+export type Step = 'p1' | 'p2';
+
+/** One step's tiles (`?` first) and where each sits (district-groups). */
+export interface Grid {
+  tiles: string[];
+  layout: Layout;
+}
+
 export { RANDOM };
 
 export interface RosterEntry {
@@ -17,6 +26,10 @@ export interface RosterEntry {
   link: LinkState;
   /** Her select-screen group (a district); absent or null: none. */
   group?: string | null;
+  /** On the 1P grid (select leads spec §1); when no entry has it, everyone is. */
+  playable?: boolean;
+  /** Found in play: never on the 2P grid (select leads spec §1). */
+  discover?: boolean;
 }
 
 export interface FlowState {
@@ -31,10 +44,16 @@ export interface FlowState {
 export type LockResult = 'ok' | 'refused' | 'noop' | 'dial';
 
 export interface Flow {
-  /** The roster's tiles, `?` first. */
+  /** Each step's grid from the one roster (select leads spec §4): `cursor.p1` indexes the 1P grid, `cursor.p2` the 2P one. */
+  readonly grids: Readonly<Record<Step, Grid>>;
+  /** The grid that's up: 1P in `p1` and `you`, 2P in `p2`, `model` and `ready`. */
+  shown(): Step;
+  /** The shown grid's tiles, `?` first. */
   readonly tiles: string[];
-  /** Where each tile sits, and the group labels (district-groups). */
+  /** Where each of the shown grid's tiles sits, and the group labels (district-groups). */
   readonly layout: Layout;
+  /** Where each cursor sits on the shown grid: at 1P only the live one; at 2P the locked player's tile there (null: not on it) and the 2P cursor. */
+  marks(): { p1: number | null; p2: number | null };
   readonly state: FlowState;
   begin(remembered: Match | null): void;
   /** Back from a room: a direct contact with no key linked opens on the model step (the link panel). */
@@ -59,15 +78,22 @@ function buildTiles(entries: RosterEntry[]): string[] {
   return orderTiles(entries.map((e) => ({ id: e.id, name: e.name, connected: e.connected === true, group: e.group ?? null })));
 }
 
+/** A step's grid (select leads spec §4): 1P the playable entries (all of them when none is), 2P all but the discover ones. */
+function gridFor(entries: RosterEntry[], step: Step, columns: number): Grid {
+  const anyPlayable = entries.some((e) => e.playable === true);
+  const on = entries.filter((e) => (step === 'p1' ? !anyPlayable || e.playable === true : e.discover !== true));
+  const tiles = buildTiles(on);
+  const groupById = new Map(on.map((e) => [e.id, e.group ?? null]));
+  return { tiles, layout: layoutTiles(tiles, (id) => groupById.get(id) ?? null, columns) };
+}
+
 export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?: () => number }): Flow {
   const columns = opts.columns;
   const rng = opts.rng ?? Math.random;
   let byId = new Map(entries.map((e) => [e.id, e]));
 
-  const tiles = buildTiles(entries);
-  const groupById = new Map(entries.map((e) => [e.id, e.group ?? null]));
-  /** Where each tile sits (district-groups): ↑/↓ follow it, and the grid draws it. */
-  const layout: Layout = layoutTiles(tiles, (id) => groupById.get(id) ?? null, columns);
+  /** Each step's grid (district-groups): ↑/↓ follow its layout, and the grid draws the shown one. */
+  const grids: Record<Step, Grid> = { p1: gridFor(entries, 'p1', columns), p2: gridFor(entries, 'p2', columns) };
 
   let state: FlowState = {
     phase: 'p1',
@@ -80,10 +106,15 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   // found no remembered AI, so p2 defaulted to the player's tile).
   let p2FollowsPlayerLock = true;
 
-  /** An id's tile index (null: not on the roster). */
-  function tileIndexOf(id: string): number | null {
-    const idx = tiles.indexOf(id);
+  /** An id's tile index on `step`'s grid (null: not on it). */
+  function indexIn(step: Step, id: string | null | undefined): number | null {
+    if (!id) return null;
+    const idx = grids[step].tiles.indexOf(id);
     return idx >= 0 ? idx : null;
+  }
+
+  function shown(): Step {
+    return state.phase === 'p1' || state.phase === 'you' ? 'p1' : 'p2';
   }
 
   function resolveRandom(candidateIds: string[]): string | null {
@@ -99,22 +130,22 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   }
 
   function moveCursor(key: 'p1' | 'p2', dir: 'left' | 'right' | 'up' | 'down'): void {
-    const t = tiles;
+    const t = grids[key].tiles;
     const current = state.cursor[key];
     if (dir === 'left' || dir === 'right') {
       const delta = dir === 'left' ? -1 : 1;
       const next = (current + delta + t.length) % t.length;
       state = { ...state, cursor: { ...state.cursor, [key]: next } };
     } else {
-      const next = stepVertical(layout, current, dir);
+      const next = stepVertical(grids[key].layout, current, dir);
       if (next !== current) state = { ...state, cursor: { ...state.cursor, [key]: next } };
     }
   }
 
   function placeBegin(remembered: Match | null): void {
-    const p1 = (remembered ? tileIndexOf(remembered.player) : null) ?? 0;
-    const aiLoc = remembered ? tileIndexOf(remembered.ai) : null;
-    const p2 = aiLoc ?? p1;
+    const p1 = indexIn('p1', remembered?.player) ?? 0;
+    const aiLoc = indexIn('p2', remembered?.ai);
+    const p2 = aiLoc ?? indexIn('p2', remembered?.player) ?? 0;
     p2FollowsPlayerLock = aiLoc === null;
     state = {
       phase: 'p1',
@@ -126,6 +157,7 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   }
 
   function lockP1(): LockResult {
+    const tiles = grids.p1.tiles;
     const idx = state.cursor.p1;
     const tileId = tiles[idx];
     let resolvedId: string;
@@ -143,7 +175,7 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
     // p2's cursor moves to the locked player's tile only when begin() found
     // no remembered AI (see p2FollowsPlayerLock); otherwise it stays where the remembered AI
     // placed it.
-    const p2 = p2FollowsPlayerLock ? resolvedIdx : state.cursor.p2;
+    const p2 = p2FollowsPlayerLock ? (indexIn('p2', resolvedId) ?? 0) : state.cursor.p2;
     state = {
       ...state,
       phase: 'you',
@@ -164,6 +196,7 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   }
 
   function lockP2(): LockResult {
+    const tiles = grids.p2.tiles;
     const idx = state.cursor.p2;
     const tileId = tiles[idx];
     let resolvedId: string;
@@ -208,24 +241,24 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
       placeBegin(null);
       return;
     }
-    const playerLoc = tileIndexOf(match.player)!;
+    // The player is locked by id: an old save's player needn't be on the 1P grid (BACK to it lands on `?`).
+    const playerLoc = indexIn('p1', match.player) ?? 0;
     const aiEntry = byId.get(match.ai);
-    if (!aiEntry || !canBeAi(aiEntry)) {
-      // p2 with the player locked. When the AI id still exists (just down), put the p2
-      // cursor on her own tile, so the band shows her dimmed. Only fall back to the
-      // player's tile when the AI id is gone entirely.
-      const aiLoc = aiEntry ? tileIndexOf(match.ai) : null;
+    const aiOnGrid = indexIn('p2', match.ai);
+    if (!aiEntry || !canBeAi(aiEntry) || aiOnGrid === null) {
+      // p2 with the player locked. When the AI is on the 2P grid (just down), put the p2
+      // cursor on her own tile, so the band shows her dimmed. Otherwise (gone, or found in
+      // play) fall back to the player's tile there.
       state = {
         phase: 'p2',
-        cursor: { p1: playerLoc, p2: aiLoc ?? playerLoc },
+        cursor: { p1: playerLoc, p2: aiOnGrid ?? indexIn('p2', match.player) ?? 0 },
         player: match.player,
         ai: null,
         persona: null,
       };
       return;
     }
-    const aiLoc = tileIndexOf(match.ai)!;
-    const cursor = { p1: playerLoc, p2: aiLoc };
+    const cursor = { p1: playerLoc, p2: aiOnGrid };
     // Her model is a setting the server keeps: a linked direct contact is ready as she is.
     const phase: Phase = aiEntry.backend === 'direct' && aiEntry.link === 'no-link' ? 'model' : 'ready';
     state = { phase, cursor, player: match.player, ai: match.ai, persona: null };
@@ -243,7 +276,7 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
     if (state.phase === 'you' || state.phase === 'model' || state.phase === 'ready') return;
     const key = liveCursorKey();
     if (!key) return;
-    if (index < 0 || index >= tiles.length) return;
+    if (index < 0 || index >= grids[key].tiles.length) return;
     state = { ...state, cursor: { ...state.cursor, [key]: index } };
   }
 
@@ -272,8 +305,13 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
     // p1: nothing
   }
 
-  function idAt(which: 'p1' | 'p2'): string {
-    return tiles[state.cursor[which]];
+  function idAt(which: Step): string {
+    return grids[which].tiles[state.cursor[which]];
+  }
+
+  function marks(): { p1: number | null; p2: number | null } {
+    if (shown() === 'p1') return { p1: state.cursor.p1, p2: null };
+    return { p1: indexIn('p2', state.player), p2: state.cursor.p2 };
   }
 
   function updateLinks(newEntries: RosterEntry[]): void {
@@ -287,8 +325,15 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   }
 
   return {
-    tiles,
-    layout,
+    grids,
+    shown,
+    get tiles() {
+      return grids[shown()].tiles;
+    },
+    get layout() {
+      return grids[shown()].layout;
+    },
+    marks,
     get state() {
       return state;
     },

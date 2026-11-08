@@ -345,6 +345,13 @@ describe('title menu', () => {
     expect(document.querySelector('.title-menu .fighter.p2 img.fighter-art')).toBeNull();
   });
 
+  it('NEW GAME, LOAD and REPORT A BUG wear their pixel glyphs: a prompt, stacked shards, a transmitter', async () => {
+    await mount(fakeApi({ active: playthrough() }));
+    const glyph = (id: string) => document.querySelector<HTMLElement>(`.title-menu .tile[data-id="${id}"] .tile-glyph`)?.dataset.glyph;
+    expect(['new', 'load', 'report'].map(glyph)).toEqual(['new', 'load', 'report']);
+    expect(document.querySelector('.title-menu .tile-mosaic')).toBeNull();
+  });
+
   it('a contact with no portrait gets her initial on the CONTINUE tile', async () => {
     await mount(fakeApi({ active: playthrough(), contacts: [contact({ id: 'nix', name: 'Nix', portrait: null })] }));
     expect(document.querySelector('.title-menu .tile[data-id="continue"] .tile-mark')!.textContent).toBe('N');

@@ -2,6 +2,8 @@
 import { splitDrafts, splitFrontMatter } from './lore';
 import { z } from 'zod';
 import type { CoverId, KitEvent } from './mission';
+import type { DeckTrait } from './gear';
+import { SLOTS } from './programs';
 
 export const COVER_IDS: readonly CoverId[] = ['burner', 'fall-guy'];
 export interface StockItem {
@@ -83,3 +85,37 @@ export function parseFixer(v: string | null): KitEvent[] {
 /** What the fixer calls an item. */
 export const itemName = (item: StockItem, decks: readonly { id: string; name: string }[]): string =>
   item.kind === 'cover' ? (item.id === 'burner' ? 'Burner' : 'Fall guy') : (decks.find((d) => d.id === item.id)?.name ?? item.id);
+
+/** What a shop card needs to say what an item does: a deck's numbers, or cover. */
+export interface GearFacts {
+  kind: 'deck' | 'cover';
+  id: string;
+  quality?: 1 | 2 | 3 | 4;
+  heat?: number;
+  traits?: readonly DeckTrait[];
+}
+
+/** The card's stat line: `Q2 · 2 SLOTS · HEAT 0 · FRAGILE`, or `COVER · USED UP`. */
+export function gearStat(g: GearFacts): string {
+  if (g.kind === 'cover') return 'COVER · USED UP';
+  const q = g.quality ?? 1;
+  return [`Q${q}`, `${SLOTS[q]} ${SLOTS[q] === 1 ? 'SLOT' : 'SLOTS'}`, `HEAT ${g.heat ?? 0}`, ...(g.traits ?? []).map((t) => t.toUpperCase())].join(' · ');
+}
+
+const TRAIT_RULE: Record<DeckTrait, string> = {
+  hidden: 'Hidden: no deck heat.',
+  fragile: 'Fragile: dies on a grid miss showing a 1.',
+  breaker: 'Breaker: the wire becomes open on a grid check.',
+  ghost: 'Ghost: a crack shows one letter.',
+  chrome: 'Chrome: RESIST rolls one more die on a grid check.',
+};
+
+/** What it does, in the rules' words (docs/graft-rules.md, small jobs spec §5). */
+export function gearRule(g: GearFacts): string {
+  if (g.kind === 'cover')
+    return g.id === 'burner' ? "A blown job's rep loss is halved. Used up." : "A blown job costs no rep; the fixer takes half the job's pay from your sol. Used up.";
+  const q = g.quality ?? 1;
+  const traits = g.traits ?? [];
+  const heat = traits.includes('hidden') ? [] : [g.heat ? `Heat ${g.heat} at a job's end if you rolled a grid check.` : 'No deck heat.'];
+  return [`${SLOTS[q]} program ${SLOTS[q] === 1 ? 'slot' : 'slots'}.`, ...heat, ...traits.map((t) => TRAIT_RULE[t])].join(' ');
+}

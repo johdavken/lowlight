@@ -324,6 +324,7 @@ function loadMindless(id: string, opts: LoadAgentsOptions): AgentRecord {
       accent: look.accent,
       avatarKind: look.avatarKind,
       ...look.rooms,
+      ...selectFlags(own),
       // Missions spec §1: her own stats and starting deck, else the extended character's.
       stats: statsOf(own.stats !== undefined ? own : base, (m) => opts.warn(`character '${id}': ${m}`)),
       deck: deckOf(own.deck !== undefined ? own : base, opts.decks, (m) => opts.warn(`character '${id}': ${m}`)),
@@ -347,6 +348,20 @@ function loadMindless(id: string, opts: LoadAgentsOptions): AgentRecord {
   };
 }
 
+/** Who select offers her as (select leads spec §1): only `true` counts, and neither comes from the character she extends. */
+function selectFlags(c: Pick<Character, 'playable' | 'discover'> | null): { playable: boolean; discover: boolean } {
+  return { playable: c?.playable === true, discover: c?.discover === true };
+}
+
+/** Her select flags from her file alone, for a character that can't connect. */
+function selectFlagsOnFile(charDir: string): { playable: boolean; discover: boolean } {
+  try {
+    return selectFlags(loadCharacter(charDir));
+  } catch {
+    return selectFlags(null);
+  }
+}
+
 /** A character that runs on a model directly. Anything wrong → listed, not connected, with the reason. */
 /** Her rooms from her files alone (and the one she extends), for a character that can't connect: where she is doesn't depend on that. */
 function roomsOnFile(charDir: string, opts: LoadAgentsOptions): ResolvedRooms {
@@ -365,7 +380,7 @@ function loadDirect(id: string, opts: LoadAgentsOptions): AgentRecord {
     opts.warn(`character '${id}' can't connect: ${why}`);
     return {
       info: {
-        id, name, pronoun: 'they', description: '', accent: DEFAULT_ACCENT, avatarKind: 'monogram', ...roomsOnFile(charDir, opts),
+        id, name, pronoun: 'they', description: '', accent: DEFAULT_ACCENT, avatarKind: 'monogram', ...roomsOnFile(charDir, opts), ...selectFlagsOnFile(charDir),
         connected: false, sprite: null, backend: 'direct', modelLabel: null, connectionError: why,
         tagline: '', bio: [], facts: [], face: DEFAULT_FACE, thumb: null,
       },
@@ -432,6 +447,7 @@ function loadDirect(id: string, opts: LoadAgentsOptions): AgentRecord {
       accent: look.accent,
       avatarKind: look.avatarKind,
       ...look.rooms,
+      ...selectFlags(own),
       connected: true,
       sprite: look.sprite ? spriteRef(id, look.sprite, look.selectExpression, (m) => opts.warn(`character '${id}': ${m}`)) : null,
       // Missions spec §1: her own stats and starting deck, else the extended character's.

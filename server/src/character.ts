@@ -42,6 +42,10 @@ const characterSchema = z.object({
   portrait: z.string().min(1).optional(),
   /** Where she belongs on the select screen: a district id. Absent: her first room's district. */
   group: z.string().regex(AGENT_ID_RE).optional(),
+  /** Pickable at 1P (select leads spec §1); only `true` counts. Unchecked, so a stray value costs nothing. */
+  playable: z.unknown().optional(),
+  /** Found in play: never on select, off Around Lowlight until known (select leads spec §1, §3); only `true` counts. */
+  discover: z.unknown().optional(),
   /** Her rooms (`<district>/<folder>`), in order; the first is where she starts. */
   rooms: z.array(z.string().min(1)).optional(),
   /** Before rooms: one district, read as all of its rooms (with a warning). */

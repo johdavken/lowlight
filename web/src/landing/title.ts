@@ -62,7 +62,6 @@ export function spoken(text: string): string {
   const plain = text.replace(/\*/g, '').replace(/\s+/g, ' ').trim();
   return text.length >= LAST_LINE_MAX ? `${plain}…` : plain;
 }
-const roomThumb = (sceneId: string) => `/scenes/${sceneId.split('/').map(encodeURIComponent).join('/')}/room.png`;
 
 export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): void; refresh(): void } {
   const box = el('div', 'title-menu');
@@ -149,10 +148,8 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
         tag: { text: '▶', now: true },
       };
     }
-    if (item === 'new') return { id: item, name: LABELS[item], art: { kind: 'mark', text: '?' } };
-    if (item === 'report') return { id: item, name: LABELS[item], art: { kind: 'mark', text: '!' } };
-    const rooms = [...new Set(list.map((p) => p.location?.sceneId).filter((s): s is string => !!s))].slice(0, 4);
-    return { id: item, name: LABELS[item], art: rooms.length ? { kind: 'mosaic', srcs: rooms.map(roomThumb) } : { kind: 'mark', text: '≡' } };
+    // NEW GAME, LOAD and REPORT A BUG: pixel glyphs (a prompt, stacked shards, a transmitter).
+    return { id: item, name: LABELS[item], art: { kind: 'glyph', glyph: item } };
   }
 
   /** The band's tiles (when the items or the contact shown change). */

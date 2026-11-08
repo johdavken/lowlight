@@ -3,6 +3,9 @@
  * message of a chat-completions request.
  */
 
+/** A turn that found no key linked (unlinked mid-session): the player relinks at select. */
+export const NO_LINK_NOTICE = '// NO LINK — RELINK AT SELECT';
+
 /** Why a turn failed. `no-link`: a direct character's key was unlinked before the request went out (nothing was sent). */
 export type TurnErrorKind = 'unreachable' | 'auth' | 'busy' | 'http' | 'credit' | 'refused' | 'no-link';
 

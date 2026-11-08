@@ -6,7 +6,7 @@ import { markSplashSeen, mountSplash, sessionSplashArt, shouldShowSplash, splash
 import { createTheme, THEME, THEME_IN_SECONDS, type MenuSong } from './theme';
 import type { EngineState } from '../audio/engine';
 import { COPY } from './copy';
-import { canBeAi, createFlow, type Flow, type FlowState, type Phase } from './select-flow';
+import { canBeAi, createFlow, type Flow, type FlowState, type Phase, type Step } from './select-flow';
 import { COLUMNS, RosterGrid, type GridTile } from './roster-grid';
 import { FighterStrip, type StripModels } from './fighter-strip';
 import { glitchIn, mountStage } from './stage';
@@ -207,8 +207,22 @@ export function mountLanding(
   let swapTimer: ReturnType<typeof setTimeout> | null = null;
   let introTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
-  /** Whether the band has drawn its tiles (once, on the first render). */
-  let bandDrawn = false;
+  /** Whose grid the band holds now (select leads spec §4): it redraws when the step's grid changes. */
+  let drawn: Step | null = null;
+  /** The pointer's last spot on the page (null: never seen). */
+  let pointer: { x: number; y: number } | null = null;
+  /**
+   * After a grid swap, where the pointer rested: hovers wait until it really moves, as the swap puts
+   * another tile under a parked mouse and the browser's own enter would move the cursor there.
+   */
+  let hoverHeld: { x: number; y: number } | null = null;
+  const onPointer = (e: MouseEvent) => {
+    if (hoverHeld && (e.clientX !== hoverHeld.x || e.clientY !== hoverHeld.y)) hoverHeld = null;
+    pointer = { x: e.clientX, y: e.clientY };
+  };
+  window.addEventListener('mousemove', onPointer);
+  // mouseover comes before a tile's mouseenter (mousemove only after it): caught first, a real move releases the hold in time.
+  window.addEventListener('mouseover', onPointer, true);
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
   /** Where the live cursor rests, or null outside P1/P2: a change is a step, and its cue. */
@@ -223,7 +237,7 @@ export function mountLanding(
 
   const grid = new RosterGrid(band, {
     onHover(i) {
-      if (!flow || leaving) return;
+      if (!flow || leaving || hoverHeld) return;
       const before = liveSpot();
       flow.hover(i);
       stepped(before);
@@ -486,16 +500,20 @@ export function mountLanding(
   function render(): void {
     if (!flow || disposed) return;
     const s = flow.state;
-    if (!bandDrawn) {
+    if (drawn !== flow.shown()) {
+      // Tiles are built from the latest roster, so a poll's offline and NO LINK marks carry over.
       grid.render(flow.tiles.map((id) => toTile(id, byId.get(id))), { layout: flow.layout, groupName: (g) => districts.get(g) ?? null });
-      bandDrawn = true;
-      loadDistricts();
+      if (drawn === null) loadDistricts();
+      // Never seen the pointer: hold until it moves at all.
+      else hoverHeld = pointer ?? { x: Number.NaN, y: Number.NaN };
+      drawn = flow.shown();
     }
     const picked = (id: string | null) => (id ? (byId.get(id) ?? null) : null);
     const aiLocked = s.phase === 'model' || s.phase === 'ready';
     stage.el.dataset.phase = s.phase;
-    grid.setCursor('p1', s.cursor.p1, { live: s.phase === 'p1', locked: s.phase !== 'p1' });
-    grid.setCursor('p2', s.cursor.p2, { live: s.phase === 'p2', locked: aiLocked });
+    const marks = flow.marks();
+    grid.setCursor('p1', marks.p1, { live: s.phase === 'p1', locked: s.phase !== 'p1' });
+    grid.setCursor('p2', marks.p2, { live: s.phase === 'p2', locked: aiLocked });
     stripP1.show(s.phase === 'p1' ? picked(flow.idAt('p1')) : picked(s.player), { locked: s.phase !== 'p1' });
     stripP1.showYou(s.phase === 'p1' || s.phase === 'you' ? null : s.persona);
     stripP1.setPanel(s.phase === 'you' && you ? you.host : null);
@@ -874,6 +892,8 @@ export function mountLanding(
       closePanel();
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('mousemove', onPointer);
+      window.removeEventListener('mouseover', onPointer, true);
       stopPoll();
       cancelSwap();
       if (introTimer !== null) clearTimeout(introTimer);

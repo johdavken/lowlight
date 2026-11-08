@@ -41,6 +41,12 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
   const shown = new Map<string, string>();
   const turns = new Map<string, number>();
   const pending = new Map<string, ReturnType<typeof setTimeout>>();
+  // Per recruit, a card part way through a turn: a redraw puts this same card back so the turn runs on through its back
+  // (playtest: a lift redraws the hand on a job with a deck, and the card jumped to the ability unseen). `to` is where
+  // it's headed; a redraw that wants it elsewhere draws afresh.
+  const turning = new Map<string, { flip: HTMLElement; to: string; turn(next: HTMLElement): void }>();
+  // Per recruit, their cards as last drawn, so a turn's second half puts up the card as it stands now.
+  const stackCards = new Map<string, TableCard[]>();
   // Per recruit, turning their card to `to` with the turn's two halves (set as each stack is drawn).
   const turners = new Map<string, (to: string) => void>();
   // Recruits the table turned over to a ready ability, and the abilities it has offered while they stay ready.
@@ -95,44 +101,62 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
       return box;
     }
     const down = front.state === 'down';
-    const face = (cid: string) => cards.find((c) => c.id === cid) ?? front;
-    const t = turns.get(id) ?? 0;
-    const flip = el('div', 'tb-flip');
-    const inner = el('div', 'tb-flip-in');
-    inner.style.transform = `rotateY(${t * 180}deg)`;
-    // The side facing you holds the shown card; the other holds the back until the next turn.
-    const up = t % 2;
-    const sides: HTMLElement[] = [0, 1].map((i) => (i === up ? slotEl(face(shown.get(id) ?? front.id), i ? ' tb-side-b' : '') : cardBack(i ? ' tb-side-b' : '')));
-    inner.append(...sides);
-    flip.append(inner);
-    box.append(flip);
-    const tabs = el('div', 'tb-tabs');
-    const turn = (next: HTMLElement) => {
-      const n = (Number(inner.dataset.turns ?? t) || 0) + 1;
-      inner.dataset.turns = String(n);
-      const i = n % 2;
-      if (i) next.classList.add('tb-side-b');
-      sides[i].replaceWith(next);
-      sides[i] = next;
-      inner.style.transform = `rotateY(${n * 180}deg)`;
+    stackCards.set(id, cards);
+    const face = (cid: string) => {
+      const now = stackCards.get(id) ?? cards;
+      return now.find((c) => c.id === cid) ?? now[0];
     };
+    // A card part way through a turn stays the same card; otherwise it's drawn where its turns left it.
+    const card =
+      turning.get(id) ??
+      (() => {
+        const t = turns.get(id) ?? 0;
+        const flip = el('div', 'tb-flip');
+        const inner = el('div', 'tb-flip-in');
+        inner.style.transform = `rotateY(${t * 180}deg)`;
+        // The side facing you holds the shown card; the other holds the back until the next turn.
+        const up = t % 2;
+        const sides: HTMLElement[] = [0, 1].map((i) => (i === up ? slotEl(face(shown.get(id) ?? front.id), i ? ' tb-side-b' : '') : cardBack(i ? ' tb-side-b' : '')));
+        inner.append(...sides);
+        flip.append(inner);
+        const turn = (next: HTMLElement) => {
+          const n = (Number(inner.dataset.turns ?? t) || 0) + 1;
+          inner.dataset.turns = String(n);
+          const i = n % 2;
+          if (i) next.classList.add('tb-side-b');
+          sides[i].replaceWith(next);
+          sides[i] = next;
+          inner.style.transform = `rotateY(${n * 180}deg)`;
+        };
+        return { flip, to: shown.get(id) ?? front.id, turn };
+      })();
+    box.append(card.flip);
+    const tabs = el('div', 'tb-tabs');
     const turnTo = (to: string) => {
       shown.set(id, to);
-      // Two half turns: over to the back, then on to the card; a render meanwhile draws where it ends.
+      // Two half turns: over to the back, then on to the card. The card is held through a redraw until both are done.
       turns.set(id, (turns.get(id) ?? 0) + 2);
       for (const x of tabs.children) x.classList.toggle('on', (x as HTMLElement).dataset.id === to);
-      // A lift belongs to the side that was up.
-      if (lifted && cards.some((c) => c.id === lifted)) lift(press);
-      if (press && cards.some((c) => c.id === press)) lift(lifted);
       clearTimeout(pending.get(id));
-      turn(cardBack(''));
+      turning.set(id, { ...card, to });
+      card.turn(cardBack(''));
       pending.set(
         id,
         setTimeout(() => {
           o.cue?.('flip');
-          turn(slotEl(face(to), ''));
+          card.turn(slotEl(face(to), ''));
+          pending.set(
+            id,
+            setTimeout(() => {
+              pending.delete(id);
+              turning.delete(id);
+            }, TURN_MS),
+          );
         }, TURN_MS + BACK_HOLD_MS),
       );
+      // A lift belongs to the side that was up (the redraw a lift can start keeps this card turning).
+      if (lifted && cards.some((c) => c.id === lifted)) lift(press);
+      if (press && cards.some((c) => c.id === press)) lift(lifted);
     };
     turners.set(id, turnTo);
     for (const a of abilities) {
@@ -176,8 +200,13 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
     let i = 0;
     for (const t of flips) clearTimeout(t);
     flips = [];
-    for (const t of pending.values()) clearTimeout(t);
-    pending.clear();
+    // A turn under way runs on unless the card is now wanted elsewhere (turned back, gone down, a new deal).
+    for (const [id, c] of turning) {
+      if ((shown.get(id) ?? id) === c.to) continue;
+      clearTimeout(pending.get(id));
+      pending.delete(id);
+      turning.delete(id);
+    }
     root.classList.toggle('scroll-x', isPhone(host));
     // Six cards in the row: a recruit and their abilities count as one.
     root.classList.toggle('tuck', last.flatMap((g) => g.slots).filter((s) => !s.stack || s.id === s.stack).length >= 6);
@@ -220,6 +249,9 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
       if (so?.dealIn) {
         shown.clear();
         turns.clear();
+        for (const t of pending.values()) clearTimeout(t);
+        pending.clear();
+        turning.clear();
       }
       if (so?.dealIn) {
         auto.clear();

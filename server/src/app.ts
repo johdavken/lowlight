@@ -390,6 +390,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
           avatar: avatarFile !== null,
           thumb: info.thumb !== null,
           legacyDistrict: info.legacyDistrict,
+          ...(info.discover ? { discover: true } : {}),
           bio: info.bio,
           facts: info.facts,
           ...(sprite && Object.keys(sprite.outfits).length > 0 ? { wardrobe: { outfits: Object.keys(sprite.outfits).filter((n) => world.outfitOpen?.(info.id, n) ?? true), byScene: sprite.outfitByScene } } : {}),

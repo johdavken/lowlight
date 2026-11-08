@@ -49,7 +49,7 @@ describe('the pane: tabs over a list and the picked quest file', () => {
         { id: 'night', title: 'Night Shift', pitch: 'Forty seconds of camera.', timed: false, art: '/api/quests/art/night.webp', mission: { pay: 400, tier: 1 } },
       ],
       elsewhere: [{ id: 'rules', title: 'House Rules', contact: 'vesna', contactName: 'Vesna', next: null }],
-      fixer: { place: 'second-socket', items: [{ id: 'burner', name: 'Burner', price: 600, tier: 1, state: 'ok' }] },
+      fixer: { place: 'second-socket', items: [{ id: 'burner', name: 'Burner', kind: 'cover', price: 600, tier: 1, state: 'ok' }] },
     });
     list.toggle();
     const tabs = () => [...h.querySelectorAll<HTMLButtonElement>('.ql-tab')];
@@ -68,7 +68,8 @@ describe('the pane: tabs over a list and the picked quest file', () => {
     expect(h.querySelector('.ql-file .ql-hint')!.textContent).toBe('GOES ON ONLY WITH VESNA');
     tabs()[2].click();
     expect(h.querySelector('.ql-list')).toBeNull();
-    expect(h.querySelector('.ql-fixer .ql-item-name')!.textContent).toBe('Burner · 600 SOL');
+    expect(h.querySelector('.ql-fixer .ql-item-name')!.textContent).toBe('BURNER');
+    expect(h.querySelector('.ql-fixer .ql-item-price')!.textContent).toBe('600 SOL');
   });
 
   it('NERVE gone: one line across the pane', () => {

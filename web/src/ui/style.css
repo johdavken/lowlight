@@ -1010,6 +1010,22 @@
 }
 /* No speaker look (spec 2026-10-15): the dialogue box's border and name tab show who's speaking,
    and room lighting falls on the figures as they are. */
+/* Her face over her art (stage.ts), inside it so the light filter and MIRROR take it too. A change
+   dissolves through a dither mask (face-dither.ts), tiled so a cell is two of her own pixels. */
+.stage-art { position: relative; }
+.stage-face {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  background-position: center top;
+  -webkit-mask-size: var(--face-tile, 0.78125% 0.5208%);
+  mask-size: var(--face-tile, 0.78125% 0.5208%);
+  -webkit-mask-repeat: repeat;
+  mask-repeat: repeat;
+}
+.stage-figure:not([data-kind='sprite']) .stage-face { display: none; }
 /* Fallbacks: her tinted portrait mask, a monogram, a silhouette. */
 .stage-figure[data-kind='portrait'] .stage-art {
   background: var(--fig-accent);

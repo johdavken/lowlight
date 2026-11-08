@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DISSOLVE_STEPS, DISSOLVE_STEP_MS, ditherMask, ditherTile } from '../src/ui/face-dither';
 import { figureDrop } from '../src/ui/figure';
 import { Stage, outfitFor, type FigureSource } from '../src/ui/stage';
 
@@ -21,6 +22,13 @@ function setup(ok: (url: string) => boolean = () => true, aspect = 2 / 3) {
 const sprite = (url: string): FigureSource => ({ kind: 'sprite', url, crop: { top: 0, bottom: 0.5 } });
 const left = (root: HTMLElement) => root.querySelector<HTMLElement>('.stage-left')!;
 const right = (root: HTMLElement) => root.querySelector<HTMLElement>('.stage-right')!;
+/** What her figure draws: the face coming in (if any) over the base art, as one stacked list. */
+const drawn = (root: HTMLElement) => {
+  const fig = right(root);
+  return [fig.querySelector<HTMLElement>('.stage-face-in')!.style.backgroundImage, fig.querySelector<HTMLElement>('.stage-art')!.style.backgroundImage]
+    .filter(Boolean)
+    .join(', ');
+};
 
 describe('Stage', () => {
   it('draws both figures from their sprites, sized by the crop', async () => {
@@ -144,7 +152,7 @@ describe('Stage', () => {
   });
   describe('expressions', () => {
     const withFaces = (faces: Record<string, string>): FigureSource => ({ kind: 'sprite', url: '/s.png', crop: { top: 0, bottom: 0.5 }, expressions: faces });
-    const art = (root: HTMLElement) => right(root).querySelector<HTMLElement>('.stage-art')!;
+    const art = (root: HTMLElement) => ({ style: { backgroundImage: drawn(root) } });
     const settle = async () => {
       for (let i = 0; i < 4; i++) await flush();
     };
@@ -198,6 +206,105 @@ describe('Stage', () => {
       expect(art(root).style.backgroundImage).toBe('');
     });
   });
+  describe('face dissolve', () => {
+    const faced: FigureSource = { kind: 'sprite', url: '/s.png', crop: { top: 0, bottom: 0.5 }, expressions: { happy: '/h.png', sad: '/sad.png' } };
+    const layer = (root: HTMLElement, which: 'in' | 'out') => right(root).querySelector<HTMLElement>(`.stage-face-${which}`)!;
+    const mask = (el: HTMLElement) => el.style.getPropertyValue('mask-image');
+    const settle = async () => {
+      for (let i = 0; i < 4; i++) await vi.advanceTimersByTimeAsync(0);
+    };
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    function faceSetup(o: { reducedMotion?: boolean; width?: number } = {}) {
+      document.body.innerHTML = '<div id="stage-figures"></div>';
+      const root = document.getElementById('stage-figures')!;
+      const stage = new Stage(root, { probe: async () => ({ aspect: 2 / 3, ...(o.width ? { width: o.width } : {}) }), reducedMotion: o.reducedMotion ?? false });
+      stages.push(stage);
+      return { root, stage };
+    }
+
+    it('a new face comes in through a dither while the old goes out through its inverse, then settles unmasked', async () => {
+      const { root, stage } = faceSetup();
+      stage.setRight([faced], 'Nix', '#fff');
+      await settle();
+      stage.setExpression('right', 'happy');
+      await settle();
+      vi.advanceTimersByTime(DISSOLVE_STEP_MS * DISSOLVE_STEPS);
+      stage.setExpression('right', 'sad');
+      expect(layer(root, 'in').style.backgroundImage).toContain('/sad.png');
+      expect(layer(root, 'out').style.backgroundImage).toContain('/h.png');
+      expect(mask(layer(root, 'in'))).toBe(ditherMask(1, true));
+      expect(mask(layer(root, 'out'))).toBe(ditherMask(1, false));
+      vi.advanceTimersByTime(DISSOLVE_STEP_MS);
+      expect(mask(layer(root, 'in'))).toBe(ditherMask(2, true));
+      vi.advanceTimersByTime(DISSOLVE_STEP_MS * DISSOLVE_STEPS);
+      expect(mask(layer(root, 'in'))).toBe('');
+      expect(layer(root, 'in').style.backgroundImage).toContain('/sad.png');
+      expect(layer(root, 'out').style.backgroundImage).toBe('');
+    });
+
+    it('going back to the plain face dissolves the old one out', async () => {
+      const { root, stage } = faceSetup();
+      stage.setRight([faced], 'Nix', '#fff');
+      stage.setExpression('right', 'happy');
+      await settle();
+      stage.setExpression('right', null);
+      expect(layer(root, 'in').style.backgroundImage).toBe('');
+      expect(layer(root, 'out').style.backgroundImage).toContain('/h.png');
+      vi.advanceTimersByTime(DISSOLVE_STEP_MS * DISSOLVE_STEPS);
+      expect(layer(root, 'out').style.backgroundImage).toBe('');
+    });
+
+    it('the same face asked again (her line re-reported as she types) lets the dissolve run on', async () => {
+      const { root, stage } = faceSetup();
+      stage.setRight([faced], 'Nix', '#fff');
+      await settle();
+      stage.setExpression('right', 'happy');
+      vi.advanceTimersByTime(DISSOLVE_STEP_MS * 2);
+      const at = mask(layer(root, 'in'));
+      stage.setExpression('right', 'happy');
+      expect(mask(layer(root, 'in'))).toBe(at);
+      expect(at).not.toBe('');
+    });
+
+    it('a face that is there when the figure loads cuts in, and an outfit change keeps the face as it is', async () => {
+      const { root, stage } = faceSetup();
+      stage.setRight([{ ...faced, outfits: { home: '/home.png' } } as FigureSource], 'Nix', '#fff');
+      stage.setExpression('right', 'happy');
+      await settle();
+      expect(layer(root, 'in').style.backgroundImage).toContain('/h.png');
+      expect(mask(layer(root, 'in'))).toBe('');
+      stage.setOutfit('right', 'home');
+      expect(mask(layer(root, 'in'))).toBe('');
+      expect(layer(root, 'out').style.backgroundImage).toBe('');
+    });
+
+    it('reduced motion cuts', async () => {
+      const { root, stage } = faceSetup({ reducedMotion: true });
+      stage.setRight([faced], 'Nix', '#fff');
+      await settle();
+      stage.setExpression('right', 'happy');
+      expect(mask(layer(root, 'in'))).toBe('');
+      expect(layer(root, 'out').style.backgroundImage).toBe('');
+    });
+
+    it('a dither cell is two of her own pixels', async () => {
+      const { root, stage } = faceSetup({ width: 800 });
+      stage.setRight([faced], 'Nix', '#fff');
+      await settle();
+      expect(right(root).style.getPropertyValue('--face-tile')).toBe(ditherTile(800, 1200));
+      expect(ditherTile(800, 1200)).toBe('1% 0.6666666666666666%');
+    });
+
+    it('the masks are exact inverses: every cell shows one face', () => {
+      for (let step = 1; step < DISSOLVE_STEPS; step++) {
+        const cells = (m: string) => (decodeURIComponent(m).match(/<rect /g) ?? []).length;
+        expect(cells(ditherMask(step, true)) + cells(ditherMask(step, false))).toBe(16);
+        expect(cells(ditherMask(step, true))).toBe((step / DISSOLVE_STEPS) * 16);
+      }
+    });
+  });
   describe('outfits', () => {
     const dressed = (outfits: Record<string, string>, faces: Record<string, string> = { happy: '/e/happy' }): FigureSource => ({
       kind: 'sprite',
@@ -206,7 +313,7 @@ describe('Stage', () => {
       expressions: faces,
       outfits,
     });
-    const bg = (root: HTMLElement) => right(root).querySelector<HTMLElement>('.stage-art')!.style.backgroundImage;
+    const bg = drawn;
     const settle = async () => {
       for (let i = 0; i < 4; i++) await flush();
     };

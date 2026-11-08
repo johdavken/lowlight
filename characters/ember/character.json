@@ -1,6 +1,7 @@
 {
   "name": "Ember",
   "pronoun": "she",
+  "playable": true,
   "accent": "#b65cff",
   "description": "Punk netrunner on Hicks's crew, Silas's twin; funny, friendly, and better on the grid than either of them.",
   "tagline": "Netrunner. Punk. The best on Hicks's crew.",
@@ -120,7 +121,8 @@
       "line": "Ember Zhou. Spark. Three years ago she beat you to a payroll file you'd worked for a week and left a smiley face in the log; you tracked her down and offered her work. The best runner on your crew, you included. Loud, funny, and she won't stop signing her logs. You worry about her more than you'd say.",
       "trust": 6,
       "warmth": 4
-    }
+    },
+    "nix-direct": "Ember Zhou. Spark. Hicks's crew, from the twins' place down the hall from him; she's come up the Intake's stairs to drag him down to Hae's more than once and never come in. Loud, kind, and the one he talks about when he's not talking about himself."
   },
   "standing": {
     "vouches": "runner",

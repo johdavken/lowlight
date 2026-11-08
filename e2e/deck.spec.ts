@@ -148,13 +148,24 @@ test('REGEN gives her a second take; swipe back to the first (deck controls)', a
   await expect(page.locator('.dk-her')).toHaveCount(3);
   await page.locator('.dk-her').last().click({ button: 'right' });
   await page.locator('.dk-m-regen').click();
-  await page.waitForTimeout(500);
-  await page.locator('.dk-her').last().click({ button: 'right' });
-  await expect(page.locator('.dk-takes')).toHaveText('2/2');
+  await takesShown(page, '2/2');
   await page.locator('.dk-prev').click();
-  await page.locator('.dk-her').last().click({ button: 'right' });
-  await expect(page.locator('.dk-takes')).toHaveText('1/2');
+  await takesShown(page, '1/2');
 });
+
+/**
+ * Her latest text's menu, opened until it shows `takes`. A REGEN or a swipe lands with the server's thread update a
+ * moment after the click: a menu opened before it shows the old takes, or (within the long-press guard's 800 ms, on
+ * the thread not yet redrawn) doesn't open at all.
+ */
+async function takesShown(page: import('@playwright/test').Page, takes: string): Promise<void> {
+  await expect(async () => {
+    const close = page.locator('.dk-menu .dk-close');
+    if (await close.isVisible()) await close.click();
+    await page.locator('.dk-her').last().click({ button: 'right' });
+    await expect(page.locator('.dk-takes')).toHaveText(takes, { timeout: 1_000 });
+  }).toPass({ timeout: 10_000 });
+}
 
 test('DELETE a text and the ones after it, after asking (deck controls)', async ({ page }) => {
   await page.goto('/deck');

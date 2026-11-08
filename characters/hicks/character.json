@@ -1,6 +1,7 @@
 {
   "name": "Hicks",
   "pronoun": "he",
+  "playable": true,
   "description": "Netrunner out of Old Town; runs a two-person crew from one room on Ribbon Level 2. Sly, dry, hard to find.",
   "accent": "#3dff7a",
   "sprite": {

@@ -37,12 +37,12 @@ test('no key: NO LINK, a rejected key, then linking wakes her up', async ({ page
   expect((await page.request.delete('/api/link/openrouter')).status()).toBe(204);
   await page.reload();
   await newGame(page);
+  // She's a contact, not a lead: her tile is on the 2P grid (select leads spec §4).
+  await lockPlayer(page, 'hicks');
   const tile = page.locator(`.tile[data-id="${DIRECT.id}"]`);
   await showTile(page, DIRECT.id);
   await expect(tile.locator('.tile-chip')).toHaveText('NO LINK');
   await expect(tile).not.toHaveClass(/offline/);
-
-  await lockPlayer(page, 'hicks');
   await tile.click();
   await expect(phase(page)).toHaveAttribute('data-phase', 'model');
   const panel = page.locator('.model-band .lp-field');

@@ -155,6 +155,44 @@ describe('playthrough routes', () => {
     expect(built.world.heldLeads('someone-else')).toBeNull();
   });
 
+  it('around: a discover contact stays out until a lead the player holds names her (select leads spec §3)', async () => {
+    const lead = `---\ntitle: Valve\nfrom: nix\nto: vee\nkeys: [valve]\nfill: the order\n---\n## On her mind\nm\n## Giver knows\ng\n## Receiver knows\nr\n`;
+    const { api, built, cfg } = await start({
+      others: ['cass', 'vee'],
+      prepare: (c) => {
+        fs.mkdirSync(c.leadsDir!, { recursive: true });
+        fs.writeFileSync(path.join(c.leadsDir!, 'valve.md'), lead);
+        const file = path.join(c.charactersDir, 'vee', 'character.json');
+        fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), discover: true }));
+      },
+    });
+    const around = async () => ((await api('GET', '/api/playthroughs/active/around')).body as { contactId: string }[]).map((e) => e.contactId);
+    // Cass is the start contact; Nix unmet and plain.
+    expect(await around()).toEqual(['nix']);
+    const pt = built.world.active()!;
+    const file = path.join(cfg.playthroughsDir, pt.id, 'chars', 'nix', 'room.db');
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    const db = openDb(file, { defaultPlayer: pt.player });
+    db.giveLead({ id: 'valve', player: pt.player, details: 'The order is held.', messageId: 'm1', at: 1 });
+    db.close();
+    expect(await around()).toEqual(['nix', 'vee']);
+  });
+
+  it('GO to a discover contact nobody named still reaches her: a rumor\'s GO TO (select leads spec §2, §3)', async () => {
+    const { api } = await start({
+      others: ['cass', 'vee'],
+      prepare: (c) => {
+        const file = path.join(c.charactersDir, 'vee', 'character.json');
+        fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), discover: true }));
+      },
+    });
+    // Off AROUND LOWLIGHT, but the server still lets you walk in on her.
+    expect(((await api('GET', '/api/playthroughs/active/around')).body as { contactId: string }[]).map((e) => e.contactId)).not.toContain('vee');
+    const r = await api('POST', '/api/playthroughs/active/location', { contactId: 'vee' });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ contactId: 'vee' });
+  });
+
   it("world.questStatus reads quest runs from every contact's db, for its player only", async () => {
     const { built, cfg } = await start({ others: ['cass'] });
     const pt = built.world.active()!;

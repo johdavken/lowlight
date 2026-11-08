@@ -1,6 +1,7 @@
 {
   "name": "Rue",
   "pronoun": "she",
+  "playable": true,
   "description": "Nineteen-year-old netrunner in a hanger under the Spine's deck. Good, broke, and being recruited by a man she's sure is SDG.",
   "accent": "#d9653b",
   "tagline": "Netrunner, nineteen. Lives over the drop. Hasn't said yes.",

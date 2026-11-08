@@ -5,8 +5,14 @@ import { defineConfig } from 'vitest/config';
 // each run. 20 s keeps real hangs failing while load alone doesn't.
 const testTimeout = 20_000;
 
+// Vitest's default is one worker per core minus one, and each of those also starts ffmpeg and
+// servers, so one run (two when several checkouts test at once) pins every core. Half the cores
+// keeps the machine usable; VITEST_WORKERS (a count or a percentage) overrides it for one run.
+const maxWorkers = process.env.VITEST_WORKERS ?? '50%';
+
 export default defineConfig({
   test: {
+    maxWorkers,
     projects: [
       {
         test: {

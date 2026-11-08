@@ -27,6 +27,8 @@ export interface RoomOptions {
 }
 
 export type Result = { ok: true; text: string } | { ok: false; error: string };
+/** The plain success: nothing to say. */
+export const OK: Result = { ok: true, text: 'ok' };
 
 export interface RoomOp {
   tool: string;

@@ -1,6 +1,7 @@
 {
   "name": "Mother Rot",
   "pronoun": "he",
+  "discover": true,
   "accent": "#b5835a",
   "tagline": "Everything lost in the Marsh finds its way to Mother Rot.",
   "bio": "bio.md",

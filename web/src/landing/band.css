@@ -14,7 +14,6 @@
 .band .cursor { position: absolute; top: 0; }
 
 .band-tile > .tile-face,
-.band-tile > .tile-mosaic,
 .band-tile > .tile-mark {
   position: absolute;
   inset: 0 -14px;
@@ -22,9 +21,10 @@
 }
 .band-tile > .tile-art { position: absolute; inset: 0 -14px; width: calc(100% + 28px); height: 100%; transform: skewX(12deg); }
 .tile-face { background: center 4% / 300% no-repeat; image-rendering: pixelated; }
-.tile-mosaic { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 6px 18px 30px; box-sizing: border-box; }
-.tile-mosaic i { background: center / cover no-repeat; image-rendering: pixelated; opacity: 0.85; }
 .tile-mark { display: grid; place-items: center; font: 64px var(--pixel); color: #a58cd6; }
+/* A pixel glyph sits where the mark's character would, upright, above the name. */
+.tile-glyph { padding-bottom: 22px; box-sizing: border-box; }
+.tile-glyph svg { width: 64px; height: 64px; fill: currentColor; }
 .band-tag {
   position: absolute;
   top: 4px;

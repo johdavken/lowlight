@@ -26,18 +26,22 @@ describe('TileBand', () => {
       [
         { id: 'room', name: 'r', art: { kind: 'room', src: '/scenes/a/room.png' }, tag: { text: '▶ NOW', now: true } },
         { id: 'face', name: 'f', art: { kind: 'face', src: '/face.png' } },
-        { id: 'mosaic', name: 'm', art: { kind: 'mosaic', srcs: ['/a.png', '/b.png', '/c.png', '/d.png'] } },
+        { id: 'glyph', name: 'g', art: { kind: 'glyph', glyph: 'load' } },
         { id: 'mark', name: 'new game', art: { kind: 'mark', text: '?' } },
       ],
       0,
     );
     const t = tiles(b);
-    expect(t.map((x) => x.dataset.id)).toEqual(['room', 'face', 'mosaic', 'mark']);
+    expect(t.map((x) => x.dataset.id)).toEqual(['room', 'face', 'glyph', 'mark']);
     expect(t[3]!.querySelector('.tile-name')!.textContent).toBe('NEW GAME');
     expect(t[0]!.querySelector<HTMLImageElement>('img.tile-art')!.getAttribute('src')).toBe('/scenes/a/room.png');
     expect(t[0]!.querySelector('.band-tag.now')!.textContent).toBe('▶ NOW');
     expect(t[1]!.querySelector<HTMLElement>('.tile-face')!.style.backgroundImage).toContain('/face.png');
-    expect(t[2]!.querySelectorAll('.tile-mosaic i')).toHaveLength(4);
+    // A glyph is pixel art: an inline svg of 1×1 cells in the mark's colour.
+    const glyph = t[2]!.querySelector<HTMLElement>('.tile-mark.tile-glyph')!;
+    expect(glyph.dataset.glyph).toBe('load');
+    expect(glyph.querySelector('svg')!.getAttribute('viewBox')).toBe('0 0 16 16');
+    expect(glyph.querySelectorAll('svg rect').length).toBeGreaterThan(20);
     expect(t[3]!.querySelector('.tile-mark')!.textContent).toBe('?');
   });
 

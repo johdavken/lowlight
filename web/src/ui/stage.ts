@@ -1,5 +1,6 @@
 import type { Crop } from '../../../shared/types';
 import { WAIST_PULL, figureBox, figureDrop } from './figure';
+import { DISSOLVE_STEPS, DISSOLVE_STEP_MS, ditherMask, ditherTile } from './face-dither';
 import { FLAT_LIGHT, lightFilter } from './stage-light';
 
 /** What a figure shows, in order of preference: a sprite, her portrait, a monogram, a silhouette. */
@@ -31,14 +32,17 @@ interface Faces {
   wanted: string | null;
   outfits: Map<string, string>;
   wantedOutfit: string | null;
+  /** The face url fully showing (null: the plain face), and the dissolve to the next one while it runs. */
+  shown: string | null;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 function cssUrl(url: string): string {
   return `url("${url.replace(/[\\"]/g, '\\$&').replace(/[\n\r\f]/g, '')}")`;
 }
 
-/** What a successful probe learned about the image: its width / height. */
-type Probed = { aspect: number };
+/** What a successful probe learned about the image: its width / height, and its width in pixels when known. */
+type Probed = { aspect: number; width?: number };
 const MASTER_ASPECT = 2 / 3;
 
 /**
@@ -48,7 +52,7 @@ const MASTER_ASPECT = 2 / 3;
 function probeImage(url: string): Promise<Probed | null> {
   return new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => resolve({ aspect: img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : MASTER_ASPECT });
+    img.onload = () => resolve({ aspect: img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : MASTER_ASPECT, width: img.naturalWidth || undefined });
     img.onerror = () => resolve(null);
     img.src = url;
   });
@@ -63,6 +67,16 @@ function setArt(fig: HTMLElement, images: string): void {
   fig.querySelector<HTMLElement>('.stage-art')!.style.backgroundImage = images;
 }
 
+/** A sprite's width when the probe didn't say (the 1024×1536 masters). */
+const MASTER_WIDTH = 1024;
+
+/** A face layer's image and dither mask ('' clears either). */
+function setLayer(layer: HTMLElement, image: string, mask: string): void {
+  layer.style.backgroundImage = image;
+  layer.style.setProperty('mask-image', mask);
+  layer.style.setProperty('-webkit-mask-image', mask);
+}
+
 export class Stage {
   private readonly figures: Record<Side, HTMLElement>;
   private readonly tokens: Record<Side, number> = { left: 0, right: 0 };
@@ -73,15 +87,26 @@ export class Stage {
   private readonly waists: Record<Side, number | null> = { left: null, right: null };
   private pull = WAIST_PULL;
   private readonly faces: Record<Side, Faces> = {
-    left: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null },
-    right: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null },
+    left: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null, shown: null, timer: null },
+    right: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null, shown: null, timer: null },
   };
+  /** Each figure's face layers over its art: the face coming in, and the one going out while it dissolves. */
+  private readonly faceLayers: Record<Side, { in: HTMLElement; out: HTMLElement }>;
+  /** Faces cut instead of dissolving (prefers-reduced-motion). */
+  private readonly reducedMotion: boolean;
 
   constructor(
     private readonly root: HTMLElement,
-    opts: { probe?: (url: string) => Promise<Probed | null>; flatLight?: boolean } = {},
+    opts: { probe?: (url: string) => Promise<Probed | null>; flatLight?: boolean; reducedMotion?: boolean } = {},
   ) {
     this.probe = opts.probe ?? probeImage;
+    this.reducedMotion = opts.reducedMotion ?? globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+    const layer = (which: 'in' | 'out') => {
+      const el = document.createElement('div');
+      el.className = `stage-face stage-face-${which}`;
+      return el;
+    };
+    this.faceLayers = { left: { in: layer('in'), out: layer('out') }, right: { in: layer('in'), out: layer('out') } };
     const flat = opts.flatLight ?? FLAT_LIGHT;
     root.classList.add('stage');
     const make = (side: Side) => {
@@ -90,6 +115,7 @@ export class Stage {
       fig.setAttribute('role', 'img');
       const art = document.createElement('div');
       art.className = 'stage-art';
+      art.append(this.faceLayers[side].in, this.faceLayers[side].out);
       // The room's light on her (stage-light.ts): a filter on her art, read by style.css for sprites;
       // in Firefox one brightness, since the filter crops her there (FLAT_LIGHT).
       if (flat) {
@@ -146,11 +172,11 @@ export class Stage {
    * Shows a sprite figure with one of its expressions (null = the plain face), drawn over the
    * current outfit. A name it doesn't have, or whose image failed to load, shows the plain face;
    * asked for before the figure has resolved, it applies once it does. Other figure kinds ignore
-   * it. Instant, same crop.
+   * it. Same crop; the face dissolves in through a dither (face-dither.ts), or cuts with reduced motion.
    */
   setExpression(side: Side, name: string | null): void {
     this.faces[side].wanted = name;
-    this.applyFace(side);
+    this.applyFace(side, true);
   }
 
   /**
@@ -164,7 +190,10 @@ export class Stage {
   }
 
   dispose(): void {
-    for (const s of SIDES) this.tokens[s]++;
+    for (const s of SIDES) {
+      this.tokens[s]++;
+      this.stopDissolve(s);
+    }
   }
 
   private set(side: Side, chain: FigureSource[], name: string, accent: string): void {
@@ -176,7 +205,7 @@ export class Stage {
     faces.sprite = null;
     faces.loaded = new Map();
     faces.outfits = new Map();
-    void this.resolve(chain).then(async ({ src, aspect }) => {
+    void this.resolve(chain).then(async ({ src, aspect, width }) => {
       if (token !== this.tokens[side]) return;
       // The outfit she should be wearing loads before the first paint, so a page load or reconnect
       // never flashes the plain sprite first.
@@ -189,7 +218,9 @@ export class Stage {
       if (token !== this.tokens[side]) return;
       this.aspects[side] = aspect;
       this.waists[side] = src.kind === 'sprite' ? (src.waist ?? null) : null;
-      this.render(fig, src, aspect);
+      this.render(side, src, aspect);
+      this.cutFace(side, null);
+      fig.style.setProperty('--face-tile', ditherTile(width ?? MASTER_WIDTH, (width ?? MASTER_WIDTH) / aspect));
       this.applyDrop(side);
       if (src.kind !== 'sprite') return;
       faces.sprite = src.url;
@@ -216,30 +247,82 @@ export class Stage {
    * Draws the wanted face over the wanted outfit (each falling back to the sprite's own) as stacked
    * backgrounds on one element, so both share the crop. Nothing until the figure resolves to a sprite.
    */
-  private applyFace(side: Side): void {
-    const { sprite, loaded, wanted, outfits, wantedOutfit } = this.faces[side];
+  /** Draws the base and the wanted face; `dissolve` (a change of face) blends it in, else it cuts (loading, outfits). */
+  private applyFace(side: Side, dissolve = false): void {
+    const faces = this.faces[side];
+    const { sprite, loaded, wanted, outfits, wantedOutfit } = faces;
     if (sprite === null) return;
     const base = (wantedOutfit !== null && outfits.get(wantedOutfit)) || sprite;
-    const face = wanted !== null ? loaded.get(wanted) : undefined;
-    setArt(this.figures[side], face ? `${cssUrl(face)}, ${cssUrl(base)}` : cssUrl(base));
+    setArt(this.figures[side], cssUrl(base));
+    const face = (wanted !== null && loaded.get(wanted)) || null;
+    // The same face again (her line re-reported as she types) lets a dissolve run on.
+    if (face === faces.shown) return;
+    if (!dissolve || this.reducedMotion) this.cutFace(side, face);
+    else this.dissolveFace(side, face);
   }
 
-  private async resolve(chain: FigureSource[]): Promise<{ src: FigureSource; aspect: number }> {
+  /** Shows `face` (null: the plain face) at once, ending any dissolve. */
+  private cutFace(side: Side, face: string | null): void {
+    this.stopDissolve(side);
+    const { in: incoming, out } = this.faceLayers[side];
+    setLayer(incoming, face ? cssUrl(face) : '', '');
+    setLayer(out, '', '');
+    this.faces[side].shown = face;
+  }
+
+  /**
+   * Dissolves from the face showing to `face`: the new one opens through the dither a step at a
+   * time while the old closes through its inverse. A change mid-dissolve starts from the face it
+   * was heading to.
+   */
+  private dissolveFace(side: Side, face: string | null): void {
+    const faces = this.faces[side];
+    const from = faces.shown;
+    this.stopDissolve(side);
+    faces.shown = face;
+    const { in: incoming, out } = this.faceLayers[side];
+    const fromImage = from ? cssUrl(from) : '';
+    const toImage = face ? cssUrl(face) : '';
+    let step = 0;
+    const tick = () => {
+      step++;
+      if (step >= DISSOLVE_STEPS) {
+        faces.timer = null;
+        setLayer(incoming, toImage, '');
+        setLayer(out, '', '');
+        return;
+      }
+      setLayer(incoming, toImage, ditherMask(step, true));
+      setLayer(out, fromImage, ditherMask(step, false));
+      faces.timer = setTimeout(tick, DISSOLVE_STEP_MS);
+    };
+    tick();
+  }
+
+  private stopDissolve(side: Side): void {
+    const faces = this.faces[side];
+    if (faces.timer !== null) clearTimeout(faces.timer);
+    faces.timer = null;
+  }
+
+  private async resolve(chain: FigureSource[]): Promise<{ src: FigureSource; aspect: number; width?: number }> {
     for (const src of chain) {
       if (src.kind === 'monogram' || src.kind === 'silhouette') return { src, aspect: MASTER_ASPECT };
       const probed = await this.probe(src.url);
-      if (probed) return { src, aspect: probed.aspect };
+      if (probed) return { src, aspect: probed.aspect, ...(probed.width ? { width: probed.width } : {}) };
     }
     return { src: { kind: 'silhouette' }, aspect: MASTER_ASPECT };
   }
 
-  private render(fig: HTMLElement, src: FigureSource, aspect: number): void {
+  private render(side: Side, src: FigureSource, aspect: number): void {
+    const fig = this.figures[side];
     const art = fig.querySelector<HTMLElement>('.stage-art')!;
     fig.dataset.kind = src.kind;
     fig.style.setProperty('--fig-aspect', String(aspect));
     if (src.kind === 'sprite' && src.pixel) fig.dataset.pixel = '';
     else delete fig.dataset.pixel;
     art.textContent = '';
+    art.append(this.faceLayers[side].in, this.faceLayers[side].out);
     setArt(fig, '');
     art.style.removeProperty('--portrait');
     if (src.kind === 'sprite') {
@@ -249,7 +332,7 @@ export class Stage {
       art.style.setProperty('--portrait', cssUrl(src.url));
       this.applyCrop(fig, { top: 0, bottom: 1 }, 1);
     } else {
-      if (src.kind === 'monogram') art.textContent = src.letter;
+      if (src.kind === 'monogram') art.prepend(src.letter);
       this.applyCrop(fig, { top: 0, bottom: 1 }, 1);
     }
   }

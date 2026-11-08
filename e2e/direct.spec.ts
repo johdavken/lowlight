@@ -32,8 +32,9 @@ test('nix-direct: a reply on GLM, a tool call, switching model, regenerate, a cr
   // The select screen: her tile is live, her file shows her model, and the model step lists the catalog.
   await skipSplash(page);
   await newGame(page);
-  await expect(page.locator(`.tile[data-id="${DIRECT.id}"]`)).not.toHaveClass(/offline/);
   await lockPlayer(page, 'hicks');
+  // A contact, not a lead: her tile is on the 2P grid (select leads spec §4).
+  await expect(page.locator(`.tile[data-id="${DIRECT.id}"]`)).not.toHaveClass(/offline/);
   await page.locator(`.tile[data-id="${DIRECT.id}"]`).hover();
   await expect(page.locator('.fighter.p2 .fighter-file')).toContainText('GLM 5.2');
   await page.locator(`.tile[data-id="${DIRECT.id}"]`).click();

@@ -78,19 +78,21 @@ test('keyboard only: any key, then Enter through player, AI and JACK IN reaches 
   await expect(page.locator('.splash')).toHaveCount(0); // keys wait for the intro to finish
   // The title: Enter on NEW GAME (↓ past CONTINUE when there's a playthrough to continue).
   await newGame(page);
-  // The roster is grouped by district (the live roster, see e2e/serve.ts): ←/→ walk its order, so
-  // the presses come from where Cass and Alpha actually are.
-  const order = await page.locator('.grid .tile[data-id]').evaluateAll((ts) => ts.map((t) => (t as HTMLElement).dataset.id!));
-  const cass = order.indexOf('cass');
-  const alpha = order.indexOf(SECOND.id);
-  for (let i = 0; i < cass; i++) await page.keyboard.press('ArrowRight');
+  // Each step has its own grid, grouped by district (the live roster, see e2e/serve.ts; select leads
+  // spec §4): ←/→ walk its order, so the presses come from where Hicks and Alpha actually are.
+  const tileOrder = () => page.locator('.grid .tile[data-id]').evaluateAll((ts) => ts.map((t) => (t as HTMLElement).dataset.id!));
+  const leads = await tileOrder();
+  for (let i = 0; i < leads.indexOf('hicks'); i++) await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Enter');
-  // YOU: Enter plays as Cass.
+  // YOU: Enter plays as Hicks.
   await expect(phase(page)).toHaveAttribute('data-phase', 'you');
   await page.keyboard.press('Enter');
   await expect(phase(page)).toHaveAttribute('data-phase', 'p2');
-  // The CPU cursor starts on Cass's tile: → round to Alpha, Enter, then Enter keeps her model.
-  for (let i = 0; i < (alpha - cass + order.length) % order.length; i++) await page.keyboard.press('ArrowRight');
+  // The CPU cursor starts on Hicks's tile on the 2P grid: → round to Alpha, Enter, then Enter keeps her model.
+  const order = await tileOrder();
+  const hicks = order.indexOf('hicks');
+  const alpha = order.indexOf(SECOND.id);
+  for (let i = 0; i < (alpha - hicks + order.length) % order.length; i++) await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Enter');
   await expect(phase(page)).toHaveAttribute('data-phase', 'model');
   await expect(page.locator('.model-band .mp-row.on')).toBeVisible();
@@ -99,7 +101,7 @@ test('keyboard only: any key, then Enter through player, AI and JACK IN reaches 
   await page.keyboard.press('Enter');
   await page.waitForURL(`**/room/${SECOND.id}*`);
   await page.waitForFunction(() => window.__nixRoom !== undefined);
-  await expect(page.locator('.stage-left')).toHaveAttribute('aria-label', 'Cass');
+  await expect(page.locator('.stage-left')).toHaveAttribute('aria-label', 'Hicks');
 });
 
 test('splash: opening a room directly, then going back, skips it', async ({ page }) => {
@@ -141,10 +143,12 @@ test('landing lists both contacts; each room renders its own pack, presets apply
 
   await skipSplash(page);
   await newGame(page);
-  // One roster page: RANDOM + the direct characters (nix-direct, cass, Hicks and whoever else
-  // characters/ holds, and the e2e-only SECOND).
-  const ids = await page.locator('.tile').evaluateAll((ns) => ns.map((n) => (n as HTMLElement).dataset.id));
-  expect(ids).toEqual(expect.arrayContaining(['?random', DIRECT.id, SECOND.id, 'cass', 'hicks']));
+  // 1P: RANDOM + the leads; 2P (after Hicks): the contacts (nix-direct, cass, Hicks and whoever else
+  // characters/ holds, and the e2e-only SECOND). Select leads spec §4.
+  const ids = () => page.locator('.tile').evaluateAll((ns) => ns.map((n) => (n as HTMLElement).dataset.id));
+  expect(await ids()).toEqual(expect.arrayContaining(['?random', 'hicks']));
+  await lockPlayer(page, 'hicks');
+  expect(await ids()).toEqual(expect.arrayContaining(['?random', DIRECT.id, SECOND.id, 'cass', 'hicks']));
   await expect(page.locator(`.tile[data-id="${SECOND.id}"]`)).not.toHaveClass(/offline/);
   await expect(page.locator('.tile[data-id="cass"]')).not.toHaveClass(/offline/);
   // Hicks has a mind of his own since he became a contact (GLM).
@@ -399,8 +403,8 @@ test('expressions: the dev panel picks her face for one reply', async ({ page })
   await expect(select).toBeVisible();
   await select.selectOption('happy');
 
-  const art = page.locator('.stage-figure.stage-right .stage-art');
-  await expect.poll(() => art.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('/sprite/happy');
+  const face = page.locator('.stage-figure.stage-right .stage-face-in');
+  await expect.poll(() => face.evaluate((el) => getComputedStyle(el).backgroundImage)).toContain('/sprite/happy');
 
   expect(errors).toEqual([]);
 });
@@ -609,7 +613,8 @@ test('greeting: after END SCENE, back in greets you again, and only once the rec
   page.on('pageerror', (err) => errors.push(err.message));
 
   await skipSplash(page);
-  await dialIn(page, DIRECT.id, SECOND.id);
+  // Rue, not Hicks: a fresh pair, as Alpha was before she left 1P (select leads spec §1).
+  await dialIn(page, DIRECT.id, 'rue');
   await page.waitForFunction(() => window.__nixRoom !== undefined);
   await awaitGreeting(page);
   await expect(page.locator('.link')).toHaveAttribute('data-status', 'ok');
@@ -999,11 +1004,12 @@ test('a line that arrives live: its name row sits over its text and its footer o
   await expect(replies).toHaveCount(before + 1, { timeout: 15_000 });
 });
 
-test('persona: play Nix as Vee — the room names you Vee and her turn says who you are', async ({ page }) => {
+test('persona: play Rue as Vee — the room names you Vee and her turn says who you are', async ({ page }) => {
   await skipSplash(page);
   await newGame(page);
-  await showTile(page, DIRECT.id);
-  await page.locator(`.tile[data-id="${DIRECT.id}"]`).click();
+  // A lead (select leads spec §1): Rue, who is she.
+  await showTile(page, 'rue');
+  await page.locator('.tile[data-id="rue"]').click();
   await expect(phase(page)).toHaveAttribute('data-phase', 'you');
   await page.locator('.yp-row[data-kind="custom"]').click();
   await page.locator('.yp-name').fill('Vee');
@@ -1031,7 +1037,7 @@ test('persona: play Nix as Vee — the room names you Vee and her turn says who 
   await send(page, { type: 'user_message', text: 'hello' });
   await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
   const said = (await chatsOf(SECOND)).at(-1)!.map((m) => m.content).join('\n');
-  // Vee takes Nix's pronoun (she), as every name in a prompt carries one.
+  // Vee takes Rue's pronoun (she), as every name in a prompt carries one.
   expect(said).toContain('[you: Vee (she) — Ex-courier.]');
   expect(said).toContain("[who's here: Vee (she)]");
 });

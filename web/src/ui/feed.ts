@@ -51,6 +51,12 @@ export interface CurrentLine {
    * showing (while she types, through what's typed), each trimmed, one per line; '' when none.
    */
   actions: string;
+  /**
+   * Faces hold: the last line of yours and of hers before this page (her earlier beats on this
+   * reply count), so the figure not speaking keeps the face its own line gave it. Absent when
+   * there is none since the visit began (her greeting, a move, END SCENE).
+   */
+  held?: { contact?: { actions: string; expression?: string }; user?: { actions: string } };
 }
 
 interface Entry {
@@ -1098,6 +1104,7 @@ export class Feed {
     this.currentNode = node;
     const c: CurrentLine | null = e ? { id: e.msg.id, role: e.msg.role, status: e.msg.status, ...this.speakerOf(e), actions: '' } : null;
     if (c && e) c.actions = this.actionsOf(e, c);
+    if (c && e && node) c.held = this.heldFaces(node, e, c);
     if (c && e?.msg.role === 'agent' && e.msg.expression) c.expression = e.msg.expression;
     if (c && e?.msg.role === 'agent' && e.msg.othersExpressions) c.othersExpressions = e.msg.othersExpressions;
     this.root.classList.toggle('speaker-user', c?.role === 'user');
@@ -1121,7 +1128,7 @@ export class Feed {
       const name = e.node.querySelector('.meta .name');
       if (name) name.textContent = other ? other.name.toUpperCase() : theirs && e.stranger ? e.stranger.toUpperCase() : this.agentName;
     }
-    const key = c ? `${c.id}:${c.status}:${c.expression ?? ''}:${c.speaker}:${c.otherId ?? ''}:${JSON.stringify(c.othersExpressions ?? {})}:${c.actions}` : '';
+    const key = c ? `${c.id}:${c.status}:${c.expression ?? ''}:${c.speaker}:${c.otherId ?? ''}:${JSON.stringify(c.othersExpressions ?? {})}:${c.actions}:${JSON.stringify(c.held ?? {})}` : '';
     if (key === this.currentKey) return;
     this.currentKey = key;
     for (const fn of this.currentListeners) fn(c);
@@ -1130,8 +1137,48 @@ export class Feed {
   /** An other's accent, for their beat names. */
   private readonly accentOf = (id: string): string | undefined => this.others.find((o) => o.id === id)?.accent;
 
+  /**
+   * Faces hold (see CurrentLine.held): for each of you and her not speaking now, the actions of
+   * your/her last line before this one. Her earlier beats on the reply showing count. Her lines
+   * are any but OOC and texts; yours are your roleplay lines (the ones the box shows). The walk
+   * back stops at a visit's start (a greeting, a move, END SCENE): her line there still counts.
+   */
+  private heldFaces(node: HTMLElement, e: Entry, c: CurrentLine): CurrentLine['held'] {
+    const held: NonNullable<CurrentLine['held']> = {};
+    const boundary = (m: ChatMessage) => m.mode === 'travel' || m.mode === 'scene' || m.mode === 'end' || m.mode === 'greet';
+    const hers = (p: Entry) =>
+      p.msg.role === 'agent' && p.msg.status !== 'failed' && p.msg.mode !== 'ooc' && p.msg.mode !== 'text' && (p.beats.length === 0 || p.beats.some((b) => b.who === 'contact'));
+    const yours = (p: Entry) => p.msg.role === 'user' && p.msg.status !== 'failed' && p.msg.mode === undefined;
+    const herLine = (p: Entry) => ({ actions: this.actionsOf(p, { speaker: 'contact' }), ...(p.msg.expression ? { expression: p.msg.expression } : {}) });
+    const want = { contact: c.speaker !== 'contact', user: c.speaker !== 'user' && !boundary(e.msg) };
+    // Her earlier beats on this reply (another's page): hers holds from them.
+    if (want.contact && e.msg.role === 'agent') {
+      const upTo = this.typing?.id === e.msg.id ? this.typing.shown : this.limit(e);
+      if (e.beats.some((b) => b.who === 'contact' && b.bodyStart <= upTo)) {
+        held.contact = herLine(e);
+        want.contact = false;
+      }
+    }
+    if (boundary(e.msg)) want.contact = false;
+    for (let n = node.previousElementSibling; n && (want.contact || want.user); n = n.previousElementSibling) {
+      if (!(n instanceof HTMLElement) || !n.classList.contains('msg')) continue;
+      const p = this.entries.get(n.dataset.id ?? '');
+      if (!p) continue;
+      if (want.contact && hers(p)) {
+        held.contact = herLine(p);
+        want.contact = false;
+      }
+      if (boundary(p.msg)) break;
+      if (want.user && yours(p)) {
+        held.user = { actions: this.actionsOf(p, { speaker: 'user' }) };
+        want.user = false;
+      }
+    }
+    return held.contact || held.user ? held : undefined;
+  }
+
   /** The line's *actions* for `c`'s speaker, up to the page showing or the typing frontier (faces from actions). */
-  private actionsOf(e: Entry, c: CurrentLine): string {
+  private actionsOf(e: Entry, c: Pick<CurrentLine, 'speaker' | 'otherId'>): string {
     const upTo = this.typing?.id === e.msg.id ? this.typing.shown : this.limit(e);
     const mine = (b: Beat) => b.who === c.speaker && (b.who !== 'other' || b.id === c.otherId);
     const ranges: Array<[number, number]> = e.beats.length === 0 ? [[0, upTo]] : e.beats.filter(mine).map((b) => [b.bodyStart, Math.min(b.end, upTo)]);

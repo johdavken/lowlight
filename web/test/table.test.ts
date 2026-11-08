@@ -240,6 +240,16 @@ describe('card faces', () => {
     expect(name('COUNTERMEASURE')).toContain('long');
     expect(name('LEECH')).toBe('tbc-name');
   });
+  it('a foil program: its plain art, the foil shimmer, +1D on the corner, one run, how many held', () => {
+    const f = programFace({ id: 'foil:solvent', name: 'SOLVENT', stat: 'tech', kind: 'position', foil: true, count: 2 });
+    expect(f.classList.contains('tb-foil')).toBe(true);
+    expect(f.querySelector('img')!.getAttribute('src')).toBe('/programs/solvent.webp');
+    expect(f.querySelector('.tbc-pic .tbc-grade')!.textContent).toBe('+1D');
+    expect([...f.querySelectorAll('.tbc-note')].map((n) => n.textContent)).toEqual(['BETTER POSITION', 'FOIL ×2 · ONE RUN']);
+    const plain = programFace({ id: 'solvent', name: 'SOLVENT', stat: 'tech', kind: 'position' });
+    expect(plain.classList.contains('tb-foil')).toBe(false);
+    expect(plain.querySelector('.tbc-grade')).toBeNull();
+  });
   it('a long line sets smaller', () => {
     const lines = [...slotFace('LOAD').querySelectorAll('.tbc-note')];
     expect(lines[0].textContent).toBe('TAP TO SLOT A PROGRAM');

@@ -5,7 +5,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 `· man` or `· woman` after a name keeps it to faces tagged that way; a name with neither fits any face.
 
 ## karasu
-- Juno Sato
+- Juno Sato · woman
 - Pell Okoro
 - Ren Takagi
 - Mika Arai · woman
@@ -21,7 +21,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 - Daichi Mori · man
 - Lan Esposito
 - Aki Ferro
-- Noor Hayashi
+- Noor Hayashi · man
 - Rook Tanabe
 - Saya Dumont · woman
 - Ichiro Hale · man
@@ -30,7 +30,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 - Celeste Varga · woman
 - Marlo Quint
 - Anouk Silva · woman
-- Teddy Laurent
+- Teddy Laurent · man
 - Vivi Okafor · woman
 - Sasha Belov
 - Lux Marchetti
@@ -50,7 +50,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 
 ## strand
 - Saida Rahm · woman
-- Ilya Voss
+- Ilya Voss · man
 - Margit Hale · woman
 - Tomas Reyes · man
 - Gus Palmer · man
@@ -59,16 +59,16 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 - Rosa Kettle · woman
 - Wade Ocampo · man
 - Tilda Marsh · woman
-- Ezra Quill
+- Ezra Quill · man
 - Nell Danvers · woman
 - Cato Mendes · man
 - Dot Halloran · woman
 - Rudi Baptiste · man
 - Inez Coelho · woman
 - Moss Whitaker
-- Fern Abara
+- Fern Abara · woman
 - Hollis Grey
-- Lupe Santana
+- Lupe Santana · woman
 
 ## tidal
 - Vesna Kral · woman
@@ -86,7 +86,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 - Mila Jovic · woman
 - Stas Rybak · man
 - Tamsin Karas · woman
-- Yuri Okonjo
+- Yuri Okonjo · man
 - Lena Brodsky · woman
 - Mato Vidak · man
 - Sava Nilsen
@@ -105,7 +105,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 - Mags O'Leary · woman
 - Lonnie Fisk
 - Abe Thorne · man
-- Juno Mbeki
+- Juno Mbeki · woman
 - Pip Carver
 - Nettie Hask · woman
 - Crane Delgado
@@ -122,7 +122,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 - Marek Duda · man
 - Hilde Saar · woman
 - Rocco Ianni · man
-- Bex Morrow
+- Bex Morrow · woman
 - Dmitri Lenz · man
 - Una Ferris · woman
 - Gil Okoye · man

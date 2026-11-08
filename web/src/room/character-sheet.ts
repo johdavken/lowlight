@@ -210,7 +210,7 @@ function purse(label: string, amount: string, note?: string): HTMLElement {
   return n;
 }
 
-/** KIT: sol, the decks you own with CARRY, cover, and the chrome to come. */
+/** KIT: sol, the decks you own with CARRY, programs, cover, and the chrome to come. */
 function kitPage(kit: KitView, onCarry?: (id: string) => void): HTMLElement {
   const wallet = el('div', 'cs-wallets');
   wallet.append(purse('SOL', sol(kit.sol), 'WHAT YOU HOLD'), purse('GRID', '—'), purse('HARD SOL', '—'));
@@ -239,10 +239,19 @@ function kitPage(kit: KitView, onCarry?: (id: string) => void): HTMLElement {
     cover.append(chip);
   }
 
+  // Programs you own and foils held (owned programs): FIREWALL and your starter, what fixers sold you, what jobs dropped.
+  const programs = el('div', 'cs-chips');
+  for (const p of kit.programs ?? []) {
+    const chip = el('span', `cs-chip${p.foil ? ' foil' : ''}`, p.foil ? `${p.name} FOIL` : p.name);
+    if (p.foil) chip.append(el('b', '', `×${p.count ?? 1}`));
+    programs.append(chip);
+  }
+
   const n = el('div', 'cs-kit');
   n.append(
     sec('sol', 'SOL', '', wallet),
     sec('decks', 'DECKS', `${kit.owned.length} OWNED`, ...decks, el('div', 'cs-deck-why')),
+    ...(kit.programs ? [sec('programs', 'PROGRAMS', `${kit.programs.filter((p) => !p.foil).length} OWNED`, programs)] : []),
     sec('cover', 'COVER', '', cover),
     planned('chrome', 'CHROME', emptyRow('CHROME', 'Empty slot'), emptyRow('JACK', 'Empty slot')),
   );

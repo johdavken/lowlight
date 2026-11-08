@@ -177,6 +177,8 @@ export interface QuestEntry {
   kind: 'quest' | 'mission' | 'contract';
   /** A contract's arc (tier 3 contracts spec §2): the two waits in minutes, its groundwork, when it's offered, its rumor. */
   contract?: { night: number; fallout: number; pieces: { id: string; spec: Specialty; line: string }[]; postsAt: number; rumor: string; /** The lead you must hold before it's listed (world/leads id). */ lead?: string; /** Who comes as a guest (guest crew spec §2): a contact and a grade. */ guest?: { id: string; grade: Grade } };
+  /** A mission's guest (The Passenger spec, engine §1): offered whenever it runs, no lead. A contract's is `contract.guest`. */
+  guest?: { id: string; grade: Grade };
   /** What the JOBS list says a mission pays (null: not said). */
   pay: number | null;
   /** Small jobs spec §1: the rep tier needed in the job's district (default 1). */
@@ -703,7 +705,7 @@ export const LOOT_MAX = 80;
 export function parseQuestFile(
   id: string,
   text: string,
-  known: { roster: ReadonlySet<string> | null; places: ReadonlySet<string> | null; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string> } | null; decks?: ReadonlySet<string> | null; outfits?: ReadonlySet<string> | null },
+  known: { roster: ReadonlySet<string> | null; places: ReadonlySet<string> | null; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string> } | null; decks?: ReadonlySet<string> | null; outfits?: ReadonlySet<string> | null; /** Guest files' ids (The Passenger spec, engine §2); null or absent: unchecked. */ guests?: ReadonlySet<string> | null },
 ): { ok: true; entry: QuestEntry; warnings: string[] } | { ok: false; problems: QuestProblem[] } {
   const problems: QuestProblem[] = idOk(id) ? [] : [{ field: 'id', message: `must be lowercase letters, digits and dashes, at most ${LORE_ID_MAX}` }];
   const s = splitFrontMatter(text);
@@ -867,7 +869,7 @@ export function parseQuestFile(
       if (known.roster && !known.roster.has(s.who)) problems.push({ field: o.id, message: `settles: no contact '${s.who}'` });
     }
     if (o.effects.guestNote !== undefined) {
-      if (f.guest == null) problems.push({ field: o.id, message: 'guest-note: needs a guest: on the contract' });
+      if (f.guest == null || !contracted) problems.push({ field: o.id, message: 'guest-note: needs a guest: on the contract' });
       if (o.to !== 'end') problems.push({ field: o.id, message: 'guest-note: goes on an outcome that ends (→ end)' });
       if (o.effects.guestNote.length > GUEST_NOTE_MAX) problems.push({ field: o.id, message: `guest-note: at most ${GUEST_NOTE_MAX} characters (this is ${o.effects.guestNote.length})` });
     }
@@ -941,7 +943,10 @@ export function parseQuestFile(
     if (f.guest != null && f.lead == null) problems.push({ field: 'guest', message: 'a guest needs a lead:' });
   } else {
     if (f.lead != null) problems.push({ field: 'lead', message: 'only a contract is opened by a lead' });
-    if (f.guest != null) problems.push({ field: 'guest', message: 'only a contract has a guest' });
+    // A mission may bring a guest with no lead (The Passenger spec, engine §1); a quest that is no job may not.
+    if (f.guest != null && !mission) problems.push({ field: 'guest', message: 'only a contract or a mission has a guest' });
+    else if (f.guest != null && !guest) problems.push({ field: 'guest', message: 'guest: is a contact and a grade, like ember VET' });
+    else if (guest && known.guests && !known.guests.has(guest.id) && !known.roster?.has(guest.id)) problems.push({ field: 'guest', message: `no character or guest '${guest.id}'` });
   }
   const roots = [first, ...arcBeats.filter((b) => beats.has(b)), ...pushBeats, ...(beats.has('getaway') ? ['getaway'] : [])];
   const reached = new Set<string>(roots);
@@ -959,7 +964,7 @@ export function parseQuestFile(
 
   if (problems.length > 0) return { ok: false, problems };
   const timed = [...outcomes.values()].some((o) => o.wait?.by != null);
-  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor!, ...(f.lead ? { lead: f.lead } : {}), ...(guest ? { guest } : {}) } } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, ...(f['posted-by'] ? { postedBy: f['posted-by'] } : {}), ...(f.brief ? { brief: f.brief } : {}), ...(f['known-by'] ? { knownBy: f['known-by'] } : {}), timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.for ? { for: f.for } : {}), ...(f.bars ? { bars: f.bars } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}) };
+  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor!, ...(f.lead ? { lead: f.lead } : {}), ...(guest ? { guest } : {}) } } : {}), ...(!contracted && mission && guest ? { guest } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, ...(f['posted-by'] ? { postedBy: f['posted-by'] } : {}), ...(f.brief ? { brief: f.brief } : {}), ...(f['known-by'] ? { knownBy: f['known-by'] } : {}), timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.for ? { for: f.for } : {}), ...(f.bars ? { bars: f.bars } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}) };
   if (entry.template) warnings.push(...offTemplate(entry));
   return { ok: true, warnings, entry };
 }
@@ -1269,7 +1274,7 @@ const setupSchema = z.object({
   // Contact cards (spec 2026-10-31-contact-cards §2), as they were at GO IN.
   contacts: z.array(z.object({ id: z.string(), name: z.string(), accent: z.string(), portrait: z.string().nullable(), spec: z.preprocess(normalSpec, z.enum(SPECIALTIES)) })).max(2).optional(),
   // A contract's guest (spec 2026-11-05-guest-crew §2), as they were at GO IN.
-  guest: z.object({ id: z.string(), name: z.string(), accent: z.string(), portrait: z.string().nullable(), spec: z.preprocess(normalSpec, z.enum(SPECIALTIES)), grade: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), abilities: z.array(z.string()) }).optional(),
+  guest: z.object({ id: z.string(), name: z.string(), accent: z.string(), portrait: z.string().nullable(), spec: z.preprocess(normalSpec, z.enum(SPECIALTIES)), grade: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), abilities: z.array(z.string()), kind: z.literal('guest').optional(), art: z.string().optional(), line: z.string().optional() }).optional(),
   // Crew abilities (spec 2026-11-01): the loadout at GO IN, and what played at the end.
   abilities: z.record(z.string(), z.array(z.string())).optional(),
   ended: z.array(z.string()).optional(),
@@ -1365,6 +1370,8 @@ const runSchema = z.object({
         lift: z.literal(true).optional(),
         rep: z.object({ district: z.string(), delta: z.number() }).optional(),
         cover: z.object({ id: z.enum(['burner', 'fall-guy']), delta: z.number() }).optional(),
+        // A foil dropped (+1) or used up (−1) (owned programs).
+        program: z.object({ id: z.string(), foil: z.number().int().optional() }).optional(),
       }),
     )
     .optional(),
@@ -1805,4 +1812,9 @@ export function withGetaway(q: QuestEntry): QuestEntry {
   const outcomes = new Map(q.outcomes);
   for (const o of STOCK_GETAWAY.outcomes) outcomes.set(o.id, o);
   return { ...q, beats, outcomes };
+}
+
+/** Who a job brings as a guest: a contract's (its lead's giver) or a mission's. Null: none. */
+export function questGuest(q: Pick<QuestEntry, 'contract' | 'guest'>): { id: string; grade: Grade } | null {
+  return q.contract?.guest ?? q.guest ?? null;
 }

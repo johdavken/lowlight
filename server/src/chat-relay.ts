@@ -2,7 +2,7 @@ import { parsePhotoReply, photoForModel, photosLine, type Photo } from '../../sh
 import { type TrustControl } from './standing';
 import { commsKey, parseComms, type CommsState } from '../../shared/comms';
 import { arrangementLine } from '../../shared/arrangement';
-import type { ChatMessage, ChatMode, ContactCard, CrewView, PlanCard, RoomState, ServerEvent, Take } from '../../shared/types';
+import type { ChatMessage, ChatMode, ContactCard, CrewView, GuestCard, PlanCard, RoomState, ServerEvent, Take } from '../../shared/types';
 import { type Recruit } from '../../shared/crew';
 import { crewLine } from '../../shared/crew-line';
 import type { CrewState } from '../../shared/crew-fold';
@@ -181,6 +181,8 @@ export interface ChatRelayDeps {
     heard?(key: string): boolean;
     /** Contact cards the player holds (contact cards spec §1). */
     contactCards?(): ContactCard[];
+    /** Guest files (The Passenger spec, engine §2): someone a mission brings who isn't a contact. */
+    guestCards?(): GuestCard[];
     /** The crew book's traits (the hand spec §2: never-held on a call's loss). */
     crewTraits?(): Trait[];
     /** The crew book's abilities (crew abilities spec §2): labels, effects and timings at the table. */

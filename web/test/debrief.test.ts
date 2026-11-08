@@ -21,6 +21,12 @@ const D: Debrief = {
   heat: { district: 'karasu', delta: 3 },
   rep: { district: 'karasu', before: 30, after: 37 },
 };
+describe('a foil found (owned programs)', () => {
+  it('names the program', () => {
+    show({ ...D, found: 'VOICEBOX' });
+    expect(document.querySelector('.db-loot.db-found')!.textContent).toBe('FOUND · VOICEBOX · FOIL');
+  });
+});
 describe('loot (crew goods spec §6)', () => {
   it('names the lot', () => {
     show({ ...D, loot: { label: 'DATA' } });

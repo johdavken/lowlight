@@ -11,6 +11,7 @@ import { COLUMNS, RosterGrid, type GridTile } from './roster-grid';
 import { FighterStrip, type StripModels } from './fighter-strip';
 import { glitchIn, mountStage } from './stage';
 import { mountTitle, type TitleCue } from './title';
+import { startUpdate, updateStatus } from '../net/update';
 import { mountLoad } from './load';
 import { MENU_CUE_URL, menuCuePlayer } from './menu-sound';
 import * as playthroughs from '../net/playthroughs';
@@ -716,6 +717,7 @@ export function mountLanding(
       agents: () => byId,
       backdrop: screenBackdrop,
       reducedMotion,
+      update: { status: updateStatus, start: startUpdate },
     });
     glitchIn([...titleHost.children] as HTMLElement[], { reducedMotion });
   }

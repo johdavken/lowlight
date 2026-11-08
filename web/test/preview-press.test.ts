@@ -36,3 +36,20 @@ describe('a parked roll says what it lost', () => {
     expect(parkedLine({ kind: 'clean', cost: { alarm: 0, heat: 0 }, missTake: true })).not.toContain('TAKE −1');
   });
 });
+
+describe('a foil whose step does nothing still lifts the cut, as the server counts it (owned programs, review)', () => {
+  it('a position foil marked in the dark on a holding deck lifts TIER 2 −1', () => {
+    const DECK = { id: 'd', name: 'D', quality: 2 as const, heat: 0, traits: [] };
+    const foil = { id: 'foil:solvent', name: 'SOLVENT', stat: 'tech' as const, kind: 'position' as const, line: 'x', foil: true as const };
+    const dark = { ...check, base: 60 };
+    const plain = poolOf(dark, { ...who, deck: DECK, tier: 2, tag: 'fair' });
+    const server = poolOf(dark, { ...who, deck: DECK, tier: 2, tag: 'fair', programs: [foil] });
+    expect(plain.position).toBe('dark');
+    expect(plain.tier?.lifted).toBe(false);
+    expect(server.tier?.lifted).toBe(true);
+    const card = programsOn(plain, [{ name: 'SOLVENT', kind: 'position', alarm: 0, load: false, foil: true, tier: server.tier }]);
+    expect(card.ran).toHaveLength(1);
+    expect(card.tier).toEqual(server.tier);
+    expect(card.effect).toBe(server.effect);
+  });
+});

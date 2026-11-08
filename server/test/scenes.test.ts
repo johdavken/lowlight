@@ -8,6 +8,7 @@ import { loadPacks, SceneRegistry } from '../src/scenes';
 import { generateScenes } from '../../tools/gen-placeholders';
 import { sceneSchema } from '../../shared/scene-schema';
 import type { SceneDef } from '../../shared/types';
+import { MAX_POINTS } from '../../shared/weather-area';
 
 let tmpDir: string;
 
@@ -887,8 +888,10 @@ describe('weatherArea', () => {
   it('rejects both fields', () => refused(flat({ weatherRegion: [0, 0, 10, 10], weatherArea: [sq(0, 0)] }), /use weatherArea or weatherRegion, not both/));
   it('rejects 9 shapes', () => refused(flat({ weatherArea: Array.from({ length: 9 }, (_, i) => sq(i * 60, 0)) }), /weatherArea/));
   it('rejects a 2-point shape', () => refused(flat({ weatherArea: [[[0, 0], [10, 10]]] }), /weatherArea/));
-  it('rejects a 33-point shape', () =>
-    refused(flat({ weatherArea: [Array.from({ length: 33 }, (_, i) => [Math.round(400 + 300 * Math.cos(i / 5.25)), Math.round(400 + 300 * Math.sin(i / 5.25))])] }), /weatherArea/));
+  it('rejects a shape with one point over MAX_POINTS', () => {
+    const n = MAX_POINTS + 1;
+    return refused(flat({ weatherArea: [Array.from({ length: n }, (_, i) => [Math.round(400 + 300 * Math.cos((i / n) * 2 * Math.PI)), Math.round(400 + 300 * Math.sin((i / n) * 2 * Math.PI))])] }), /weatherArea/);
+  });
   it('rejects a point outside the frame', () => refused(flat({ weatherArea: [[[1537, 10], [1500, 10], [1500, 60]]] }), /weather shape point must lie inside the frame/));
   it('rejects a shape under 4 px²', () => refused(flat({ weatherArea: [[[0, 0], [10, 0], [20, 0]]] }), /weather shape is too small/));
 

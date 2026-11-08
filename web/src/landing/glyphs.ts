@@ -1,6 +1,6 @@
 /** The title band's pixel glyphs: 16×16 art, `#` for a lit cell, drawn crisp in the mark's colour. */
 
-export type GlyphName = 'new' | 'load' | 'report';
+export type GlyphName = 'new' | 'load' | 'report' | 'update';
 
 const ROWS: Record<GlyphName, string[]> = {
   // NEW GAME: a terminal prompt, a fresh line waiting.
@@ -56,6 +56,25 @@ const ROWS: Record<GlyphName, string[]> = {
     '.....##..##.....',
     '....##....##....',
     '...##......##...',
+    '................',
+    '................',
+    '................',
+  ],
+  // UPDATE: a line coming down into the tray (the public repo's new commits, pulled in).
+  update: [
+    '................',
+    '.......##.......',
+    '.......##.......',
+    '.......##.......',
+    '.......##.......',
+    '....##.##.##....',
+    '.....######.....',
+    '......####......',
+    '.......##.......',
+    '................',
+    '.##..........##.',
+    '.##..........##.',
+    '.##############.',
     '................',
     '................',
     '................',

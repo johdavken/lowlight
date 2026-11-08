@@ -105,6 +105,8 @@ import { markSplashSeen } from './landing/splash';
 import { GigWindow, type GigWindowOpts } from './ui/gig/window';
 import { GIG_CUE_URL, GIG_MUSIC_LEVEL, GIG_MUSIC_URL, TABLE_MUSIC_URL, gigCuePlayer, type GigCueName } from './ui/gig/sound';
 import { PAPERS_CUE_URL, papersCuePlayer, type PapersCueName } from './ui/papers/sound';
+import { PapersHud } from './ui/papers/hud';
+import type { PapersBoard } from '../../shared/papers/generate';
 import type { PapersData } from '../../shared/papers/data';
 import type { Brief } from '../../shared/gig/brief';
 import { diceRoom } from './ui/dice/room';
@@ -197,11 +199,15 @@ function startRoom(agentId: string): void {
    * the cards panels): SUGGEST's set, drafted for the moment before, is spent. */
   let momentMoved = () => {};
   let wasBusy = false;
+  /** The papers board's keys, shown in the prompt while it holds them (set from SIT DOWN, main.ts below). */
+  let papersHint: string | null = null;
   const updateBusy = () => {
     // A swipe, a regenerate, a DRAW or a card pick moves the moment without a new line of yours.
     if (turns.busy && !wasBusy) momentMoved();
     wasBusy = turns.busy;
     if (!socketOpen) input.setBusy(true, '// NO CARRIER');
+    // The papers board holds the keys (chat stays closed at the desk): the prompt shows its keys instead.
+    else if (papersHint) input.setBusy(true, papersHint);
     else input.setBusy(turns.busy);
     feed.setBusy(!socketOpen || turns.busy || branching);
     // Saving waits for her reply to finish, as the server would refuse it.
@@ -516,7 +522,7 @@ function startRoom(agentId: string): void {
     if (title === null) {
       beatSong = null;
       beatSongUrl = null;
-      if (!gigWindow) roomAudio.overrideMusic(tableUp ? TABLE_MUSIC_URL : null, GIG_MUSIC_LEVEL);
+      if (!gigOpen()) roomAudio.overrideMusic(tableUp ? TABLE_MUSIC_URL : null, GIG_MUSIC_LEVEL);
       return;
     }
     songList ??= fetch('/api/songs').then((r) => r.json() as Promise<{ songs: { title: string; url: string }[]; beats: { title: string; url: string }[] }>).then((j) => [...j.beats, ...j.songs]).catch(() => {
@@ -528,7 +534,7 @@ function startRoom(agentId: string): void {
     if (!song || ask !== songAsk) return;
     beatSong = title;
     beatSongUrl = song.url;
-    if (!gigWindow) roomAudio.overrideMusic(song.url, GIG_MUSIC_LEVEL);
+    if (!gigOpen()) roomAudio.overrideMusic(song.url, GIG_MUSIC_LEVEL);
   };
   let tableDown: ReturnType<typeof setTimeout> | null = null;
   // The job's written text beside the subtitles while a table is up (the JOB column, 2026-11-02); the last table closing takes it.
@@ -578,12 +584,15 @@ function startRoom(agentId: string): void {
     if (!on) jobColumn.clear();
     if (tableDown) clearTimeout(tableDown);
     tableDown = null;
-    if (on && !beatSong) roomAudio.overrideMusic(TABLE_MUSIC_URL, GIG_MUSIC_LEVEL);
-    else if (!on) tableDown = setTimeout(() => !tableUp && !gigWindow && !beatSong && roomAudio.overrideMusic(null), 1500);
+    // The papers board is a table too, but keeps the desk's own track (Fast Drying Lacquer), not On The Wire.
+    if (on && !beatSong) roomAudio.overrideMusic(papersSitting ? GIG_MUSIC_URL : TABLE_MUSIC_URL, GIG_MUSIC_LEVEL);
+    else if (!on) tableDown = setTimeout(() => !tableUp && !gigOpen() && !beatSong && roomAudio.overrideMusic(null), 1500);
   });
   /** The SETUP card before a job's first beat (the hand spec §1), and the job it's for. */
   let setupCard: { id: string; card: SetupCard; offer: string } | null = null;
   const startQuest = (id: string) => {
+    // A job waits until you've left the papers desk: two tables would take each other's keys.
+    if (papersHud) return;
     const open = questState.open.find((q) => q.id === id);
     // A job with a SETUP card: how you go in and who you bring first; anything else starts now.
     if (!open?.setup) {
@@ -914,8 +923,22 @@ function startRoom(agentId: string): void {
   void listPlaythroughs().then((l) => (crewPt = l.active ?? ''), () => {});
   /** The tab PEOPLE last showed: the bar's PEOPLE and Alt+P open it there. */
   let lastPeopleTab: PeopleTab = 'file';
-  // Gig runs: the gig window over the map (GIGS at a gig place); one at a time.
+  // Gig runs: the gig window over the map (GIGS at a gig place) lists the jobs; SIT DOWN closes it and the map, and
+  // the papers board goes up over the room (mockup papers-board.html, D, 2026-11-08). One at a time.
   let gigWindow: GigWindow | null = null;
+  let papersHud: PapersHud | null = null;
+  /** From SIT DOWN until the board is gone: its table music is the desk's track, not Graft's. */
+  let papersSitting = false;
+  const gigOpen = () => gigWindow !== null || papersHud !== null;
+  const closePapers = () => {
+    if (!papersHud) return;
+    const hud = papersHud;
+    papersHud = null;
+    papersSitting = false;
+    hud.destroy();
+    // A quest beat's song was playing under the desk's track: it comes back (the table's closing timer leaves it alone).
+    if (beatSongUrl) roomAudio.overrideMusic(beatSongUrl, GIG_MUSIC_LEVEL);
+  };
   /** Why GIGS can't open (her link), or null; a down connection is checked when the map asks. */
   /** Why GIGS can't run: read when asked, since words about her follow her pronoun (her portrait can come after). */
   let gigWhyNot: (() => string) | null = null;
@@ -929,8 +952,10 @@ function startRoom(agentId: string): void {
   };
   const gigCue = gigCuePlayer(roomAudio);
   const papersCue = papersCuePlayer(roomAudio);
-  /** What every gig window shares: who's playing, the cues, the music, papers data, the dev strip. */
-  const gigShared = (): Pick<GigWindowOpts, 'you' | 'contact' | 'onClose' | 'loadPapers' | 'cue' | 'music' | 'reducedMotion' | 'dev'> => ({
+  /** The dev strip on the board (the run's seed and its best): with the admin panel open, or a fixed ?gigSeed=. */
+  const gigDev = () => devPanel.open || new URLSearchParams(location.search).has('gigSeed');
+  /** What every gig window shares: who's playing, the cues, papers data. */
+  const gigShared = (): Pick<GigWindowOpts, 'you' | 'contact' | 'onClose' | 'loadPapers' | 'cue' | 'reducedMotion'> => ({
     you: personaName ?? 'You',
     contact: agentName,
     onClose: closeGig,
@@ -941,30 +966,49 @@ function startRoom(agentId: string): void {
           if (n in PAPERS_CUE_URL) papersCue(n as PapersCueName);
         } else if (name in GIG_CUE_URL) gigCue(name as GigCueName);
       },
-      // The gig track on the jobs and result screens, and at the desk until its track is made (PAPERS_MUSIC_URL:
-      // a missing file would stop the music, not fall back).
-      music: () => roomAudio.overrideMusic(GIG_MUSIC_URL, GIG_MUSIC_LEVEL),
       reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
-      // The dev strip (the run's seed and result): with the admin panel open, or a fixed ?gigSeed=.
-      dev: devPanel.open || new URLSearchParams(location.search).has('gigSeed'),
   });
   const gigAudio = () => {
     for (const url of [...Object.values(GIG_CUE_URL), ...Object.values(PAPERS_CUE_URL)]) roomAudio.preloadCue(url);
     roomAudio.overrideMusic(GIG_MUSIC_URL, GIG_MUSIC_LEVEL);
   };
   const openGig = (place: Place, district: District) => {
-    if (gigWindow) return;
+    if (gigOpen()) return;
     gigAudio();
     gigWindow = new GigWindow(gameRoot(), {
       ...gigShared(),
       place: { id: place.id, name: place.name, district: district.name },
       load: () =>
         fetch(`/api/gigs?place=${encodeURIComponent(place.id)}`).then(async (r) => (r.ok ? ((await r.json()) as { briefs: Brief[] }).briefs : [])),
-      // The window and the map stay up until her turn starts on it (or the server says why not).
+      onSit: (job) => sitDown(place, job),
+    });
+  };
+  /** SIT DOWN: the window and the map go, and the board stands over the room until her turn starts on the run. */
+  const sitDown = (place: Place, job: { brief: Brief; board: PapersBoard }) => {
+    if (papersHud) return;
+    papersSitting = true;
+    // The window goes without handing the music back: the board's table keeps the desk's track playing.
+    gigWindow?.destroy({ quiet: true });
+    gigWindow = null;
+    map.close();
+    papersHud = new PapersHud(gameRoot(), {
+      brief: job.brief,
+      board: job.board,
+      place: { id: place.id, name: place.name },
       onSend: (run) => {
         if (socket && socketOpen) socket.send({ type: 'gig', ...run });
-        else gigWindow?.showRefusal('no link');
+        else papersHud?.showRefusal('no link');
       },
+      onClose: closePapers,
+      cue: gigShared().cue,
+      hint: (text) => {
+        papersHint = text;
+        updateBusy();
+      },
+      reducedMotion: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false,
+      dev: gigDev(),
+      // A screen, the map or the pause menu over the board has the keys (Esc closes it, not the desk).
+      blocked: () => chromeOpen || map.isOpen || currentScreen() !== null || book.isOpen || paused !== null || recap.visible || modelMenu.isOpen || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || bugReportOpen(),
     });
   };
   const map = new MapPanel(byId('map'), {
@@ -995,7 +1039,7 @@ function startRoom(agentId: string): void {
         player: mapPlayer,
         contact: { id: agentId, name: agentName, accent: agentAccent },
         busy: turns.busy,
-        gigBlock: gigBlock(),
+        gigBlock: tableUp ? 'a job is on the table' : gigBlock(),
       }),
       comms: { on: comms.on, can: comms.can, herAt: comms.herAt },
     }),
@@ -1019,6 +1063,8 @@ function startRoom(agentId: string): void {
    * The server still checks the move, and a refusal shows on the screen with your text kept.
    */
   function openTravel(placeId: string, onComms: boolean): void {
+    // Not mid-desk: the papers board stays in the room you sat down in until it's sent.
+    if (papersHud) return;
     const place = map.place(placeId);
     if (!place?.scene || travelScreen?.screen.open) return;
     const sceneId = place.scene;
@@ -1422,7 +1468,7 @@ function startRoom(agentId: string): void {
     return true;
   };
   /** Something modal owns the keys, so the drawer neither opens nor takes Esc. A full screen isn't one: BOOK replaces it. */
-  const bookBlocked = () => (chromeOpen && currentScreen() === null) || cracking || paused !== null || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigWindow !== null || modelMenu.isOpen || bugReportOpen();
+  const bookBlocked = () => (chromeOpen && currentScreen() === null) || cracking || paused !== null || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigOpen() || modelMenu.isOpen || bugReportOpen();
   const toggleBook = () => {
     if (book.isOpen) return book.close();
     if (bookBlocked() || !closeScreen(currentScreen())) return;
@@ -1468,7 +1514,7 @@ function startRoom(agentId: string): void {
       const owns = currentScreen() === null ? a?.closest('#input') === null : a?.closest('.scr-root, #map') != null;
       return (field && owns) || a?.closest('.devpanel') != null || textsOwnsTab(a);
     },
-    blocked: () => gigWindow !== null || modelMenu.isOpen || bugReportOpen() || dice.open || recap.visible || cardsOpen(),
+    blocked: () => gigOpen() || modelMenu.isOpen || bugReportOpen() || dice.open || recap.visible || cardsOpen(),
     go: switchTo,
     turnPage: (cur, dir) => (cur === 'you' ? sheet?.turnPage(dir) : cur === 'people' ? people?.turnPage(dir) : false) ?? false,
     shown: (s) => s !== 'quest' || questList.has(),
@@ -1591,7 +1637,7 @@ function startRoom(agentId: string): void {
   // Doors (clickable doors spec §3): click one to go through its exit; inert while a panel is open.
   const doors = new DoorLayer(byId('doors'), {
     send: (to) => socket?.send({ type: 'exit', to }),
-    blocked: () => chromeOpen || map.isOpen || book.isOpen || whosHere.cardOpen || questList.isOpen || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigWindow !== null,
+    blocked: () => chromeOpen || map.isOpen || book.isOpen || whosHere.cardOpen || questList.isOpen || recap.visible || cardsOpen() || dice.open || (intro?.open ?? false) || (travelScreen?.screen.open ?? false) || gigOpen(),
     roomRect: () => renderer?.roomRect() ?? { left: 0, top: 0, width: 0, height: 0 },
     stage: () => gameStage.rect(),
   });
@@ -1754,8 +1800,9 @@ function startRoom(agentId: string): void {
           suggestSpent();
           // Her turn has started on the game: the tray goes, her face back to hers.
           if (e.message.mode === 'dice') dice.row(e.message);
-          // Her turn has started on the run: the window and the map go.
+          // Her turn has started on the run: the board (and any window and map) go.
           if (e.message.mode === 'gig') {
+            closePapers();
             closeGig();
             map.close();
           }
@@ -1900,7 +1947,7 @@ function startRoom(agentId: string): void {
       case 'notice':
         // A play the server refused (busy, no key) is said in the open panel; anything else in the feed.
         if (e.for === 'encounter' && encounterPanel) encounterPanel.showRefusal(e.text);
-        else if (e.for === 'gig' && gigWindow) gigWindow.showRefusal(e.text);
+        else if (e.for === 'gig' && papersHud) papersHud.showRefusal(e.text);
         else if (e.for === 'dice' && dice.open) dice.refusal(e.text);
         else if (e.for === 'crew' && crew) crew.refusal(e.text);
         else if (e.for === 'kit' && sheet) sheet.refusal(e.text);

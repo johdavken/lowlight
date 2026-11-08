@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { loadDecks } from '../src/gear';
+import { loadDecks, loadPrograms } from '../src/gear';
 import { SAMPLE, block } from '../../shared/gear.fixture';
 
 describe('loadDecks', () => {
@@ -22,8 +22,9 @@ describe('loadStock', async () => {
   const { loadStock } = await import('../src/gear');
   it('reads the live stock against the live decks; a missing file has none', () => {
     const decks = loadDecks('world/gear', () => {});
+    const programs = loadPrograms('world/gear', () => {});
     const warns: string[] = [];
-    expect(Object.keys(loadStock('world/gear', decks, (m) => warns.push(m))).sort()).toEqual(['deck-market', 'second-socket', 'the-tilt', 'under-the-cat']);
+    expect(Object.keys(loadStock('world/gear', decks, (m) => warns.push(m), programs)).sort()).toEqual(['deck-market', 'second-socket', 'the-tilt', 'under-the-cat']);
     expect(warns).toEqual([]);
     expect(loadStock('/nonexistent', decks, () => {})).toEqual({});
   });

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "concurrently \"tsx watch server/src/main.ts\" \"vite\"",
+    "play": "node tools/play.ts",
     "build": "vite build",
     "start": "tsx server/src/main.ts --production",
     "test": "nice -n 10 vitest run",

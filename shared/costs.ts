@@ -34,8 +34,11 @@ export const APPROACH_COSTS: Record<Approach, { never: CostId; first: CostId }> 
   smooth: { never: 'small', first: 'worse' },
   hard: { never: 'alarm', first: 'take' },
 };
-/** False: `never` still holds, and every pick is free (the spec's "removal"). */
-export const FORCED_FIRST = true;
+/**
+ * False: `never` still holds, and every pick is free (the spec's "removal"). Removal since 2026-11-08: forced left a
+ * one-pick roll no choice (QUIET chose between costs on 8 % of cost picks), and free picks moved clean rates < 1 point.
+ */
+export const FORCED_FIRST = false;
 
 /** The cost that has to be picked first on this deal: null with no approach, or when it wasn't dealt because it can't bite. */
 export function firstCost(approach: Approach | null | undefined, dealt: readonly CostId[]): CostId | null {
@@ -47,7 +50,7 @@ export function firstCost(approach: Approach | null | undefined, dealt: readonly
 /**
  * Up to three different costs, seeded (rewind and BRANCH HERE deal the same), from the ones that can bite here:
  * `take` (TAKE above 0 on a check that fills it), `next` (a next roll in this job), `alarm` (below ALARM's max). With an
- * approach its `never` cost stays out and its `first` cost leads, so a slice of the deal takes it first.
+ * approach its `never` cost stays out, and while FORCED_FIRST holds its `first` cost leads.
  */
 export function dealCosts(seed: string, can: { take: boolean; next: boolean; alarm: boolean }, approach?: Approach | null): CostId[] {
   const never = approach ? APPROACH_COSTS[approach].never : null;

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { HIREABLE, parseCrewBook, TIMING } from './crew-book';
+import { hiresFor } from './crew';
 import { parseExtras } from './extras';
 
 // The shipped crew content (crew spec §7): it parses clean and has enough of everything to draw from.
@@ -82,6 +83,34 @@ describe('world/crew', () => {
     const r = parseExtras(JSON.parse(fs.readFileSync('world/extras/extras.json', 'utf8')));
     if (!r.ok) throw new Error(r.message);
     for (const s of ['runner', 'face', 'muscle', 'fence', 'ears']) expect(r.extras.filter((e) => e.tags.includes('crew') && e.tags.includes(s)).length).toBeGreaterThanOrEqual(8);
+  });
+  it('a month of nights across the city never puts a marked name on a face tagged the other way', () => {
+    const r = parseExtras(JSON.parse(fs.readFileSync('world/extras/extras.json', 'utf8')));
+    if (!r.ok) throw new Error(r.message);
+    const tag = (id: string | null) => r.extras.find((e) => e.id === id)?.tags.find((t) => t === 'man' || t === 'woman');
+    const origins = Object.keys(book.names);
+    const clashes: string[] = [];
+    for (let s = 0; s < 20; s++) {
+      // A crew that keeps growing, so names and faces run short the way a long story spends them.
+      const usedFaces = new Set<string>();
+      const usedNames = new Set<string>();
+      for (let day = 1; day <= 30; day++)
+        for (const d of origins) {
+          const cards = hiresFor({ book, place: `p-${d}`, district: d, specs: ['runner', 'fence'], tier: 3, day, seed: `s${s}`, faces: r.extras, usedFaces, usedNames, origins });
+          const first = cards[0]?.recruit;
+          for (const c of cards) {
+            if (!c.recruit) continue;
+            const want = book.genders?.[c.recruit.name];
+            const has = tag(c.recruit.face);
+            if (want && has && want !== has) clashes.push(`${c.recruit.name} on ${c.recruit.face}`);
+          }
+          if (first && day % 3 === 0) {
+            if (first.face) usedFaces.add(first.face);
+            usedNames.add(first.name);
+          }
+        }
+    }
+    expect(clashes).toEqual([]);
   });
   it('abilities: 5 per hireable specialty, 7 for a runner, save only at VET, no again on a fence', () => {
     for (const s of HIREABLE) expect(book.abilities.filter((a) => a.for !== 'any' && a.for.includes(s)).length).toBe(s === 'runner' ? 7 : 5);

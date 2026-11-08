@@ -79,6 +79,30 @@ test('tier 2: SETUP says so, a card shows the cut, a called recruit lifts it (ti
   expect(b.x >= a.x + a.width || b.x + b.width <= a.x).toBe(true);
   await page.mouse.move(5, 5);
   await expect(panel).toBeHidden();
+
+  // A tab on the lifted recruit drops the lift, and the hand redraws mid-turn: the card still turns through its back
+  // rather than snapping to it.
+  const tab = page.locator('.tb-tab').first();
+  await expect(page.locator('.tb-crew-stack .tb-slot.lifted')).toHaveCount(1);
+  // The card's turn, frame by frame: cos of its angle. A snap goes 1 → −1 with nothing between.
+  await page.evaluate(() => {
+    const w = window as unknown as { __cos: number[] };
+    w.__cos = [];
+    const t0 = performance.now();
+    const tick = () => {
+      const inner = document.querySelector<HTMLElement>('.tb-flip-in');
+      if (inner) w.__cos.push(new DOMMatrix(getComputedStyle(inner).transform).m11);
+      if (performance.now() - t0 < 1200) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await tab.click();
+  await page.waitForTimeout(1300);
+  const cos = await page.evaluate(() => (window as unknown as { __cos: number[] }).__cos);
+  const firstBack = cos.findIndex((c) => c < -0.9);
+  expect(firstBack).toBeGreaterThan(0);
+  // On the way over to the back, frames part way round.
+  expect(cos.slice(0, firstBack).filter((c) => c > -0.9 && c < 0.9).length).toBeGreaterThanOrEqual(3);
 });
 
 test('SETUP: the printed approach cards clear the title, the hand and GO IN, their words inside the card', async ({ page }) => {

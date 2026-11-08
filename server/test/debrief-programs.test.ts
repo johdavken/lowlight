@@ -55,6 +55,11 @@ describe('the debrief: programs (programs spec §2.5)', () => {
     expect(buildDebrief({ ...base, run: hot, programs: PROGRAMS, deck: meridian }).programs).toEqual(['SOLVENT · RAN 2 · TECH IN THE DARK', 'LEECH · RAN 1 · TECH BIG', 'FIREWALL · BURNED', 'LOADED MID-JOB: SOLVENT, FIREWALL · 2 NERVE']);
   });
 
+  it('a foil is named as one: its runs, its lacquer and its mid-job load (owned programs, review)', () => {
+    const foil: QuestRun = { ...RUN, picks: [{ beat: 'door', choice: 'talk', roll: roll({ position: 'dark', programs: ['foil:solvent'] }) }], programs: [{ id: 'foil:solvent', at: 1, hot: true, burned: true }] };
+    expect(buildDebrief({ ...base, run: foil, programs: PROGRAMS, deck: POCKET }).programs).toEqual(['SOLVENT FOIL · RAN 1 · TECH IN THE DARK', 'ALARM +1 FROM THE LACQUER', 'LOADED MID-JOB: SOLVENT FOIL · 1 NERVE']);
+  });
+
   it('missionSummary is unchanged by programs', () => {
     const d = buildDebrief({ ...base, run: RUN, programs: PROGRAMS, deck: POCKET });
     const { programs: _p, ...plain } = d;

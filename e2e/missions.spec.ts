@@ -27,7 +27,9 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   await row.click();
   await page.locator('.ql-file .ql-start').click();
   // Each approach says how it goes wrong (approach shapes spec §1).
-  for (const line of ['NO TAKE LOSS', 'ALARM FIRST', 'NEVER SMALL', 'WORSE FIRST', 'NO ALARM COSTS', 'TAKE FIRST']) await expect(page.locator('.ts-approach')).toContainText(line);
+  for (const line of ['NO TAKE LOSS', 'NEVER SMALL', 'NO ALARM COSTS']) await expect(page.locator('.ts-approach')).toContainText(line);
+  // Removal (approach shapes, 2026-11-08): no first-pick line on the cards.
+  await expect(page.locator('.ts-approach .tbc-first')).toHaveCount(0);
   await page.waitForTimeout(1500);
   await page.screenshot({ path: 'test-results/missions-setup.png' });
   await goIn(page);
@@ -53,11 +55,11 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   await page.waitForTimeout(500);
   await page.screenshot({ path: 'test-results/missions-costs.png' });
   await expectTableClear(page, 'the costs');
-  // QUIET's own cost comes first: the only card that picks, and it says why (approach shapes spec §1).
+  // Every dealt card picks: QUIET is never dealt TAKE −1, and nothing is forced first (approach shapes, removal 2026-11-08).
   const free = page.locator('.tb-costs .tb-cost.pickable');
-  await expect(free).toHaveCount(1);
-  await expect(free).toHaveAttribute('data-cost', 'alarm');
-  await expect(free.locator('.tb-cost-first')).toHaveText('QUIET FIRST');
+  await expect(free).toHaveCount(3);
+  await expect(page.locator('.tb-costs .tb-cost[data-cost="take"]')).toHaveCount(0);
+  await expect(page.locator('.tb-costs .tb-cost-first')).toHaveCount(0);
   // Pick it: it stands alone with its answers branching off it. RESIST it (EDGE's dice set the NERVE), then pick and
   // TAKE IT on the second.
   await free.first().click();
@@ -121,6 +123,9 @@ test('programs: load SOLVENT at SETUP, run it twice, the debrief counts it', asy
   await questTab(page, 'fixer');
   await page.locator('.ql-fixer .ql-item', { hasText: 'Cortex Meridian' }).locator('.ql-buy').click();
   await expect.poll(async () => ((await (await page.request.get('/api/kit')).json()) as { kit: { deck: { id: string } | null } }).kit.deck?.id).toBe('meridian');
+  // Owned programs: SOLVENT and FIREWALL are the starter; LEECH is bought; the rest aren't offered.
+  await page.locator('.ql-fixer .ql-item', { hasText: 'LEECH' }).locator('.ql-buy').click();
+  await expect(page.locator('.ql-fixer .ql-item', { hasText: 'LEECH' }).locator('.ql-item-why')).toHaveText('YOU HAVE ONE');
   await questTab(page, 'here');
   await questRow(page, 'Night Shift').click();
   await page.locator('.ql-file .ql-start').click();
@@ -128,6 +133,9 @@ test('programs: load SOLVENT at SETUP, run it twice, the debrief counts it', asy
   await expect(page.locator('.ts-hand .g-deck .tb-slot')).toHaveCount(2);
   await expect(page.locator('.ts-hand .g-deck .ts-lean')).toContainText('JOB LEANS');
   await page.locator('.ts-hand .g-deck .tb-slot[data-id="slot:1"]').click();
+  await expect(page.locator('.ts-tray .tb-slot')).toHaveCount(3);
+  await expect(page.locator('.ts-tray .tb-slot[data-id="prog-pick:leech"]')).toHaveCount(1);
+  await expect(page.locator('.ts-tray .tb-slot[data-id="prog-pick:voicebox"]')).toHaveCount(0);
   await page.screenshot({ path: 'test-results/programs-setup-fan.png' });
   await page.locator('.ts-tray .tb-slot[data-id="prog-pick:solvent"]').click();
   await expect(page.locator('.ts-hand .g-deck .tb-slot')).toHaveCount(2);

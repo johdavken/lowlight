@@ -392,8 +392,9 @@ async function main(): Promise<void> {
   const gearDir = path.join(tmpDir, 'gear');
   fs.mkdirSync(gearDir, { recursive: true });
   for (const f of ['decks.md', 'words.md', 'programs.md']) fs.copyFileSync(`./world/gear/${f}`, path.join(gearDir, f));
-  // A free Cortex Meridian too (programs spec §5, e2e/missions.spec.ts): two program slots for the programs spec.
-  fs.writeFileSync(path.join(gearDir, 'stock.md'), '---\nplace: lowlight-intake\nitems:\n  - burner · 0 · 1\n  - meridian · 0 · 1\n  - pocket-deck · 0 · 1\n---\n');
+  // A free Cortex Meridian too (programs spec §5, e2e/missions.spec.ts): two program slots for the programs spec. And a free
+  // LEECH (owned programs): the player starts with SOLVENT and FIREWALL, and buys it to see it at SETUP.
+  fs.writeFileSync(path.join(gearDir, 'stock.md'), '---\nplace: lowlight-intake\nitems:\n  - burner · 0 · 1\n  - meridian · 0 · 1\n  - pocket-deck · 0 · 1\n  - leech · 0 · 1\n---\n');
   // SPRING THEM (e2e/crew.spec.ts, crew spec §5): a rescue with one sure way out, posted where the recruit was hired.
   fs.writeFileSync(
     path.join(questsDir, 'spring-test.md'),

@@ -48,7 +48,7 @@ export function tradedSide(side: Side, o: { trade: Trade | null; push: PushMode 
 }
 
 /** A program marked on a card (programs spec §2.1): its kind, the tier its preview reports, the lacquer's ALARM, and whether it's a mid-job load. */
-export type Marked = { name?: string; kind: ProgramKind; tier?: Pool['tier']; alarm: 0 | 1; load: boolean };
+export type Marked = { name?: string; kind: ProgramKind; tier?: Pool['tier']; alarm: 0 | 1; load: boolean; /** A foil (owned programs): runs for its die even where its step does nothing. */ foil?: true };
 
 /** The position `poolOf` reaches from `path`: `n` programs, the lifts, the trade, NEXT ROLL WORSE, then a setup, in that order. */
 function positionAt(path: NonNullable<Pool['path']>, n: number, trade: Trade | null): Position {
@@ -73,8 +73,16 @@ export function programsOn<S extends Pick<Side, 'position' | 'effect' | 'effectR
     const lifts = s.tier && !s.tier.lifted && m.tier?.lifted ? 1 : 0;
     const steps = (m.kind === 'effect' ? 1 : 0) + lifts;
     const after = s.effect === undefined ? undefined : clamped(rawOf(s) + steps);
-    if (m.kind === 'position' && (s.position === 'dark' || at(moved + 1) === s.position)) continue;
-    if (m.kind === 'effect' && s.effect !== undefined && (s.effect === 'big' || after === s.effect)) continue;
+    const covered = (m.kind === 'position' && (s.position === 'dark' || at(moved + 1) === s.position)) || (m.kind === 'effect' && s.effect !== undefined && (s.effect === 'big' || after === s.effect));
+    if (covered) {
+      // A foil still runs for its die (owned programs): its step does nothing, but as a running program it lifts the
+      // tier's cut on a deck that holds, as the server's tierCut counts it.
+      if (m.foil) {
+        ran.push(m);
+        if (lifts) s = { ...s, tier: m.tier, ...(s.effect !== undefined ? { effectRaw: rawOf(s) + 1, effect: clamped(rawOf(s) + 1) } : {}) };
+      }
+      continue;
+    }
     ran.push(m);
     if (m.kind === 'position') s = { ...s, position: at(++moved) };
     if (s.effect !== undefined && steps) s = { ...s, effectRaw: rawOf(s) + steps, effect: after };

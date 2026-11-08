@@ -3,6 +3,7 @@ import { keysFor, routeFor } from './model-route';
 import { fittingPhotos } from '../../shared/photos';
 import crypto from 'node:crypto';
 import { DEFAULT_CREW_DIR, loadCrewBook } from './crew-book-load';
+import { loadGuests } from './guests-load';
 import { crewView, freeDraw, freeHireWaiting } from './crew-view';
 import type { CrewState } from '../../shared/crew-fold';
 import { jobRecruitCard, rescueOpen } from '../../shared/crew';
@@ -27,6 +28,7 @@ import { DEFAULT_LEADS_DIR, loadLeadBook } from './leads';
 import { DEFAULT_QUESTS_DIR, loadQuestBook } from './quests';
 import { DEFAULT_EXTRAS_DIR, extraImages, loadExtras } from './extras';
 import { DEFAULT_GEAR_DIR, loadDecks, loadPrograms, loadStock, loadWords } from './gear';
+import { loadablePrograms, NO_PROGRAMS, starterPrograms } from '../../shared/programs';
 import { DEFAULT_STATS } from '../../shared/stats';
 import { heatIn, hottest, repTier, STARTER_DECK } from '../../shared/mission';
 import type { CrewView, KitView, QuestState } from '../../shared/types';
@@ -84,6 +86,7 @@ import { openSettings, type Settings } from './settings';
 import { registerLinkRoutes } from './link-routes';
 import { createAnthropicCatalog, createModelCatalog, createRoutedCatalog } from './model-catalog';
 import { registerBugReportRoutes } from './bug-report-routes';
+import { registerUpdateRoutes, type UpdateDeps } from './update';
 import { readTurns } from './bug-report';
 import { formatClock, START } from '../../shared/clock';
 import { narratorPowerLine } from '../../shared/outage';
@@ -92,6 +95,8 @@ import os from 'node:os';
 export interface BuildAppDeps {
   /** The player's settings (main passes its own; default: data/settings.json under cfg.dataDir). */
   settings?: Settings;
+  /** UPDATE on the title (start.ts outside Electron); without it the route says not eligible. */
+  update?: Omit<UpdateDeps, 'originAllowed' | 'dataDir'>;
 }
 
 export interface BuiltApp {
@@ -169,10 +174,12 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   const decks = loadDecks(cfg.gearDir ?? DEFAULT_GEAR_DIR, (m) => console.warn(m));
   const programs = loadPrograms(cfg.gearDir ?? DEFAULT_GEAR_DIR, (m) => console.warn(m));
   // The fixers' stock (small jobs spec §5), read once at startup like the decks.
-  const stock = loadStock(cfg.gearDir ?? DEFAULT_GEAR_DIR, decks, (m) => console.warn(m));
+  const stock = loadStock(cfg.gearDir ?? DEFAULT_GEAR_DIR, decks, (m) => console.warn(m), programs);
   const words = loadWords(cfg.gearDir ?? DEFAULT_GEAR_DIR, (m) => console.warn(m));
   // The crew tables (crew spec §1–§2), read once at startup like the decks.
   const crewBook = loadCrewBook(cfg.crewDir ?? DEFAULT_CREW_DIR, (m) => console.warn(m));
+  // Guest files (The Passenger spec, engine §2): world/crew/guests/, read once with the crew book, before the quest book that names them.
+  const guestBook = loadGuests(path.join(cfg.crewDir ?? DEFAULT_CREW_DIR, 'guests'), (m) => console.warn(m));
   // The GM's written lines (roll lifecycle spec §1.4), beside the crew book; missing: the built-in ones.
   const gmWritten = loadGmLines(path.join(path.dirname(cfg.crewDir ?? DEFAULT_CREW_DIR), 'gm', 'costs.md'), (m) => console.warn(m));
   /** The crew's seed: the playthrough's id. Test-only (e2e): NIX_TEST_CREW_SEED pins it, so hires and rolls repeat. */
@@ -230,6 +237,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       extras: extrasKnown(extras),
       decks: new Set(decks.map((d) => d.id)),
       outfits: new Set(records.flatMap((r) => Object.keys(r.sprite?.outfits ?? {}).map((n) => `${r.info.id}/${n}`))),
+      guests: new Set(guestBook.map((g) => g.id)),
     },
     (m) => console.warn(m),
     leadBook,
@@ -346,7 +354,9 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     contactName: (id) => records.find((r) => r.info.id === id)?.info.name ?? id,
     kitStart: (id) => {
       const info = records.find((r) => r.info.id === id)?.info;
-      return { stats: info?.stats ?? DEFAULT_STATS, deck: info?.deck ?? null, ...(decks.some((d) => d.id === STARTER_DECK) ? { pocket: STARTER_DECK } : {}) };
+      const stats = info?.stats ?? DEFAULT_STATS;
+      // The starter programs (owned programs): FIREWALL and the one for the highest stat.
+      return { stats, deck: info?.deck ?? null, ...(decks.some((d) => d.id === STARTER_DECK) ? { pocket: STARTER_DECK } : {}), programs: starterPrograms(stats, programs) };
     },
     placeName,
     hasScene: (id) => cityRooms.has(id),
@@ -365,6 +375,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     questBook: () => questBook,
     districtOf: (placeId) => places.districtOf(placeId),
     crewBook: () => crewBook,
+    crewFaces: () => extras,
     crewSeed,
     crewPlaceName: (placeId) => places.placeName(placeId),
     districtName: (id) => loreMap?.districts.find((d) => d.id === id)?.name ?? id,
@@ -527,6 +538,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
             const pt = world.active();
             return pt ? world.contactCards(pt.player) : [];
           },
+          guestCards: () => guestBook,
           crewToldUntil: () => {
             const pt = world.active();
             return pt ? world.crewToldUntil(pt.player) : null;
@@ -699,6 +711,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         crewLatest: k.crew.latest,
         crewPicks: k.crew.members.some((m) => m.state !== 'gone' && m.picks.length > 0),
         crewFree: pt ? freeHireWaiting({ crew: k.crew, seed: crewSeed(pt.id), jobCards: jobCardsOf(pt.player, k.crew), now: world.clockNow() ?? START }) : false,
+        programs: loadablePrograms(programs, k.kit.programs ?? NO_PROGRAMS).map((p) => ({ id: p.id, name: p.name, stat: p.stat, kind: p.kind, ...(p.foil ? { foil: true as const } : {}), ...(p.count && p.count > 1 ? { count: p.count } : {}) })),
       } satisfies KitView,
     };
   });
@@ -997,6 +1010,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     originAllowed,
   });
   registerPlaythroughRoutes(app, world, playthroughs, originAllowed);
+  // UPDATE on the title: a public clone whose main has moved on (plan 2026-11-08).
+  registerUpdateRoutes(app, deps.update ? { ...deps.update, dataDir: cfg.dataDir, originAllowed } : null);
   // Bug reports: the game's state as the player left it, sent to the relay or saved (spec 2026-10-11 bug report).
   registerBugReportRoutes(app, {
     relayUrl: cfg.bugRelayUrl ?? null,

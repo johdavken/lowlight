@@ -43,7 +43,7 @@
   },
   "outfitByScene": {
     "karasu/zhou-flat": "lounge",
-    "karasu/hicks-gallery": "lounge",
+    "karasu/hicks-gallery": "indoors",
     "karasu/lowlight-intake": "indoors",
     "karasu/the-tilt": "indoors",
     "karasu/second-socket": "indoors",

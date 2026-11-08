@@ -9,7 +9,7 @@ export type Shape = Point[];
 
 export const MAX_SHAPES = 8;
 export const MIN_POINTS = 3;
-export const MAX_POINTS = 32;
+export const MAX_POINTS = 64;
 /** px²: anything smaller (three points in a line) is no shape at all. */
 export const MIN_SHAPE_AREA = 4;
 

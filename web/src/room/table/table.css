@@ -135,6 +135,8 @@
 .tb-odds.none { opacity: 0.45; }
 .tb-flag { font-size: 13px; letter-spacing: 0.16em; color: var(--tool); }
 .tb-flag.red { color: #ff5a5a; }
+/* A MISS BLOWS IT on the header: a filled chip like the cards' red flags, since it's the beat's whole stake. */
+.tb-head .tb-flag.blows { align-self: center; padding: 2px 7px 0; color: #05020a; background: #ff5a5a; }
 .tb-said { font: italic 14px/1.4 var(--mono); color: var(--user); }
 .tb-actions { display: flex; gap: 8px; margin-top: 4px; }
 .tb-actions button,
@@ -501,6 +503,8 @@
 /* Crew and program cards print in a black border catching the room's light: warm from the lamps, cool from the neon.
    The band sits somewhere else on each card (--lx), so a row doesn't look stamped. */
 .tb-slot:has(> .tbc-print),
+.tb-slot:has(> .tbc-back),
+.tb-slot.tb-cardback,
 .tb:not(.phone) .ts-approach .tb-card {
   position: relative;
   border: 0;
@@ -509,9 +513,14 @@
   background: #09080b linear-gradient(125deg, #2c1d10 0%, #15131a 30%, #3f3c47 46%, #14161c 60%, #10242e 100%) var(--lx, 27%) 30% / 240% 240%;
 }
 /* The same light over the whole card, faintly: a glossy print catching the room. */
-.tb-slot:has(> .tbc-print)::before, .tb:not(.phone) .ts-approach .tb-card::before { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; mix-blend-mode: screen; opacity: 0.4; background: linear-gradient(125deg, rgba(240, 170, 95, 0.5) 0%, rgba(240, 170, 95, 0) 30%, rgba(255, 250, 240, 0.32) 46%, rgba(120, 190, 225, 0) 60%, rgba(90, 170, 215, 0.5) 100%) var(--lx, 27%) 30% / 240% 240%; }
+.tb-slot:has(> .tbc-print)::before, .tb-slot:has(> .tbc-back)::before, .tb-slot.tb-cardback::before, .tb:not(.phone) .ts-approach .tb-card::before { content: ''; position: absolute; inset: 0; z-index: 3; pointer-events: none; mix-blend-mode: screen; opacity: 0.4; background: linear-gradient(125deg, rgba(240, 170, 95, 0.5) 0%, rgba(240, 170, 95, 0) 30%, rgba(255, 250, 240, 0.32) 46%, rgba(120, 190, 225, 0) 60%, rgba(90, 170, 215, 0.5) 100%) var(--lx, 27%) 30% / 240% 240%; }
 .tb-slot > .tbc-print, .tb:not(.phone) .ts-approach .tb-card > .tbc-print { position: absolute; inset: var(--print, 8px); width: auto; height: auto; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px #57525e; }
 .tb-hand .g-deck .tb-slot.on:has(> .tbc-print)::after { inset: var(--print, 8px); border-radius: 3px; }
+/* A card face down prints in the same border: a burned or used card, the far side of a recruit's flip, and the back a
+   dealt card shows before it turns over. */
+.tb-slot > .tbc-back { position: absolute; inset: var(--print, 8px); width: auto; height: auto; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px #57525e; }
+.tb-slot.tb-cardback > .tbc-art { position: absolute; top: var(--print, 8px); left: var(--print, 8px); width: calc(100% - 2 * var(--print, 8px)); height: calc(100% - 2 * var(--print, 8px)); border-radius: 3px; box-shadow: 0 0 0 1px #57525e; }
+.tb-slot.dealt-down:not(.s-down):has(> .tbc-print)::after { inset: var(--print, 8px); border-radius: 3px; }
 .ts-ready { --print: 5px; }
 /* Their words, centred on the fade: a serif name, then the card's lines, the first in its colour and the rest quieter. */
 .tb-slot > .tbc-print .tbc-body { align-items: center; gap: 2px; padding-bottom: 8px; text-align: center; }
@@ -812,11 +821,14 @@
 /* The HUD has the height: a choice's whole line shows, its card growing a row rather than cutting it off (playtest: a ONE SHOT line lost its end). The phone keeps the three-line clamp. */
 .tb.hud:not(.phone) .tb-call .tb-line { display: block; -webkit-line-clamp: none; line-clamp: none; overflow: visible; }
 
-/* A card in words (card-info.ts): beside the card, never over it, and it takes no clicks. */
-.tb-info { position: absolute; z-index: 30; width: 300px; max-width: calc(100% - 16px); box-sizing: border-box; padding: 8px 12px; pointer-events: none; background: rgba(4, 16, 22, 0.95); border: 1px solid rgba(127, 233, 255, 0.45); }
+/* A card in words (card-info.ts): beside the card, never over it, and it takes no clicks. Dressed like a tip (.gt-tip):
+   the violet box with the cyan bar, a white gist, the rest under a rule; the HUD's words take .gt-lit's colours. */
+.tb-info { position: absolute; z-index: 30; width: 330px; max-width: calc(100% - 16px); box-sizing: border-box; padding: 12px 14px 10px; pointer-events: none; background: rgba(10, 5, 20, 0.97); border: 1px solid var(--user); border-left-width: 3px; box-shadow: 0 0 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(127, 233, 255, 0.25); color: #cfeff7; animation: tb-deal 200ms ease-out both; }
 .tb-info[hidden] { display: none; }
-.tb-info-title { font: 14px var(--pixel); letter-spacing: 0.16em; color: var(--user); margin-bottom: 4px; }
-.tb-info-line { font: 13px/1.45 var(--mono); color: #d9eef3; }
+.tb-info-title { font: 22px/1 var(--pixel); letter-spacing: 0.16em; color: var(--user); }
+.tb-info-line { font: 12.5px/1.42 var(--mono); }
+.tb-info-gist { margin: 6px 0 0; font: 600 14px/1.4 var(--mono); color: #fff; }
+.tb-info-rows { display: grid; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(127, 233, 255, 0.2); }
 /* A long press on a card opens its panel, not the browser's image menu. */
 .tb button[data-id] img { -webkit-touch-callout: none; }
 

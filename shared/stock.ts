@@ -3,18 +3,18 @@ import { splitDrafts, splitFrontMatter } from './lore';
 import { z } from 'zod';
 import type { CoverId, KitEvent } from './mission';
 import type { DeckTrait } from './gear';
-import { SLOTS } from './programs';
+import { FIREWALL, SLOTS } from './programs';
 
 export const COVER_IDS: readonly CoverId[] = ['burner', 'fall-guy'];
 export interface StockItem {
   id: string;
-  kind: 'deck' | 'cover';
+  kind: 'deck' | 'cover' | 'program';
   price: number;
   tier: 1 | 2 | 3 | 4;
 }
 
 /** Each block's place and items (`<id> · <price> · <tier>`); a bad line is skipped with one problem. */
-export function parseStock(text: string, deckIds: ReadonlySet<string>): { byPlace: Record<string, StockItem[]>; problems: string[] } {
+export function parseStock(text: string, deckIds: ReadonlySet<string>, programIds: ReadonlySet<string> = new Set()): { byPlace: Record<string, StockItem[]>; problems: string[] } {
   const byPlace: Record<string, StockItem[]> = {};
   const problems: string[] = [];
   for (const draft of splitDrafts(text)) {
@@ -33,23 +33,26 @@ export function parseStock(text: string, deckIds: ReadonlySet<string>): { byPlac
     for (const raw of items) {
       const m = /^([a-z0-9]+(?:-[a-z0-9]+)*)\s*·\s*(\d+)\s*·\s*([1-4])$/.exec(String(raw).trim());
       const id = m?.[1];
-      const kind = id && (COVER_IDS as readonly string[]).includes(id) ? 'cover' : id && deckIds.has(id) ? 'deck' : null;
-      if (!m || !kind) problems.push(`${place}: can't read '${String(raw)}' (<deck or burner / fall-guy> · <price> · <tier 1–4>)`);
+      // FIREWALL is everyone's from the start (owned programs): never sold.
+      const kind = id && (COVER_IDS as readonly string[]).includes(id) ? 'cover' : id && deckIds.has(id) ? 'deck' : id && id !== FIREWALL && programIds.has(id) ? 'program' : null;
+      if (!m || !kind) problems.push(`${place}: can't read '${String(raw)}' (<deck, program or burner / fall-guy> · <price> · <tier 1–4>)`);
       else list.push({ id: m[1], kind, price: Number(m[2]), tier: Number(m[3]) as StockItem['tier'] });
     }
   }
   return { byPlace, problems };
 }
 
-/** The kit event a purchase makes: a deck is carried and the old one kept (`keep`: no trade-in); cover adds one. */
+/** The kit event a purchase makes: a deck is carried and the old one kept (`keep`: no trade-in); cover adds one; a program is yours. */
 export function buyEvent(o: { item: StockItem; at: number }): KitEvent {
+  if (o.item.kind === 'program') return { at: o.at, sol: -o.item.price, program: { id: o.item.id } };
   if (o.item.kind === 'cover') return { at: o.at, sol: -o.item.price, cover: { id: o.item.id as CoverId, delta: 1 } };
   return { at: o.at, sol: -o.item.price, deck: o.item.id, keep: true };
 }
 
-/** `owned`: a deck you already have isn't sold to you again. */
-export function canBuy(o: { item: StockItem; sol: number; tier: number; owned?: readonly string[] }): 'ok' | 'locked' | 'short' | 'owned' {
+/** `owned`: a deck you already have isn't sold to you again; `programs`: nor is a program you own. */
+export function canBuy(o: { item: StockItem; sol: number; tier: number; owned?: readonly string[]; programs?: readonly string[] }): 'ok' | 'locked' | 'short' | 'owned' {
   if (o.item.kind === 'deck' && o.owned?.includes(o.item.id)) return 'owned';
+  if (o.item.kind === 'program' && o.programs?.includes(o.item.id)) return 'owned';
   if (o.tier < o.item.tier) return 'locked';
   return o.sol < o.item.price ? 'short' : 'ok';
 }
@@ -65,6 +68,7 @@ const fixerSchema = z.array(
     carry: z.literal(true).optional(),
     keep: z.literal(true).optional(),
     cover: z.object({ id: z.enum(['burner', 'fall-guy']), delta: z.number() }).optional(),
+    program: z.object({ id: z.string() }).optional(),
   }),
 );
 
@@ -83,21 +87,26 @@ export function parseFixer(v: string | null): KitEvent[] {
 }
 
 /** What the fixer calls an item. */
-export const itemName = (item: StockItem, decks: readonly { id: string; name: string }[]): string =>
-  item.kind === 'cover' ? (item.id === 'burner' ? 'Burner' : 'Fall guy') : (decks.find((d) => d.id === item.id)?.name ?? item.id);
+export const itemName = (item: StockItem, decks: readonly { id: string; name: string }[], programs: readonly { id: string; name: string }[] = []): string =>
+  item.kind === 'cover' ? (item.id === 'burner' ? 'Burner' : 'Fall guy') : item.kind === 'program' ? (programs.find((p) => p.id === item.id)?.name ?? item.id) : (decks.find((d) => d.id === item.id)?.name ?? item.id);
 
 /** What a shop card needs to say what an item does: a deck's numbers, or cover. */
 export interface GearFacts {
-  kind: 'deck' | 'cover';
+  kind: 'deck' | 'cover' | 'program';
   id: string;
   quality?: 1 | 2 | 3 | 4;
   heat?: number;
   traits?: readonly DeckTrait[];
+  /** A program's stat, kind and card line. */
+  stat?: string;
+  programKind?: string;
+  line?: string;
 }
 
 /** The card's stat line: `Q2 · 2 SLOTS · HEAT 0 · FRAGILE`, or `COVER · USED UP`. */
 export function gearStat(g: GearFacts): string {
   if (g.kind === 'cover') return 'COVER · USED UP';
+  if (g.kind === 'program') return ['PROGRAM', ...(g.stat && g.stat !== 'any' ? [g.stat.toUpperCase()] : []), (g.programKind ?? '').toUpperCase()].filter(Boolean).join(' · ');
   const q = g.quality ?? 1;
   return [`Q${q}`, `${SLOTS[q]} ${SLOTS[q] === 1 ? 'SLOT' : 'SLOTS'}`, `HEAT ${g.heat ?? 0}`, ...(g.traits ?? []).map((t) => t.toUpperCase())].join(' · ');
 }
@@ -112,6 +121,7 @@ const TRAIT_RULE: Record<DeckTrait, string> = {
 
 /** What it does, in the rules' words (docs/graft-rules.md, small jobs spec §5). */
 export function gearRule(g: GearFacts): string {
+  if (g.kind === 'program') return [g.line ?? '', 'Yours for good: load it free at SETUP.'].filter(Boolean).join(' ');
   if (g.kind === 'cover')
     return g.id === 'burner' ? "A blown job's rep loss is halved. Used up." : "A blown job costs no rep; the fixer takes half the job's pay from your sol. Used up.";
   const q = g.quality ?? 1;

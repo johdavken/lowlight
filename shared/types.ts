@@ -127,6 +127,8 @@ export interface SceneDef {
   resident?: { character: string; scale: number };
   /** Everyone's place: in every contact's places, so any of them can take you there (not only its owner's). */
   public?: boolean;
+  /** A way in to someone's place (a walkway, a landing): never one of her home rooms, so home wear (sleepwear and the like) isn't worn there. */
+  entry?: boolean;
   /** Rooms reached from this one without the map: whoever you're with can take you (room exits spec §2). */
   exits?: ExitDef[];
   /** A venue's hours, HH:MM (story moods spec §5): last call, closing and closed moods follow them. */
@@ -220,6 +222,14 @@ export interface ContactCard {
   spec: Specialty;
 }
 
+/** A guest who isn't a contact (The Passenger spec, engine §2): world/crew/guests/<id>.md, on a foil card with no figure. */
+export interface GuestCard extends ContactCard {
+  /** Their bust, `/api/crew/art/<file>`; null: none yet, the card shows a crew face. */
+  art: string | null;
+  /** What the card says about them, as a shown trait. */
+  line: string | null;
+}
+
 /** A job's SETUP card (the hand spec §1): its district, your tier and heat there, the favour (null: allowed, else why not) and your ready crew. */
 export interface SetupOffer {
   district: string;
@@ -235,7 +245,7 @@ export interface SetupOffer {
   /** The deck you hold, when this job bars it (`bars:`). */
   barred?: string;
   /** The programs SETUP can load (programs spec §1.2a), with a deck; absent without one. */
-  programs?: { id: string; name: string; stat: string; kind: ProgramKind; line: string }[];
+  programs?: { id: string; name: string; stat: string; kind: ProgramKind; line: string; /** A foil copy (owned programs): one run, +1 die, then gone. */ foil?: true; /** Foil copies held, where more than one. */ count?: number }[];
   /** The stats the job's checks lean on, most used first, at most three: `LEANS TECH · COOL`. */
   leans?: string[];
   /** What the job's tier asks for (tier effect spec §2); absent on tier 1. */
@@ -274,8 +284,9 @@ export interface HandView {
     deck: { name: string; quality: number; skin: string } | null;
     slots: number;
     dead: boolean;
-    loaded: { id: string; name: string; stat: string; kind: ProgramKind; burned: boolean }[];
-    catalog: { id: string; name: string; stat: string; kind: ProgramKind; line: string }[];
+    loaded: { id: string; name: string; stat: string; kind: ProgramKind; burned: boolean; foil?: true }[];
+    /** What you can load (owned programs): owned, and foils held. */
+    catalog: { id: string; name: string; stat: string; kind: ProgramKind; line: string; foil?: true; count?: number }[];
   };
 }
 
@@ -310,7 +321,7 @@ export interface QuestState {
     tier?: number;
     /** On a push beat (card hover info): a win here fills no TAKE. */
     pressing?: true;
-    choices: { id: string; line: string; pool?: Pool; /** The route's own ALARM (its [alarm +n]), landed on the pick whatever the dice. */ alarm?: number; red?: true; crack?: { length: number; tries: number; /** What a win fills. */ take?: number }; /** Each playable card's pool on this choice (the hand spec §2), by card id: the preview is the roll. */ plays?: Record<string, { /** The stat it rolls on, where a card moves it (One More Thing). */ stat?: string; dice: number; position: Position; effect?: Effect; effectRaw?: number; tier?: Pool['tier']; path?: Pool['path']; /** Each program on this card's pool, where a card changes what fits. */ previews?: Record<string, ProgramPreview>; /** On a call: what each ability beside it would make the roll (ability pass spec §1). */ presses?: Record<string, { dice: number; position: Position; effect?: Effect; effectRaw?: number; tier?: Pool['tier']; path?: Pool['path']; previews?: Record<string, ProgramPreview> }> }>; /** SAFE / BOLD here (effect and NERVE spec §1): null where allowed, else why not. */ trade?: { safe: string | null; bold: string | null }; /** PUSH for effect: null where allowed, else why not. */ pushEffect?: string | null; /** Each program alone on this choice (programs spec §2.1): its pool, or why it can't run here; absent on a run from before programs. */ programs?: Record<string, ProgramPreview> }[];
+    choices: { id: string; line: string; pool?: Pool; /** The route's own ALARM (its [alarm +n]), landed on the pick whatever the dice. */ alarm?: number; red?: true; /** A miss (a crack's lockout) here blows the job: the table marks it. */ blows?: true; crack?: { length: number; tries: number; /** What a win fills. */ take?: number }; /** Each playable card's pool on this choice (the hand spec §2), by card id: the preview is the roll. */ plays?: Record<string, { /** The stat it rolls on, where a card moves it (One More Thing). */ stat?: string; dice: number; position: Position; effect?: Effect; effectRaw?: number; tier?: Pool['tier']; path?: Pool['path']; /** Each program on this card's pool, where a card changes what fits. */ previews?: Record<string, ProgramPreview>; /** On a call: what each ability beside it would make the roll (ability pass spec §1). */ presses?: Record<string, { dice: number; position: Position; effect?: Effect; effectRaw?: number; tier?: Pool['tier']; path?: Pool['path']; previews?: Record<string, ProgramPreview> }> }>; /** SAFE / BOLD here (effect and NERVE spec §1): null where allowed, else why not. */ trade?: { safe: string | null; bold: string | null }; /** PUSH for effect: null where allowed, else why not. */ pushEffect?: string | null; /** Each program alone on this choice (programs spec §2.1): its pool, or why it can't run here; absent on a run from before programs. */ programs?: Record<string, ProgramPreview> }[];
     art?: string;
     /** A job's run (small jobs spec §6; the table spec §2–§3): ALARM 0–4, NERVE left of its max, heat in its district, and its pay range. */
     alarm?: number;
@@ -355,7 +366,7 @@ export interface QuestState {
   rumors?: { id: string; line: string; place: string; placeName: string; contact: string; contactName: string; here: boolean; leaving: string | null; /** A lead's contract you can't take yet: the rep it needs. */ needs?: number }[];
   boards?: { place: string; name: string; jobs: { id: string; title: string; pitch: string | null; postedBy?: string; brief?: string; art?: string; tier?: number; pay: number | null; range?: [number, number]; with?: string; opens?: string; comms?: string; once?: true }[] }[];
   /** The fixer at a board (small jobs spec §5): its stock, each item buyable, above your tier there, or more than your sol. */
-  fixer?: { place: string; items: { id: string; name: string; kind: 'deck' | 'cover'; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: 1 | 2 | 3 | 4; /** A deck's heat and traits. */ heat?: number; traits?: DeckTrait[]; state: 'ok' | 'locked' | 'short' | 'owned' }[] };
+  fixer?: { place: string; items: { id: string; name: string; kind: 'deck' | 'cover' | 'program'; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: 1 | 2 | 3 | 4; /** A deck's heat and traits. */ heat?: number; traits?: DeckTrait[]; /** A program's stat, kind and card line. */ stat?: string; programKind?: ProgramKind; line?: string; state: 'ok' | 'locked' | 'short' | 'owned' }[] };
 }
 
 /** No quest lines to show. */
@@ -395,6 +406,8 @@ export interface Debrief {
   recruit?: string;
   /** Outfits as rewards: a `gives: outfit` ending's line, `OUTFIT · HICKS · TIE`. */
   outfit?: string;
+  /** A foil program the job dropped (owned programs), by name. */
+  found?: string;
   /** The lot a `loot:` job dropped (crew goods spec §6); `lost`: no room in the stash. */
   loot?: { label: string; lost?: true };
   /** Each check: a d100 roll (before the table), the table's dice (spec 2026-10-29), or a crack. */
@@ -980,6 +993,8 @@ export interface KitView {
   crewPicks?: boolean;
   /** Crew spec §5: a job's free hire is waiting (the dot too, until they're hired or 06:00 takes them). */
   crewFree?: boolean;
+  /** Programs you own and foils held (owned programs). */
+  programs?: { id: string; name: string; stat: string; kind: ProgramKind; foil?: true; count?: number }[];
 }
 
 /** A recruit on the CREW screen (crew spec §4): the folded member plus what the profile shows. */

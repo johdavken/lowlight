@@ -10,6 +10,7 @@ import { createPlaythroughs } from './playthroughs';
 import { completeSceneId } from './room-state';
 import { roomRegistry } from './rooms';
 import { loadPacks } from './scenes';
+import { UPDATE_EXIT } from '../../shared/update';
 
 const HEALTH_POLL_MS = 30_000;
 
@@ -57,7 +58,24 @@ export async function start(env: NodeJS.ProcessEnv, log: (line: string) => void 
     });
   }
 
-  const built = await buildApp(cfg, { settings });
+  // UPDATE on the title (plan 2026-11-08): any checkout may ask (only a public clone on main is eligible);
+  // only `npm run play` can apply one, by closing the game and exiting UPDATE_EXIT for the launcher.
+  const launcher = env.LOWLIGHT_LAUNCHER === '1';
+  let shut: (() => Promise<void>) | null = null;
+  const update = process.versions.electron
+    ? undefined
+    : {
+        repoDir: process.cwd(),
+        launcher,
+        apiBase: env.LOWLIGHT_UPDATE_API || undefined,
+        exitForUpdate: launcher
+          ? () => {
+              log('[update] closing the game for the update');
+              void (shut?.() ?? Promise.resolve()).finally(() => process.exit(UPDATE_EXIT));
+            }
+          : undefined,
+      };
+  const built = await buildApp(cfg, { settings, update });
   const { app } = built;
 
   // Bring every connected agent's room up front, so her link status is known straight away.
@@ -79,14 +97,13 @@ export async function start(env: NodeJS.ProcessEnv, log: (line: string) => void 
   log(`Nix Room listening on ${url} — rooms: ${connected.join(', ') || 'none connected yet'}`);
 
   let closed: Promise<void> | null = null;
-  return {
-    url,
-    close() {
-      closed ??= (async () => {
-        clearInterval(healthTimer);
-        await built.close();
-      })();
-      return closed;
-    },
+  const close = (): Promise<void> => {
+    closed ??= (async () => {
+      clearInterval(healthTimer);
+      await built.close();
+    })();
+    return closed;
   };
+  shut = close;
+  return { url, close };
 }

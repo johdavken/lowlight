@@ -32,7 +32,7 @@ export interface Setup {
   /** Contact cards brought (contact cards spec §2), as they were at GO IN: a rewound lead doesn't strip a running job. */
   contacts?: ContactCard[];
   /** A contract's guest (guest crew spec §2), as they were at GO IN: `guest-<id>` is in `people`. */
-  guest?: ContactCard & { grade: Grade; abilities: string[] };
+  guest?: ContactCard & { grade: Grade; abilities: string[]; /** A guest file's, not a contact (The Passenger spec, engine §2): no figure, no trust. Absent: a contact. */ kind?: 'guest'; /** A guest file's bust, when it has one. */ art?: string; /** A guest file's card line, shown as a trait. */ line?: string };
   /** Each recruit's slotted abilities at GO IN (crew abilities plan ruling 4); absent on runs from before abilities. */
   abilities?: Record<string, string[]>;
   /** AT THE END abilities that acted when the job settled, `<rid>/<ability>`, for the debrief. */

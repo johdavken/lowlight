@@ -54,3 +54,5 @@
   border-left: 3px solid #ff6b8a;
 }
 .title-error:empty { display: none; }
+/* UPDATED after an update came in: the same line, in the select's green. */
+.title-error.ok { color: #7dffb0; border-left-color: #7dffb0; }

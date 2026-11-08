@@ -20,6 +20,19 @@ describe('sixesBetween', () => {
 
 describe('foldKit', () => {
   const start = { deck: 'stall-build', nerveMax: 2, from: at(1, 20) };
+  it('programs: the starter owned, a buy adds one, foils count up and down (owned programs plan)', () => {
+    const k = foldKit({ ...start, programs: ['firewall', 'solvent'] }, [
+      { at: at(1, 21), sol: 500 },
+      { at: at(1, 22), sol: -200, program: { id: 'leech' } },
+      { at: at(1, 22), program: { id: 'leech' } },
+      { at: at(1, 23), program: { id: 'spike', foil: 1 } },
+      { at: at(1, 23), program: { id: 'spike', foil: 1 } },
+      { at: at(2, 1), program: { id: 'spike', foil: -1 } },
+      { at: at(2, 2), program: { id: 'voicebox', foil: -1 } },
+    ], at(2, 3));
+    expect(k.programs).toEqual({ owned: ['firewall', 'solvent', 'leech'], foil: { spike: 1, voicebox: 0 } });
+    expect(foldKit(start, [], at(1, 21)).programs).toEqual({ owned: [], foil: {} });
+  });
   it('no events: the start deck, sol 0, heat 0, full EDGE', () => {
     expect(foldKit(start, [], at(1, 21))).toMatchObject({ deck: 'stall-build', sol: 0, heat: {}, nerveLeft: 2, nerveMax: 2 });
   });

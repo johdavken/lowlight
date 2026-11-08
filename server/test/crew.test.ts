@@ -39,7 +39,7 @@ blown:
 ---
 `;
 const TRAITS = 'sure · Sure Thing · + · odds any +90 · any · Never misses.\n';
-const NAMES = '## strand\n- Juno Sato\n- Ilya Voss\n- Saida Rahm\n## karasu\n- Pell\n- Dez Okoro\n';
+const NAMES = '## strand\n- Juno Sato\n- Ilya Voss · man\n- Saida Rahm\n## karasu\n- Pell\n- Dez Okoro\n';
 
 const cleanups: (() => Promise<void> | void)[] = [];
 afterEach(async () => {
@@ -125,6 +125,20 @@ describe('crew in the playthrough', () => {
     expect(k.kit.sol).toBe(paid ? 300 : 0);
     expect(k.kit.rep.strand ?? 0).toBe(paid ? 1 : 0);
     expect(s.built.world.kitOf(s.pt.player, 1200 + 5 * 60 - 1)!.crew.members[0].state).toBe('out');
+  });
+
+  it('a marked name hired onto a face tagged the other way reads back with one that fits', async () => {
+    const s = await start();
+    const ilya: Recruit = { ...juno, id: 'r-ilya', name: 'Ilya Voss', face: 'crew-runner-01', spec: 'runner' };
+    write(s.open('nix'), s.pt.player, 'r-ilya', [{ ...hire, recruit: ilya }], 'n1');
+    write(s.open('nix'), s.pt.player, 'r-juno', [{ ...hire, recruit: { ...juno, face: 'crew-runner-01' } }], 'n2');
+    const k = s.built.world.kitOf(s.pt.player, 1200)!;
+    const face = k.crew.members.find((m) => m.recruit.id === 'r-ilya')!.recruit.face;
+    expect(face).not.toBe('crew-runner-01');
+    expect(face).toMatch(/^crew-(runner|wire)-/);
+    // Unmarked keeps its face; the stored event is untouched.
+    expect(k.crew.members.find((m) => m.recruit.id === 'r-juno')!.recruit.face).toBe('crew-runner-01');
+    expect(s.open('nix').getMeta(crewKey(s.pt.player, 'r-ilya'))).toContain('crew-runner-01');
   });
 
   it('events merge across room dbs', async () => {

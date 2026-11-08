@@ -200,7 +200,8 @@ export function drawRecruit(o: { book: CrewBook; r: () => number; id: string; sp
   // Unused names from home first, then from anywhere (a big crew can spend a district), then home's again.
   const unused = (l: string[]) => l.filter((x) => !o.usedNames.has(x));
   const home = o.book.names[origin] ?? [];
-  const names = [unused(home), unused(Object.values(o.book.names).flat()), home].find((l) => l.length > 0) ?? [];
+  const tiers = [unused(home), unused(Object.values(o.book.names).flat()), home];
+  const names = tiers.find((l) => l.length > 0) ?? [];
   // The name's draw comes before the face's, as it always has, but is spent after it: the face picks first and the
   // name comes from those that fit it (marked the same or unmarked), so the cards only change where they clashed.
   const nameR = names.length > 0 ? r() : 0;
@@ -209,8 +210,11 @@ export function drawRecruit(o: { book: CrewBook; r: () => number; id: string; sp
   const face = fp.length > 0 ? pick(r, fp) : null;
   if (face) o.usedFaces.add(face.id);
   const sex = o.sex ?? face?.tags.find((t): t is 'man' | 'woman' => t === 'man' || t === 'woman');
-  const fits = sex ? names.filter((x) => (o.book.genders?.[x] ?? sex) === sex) : names;
-  const from = fits.length > 0 ? fits : names;
+  // A home district short of names that fit the face borrows one before it clashes; a name on the crew comes up again
+  // only when every unused one is spent.
+  const fitting = (l: string[]) => (sex ? l.filter((x) => (o.book.genders?.[x] ?? sex) === sex) : l);
+  const [uHome, uAll] = tiers;
+  const from = [fitting(uHome), fitting(uAll), uHome, uAll, fitting(home), home].find((l) => l.length > 0) ?? [];
   const name = from.length > 0 ? from[Math.floor(nameR * from.length)] : 'Nobody';
   o.usedNames.add(name);
   const tp = o.book.traits.filter((t) => traitFits(t, spec));
@@ -226,6 +230,32 @@ export function drawRecruit(o: { book: CrewBook; r: () => number; id: string; sp
   // Drawn last, from its own seed, so every draw above is as it was before abilities.
   const ability = hireAbility(o.book, recruit, `${o.id}|ability`);
   return { ...recruit, abilities: ability ? [ability] : [] };
+}
+
+/**
+ * Recruits whose marked name sits on a face tagged the other way (hired before the marks, or before a name was marked)
+ * get a face that fits: a crew face of their specialty, else a local one, none another recruit wears, picked by id so
+ * it holds. Read-side, so a rewind can't bring the clash back. Unmarked names and untagged faces are left alone.
+ */
+export function fitFaces(recruits: readonly Recruit[], book: CrewBook, faces: readonly Extra[]): Recruit[] {
+  const tagOf = (id: string | null) => faces.find((f) => f.id === id)?.tags.find((t): t is 'man' | 'woman' => t === 'man' || t === 'woman');
+  const clashes = (r: Recruit) => {
+    const want = book.genders?.[r.name];
+    const has = tagOf(r.face);
+    return want !== undefined && has !== undefined && want !== has;
+  };
+  const taken = new Set(recruits.filter((r) => r.face && !clashes(r)).map((r) => r.face!));
+  return recruits.map((r) => {
+    if (!clashes(r)) return r;
+    const want = book.genders![r.name];
+    const pool = (tags: string[]) => faces.filter((f) => [...tags, want].every((t) => f.tags.includes(t)) && !taken.has(f.id));
+    const crew = pool(['crew', normalSpec(r.spec)]);
+    const fp = crew.length > 0 ? crew : pool(['local']);
+    if (fp.length === 0) return r;
+    const face = fp[hashSeed(`${r.id}|face`) % fp.length].id;
+    taken.add(face);
+    return { ...r, face };
+  });
 }
 
 type FreeDraw = { book: CrewBook; district: string; seed: string; faces: Extra[]; usedFaces: ReadonlySet<string>; usedNames?: ReadonlySet<string>; origins: string[] };

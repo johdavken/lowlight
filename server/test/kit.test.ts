@@ -91,7 +91,7 @@ describe('the kit across the playthrough', () => {
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({
       // The Pocket deck everyone owns, carried with no other; its catalog row is the live world/gear/decks.md, so match by id.
-      kit: { deck: expect.objectContaining({ id: STARTER_DECK }), owned: [expect.objectContaining({ id: STARTER_DECK })], sol: 0, heat: 0, heatHere: 0, here: null, heatBy: {}, hottest: null, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: 5, nerveMax: 5, stats: DEFAULT_STATS, crewLatest: null, crewPicks: false, crewFree: false },
+      kit: { deck: expect.objectContaining({ id: STARTER_DECK }), owned: [expect.objectContaining({ id: STARTER_DECK })], sol: 0, heat: 0, heatHere: 0, here: null, heatBy: {}, hottest: null, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: 5, nerveMax: 5, stats: DEFAULT_STATS, crewLatest: null, crewPicks: false, crewFree: false, programs: [expect.objectContaining({ id: 'solvent' }), expect.objectContaining({ id: 'firewall' })] },
     });
   });
 

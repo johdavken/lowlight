@@ -59,7 +59,9 @@ describe('TEXT SIZE (fixed stage §6)', () => {
     expect(style).toMatch(/\.ghost \{[^}]*font-size: 26px/);
     // The briefs a gig is played from (job cards, slip runs, Papers) follow it too.
     expect(css('web/src/ui/gig/gig.css')).toMatch(/\.gig-job-brief \{[^}]*font-size: calc\(12\.5px \* var\(--text-scale, 1\)\)/);
-    expect(css('web/src/ui/papers/papers.css')).toMatch(/\.pp-brief \{[^}]*font-size: calc\(12\.5px \* var\(--text-scale, 1\)\)/);
+    // The papers board's reading text: the bulletin, its reasons, the officer's checks (hud.css, 2026-11-08).
+    expect(css('web/src/ui/papers/hud.css')).toMatch(/\.pp-why \{[^}]*font-size: calc\(12\.5px \* var\(--text-scale, 1\)\)/);
+    expect(css('web/src/ui/papers/hud.css')).toMatch(/\.pp-check \{[^}]*font-size: calc\(13\.5px \* var\(--text-scale, 1\)\)/);
     expect(style).toMatch(/\.gig-brief \{[^}]*font: calc\(13px \* var\(--text-scale, 1\)\)\/1\.55 var\(--mono\)/);
   });
 });

@@ -4,10 +4,11 @@ import { dayWords, promisePlaces } from '../../shared/promise';
 import { markSeen, MEET_WAIT, parsePlan, planKey, planOver, planPlaceAt, planSeenKey, planTail, withSeen, type Plan, type SeenMark } from '../../shared/plan';
 import type { Pronoun } from '../../shared/pronoun';
 import { emptyCrewBook, type CrewBook } from '../../shared/crew-book';
-import { parseInstance } from '../../shared/crew';
+import { fitFaces, parseInstance } from '../../shared/crew';
 import { foldWithCrew, type CrewEvent, type CrewState, type FoldJob } from '../../shared/crew-fold';
 import { parseCrewEvents } from './crew-view';
 import type { LeadEntry } from '../../shared/leads';
+import type { Extra } from '../../shared/extras';
 import { fillRecruit, parseRun, rewardOutfits, type QuestEntry, type QuestStatus } from '../../shared/quests';
 import { outcomeTier, type Kit, type KitEvent } from '../../shared/mission';
 import { fixerKey, parseFixer } from '../../shared/stock';
@@ -325,11 +326,13 @@ export function createWorld(deps: {
   /** Her outfits opened by standing (character.json `outfitUnlocks`); read live. */
   outfitUnlocks?(contactId: string): Record<string, OutfitUnlock> | undefined;
   /** A roster character's stats and starting deck (missions spec §1); read live. Absent: 3s and none. */
-  kitStart?(player: string): { stats: Stats; deck: string | null; pocket?: string };
+  kitStart?(player: string): { stats: Stats; deck: string | null; pocket?: string; /** The starter programs (owned programs). */ programs?: string[] };
   /** A map place's district (small jobs spec §2): where an old mission's district-less heat lands. */
   districtOf?(placeId: string): string | null;
   /** The crew tables (world/crew). */
   crewBook?(): CrewBook;
+  /** The extras (world/extras): crew faces, so a hire's face can be made to fit their name (fitFaces). */
+  crewFaces?(): Extra[];
   /** What seeds the crew's draws and rolls for a playthrough (its id; e2e pins it). */
   crewSeed?(playthroughId: string): string;
   /** Names for crew result lines: a map place's (by place id) and a district's. */
@@ -1161,16 +1164,23 @@ export function createWorld(deps: {
       const now = at ?? clockOf(pt);
       const key = `${pt.id}|${player}|${at ?? '-'}|${now}|${prints.join(';')}`;
       if (kitMemo?.key === key) return kitMemo.value;
-      const start: { stats: Stats; deck: string | null; pocket?: string } = deps.kitStart?.(player) ?? { stats: DEFAULT_STATS, deck: null };
+      const start: { stats: Stats; deck: string | null; pocket?: string; programs?: string[] } = deps.kitStart?.(player) ?? { stats: DEFAULT_STATS, deck: null };
       const sol = solFromEnv(player);
       const seeded = [...repFromEnv(player).map((rep): KitEvent => ({ at: START, rep })), ...(sol ? [{ at: START, sol }] : [])];
       const kept = [...seeded, ...(at === undefined ? events : events.filter((e) => e.at <= at))];
       const crewBook = deps.crewBook?.() ?? emptyCrewBook();
       const job = (id: string) => book.find((q) => q.id === id);
+      // A face that fits the name (fitFaces): hires from before the man/woman marks, fixed on read so a rewind can't
+      // bring the clash back. In hire order, so the faces handed out hold.
+      const hireOf = (l: CrewEvent[]) => l.find((e): e is Extract<CrewEvent, { type: 'hire' }> => e.type === 'hire');
+      const lists = [...crewLists.values()].filter((l) => hireOf(l) !== undefined).sort((a, b) => hireOf(a)!.at - hireOf(b)!.at || hireOf(a)!.recruit.id.localeCompare(hireOf(b)!.recruit.id));
+      const hired = lists.map((l) => hireOf(l)!.recruit);
+      const refaced = new Map(fitFaces(hired, crewBook, deps.crewFaces?.() ?? []).flatMap((x, i) => (x.face !== hired[i].face ? [[x.id, x.face] as const] : [])));
+      const crewFitted = [...crewLists.values()].map((l) => l.map((e) => (e.type === 'hire' && refaced.has(e.recruit.id) ? { ...e, recruit: { ...e.recruit, face: refaced.get(e.recruit.id)! } } : e)));
       const r = foldWithCrew({
-        start: { deck: start.deck, ...(start.pocket ? { pocket: start.pocket } : {}), nerveMax: nerveMax(start.stats), from: START },
+        start: { deck: start.deck, ...(start.pocket ? { pocket: start.pocket } : {}), nerveMax: nerveMax(start.stats), from: START, ...(start.programs ? { programs: start.programs } : {}) },
         kitEvents: kept,
-        crew: [...crewLists.values()].map((l) => (at === undefined ? l : l.filter((e) => e.at <= at))),
+        crew: crewFitted.map((l) => (at === undefined ? l : l.filter((e) => e.at <= at))),
         now,
         book: crewBook,
         seed: deps.crewSeed?.(pt.id) ?? pt.id,

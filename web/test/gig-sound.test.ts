@@ -27,7 +27,7 @@ describe('the window plays its cues', () => {
   afterEach(() => win?.destroy());
 
   async function open(cue: GigWindowOpts['cue']) {
-    win = new GigWindow(document.body, { place: { id: 'p', name: 'P', district: 'D' }, you: 'Y', contact: 'C', load: async () => [brief], loadPapers: async () => ({ ...data, firstNight: false }), onSend: () => {}, onClose: () => {}, reducedMotion: true, seed: () => 7, cue });
+    win = new GigWindow(document.body, { place: { id: 'p', name: 'P', district: 'D' }, you: 'Y', contact: 'C', load: async () => [brief], loadPapers: async () => ({ ...data, firstNight: false }), onSit: () => {}, onClose: () => {}, reducedMotion: true, seed: () => 7, cue });
     for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0));
     return win;
   }

@@ -279,6 +279,17 @@ describe('programs in the pool (programs spec §1.4)', () => {
     expect(poolOf(check(), { stats: HICKS, deck: DECK, with: 'x' }).quiet).toBeUndefined();
   });
 
+  it('a foil adds a die and is marked on the run; capped at the pool max', () => {
+    const foil = { ...SOLVENT, id: 'foil:solvent', foil: true as const };
+    const plain = poolOf(check(), { stats: HICKS, deck: DECK, with: 'x' });
+    const pool = poolOf(check(), { stats: HICKS, deck: DECK, with: 'x', programs: [foil] });
+    expect(pool.dice).toBe(plain.dice + 1);
+    expect(pool.parts).toContainEqual({ label: 'SOLVENT FOIL', dice: 1, kind: 'pocket' });
+    expect(pool.programs).toEqual([{ id: 'foil:solvent', label: 'SOLVENT', alarm: 0, foil: true }]);
+    const big = poolOf(check(), { stats: { ...HICKS, tech: 10 }, deck: DECK, with: 'x', push: 'dice', extra: [{ delta: 1, label: 'a' }, { delta: 1, label: 'b' }, { delta: 1, label: 'c' }, { delta: 1, label: 'd' }], programs: [foil] });
+    expect(big.dice).toBeLessThanOrEqual(6);
+  });
+
   it('programs never change dice', () => {
     const all = [SOLVENT, LEECH, P('skeleton-key', 'reflex', 'position'), P('voicebox', 'cool', 'effect'), P('sniffer', 'wits', 'effect'), P('spike', 'body', 'position'), SCRUB];
     expect(poolOf(check({ grid: true }), { stats: HICKS, deck: DECK, with: 'x', programs: all }).dice).toBe(poolOf(check({ grid: true }), { stats: HICKS, deck: DECK, with: 'x' }).dice);

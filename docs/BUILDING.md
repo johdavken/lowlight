@@ -17,6 +17,8 @@ npm run dev
 
 Then open http://localhost:5173. The game server runs on port 7700 behind Vite.
 
+`npm run play` (`tools/play.ts`) runs the same game without watching files, and is what the README tells players to use. On a clone of the public repo, on `main`, it can apply UPDATE from the title screen: the server exits, the script fetches `main`, fast-forwards, runs `npm ci` when `package-lock.json` changed, and starts the game again. The title asks GitHub's compare API whether there is anything new, so checking never counts as a clone. `VITE_PORT` and `NIX_ROOM_PORT` move both ports.
+
 The same commands work on Windows, in cmd, PowerShell or Git Bash. The repository's `.gitattributes` keeps every text file's line endings as LF, whatever Git's own setting, because the content files are read line by line.
 
 To run the built game from one server instead:

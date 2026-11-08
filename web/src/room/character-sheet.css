@@ -135,4 +135,6 @@
 .cs-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .cs-chip { padding: 1px 9px; font: 17px var(--pixel); letter-spacing: 0.14em; border: 1px solid var(--cs-rule); }
 .cs-chip b { margin-left: 4px; font-weight: 400; color: var(--cs-side); }
+/* A foil program (owned programs): the table's foil sheen, still. */
+.cs-chip.foil { border-color: rgba(160, 230, 255, 0.6); background: linear-gradient(115deg, rgba(255, 240, 200, 0.10), rgba(160, 230, 255, 0.16), rgba(255, 170, 230, 0.10)); }
 .cs-slot { display: flex; justify-content: space-between; padding: 3px 0; font: 18px var(--pixel); letter-spacing: 0.14em; color: var(--cs-dim); opacity: 0.7; }

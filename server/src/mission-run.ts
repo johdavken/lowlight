@@ -4,7 +4,7 @@
  */
 import { hintLine, makeTerminal, type TerminalSetup } from '../../shared/crack';
 import type { Deck } from '../../shared/gear';
-import { belowTier, HOT_LOAD_NERVE, type Program } from '../../shared/programs';
+import { belowTier, HOT_LOAD_NERVE, programOf, type Program } from '../../shared/programs';
 import { rng } from '../../shared/rng';
 import { formLabel, withArticle } from '../../shared/kit-line';
 import { crackTries, type CoverId, type Kit, type KitEvent, type Odds, type Tier } from '../../shared/mission';
@@ -120,23 +120,28 @@ function programLines(run: QuestRun, catalog: Program[], deck: Deck | null, tier
   const rolls = run.picks.flatMap((p) => (p.roll && !isLegacyRoll(p.roll) ? [p.roll] : []));
   let lacquer = 0;
   const lines = (run.programs ?? []).flatMap((l) => {
-    const p = catalog.find((x) => x.id === l.id);
+    // A foil by its load id (owned programs): `SOLVENT FOIL · RAN 1 · …`.
+    const p = programOf(catalog, l.id);
     if (!p) return [];
+    const name = p.foil ? `${p.name} FOIL` : p.name;
     const below = deck !== null && belowTier(deck, p, tier);
     if (p.kind === 'firewall') {
       if (!l.burned) return [];
       if (below) lacquer += 1;
-      return [`${p.name} · BURNED`];
+      return [`${name} · BURNED`];
     }
     const ran = rolls.filter((r) => r.programs?.includes(p.id));
     if (ran.length === 0) return [];
     if (below) lacquer += ran.length;
     const last = ran.at(-1)!;
     const how = p.kind === 'effect' ? (last.effect ?? 'fair').toUpperCase() : POSITION_WORDS[last.position];
-    return [`${p.name} · RAN ${ran.length} · ${last.stat} ${how}`];
+    return [`${name} · RAN ${ran.length} · ${last.stat} ${how}`];
   });
   // What the mid-job loads cost (programs spec §1.2a): each named, then the NERVE.
-  const hot = (run.programs ?? []).filter((l) => l.hot).flatMap((l) => catalog.filter((p) => p.id === l.id).map((p) => p.name));
+  const hot = (run.programs ?? []).filter((l) => l.hot).flatMap((l) => {
+    const p = programOf(catalog, l.id);
+    return p ? [p.foil ? `${p.name} FOIL` : p.name] : [];
+  });
   return [...lines, ...(lacquer > 0 ? [`ALARM +${lacquer} FROM THE LACQUER`] : []), ...(hot.length ? [`LOADED MID-JOB: ${hot.join(', ')} · ${hot.length * HOT_LOAD_NERVE} NERVE`] : [])];
 }
 

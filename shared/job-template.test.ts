@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blowUpSpread, offTemplate, rolledBeats } from './job-template';
+import { blowsOnMiss, blowUpSpread, offTemplate, rolledBeats } from './job-template';
 import { parseQuestFile, type QuestEntry } from './quests';
 
 const PAIRS: Record<1 | 2, string[][]> = { 1: [['cool', 'reflex'], ['body', 'wits'], ['body', 'tech']], 2: [['cool', 'reflex'], ['wits', 'tech'], ['body', 'cool'], ['tech', 'wits'], ['reflex', 'body']] };
@@ -77,5 +77,14 @@ describe('blowUpSpread (approach shapes spec §2)', () => {
   });
   it('a soft beat, a push beat and another tier do not count', () => {
     expect(blowUpSpread([job(['cool', 'body']), job(['cool', 'wits'], { soft: true }), job(['cool', 'wits'], { id: 'push-1' }), job(['tech', 'wits']), job(['tech', 'reflex']), job(['cool', 'wits'], { tier: 1 }), job(['body', 'wits'], { tier: 1 }), job(['body', 'tech'], { tier: 1 })]).filter((r) => r.stat === 'cool')).toEqual([]);
+  });
+});
+
+describe('blowsOnMiss', () => {
+  it('is true for a card whose fail takes nothing or is blown, false for the rest', () => {
+    const q = parse(text({ patch: (x) => x.replace('- x: X. → o2 / o2', '- x: X. → o2 / gone').replace(/(## o2\n\*On\.\*\npay: full\ntake: full\n→ end\n)/, '$1\n## gone\n*Gone.*\ntake: none\n→ end\n') })).entry;
+    const last = q.beats.get('b2')![0].choices;
+    expect(last.map((c) => blowsOnMiss(q, c))).toEqual([true, false]);
+    expect(q.beats.get('b0')![0].choices.map((c) => blowsOnMiss(q, c))).toEqual([false, false]);
   });
 });

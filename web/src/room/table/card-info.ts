@@ -4,11 +4,12 @@
  * values the card's face draws.
  */
 import { GRADES, type Grade, type Specialty } from '../../../../shared/crew-book';
-import { APPROACH_COSTS, COSTS, picksFor } from '../../../../shared/costs';
+import { APPROACH_COSTS, COSTS, FORCED_FIRST, picksFor } from '../../../../shared/costs';
 import { deckNotes, EFFECT_NAMES, kindResult, POSITION_NAMES, type Effect, type Pool, type Position } from '../../../../shared/dice';
 import { APPROACH_STATS, SPEC_STAT, type Approach } from '../../../../shared/hand';
 import { HOT_LOAD_NERVE, type ProgramKind } from '../../../../shared/programs';
 import { el } from './el';
+import { litNodes } from './tips';
 
 export type Info = { title: string; lines: string[] };
 
@@ -43,6 +44,8 @@ export function choiceInfo(o: {
   tierOf?: number;
   route?: number;
   red?: boolean;
+  /** A miss here blows the job. */
+  blows?: boolean;
 }): Info {
   const { pool, state: s } = o;
   const base = pool.base ?? Math.max(0, pool.dice - pool.parts.reduce((n, x) => n + x.dice, 0));
@@ -61,13 +64,14 @@ export function choiceInfo(o: {
   if (s.nerve) lines.push(`Loading costs ${s.nerve} NERVE.`);
   if (o.route) lines.push(routeLine(o.route));
   if (o.red) lines.push('One shot: no PUSH, no programs.');
+  if (o.blows) lines.push('A miss here blows the job: no take, no pay, and costs can\'t save it.');
   if (s.why) lines.push(`Can't go: ${s.why}.`);
   return { title: `${pool.stat} · ${s.dice} DICE`, lines };
 }
 
 /** A choice with no roll: a crack, or a route with its own ALARM; null: the card says it all. */
-export function plainInfo(c: { crack?: { length: number; tries: number; take?: number }; alarm?: number }, takes: boolean): Info | null {
-  if (c.crack) return { title: 'CRACK', lines: [`A terminal: ${c.crack.length}-letter words, ${c.crack.tries} tries. ${takes ? `A win fills ${c.crack.take ?? 2} TAKE, a lockout raises ALARM.` : 'A lockout raises ALARM.'}`, ...(c.alarm ? [routeLine(c.alarm)] : [])] };
+export function plainInfo(c: { crack?: { length: number; tries: number; take?: number }; alarm?: number; blows?: true }, takes: boolean): Info | null {
+  if (c.crack) return { title: 'CRACK', lines: [`A terminal: ${c.crack.length}-letter words, ${c.crack.tries} tries. ${takes ? `A win fills ${c.crack.take ?? 2} TAKE, a lockout raises ALARM.` : 'A lockout raises ALARM.'}`, ...(c.alarm ? [routeLine(c.alarm)] : []), ...(c.blows ? ['A lockout here blows the job: no take, no pay.'] : [])] };
   return c.alarm ? { title: 'THIS ROUTE', lines: [routeLine(c.alarm)] } : null;
 }
 
@@ -100,7 +104,7 @@ export const GOES_WRONG: Record<Approach, string> = {
 /** An approach's card at SETUP (approach shapes spec §1). */
 export const approachInfo = (a: Approach): Info => ({
   title: a.toUpperCase(),
-  lines: [`+1d on ${APPROACH_STATS[a].map((s) => s.toUpperCase()).join(' · ')}.`, `Never dealt ${COSTS[APPROACH_COSTS[a].never].tag}. ${COSTS[APPROACH_COSTS[a].first].tag} comes first.`, GOES_WRONG[a]],
+  lines: [`+1d on ${APPROACH_STATS[a].map((s) => s.toUpperCase()).join(' · ')}.`, `Never dealt ${COSTS[APPROACH_COSTS[a].never].tag}.${FORCED_FIRST ? ` ${COSTS[APPROACH_COSTS[a].first].tag} comes first.` : ''}`, GOES_WRONG[a]],
 });
 
 export const favourInfo = (plays?: string[], used = false): Info => ({ title: 'THE FAVOUR', lines: used ? ['Used.'] : ['+1d, once.', ...here(plays)] });
@@ -108,7 +112,7 @@ export const favourInfo = (plays?: string[], used = false): Info => ({ title: 'T
 const KIND_WORDS: Record<ProgramKind, string> = { position: 'a step out of danger', effect: 'a step more effect', quiet: 'takes 1 off the heat you leave with', firewall: 'cancels one cost' };
 
 /** A program's card: what it does, how it stands against the tier, and `plays`, where it would run on this beat. */
-export function programInfo(p: { name: string; stat: string; kind: ProgramKind; line: string }, o: { tier?: number; quality?: number; plays?: string[]; nerve?: number; dead?: boolean; burned?: boolean }): Info {
+export function programInfo(p: { name: string; stat: string; kind: ProgramKind; line: string; foil?: true; count?: number }, o: { tier?: number; quality?: number; plays?: string[]; nerve?: number; dead?: boolean; burned?: boolean }): Info {
   if (o.dead) return { title: p.name, lines: [p.line, 'The deck is dead: nothing runs.'] };
   if (o.burned) return { title: p.name, lines: [p.line, 'Burned: used up on this job.'] };
   const lines = [p.line, `${p.stat === 'any' ? 'Any roll' : `On ${p.stat.toUpperCase()}`}: ${KIND_WORDS[p.kind]}.`];
@@ -118,7 +122,9 @@ export function programInfo(p: { name: string; stat: string; kind: ProgramKind; 
     else if (lifts && o.tier >= 2) lines.push('Lifts the tier cut on any roll it runs on.');
   }
   if (o.nerve) lines.push(`Loading mid-job costs ${o.nerve} NERVE.`);
-  return { title: p.name, lines: [...lines, ...here(o.plays)] };
+  // A foil (owned programs): one run with a die more, then gone.
+  if (p.foil) lines.push(`Foil: its one run rolls a die more, then it's gone${(p.count ?? 1) > 1 ? ` (you hold ${p.count})` : ''}.`);
+  return { title: p.foil ? `${p.name} · FOIL` : p.name, lines: [...lines, ...here(o.plays)] };
 }
 
 /** An empty program slot. */
@@ -171,7 +177,16 @@ export function mountCardInfo(root: HTMLElement, lookup: (card: HTMLElement) => 
   const open = (card: HTMLElement): boolean => {
     const info = card.isConnected && card.dataset.state !== 'empty' ? lookup(card) : null;
     if (!info) return false;
-    panel.replaceChildren(el('div', 'tb-info-title', info.title), ...info.lines.map((l) => el('div', 'tb-info-line', l)));
+    // Dressed like a tip (tips.ts): the first line is the gist, the rest sit under a rule, the HUD's words in their colours.
+    const line = (l: string, i: number) => {
+      const d = el('div', i ? 'tb-info-line' : 'tb-info-line tb-info-gist');
+      d.append(...litNodes(l));
+      return d;
+    };
+    const [first, ...rest] = info.lines;
+    const body = rest.length ? [el('div', 'tb-info-rows')] : [];
+    body[0]?.append(...rest.map((l) => line(l, 1)));
+    panel.replaceChildren(el('div', 'tb-info-title', info.title), ...(first === undefined ? [] : [line(first, 0)]), ...body);
     panel.hidden = false;
     place(card);
     return true;

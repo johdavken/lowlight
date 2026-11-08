@@ -5,6 +5,7 @@
  * (spec 2026-10-11 bug report §3.1).
  */
 import type { AroundEntry, ContactEntry, PlaythroughInfo } from '../../../shared/types';
+import type { UpdateInfo, UpdateStatus } from '../../../shared/update';
 import type { PlaythroughApi, PlaythroughListing } from '../net/playthroughs';
 import { FighterStrip, liveFacts, type StripFile } from './fighter-strip';
 import { mountHelpCorner } from './help-corner';
@@ -13,8 +14,17 @@ import { canBeAi } from './select-flow';
 import { TileBand, type BandTile } from './tile-band';
 import './title.css';
 
-export type TitleItem = 'continue' | 'new' | 'load' | 'report';
+export type TitleItem = 'continue' | 'new' | 'load' | 'report' | 'update';
 export type TitleCue = 'move' | 'confirm';
+
+/** UPDATE (plan 2026-11-08): only a clone of the public repo gets an answer that shows the tile. */
+export interface TitleUpdate {
+  status(): Promise<UpdateInfo>;
+  /** Asks the game to close and update (it answers first). */
+  start(): Promise<void>;
+  /** Default: location.reload(). */
+  reload?(): void;
+}
 
 export interface TitleDeps {
   api: PlaythroughApi;
@@ -28,15 +38,44 @@ export interface TitleDeps {
   /** What the backdrop shows: an agent's room, or the skyline (null). The landing waits for the cursor to rest. */
   backdrop(agentId: string | null): void;
   reducedMotion: boolean;
+  /** Absent: no UPDATE tile. */
+  update?: TitleUpdate;
 }
 
 /** JACK IN shows this long before the room opens. */
 export const JACK_MS = 900;
 
-const LABELS: Record<TitleItem, string> = { continue: 'CONTINUE', new: 'NEW GAME', load: 'LOAD', report: 'REPORT A BUG' };
+const LABELS: Record<TitleItem, string> = { continue: 'CONTINUE', new: 'NEW GAME', load: 'LOAD', report: 'REPORT A BUG', update: 'UPDATE' };
 // Keys in brackets, so a key never reads as part of its action (ENTER JACK IN).
 const HINTS = '[←→] CHOOSE · [↑↓] CONTACT · [ENTER] JACK IN · [ESC] SPLASH';
 const HINTS_ONE = '[←→] CHOOSE · [ENTER] JACK IN · [ESC] SPLASH';
+const HINTS_UPDATE = '[←→] CHOOSE · [ENTER] UPDATE · [ESC] SPLASH';
+const HINTS_NO_ENTER = '[←→] CHOOSE · [ESC] SPLASH';
+
+/** Polling for the game to come back after UPDATE, and how long before giving up. */
+export const UPDATE_POLL_MS = 2000;
+export const UPDATE_GIVE_UP_MS = 15 * 60_000;
+/** An update result younger than this is announced on the title, once. */
+const UPDATE_NOTICE_MS = 2 * 60_000;
+const UPDATE_SEEN_KEY = 'lowlight.updateSeen';
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+/** "Nov 8". */
+const shortDate = (at: number) => new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+const clockText = (ms: number) => {
+  const s = Math.floor(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+};
+/** Once per result: localStorage may be missing or refuse (private window). */
+function firstSight(at: number): boolean {
+  try {
+    if (localStorage.getItem(UPDATE_SEEN_KEY) === String(at)) return false;
+    localStorage.setItem(UPDATE_SEEN_KEY, String(at));
+  } catch {
+    // Can't remember it: show it anyway.
+  }
+  return true;
+}
 
 /** "just now", "5m ago", "2h ago", "3d ago". */
 export function ago(at: number, now = Date.now()): string {
@@ -69,8 +108,8 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   const logo = el('div', 'title-logo');
   const p1 = new FighterStrip(box, 'p1', { reducedMotion: deps.reducedMotion });
   const p2 = new FighterStrip(box, 'p2', { reducedMotion: deps.reducedMotion });
-  // Room for all four (CONTINUE, NEW GAME, LOAD, REPORT A BUG): none hides past the edge.
-  const band = new TileBand(box, { reducedMotion: deps.reducedMotion, visible: 4, tileW: 150, tileH: 160, onPick: (i) => pick(i), onHover: (i) => focus(i) });
+  // Room for all five (CONTINUE, NEW GAME, LOAD, REPORT A BUG, and UPDATE when there is one): none hides past the edge.
+  const band = new TileBand(box, { reducedMotion: deps.reducedMotion, visible: 5, tileW: 150, tileH: 160, onPick: (i) => pick(i), onHover: (i) => focus(i) });
   const under = el('div', 'title-under');
   const error = el('div', 'title-error');
   const jack = el('div', 'jack-in', 'JACK IN');
@@ -97,6 +136,46 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   let busy = false;
   let destroyed = false;
   let jackTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Public main's news for this clone, when there is any (the tile shows while it's available). */
+  let update: UpdateStatus | null = null;
+  /** load() has set the items: a late update answer adds its tile to them. */
+  let loaded = false;
+  let pollTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The launcher's last result as the title found it: a different one after UPDATE means the game is back. */
+  let lastAt: number | null = null;
+
+  const menu = (): TitleItem[] => [
+    ...(active ? (['continue'] as const) : []),
+    'new',
+    ...(list.length > 0 ? (['load'] as const) : []),
+    'report',
+    ...(update?.available ? (['update'] as const) : []),
+  ];
+
+  /** Asks whether there's an update, apart from load() so CONTINUE never waits on GitHub. */
+  async function checkUpdate(): Promise<void> {
+    if (!deps.update) return;
+    let info: UpdateInfo;
+    try {
+      info = await deps.update.status();
+    } catch {
+      return;
+    }
+    if (destroyed || !info.eligible) return;
+    const last = info.last;
+    lastAt = last?.at ?? null;
+    if (last && Date.now() - last.at < UPDATE_NOTICE_MS && firstSight(last.at)) {
+      error.classList.toggle('ok', last.ok);
+      error.textContent = last.ok ? `UPDATED · ${last.to.slice(0, 8)}` : `// UPDATE FAILED — ${last.error ?? 'see the terminal'}`;
+    }
+    update = info.status ?? null;
+    if (!loaded || busy || !update?.available) return;
+    const at = items[index];
+    items = menu();
+    index = Math.max(0, items.indexOf(at));
+    rebuild();
+    render();
+  }
 
   async function load(): Promise<void> {
     let res: Awaited<ReturnType<PlaythroughApi['listPlaythroughs']>> | null = null;
@@ -124,8 +203,9 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
       // Walked in on a stranger whose greeting never came: CONTINUE goes back into her room.
       strangerHere = around.find((e) => e.contactId === active!.location?.contactId) ?? null;
     }
-    items = [...(active ? (['continue'] as const) : []), 'new', ...(list.length > 0 ? (['load'] as const) : []), 'report'];
+    items = menu();
     index = 0;
+    loaded = true;
     if (!destroyed) {
       rebuild();
       render();
@@ -148,8 +228,8 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
         tag: { text: '▶', now: true },
       };
     }
-    // NEW GAME, LOAD and REPORT A BUG: pixel glyphs (a prompt, stacked shards, a transmitter).
-    return { id: item, name: LABELS[item], art: { kind: 'glyph', glyph: item } };
+    // NEW GAME, LOAD, REPORT A BUG and UPDATE: pixel glyphs (a prompt, stacked shards, a transmitter, a line coming in).
+    return { id: item, name: LABELS[item], art: { kind: 'glyph', glyph: item }, ...(item === 'update' ? { tag: { text: 'NEW' } } : {}) };
   }
 
   /** The band's tiles (when the items or the contact shown change). */
@@ -168,8 +248,10 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
     logo.textContent = item ? LABELS[item] : '';
     p1.setTag('1P · YOU');
     p2.setTag('CPU · AI');
-    hints.textContent = item === 'continue' && known.length > 1 ? HINTS : HINTS_ONE;
+    hints.textContent =
+      item === 'update' ? (update?.canApply ? HINTS_UPDATE : HINTS_NO_ENTER) : item === 'continue' && known.length > 1 ? HINTS : HINTS_ONE;
     if (item === 'continue' && active) renderContinue(active);
+    else if (item === 'update' && update) renderUpdate(update);
     else if (item === 'load') renderLoad();
     else if (item === 'report') renderReport();
     else renderNew();
@@ -254,11 +336,137 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
     deps.backdrop(null);
   }
 
+  /** UPDATE's card: what's new on the public repo, and what pressing it does (or why it can't). */
+  function renderUpdate(u: UpdateStatus): void {
+    fighter(p1, undefined);
+    fighter(p2, undefined);
+    p1.el.classList.remove('waiting');
+    const areas = (
+      [
+        ['CHARACTERS', u.areas.characters],
+        ['ROOMS', u.areas.rooms],
+        ['WORLD', u.areas.world],
+        ['CODE', u.areas.code],
+      ] as const
+    ).filter(([, n]) => n > 0);
+    p1.setFile({
+      name: 'Update',
+      tagline: 'New on the public repo',
+      head: '// UPDATE',
+      rows: [
+        { p: [plural(u.behind, 'change'), ...(u.newestAt !== null ? [`newest ${shortDate(u.newestAt)}`] : [])].join(' · ') },
+        { facts: areas.map(([label, n]) => ({ label, value: plural(n, 'file') })) },
+      ],
+    });
+    const why: Record<NonNullable<UpdateStatus['reason']>, StripFile> = {
+      launcher: {
+        name: 'By hand',
+        tagline: 'This time only',
+        head: '// THIS TIME',
+        rows: [
+          { p: "npm run dev can't update itself." },
+          { p: 'Close the game, then run git pull and npm ci.' },
+          { p: 'From then on start it with npm run play, and UPDATE does it for you.' },
+        ],
+      },
+      'local-edits': {
+        name: 'Your edits',
+        tagline: 'In the way',
+        head: '// IN THE WAY',
+        rows: [
+          { p: 'You changed files this update also changes:' },
+          { p: [...(u.files ?? []).slice(0, 3), ...((u.files?.length ?? 0) > 3 ? [`+${(u.files?.length ?? 0) - 3} more`] : [])].join(' · ') },
+          { p: 'Undo or commit them, then UPDATE.' },
+        ],
+      },
+      diverged: {
+        name: 'By hand',
+        tagline: 'Your copy went its own way',
+        head: '// YOUR OWN COMMITS',
+        rows: [{ p: 'Your copy has commits of its own.' }, { p: 'Pull this one by hand: git pull.' }],
+      },
+    };
+    p2.setFile(
+      u.canApply || !u.reason
+        ? {
+            name: 'One press',
+            tagline: 'Close, update, reopen',
+            head: '// WHAT HAPPENS',
+            rows: [
+              { p: 'The game closes, updates and opens again in this tab.' },
+              { p: 'Saves stay in data/.' },
+              ...(u.needsPackages ? [{ p: 'New packages too: a few minutes.' }] : []),
+            ],
+          }
+        : why[u.reason],
+    );
+    p2.el.classList.remove('waiting');
+    under.textContent = `UPDATE AVAILABLE · ${plural(u.behind, 'change').toUpperCase()}`;
+    deps.backdrop(null);
+  }
+
+  /** UPDATE pressed: the game closes and comes back updated; this tab waits for it, then reloads. */
+  async function runUpdate(up: TitleUpdate): Promise<void> {
+    busy = true;
+    band.setLive(false);
+    error.textContent = '';
+    error.classList.remove('ok');
+    jack.textContent = 'UPDATING';
+    jack.classList.add('on');
+    const pressed = Date.now();
+    // Its stamp is the launcher's clock, which may not be this tab's (a phone over the tailnet): only a new one counts.
+    const before = lastAt;
+    under.textContent = 'KEEP THIS TAB OPEN';
+    try {
+      await up.start();
+    } catch (err) {
+      if (destroyed) return;
+      unlock();
+      fail(`// COULDN'T UPDATE — ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+    const poll = async (): Promise<void> => {
+      pollTimer = null;
+      if (destroyed) return;
+      const waited = Date.now() - pressed;
+      if (waited > UPDATE_GIVE_UP_MS) {
+        under.textContent = '';
+        fail("// THE GAME DIDN'T COME BACK — LOOK AT THE TERMINAL");
+        return;
+      }
+      under.textContent = `KEEP THIS TAB OPEN · ${clockText(waited)}`;
+      // While the game is down every call fails: still updating.
+      const info = await up.status().catch(() => null);
+      if (destroyed) return;
+      if (info?.last && info.last.at !== before) {
+        (up.reload ?? (() => location.reload()))();
+        return;
+      }
+      pollTimer = setTimeout(() => void poll(), UPDATE_POLL_MS);
+    };
+    pollTimer = setTimeout(() => void poll(), UPDATE_POLL_MS);
+  }
+
+  /** An error on the title's line, in red (UPDATED's green is only for that notice). */
+  function fail(text: string): void {
+    error.classList.remove('ok');
+    error.textContent = text;
+  }
+
   /** Back from a failed CONTINUE: keys work again. */
   function unlock(): void {
     busy = false;
     band.setLive(true);
     jack.classList.remove('on');
+    jack.textContent = 'JACK IN';
+    // UPDATE's answer may have come while the band was locked.
+    if (menu().length !== items.length) {
+      const at = items[index];
+      items = menu();
+      index = Math.max(0, items.indexOf(at));
+      rebuild();
+      render();
+    }
   }
 
   async function continueWith(): Promise<void> {
@@ -281,7 +489,7 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
     } catch (err) {
       if (destroyed) return;
       unlock();
-      error.textContent = `// COULDN'T REACH ${(c?.name ?? id).toUpperCase()} — ${err instanceof Error ? err.message : String(err)}`;
+      fail(`// COULDN'T REACH ${(c?.name ?? id).toUpperCase()} — ${err instanceof Error ? err.message : String(err)}`);
       return;
     }
     if (!destroyed) deps.nav(`/room/${encodeURIComponent(id)}`);
@@ -290,6 +498,13 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   function enter(): void {
     if (busy || items.length === 0) return;
     const item = items[index];
+    if (item === 'update') {
+      // Can't update from here (the strips say why): Enter does nothing.
+      if (!update?.canApply || !deps.update) return;
+      deps.sound('confirm');
+      void runUpdate(deps.update);
+      return;
+    }
     deps.sound('confirm');
     if (item === 'new') return deps.onNewGame();
     if (item === 'load') return deps.onLoad();
@@ -339,6 +554,7 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   };
   window.addEventListener('keydown', onKey);
   void load();
+  void checkUpdate();
 
   return {
     /** The roster changed (it arrived, or a poll): redraw what's shown, unless JACK IN is under way. */
@@ -350,6 +566,7 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
     destroy() {
       destroyed = true;
       if (jackTimer !== null) clearTimeout(jackTimer);
+      if (pollTimer !== null) clearTimeout(pollTimer);
       window.removeEventListener('keydown', onKey);
       help.destroy();
       box.remove();

@@ -25,7 +25,7 @@ afterEach(() => {
 });
 
 async function open(over: Partial<GigWindowOpts> = {}) {
-  const onSend = vi.fn();
+  const onSit = vi.fn();
   const onClose = vi.fn();
   win = new GigWindow(host, {
     place: { id: 'the-tilt', name: 'The Tilt', district: 'Karasu' },
@@ -33,27 +33,18 @@ async function open(over: Partial<GigWindowOpts> = {}) {
     contact: 'Nix',
     load: async () => BRIEFS,
     loadPapers: async () => ({ ...data, firstNight: false }),
-    onSend,
+    onSit,
     onClose,
     reducedMotion: true,
     seed: () => 7,
     ...over,
   });
   await flush();
-  return { onSend, onClose };
+  return { onSit, onClose };
 }
 const $ = <T extends Element = HTMLElement>(sel: string) => host.querySelector(sel) as T | null;
 const text = (sel: string) => $(sel)?.textContent ?? null;
 const buttonText = (t: string) => [...host.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === t);
-/** Sit down at the first desk and walk away: a result waiting to be sent. */
-async function walkedAway(over: Partial<GigWindowOpts> = {}) {
-  const r = await open(over);
-  key('Enter');
-  win.handleEscape();
-  buttonText('WALK AWAY')!.click();
-  return r;
-}
-
 describe('jobs', () => {
   it('deals one job per tier, easy to hard', async () => {
     await open();
@@ -95,17 +86,17 @@ describe('picking a job with the pointer', () => {
   const at = (sel: string, type: string, x: number, y: number) => $(sel)!.dispatchEvent(new MouseEvent(type, { bubbles: true, clientX: x, clientY: y }));
 
   it("a pointer resting where the window opened doesn't pick the card under it; moving over a card does", async () => {
-    await open();
+    const first = await open();
     at('.gig-job:nth-child(2)', 'mouseenter', 300, 200);
     at('.gig-job:nth-child(2)', 'mousemove', 300, 200);
     key('Enter');
-    expect(text('.gig-where')).toContain('Job e');
+    expect(first.onSit.mock.calls[0][0].brief.id).toBe('e');
     win.destroy();
-    await open();
+    const second = await open();
     at('.gig-job:nth-child(2)', 'mousemove', 300, 200);
     at('.gig-job:nth-child(2)', 'mousemove', 310, 204);
     key('Enter');
-    expect(text('.gig-where')).toContain('Job m');
+    expect(second.onSit.mock.calls[0][0].brief.id).toBe('m');
   });
 });
 
@@ -120,40 +111,11 @@ describe('the frame', () => {
     expect(again.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('destroyed mid-run (the map closed under it): gone, nothing sent', async () => {
-    const { onSend } = await open();
-    key('Enter');
-    win.destroy();
-    expect(host.querySelector('.gig-window')).toBeNull();
-    key('Enter');
-    expect(onSend).not.toHaveBeenCalled();
-  });
-
-  it('Esc on the result screen never drops the result; the only way out is its [ENTER] button (review I1)', async () => {
-    const { onSend, onClose } = await walkedAway();
-    expect(win.handleEscape()).toBe(true);
-    expect(onClose).not.toHaveBeenCalled();
-    expect($<HTMLButtonElement>('.gig-jackout')!.hidden).toBe(true);
-    expect(onSend).not.toHaveBeenCalled();
-    key('Enter');
-    expect(onSend).toHaveBeenCalledTimes(1);
-  });
-
-  it('after a refusal, Esc may drop it (spec §8)', async () => {
-    const { onClose } = await walkedAway();
-    key('Enter');
-    win.showRefusal('wait for her to finish');
-    expect($<HTMLButtonElement>('.gig-jackout')!.hidden).toBe(false);
-    win.handleEscape();
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
   it("keys it doesn't use never reach the room behind it (review I2)", async () => {
     await open();
-    key('Enter');
     const behind = vi.fn();
     window.addEventListener('keydown', behind);
-    for (const k of ['t', 'x', 'Enter']) {
+    for (const k of ['t', 'x', 'Tab']) {
       const e = new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true });
       document.body.dispatchEvent(e);
       expect(e.defaultPrevented).toBe(true);
@@ -162,43 +124,12 @@ describe('the frame', () => {
     window.removeEventListener('keydown', behind);
   });
 
-  it('a held Enter (auto-repeat) never sends; a fresh press does', async () => {
-    const { onSend } = await walkedAway();
+  it('a held Enter (auto-repeat) never sits down; a fresh press does, once', async () => {
+    const { onSit } = await open();
     key('Enter', { repeat: true });
-    expect(onSend).not.toHaveBeenCalled();
+    expect(onSit).not.toHaveBeenCalled();
     key('Enter');
-    expect(onSend).toHaveBeenCalledTimes(1);
-  });
-
-  it('no answer after sending: back to SEND AGAIN, and Esc can leave', async () => {
-    const { onSend, onClose } = await walkedAway();
-    vi.useFakeTimers();
-    try {
-      key('Enter');
-      expect(onSend).toHaveBeenCalledTimes(1);
-      vi.advanceTimersByTime(9_999);
-      expect(text('.gig-refusal')).toBeNull();
-      vi.advanceTimersByTime(1);
-      expect(text('.gig-refusal')).toBe('no answer — check the link and send again');
-      expect(text('.gig-send')).toBe('[ENTER] SEND AGAIN');
-      win.handleEscape();
-      expect(onClose).toHaveBeenCalledTimes(1);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('destroyed while waiting: the timer does nothing', async () => {
-    await walkedAway();
-    vi.useFakeTimers();
-    try {
-      key('Enter');
-      win.destroy();
-      expect(() => vi.advanceTimersByTime(20_000)).not.toThrow();
-      expect(host.querySelector('.gig-refusal')).toBeNull();
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(onSit).toHaveBeenCalledTimes(1);
   });
 
   it('the scanlines cover the whole window: they sit outside the scrolling part', async () => {

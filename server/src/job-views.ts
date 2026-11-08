@@ -10,6 +10,7 @@ import { withGuest } from './guest';
 import { type Position } from '../../shared/dice';
 import { abilityEffect, CALL_VERB, callEffect, contactId, type Setup, lossOnAgain, type Call, type CallEffect } from '../../shared/hand';
 import type { QuestDeps } from './chat-relay';
+import { programOf, type Program } from '../../shared/programs';
 /** The crew a job's cards are read from: the roster, and its guest (guest crew spec §5). */
 export function crewOn(quests: QuestDeps | undefined, setup: Pick<Setup, 'guest'> | undefined): CrewMember[] {
   return withGuest(quests?.crewState?.()?.members ?? [], setup);
@@ -75,16 +76,21 @@ export function shownTraits(quests: QuestDeps | undefined, m: CrewMember): { lab
 }
 
 /** POCKETS as the deck (programs spec §2.1): the deck carried at GO IN, its slots, what's loaded, the catalog. */
-export function pocketsView(quests: QuestDeps | undefined, run: QuestRun, at: NonNullable<Setup['deck']>): NonNullable<HandView['pockets']> {
+export function pocketsView(quests: QuestDeps | undefined, run: QuestRun, at: NonNullable<Setup['deck']>, held: readonly Program[]): NonNullable<HandView['pockets']> {
   const deck = (quests?.decks?.() ?? []).find((d) => d.id === at.id) ?? null;
-  const catalog = quests?.programs?.() ?? [];
-  const loaded = (run.programs ?? []).flatMap((l) => catalog.filter((p) => p.id === l.id).map((p) => ({ id: p.id, name: p.name, stat: p.stat, kind: p.kind, burned: l.burned === true })));
+  const all = quests?.programs?.() ?? [];
+  // What you can load (owned programs), not the whole catalog; what's loaded by id, a foil as its copy.
+  const catalog = held.filter((p) => !(run.programs ?? []).some((l) => l.id === p.id && l.burned && p.foil));
+  const loaded = (run.programs ?? []).flatMap((l) => {
+    const p = programOf(all, l.id);
+    return p ? [{ id: p.id, name: p.name, stat: p.stat, kind: p.kind, burned: l.burned === true, ...(p.foil ? { foil: true as const } : {}) }] : [];
+  });
   return {
     deck: at.id ? { name: deck?.name ?? at.id, quality: at.quality, skin: deck?.skin ?? 'green' } : null,
     slots: at.slots,
     dead: run.deckDead === true,
     loaded,
-    catalog: catalog.map((p) => ({ id: p.id, name: p.name, stat: p.stat, kind: p.kind, line: p.line })),
+    catalog: catalog.map((p) => ({ id: p.id, name: p.name, stat: p.stat, kind: p.kind, line: p.line, ...(p.foil ? { foil: true as const } : {}), ...(p.count && p.count > 1 ? { count: p.count } : {}) })),
   };
 }
 

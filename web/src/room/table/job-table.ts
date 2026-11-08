@@ -4,7 +4,7 @@
  * choice to roll it with the card (and PUSH, if it's on). STEADY / TAKE IT, the getaway, the cover cards, WALK /
  * PRESS ON and the debrief deal here too. Story quests stay on the quest panel.
  */
-import { CARRY_ON, deckNotes, EFFECT_NAMES, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE, tradeRefusal, type Effect, type Pool, type Position, type PushMode, type Trade } from '../../../../shared/dice';
+import { CARRY_ON, deckNotes, EFFECT_NAMES, POOL_MAX, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE, tradeRefusal, type Effect, type Pool, type Position, type PushMode, type Trade } from '../../../../shared/dice';
 import type { Debrief, ProgramPreview, QuestState } from '../../../../shared/types';
 import { debriefEl } from '../debrief';
 import { landedTray, settleParked } from '../check-anim';
@@ -72,6 +72,8 @@ export function tipsFor(a: Active): TipId[] {
     ...(a.getaway ? (['getaway'] as const) : []),
     'job',
     ...(checked ? (['roll', 'position'] as const) : []),
+    // A miss here blows the job (the header's or a card's flag): the first time, what that means. GET OUT has its own.
+    ...(!a.getaway && a.choices.some((c) => c.blows) ? (['blows'] as const) : []),
     ...(effect ? (['effect'] as const) : []),
     ...(a.take ? (['take'] as const) : []),
     'alarm',
@@ -188,6 +190,12 @@ const poolText = (p: NonNullable<Choice['pool']>) => {
   return [`${p.stat} ${base > 0 ? '●'.repeat(base) : '0D'}${parts}`, POSITION_NAMES[p.position], ...(p.effect ? [EFFECT_NAMES[p.effect]] : []), ...deckNotes(p)].join(' · ');
 };
 
+/** Every rolled card on this beat blows the job on a miss (a crack's lockout): the header says so once. */
+export function allBlow(a: Active): boolean {
+  const rolled = a.choices.filter((c) => c.pool || c.crack);
+  return rolled.length > 0 && rolled.every((c) => c.blows);
+}
+
 const POS_WORD = { dark: 'DARK', open: 'OPEN', wire: 'WIRE' } as const;
 
 /** The programs marked on a card (programs spec §2.1), and the effect the server previews for a pool that shows none. */
@@ -220,7 +228,10 @@ function cardState(pool: NonNullable<Choice['pool']>, lifted: string | null, pla
   const effect = on.effect ?? stepEffect(mod.prog?.from, on.ran.filter((x) => x.kind === 'effect').length, true);
   const lacquer = on.ran.reduce((n, x) => n + x.alarm, 0);
   const nerve = on.ran.filter((x) => x.load).length * HOT_LOAD_NERVE;
-  return { play, why, pos, tier, effect, lacquer, nerve, on };
+  // A foil's die (owned programs), up to the pool's cap.
+  const rolls = play?.dice ?? pool.dice;
+  const foil = Math.max(0, Math.min(POOL_MAX - rolls, on.ran.filter((x) => x.foil).length));
+  return { play, why, pos, tier, effect, lacquer, nerve, on, foil, dice: rolls + foil };
 }
 
 /**
@@ -233,7 +244,7 @@ function cardState(pool: NonNullable<Choice['pool']>, lifted: string | null, pla
  */
 function callFace(f: HTMLElement, pool: NonNullable<Choice['pool']>, lifted: string | null, play0: Side | undefined, mod: { trade: Trade | null; push: PushMode | null; prog?: ProgMod } = { trade: null, push: null }): HTMLElement {
   const base = pool.base ?? Math.max(0, pool.dice - pool.parts.reduce((n, x) => n + x.dice, 0));
-  const { play, why, pos, tier, effect, lacquer, nerve } = cardState(pool, lifted, play0, mod);
+  const { play, why, pos, tier, effect, lacquer, nerve, foil, dice } = cardState(pool, lifted, play0, mod);
   f.classList.add('tb-call');
   f.classList.toggle('none', (Boolean(lifted) && !play) || why !== null);
   f.dataset.pos = pos;
@@ -253,7 +264,8 @@ function callFace(f: HTMLElement, pool: NonNullable<Choice['pool']>, lifted: str
   const more = play ? play.dice - pool.dice : 0;
   if (more > 0) tray.append(cells(more, 'k-people lift'));
   if (more < 0) tray.append(cells(-more, 'minus'));
-  const sum = el('span', 'tb-sum', String(play?.dice ?? pool.dice));
+  if (foil > 0) tray.append(cells(foil, 'k-pocket lift'));
+  const sum = el('span', 'tb-sum', String(dice));
   sum.append(el('small', '', 'D'));
   tray.append(sum);
   const foot = el('span', 'tb-foot');
@@ -532,7 +544,8 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     const kind = (p: string) => kinds.find((x) => x.id === p)?.kind;
     const previews = on.map((p) => previewsOn(c)![p] as Exclude<ProgramPreview, { why: string }>);
     const name = (p: string) => kinds.find((x) => x.id === p)?.name;
-    return { on: on.map((p, i) => ({ name: name(p), kind: kind(p)!, ...(previews[i].tier ? { tier: previews[i].tier } : {}), alarm: previews[i].alarm, load: progLoad.includes(p) })), from: previews.find((x) => x.effect)?.effect };
+    const foil = (p: string) => kinds.find((x) => x.id === p)?.foil;
+    return { on: on.map((p, i) => ({ name: name(p), kind: kind(p)!, ...(previews[i].tier ? { tier: previews[i].tier } : {}), alarm: previews[i].alarm, load: progLoad.includes(p), ...(foil(p) ? { foil: true as const } : {}) })), from: previews.find((x) => x.effect)?.effect };
   };
 
   /** What the rail and the marked programs do to a choice's card. */
@@ -582,7 +595,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     const s = cardState(c.pool, lifted, play0, mod);
     const caller = a.hand?.people.find((p) => p.id === lifted)?.name.split(' ')[0].toUpperCase() ?? 'CALL';
     const extra = [...(play0 && play0.dice > c.pool.dice ? [caller] : []), ...(mod.push === 'dice' && !s.why && (play0 || !lifted) ? ['PUSH'] : [])];
-    return choiceInfo({ pool: c.pool, state: { dice: s.play?.dice ?? c.pool.dice, position: s.pos, effect: s.effect, tier: s.tier, lacquer: s.lacquer, nerve: s.nerve, ran: s.on.ran.flatMap((x) => (x.name ? [x.name] : [])), extra, why: s.why ?? (lifted && !play0 ? 'NO CARD HERE' : null) }, ...(a.tier ? { tierOf: a.tier } : {}), ...(c.alarm ? { route: c.alarm } : {}), ...(c.red ? { red: true } : {}) });
+    return choiceInfo({ pool: c.pool, state: { dice: s.dice, position: s.pos, effect: s.effect, tier: s.tier, lacquer: s.lacquer, nerve: s.nerve, ran: s.on.ran.flatMap((x) => (x.name ? [x.name] : [])), extra, why: s.why ?? (lifted && !play0 ? 'NO CARD HERE' : null) }, ...(a.tier ? { tierOf: a.tier } : {}), ...(c.alarm ? { route: c.alarm } : {}), ...(c.red ? { red: true } : {}), ...(c.blows ? { blows: true } : {}) });
   };
   const info = mountCardInfo(shell.root, infoOf);
 
@@ -616,6 +629,8 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     if (c.alarm) body.querySelector('.tb-flags')?.prepend(el('span', 'tb-tag route', `ALARM +${c.alarm}`));
     const flags = body.querySelector<HTMLElement>('.tb-flags')!;
     if (c.red) flags.append(el('span', 'tb-flag red', 'ONE SHOT'));
+    // Only some cards here blow the job on a miss: those say so. When all do, the header does (allBlow).
+    if (c.blows && !allBlow(a)) flags.append(el('span', 'tb-flag red blows', c.crack ? 'LOCKOUT BLOWS IT' : 'MISS BLOWS IT'));
     if (c.crack) flags.append(el('span', 'tb-flag', `CRACK · ${c.crack.length} LETTERS · ${c.crack.tries} TRIES`));
     if (!flags.childElementCount) flags.remove();
     if (lit?.choice === c.id) {
@@ -821,7 +836,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       box.append(row);
       return box;
     }
-    // The approach's own cost is the only first pick (approach shapes spec §1).
+    // The approach's own cost is the only first pick while FORCED_FIRST holds (approach shapes spec §1).
     const forced = c.dealt.some((d) => d.first);
     for (const d of c.dealt) {
       const card = costCard(d);
@@ -857,6 +872,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     if (a.choices.some((c) => c.id === '!burner' || c.id === '!fall-guy')) head.append(el('span', 'tb-flag red', 'BLOWN'));
     if (a.push) head.append(el('span', 'tb-flag', `PRESS ON?${a.push.pot > 0 ? ` · POT +${a.push.pot} SOL` : ''}`));
     if (a.getaway) head.append(el('span', 'tb-flag red', 'GET OUT'));
+    else if (allBlow(a)) head.append(el('span', 'tb-flag red blows', 'A MISS BLOWS IT'));
     // HEAT in the job's district, the pay range, a push's pot (the table spec §4).
     strip.replaceChildren(
       el('span', 'tb-heat', `HEAT ${a.heat ?? 0}`),

@@ -6,7 +6,8 @@ import { openDb } from '../src/db';
 import { loadQuestBook } from '../src/quests';
 import { loadCrewBook } from '../src/crew-book-load';
 import { GUEST_ABILITIES } from '../../shared/contract';
-import { chooseVariant, parseQuestFile } from '../../shared/quests';
+import { chooseVariant, parseQuestFile, type Choice } from '../../shared/quests';
+import { offTemplate, rolledBeats } from '../../shared/job-template';
 import type { LeadEntry } from '../../shared/leads';
 import { CONTRACT } from '../../shared/quests.contract.fixture';
 import { TRAIL } from '../../shared/quests.fixture';
@@ -151,19 +152,88 @@ describe('lead openings', () => {
     expect(rig(text)).toBeDefined();
     expect(rig(text)).toBe(rig(fs.readFileSync('world/quests/run-sheet.md', 'utf8')));
   });
-  it("Found is Hicks's, with Ember on his ear", () => {
-    const { text } = opening('found', { lead: 'hicks', contact: 'ember', starts: 'zhou-flat', rooms: ['karasu/dead-blocks', 'karasu/sixth-floor'], recruit: { spec: 'ears', grade: 0 } });
+  it("The Passenger is Hicks's, with Ember on his ear", () => {
+    const { text } = opening('the-passenger', { lead: 'hicks', contact: 'ember', starts: 'zhou-flat', rooms: ['karasu/ripper-clinic', 'karasu/dead-blocks', 'karasu/sixth-floor'], recruit: { spec: 'ears', grade: 0 } });
     // Wren stays closed (his identity): the job names that he runs alone, never the breakup.
     expect(text).not.toMatch(/breakup|broke up/i);
   });
   // A getaway's outcomes must end the job, so a mark that holds however it goes is set on its cards.
   const getawaySets = (id: string) => read(id).entry.beats.get('getaway')![0]!.choices.map((c) => c.tags.flatMap((t) => (t.kind === 'set' ? [`${t.name}=${t.value}`] : [])));
-  it('a getaway out of Found leaves Pell on the list, and one out of Signed leaves the sparkle in the log', () => {
-    for (const sets of getawaySets('found')) expect(sets).toContain('pell=listed');
+  it('Found is gone: The Passenger replaced it (2026-11-08)', () => {
+    expect(fs.existsSync('world/quests/found.md')).toBe(false);
+  });
+  it('a getaway out of The Passenger leaves Noa seen, and one out of Signed leaves the sparkle in the log', () => {
+    for (const sets of getawaySets('the-passenger')) expect(sets).toEqual(expect.arrayContaining(['passenger_one=yes', 'noa=seen']));
     for (const sets of getawaySets('signed')) expect(sets).toContain('spark=left');
   });
   it("Signed is Ember's, with Hicks on her ear", () => {
     opening('signed', { lead: 'ember', contact: 'hicks', starts: 'the-tilt', rooms: ['velvet/under-the-cat'], recruit: { spec: 'face', grade: 0, sex: 'man' } });
+  });
+});
+
+describe("The Passenger, Hicks's arc (spec 2026-11-08)", () => {
+  const read = (id: string) => {
+    const r = parseQuestFile(id, fs.readFileSync(`world/quests/${id}.md`, 'utf8'), { roster: null, places: null });
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    return r.entry;
+  };
+  const sets = (e: ReturnType<typeof read>) => [
+    ...[...e.beats.values()].flat().flatMap((b) => b.choices.flatMap((c) => c.tags.flatMap((t) => (t.kind === 'set' ? [`${t.name}=${t.value}`] : [])))),
+  ];
+  const needsNoa = (c: Choice) => c.tags.some((t) => t.kind === 'needs' && t.all.some((x) => x.kind === 'flag' && x.name === 'guest.noa'));
+  /** An act after the opening: Hicks's, with Ember, after the last act's flag, Noa on a foil card, every beat whole without her. */
+  const act = (id: string, o: { after: string; sets: string }) => {
+    const e = read(id);
+    expect([e.kind, e.tier, e.for, e.with, e.once, e.template]).toEqual(['mission', 1, 'hicks', ['ember'], true, true]);
+    expect(JSON.stringify(e.after)).toContain(o.after);
+    expect(e.guest).toEqual({ id: 'noa', grade: 0 });
+    const beats = [...e.beats.values()].flat();
+    for (const b of beats) expect(b.views.map((v) => v.contact), `${b.id} has a view for ember`).toContain('ember');
+    const rolled = rolledBeats(e).map((r) => r.beat);
+    expect(rolled.filter((b) => b.choices.some(needsNoa)).length).toBeGreaterThanOrEqual(2);
+    for (const b of rolled) expect(b.choices.filter((c) => c.check && !needsNoa(c)).length, `${b.id} stands without her`).toBe(2);
+    for (const b of rolled) for (const c of b.choices.filter(needsNoa)) expect(c.check?.angle, `${b.id}/${c.id} is an angle`).toBe(true);
+    expect(sets(e)).toContain(o.sets);
+    expect(offTemplate(e)).toEqual([]);
+    for (const b of beats) if (b.room) expect(fs.existsSync(`scenes/${b.room}/scene.json`)).toBe(true);
+    return e;
+  };
+  it('Off Script follows The Passenger, with Noa on a foil card', () => {
+    act('off-script', { after: 'passenger_one', sets: 'passenger_two=yes' });
+  });
+  const cardSets = (e: ReturnType<typeof read>, beat: string) => e.beats.get(beat)![0].choices.map((c) => ({ id: c.id, needs: c.tags.flatMap((t) => (t.kind === 'needs' ? t.all.map((x) => (x.kind === 'flag' ? `${x.name}${x.op}${x.value}` : x.kind)) : [])), sets: c.tags.flatMap((t) => (t.kind === 'set' ? [`${t.name}=${t.value}`] : [])) }));
+  it('Off Script marks the edit only when it came home (final review I1)', () => {
+    const e = read('off-script');
+    for (const c of cardSets(e, 'home')) expect(c.sets).toContain('script=yes');
+    for (const c of cardSets(e, 'burned')) expect(c.sets).not.toContain('script=yes');
+  });
+  it("Check-In's ferry speaks of the edit only when there is one (final review I1)", () => {
+    const e = read('check-in');
+    const home = cardSets(e, 'home');
+    expect(home.filter((c) => c.sets.includes('passenger=ran')).map((c) => c.needs)).toEqual([['script=yes'], ['script!=yes']]);
+    const dry = e.beats.get('home')![0].choices.find((c) => c.tags.some((t) => t.kind === 'needs' && t.all.some((x) => x.kind === 'flag' && x.op === '!=')))!;
+    const out = e.outcomes.get(dry.to)!;
+    expect(`${out.text} ${dry.line} ${(out.effects.settles ?? []).map((x) => x.text).join(' ')}`).not.toMatch(/script|edit/i);
+    expect(e.outcomes.get('loose')!.text).not.toMatch(/script|edit/i);
+  });
+  it('a getaway with Noa marks her seen (final review I2)', () => {
+    const off = cardSets(read('off-script'), 'getaway');
+    expect(off.filter((c) => c.needs.includes('guest.noa=yes')).every((c) => c.sets.includes('noa=seen'))).toBe(true);
+    expect(off.filter((c) => c.needs.includes('guest.noa!=yes')).every((c) => !c.sets.includes('noa=seen'))).toBe(true);
+    expect(off.some((c) => c.needs.includes('guest.noa=yes'))).toBe(true);
+    // In Check-In she's in every beat, card or no card.
+    for (const c of cardSets(read('check-in'), 'getaway')) expect(c.sets).toContain('noa=seen');
+  });
+  it('Check-In follows Off Script and ends the hunt three ways', () => {
+    const e = act('check-in', { after: 'passenger_two', sets: 'passenger=hidden' });
+    expect(sets(e)).toEqual(expect.arrayContaining(['passenger=sold', 'passenger=hidden', 'passenger=ran', 'switchboard=burned']));
+    const hand = e.beats.get('choice')![0].choices.find((c) => c.id === 'hand')!;
+    const handed = e.outcomes.get(hand.to)!;
+    expect([handed.to, handed.effects.payKind]).toEqual(['end', 'full']);
+    expect(handed.effects.settles?.map((x) => x.who)).toEqual(['ember']);
+    // The choice is no roll, and only the relay is rolled after it: the deliver path is two rolled beats, the bury path three.
+    expect(e.beats.get('choice')![0].choices.every((c) => !c.check)).toBe(true);
+    expect(rolledBeats(e).map((r) => r.id)).toEqual(['out', 'meet', 'relay']);
   });
 });
 

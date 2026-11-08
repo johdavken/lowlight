@@ -92,6 +92,42 @@ test('SETUP and the table: a guest is a foil card, with her bust and GUEST', asy
   expect((await pic.screenshot({ path: 'test-results/guest-foil-b.png' })).equals(first)).toBe(false);
 });
 
+test('SETUP: a guest with no bust is a foil card with a crew face and her line', async ({ page }) => {
+  // A guest file's guest (The Passenger spec, engine §2) before her art exists: no `art`, a line as a trait.
+  const guest = { id: 'guest-noa', name: 'Noa Vey', spec: 'runner', grade: 0, toNext: 0, face: null, traits: [{ label: 'Dark Cart', good: false }], guest: true, abilities: ['CLEAN EXIT'] };
+  await page.routeWebSocket(/\/ws|\/socket|\/api/, (ws) => {
+    const server = ws.connectToServer();
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => {
+      if (typeof m !== 'string' || !m.includes('"quest_state"')) return ws.send(m);
+      const e = JSON.parse(m) as { state: { open: { setup?: { crew: unknown[] } }[] } };
+      for (const q of e.state.open) q.setup?.crew.push(guest);
+      ws.send(JSON.stringify(e));
+    });
+  });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await skipSplash(page);
+  await enter(page);
+  if ((await scene(page).textContent()) !== 'LOWLIGHT INTAKE') {
+    await send(page, { type: 'dev_action', tool: 'go_to', args: { id: 'lowlight-intake', transition: 'fade' } });
+    await expect(scene(page)).toHaveText('LOWLIGHT INTAKE', { timeout: 10_000 });
+    await enter(page);
+  }
+  await page.locator('.hud-quest').click();
+  await page.locator('.ql-row.ql-job').first().click();
+  await page.locator('.ql-file .ql-start').click();
+  const foil = page.locator('.tb-setup .tb-foil');
+  await expect(foil).toHaveCount(1);
+  await expect(foil.locator('.tbc-note').first()).toHaveText('GUEST');
+  await expect(foil.locator('.tbc-name')).toHaveText('NOA');
+  await expect(foil.locator('.tbc-tr.bad')).toHaveText('− DARK CART');
+  // No bust: no broken picture, a face in its place.
+  const broken = await foil.locator('img').evaluateAll((imgs) => imgs.filter((i) => (i as HTMLImageElement).complete && (i as HTMLImageElement).naturalWidth === 0).length);
+  expect(broken).toBe(0);
+  await expect(foil.locator('.tbc-pic .tbc-face')).toHaveCount(1);
+  await page.screenshot({ path: 'test-results/guest-foil-no-bust.png' });
+});
+
 test('a beat with a song takes the music over the table, and hands it back', async ({ page }) => {
   // A beat's own track: it's never a room's song, so the room can't be what's heard.
   const song = ((await (await page.request.get('/api/songs')).json()) as { beats: { title: string; url: string }[] }).beats[0];

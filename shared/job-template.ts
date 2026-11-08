@@ -5,7 +5,7 @@
  */
 import { jobTakeSize } from './dice';
 import { APPROACH_STATS, APPROACHES } from './hand';
-import type { Beat, QuestEntry } from './quests';
+import type { Beat, Choice, QuestEntry } from './quests';
 import type { StatKey } from './stats';
 
 /** Each tier's shape: rolled beats, TAKE, and the check number on each rolled beat, in order. */
@@ -20,6 +20,13 @@ const CARDS = 2;
 const rolledOn = (b: Beat) => b.choices.filter((c) => c.check || c.crack);
 
 /** The beats a run must roll through, in file order: each beat's plain variant (its last), not a getaway or a push beat. */
+/** A card whose miss (a crack's lockout) blows the job: its fail outcome is blown or takes nothing. The table marks it. */
+export function blowsOnMiss(q: QuestEntry, c: Choice): boolean {
+  if (!c.fail) return false;
+  const e = q.outcomes.get(c.fail)?.effects;
+  return e?.blown === true || e?.take === 'none';
+}
+
 export function rolledBeats(q: QuestEntry): { id: string; beat: Beat }[] {
   return [...q.beats].flatMap(([id, variants]) => {
     const beat = variants.at(-1)!;
@@ -56,11 +63,7 @@ export function offTemplate(q: QuestEntry): string[] {
       if (c.check && t.checks[i] !== undefined && c.check.base !== t.checks[i]) out.push(`beat ${id}: check ${c.check.base}, tier ${q.tier} wants ${t.checks[i]}`);
       if (c.tags.some((x) => x.kind === 'effect')) out.push(`beat ${id}: an effect tag`);
     }
-    const blows = cards.some((c) => {
-      const e = c.fail ? q.outcomes.get(c.fail)?.effects : undefined;
-      return e?.blown === true || e?.take === 'none';
-    });
-    if (blows) blowUps.push(id);
+    if (cards.some((c) => blowsOnMiss(q, c))) blowUps.push(id);
   });
   if (blowUps.length > 1) out.push(`${blowUps.length} blow-ups, wants one at most`);
   if (blowUps.length > 0 && blowUps.at(-1) !== beats.at(-1)?.id) out.push(`a blow-up before the last beat (${blowUps.at(-1)})`);
@@ -83,10 +86,7 @@ export function blowUpSpread(jobs: QuestEntry[]): { tier: number; stat: StatKey;
     for (const [id, variants] of q.beats) {
       if (/^push-/.test(id)) continue;
       const cards = variants.flatMap((v) => v.choices);
-      const blows = cards.some((c) => {
-        const e = c.check && c.fail ? q.outcomes.get(c.fail)?.effects : undefined;
-        return e?.blown === true || e?.take === 'none';
-      });
+      const blows = cards.some((c) => c.check !== undefined && blowsOnMiss(q, c));
       if (blows) tiers.set(q.tier, [...(tiers.get(q.tier) ?? []), [...new Set(cards.flatMap((c) => (c.check ? [c.check.stat] : [])))]]);
     }
   }

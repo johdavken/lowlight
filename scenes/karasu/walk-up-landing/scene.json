@@ -367,5 +367,6 @@
       "every": 60,
       "strength": 0.6
     }
-  ]
+  ],
+  "entry": true
 }

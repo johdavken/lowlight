@@ -134,6 +134,6 @@ describe('main.ts wires the doors (clickable doors spec §3)', () => {
   it('doors wait while a file card or the quest list is open, as for the other panels', () => {
     const main = readFileSync(path.resolve('web/src/main.ts'), 'utf8');
     const blocked = main.match(/new DoorLayer\([\s\S]*?blocked: \(\) => ([^\n]+)/)![1]!;
-    for (const open of ['chromeOpen', 'map.isOpen', 'whosHere.cardOpen', 'questList.isOpen', 'dice.open', 'gigWindow !== null']) expect(blocked).toContain(open);
+    for (const open of ['chromeOpen', 'map.isOpen', 'whosHere.cardOpen', 'questList.isOpen', 'dice.open', 'gigOpen()']) expect(blocked).toContain(open);
   });
 });

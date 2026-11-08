@@ -53,7 +53,7 @@ the model you give them, keeps their own hours and remembers you between nights.
   remembers the day's texts, and the texts remember the scene. Open `/deck` in the browser, or on your phone:
   1. Run from source, with [Tailscale](https://tailscale.com) on your PC and phone.
   2. Put your PC's tailnet name in `.env` (`NIX_ROOM_ALLOWED_HOSTS=<your-pc>.<tailnet>.ts.net`) and restart
-     `npm run dev`.
+     the game.
   3. Run `tailscale serve --bg http://localhost:5173`, then open `https://<your-pc>.<tailnet>.ts.net/deck` on
      the phone and add it to your home screen.
 
@@ -220,15 +220,18 @@ when it comes up, and there's liar's dice at the Low Roller.
 
 ## Run it from source
 
-You need Node.js 24 or newer and an OpenRouter key.
+You need Node.js 24 or newer, Git and an OpenRouter key.
 
 ```bash
+git clone https://github.com/johdavken/lowlight.git
+cd lowlight
 npm ci
-npm run dev
+npm run play
 ```
 
 Open http://localhost:5173, pick who you play and who you call, and enter your key on the select
-screen. [docs/BUILDING.md](docs/BUILDING.md) covers the desktop app, the city map's tiles, the tests and
+screen. When this repo has something new, UPDATE shows on the title screen: press it and the game closes,
+updates and opens again in the same tab. [docs/BUILDING.md](docs/BUILDING.md) covers the desktop app, the city map's tiles, the tests and
 where your saves live.
 
 ### On Windows
@@ -256,13 +259,14 @@ The [itch.io build](https://lowlightgame.itch.io/lowlight) needs none of this. T
 3. Start it, then open http://localhost:5173 in your browser:
 
    ```powershell
-   npm run dev
+   npm run play
    ```
 
-   Leave that window open while you play; Ctrl+C stops the game. Next time, `cd lowlight` and `npm run dev`
+   Leave that window open while you play; Ctrl+C stops the game. Next time, `cd lowlight` and `npm run play`
    again. Your saves stay in the `data` folder inside `lowlight`.
 
-To update, run `git pull` and then `npm ci` in the same folder.
+To update, press UPDATE on the title screen when it shows. Or close the game, then run `git pull` and `npm ci`
+in the same folder.
 
 If PowerShell says *running scripts is disabled on this system* when you type `npm`, use Command Prompt
 instead, or type `npm.cmd` in place of `npm`.

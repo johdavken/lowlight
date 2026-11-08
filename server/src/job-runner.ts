@@ -20,7 +20,7 @@ import { NO_LINK_NOTICE } from './turn';
 import { MISSION_OPEN, MISSION_CLOSE } from './instructions';
 import { hhmmOf, START, TURN_COST } from '../../shared/clock';
 import type { Player } from './players';
-import { beatAt, flagsOf, beatAway, beatText, beatViews, fillHire, heardAt, isJob, ownedBy, postsOpen, mentionsFlag, chooseVariant, fillTimes, holds, openQuests, pickLine, stepMinutes, type CrackPick, questWaitBlock, startWait, waitDue, waitLine, type Outcome, type RunWait, questBlock, questKey, shownChoices, type Beat, type CondCtx, type QuestEntry, type QuestRun, type QuestStatus } from '../../shared/quests';
+import { beatAt, flagsOf, beatAway, beatText, beatViews, fillHire, heardAt, isJob, ownedBy, postsOpen, mentionsFlag, chooseVariant, fillTimes, holds, openQuests, pickLine, stepMinutes, type CrackPick, questWaitBlock, startWait, waitDue, waitLine, type Outcome, type RunWait, questBlock, questGuest, questKey, shownChoices, type Beat, type CondCtx, type QuestEntry, type QuestRun, type QuestStatus } from '../../shared/quests';
 import { oneLine } from './persona';
 import { boardBlock, bookId, buildDebrief, clientsBlock, contractBlock, BURNER, coverCards, coveredLoss, crackLine, crackSetup, drawsFor, effectEvent, FALL_GUY, fallGuyFee, jobRunId, missionOpenBlock, missionSummary, payFor, playerKitLine, legacyRollLine, REROLL, rollLine, seedFor, STEADY, TAKE, AFTER, COST, RESIST, ARMOUR } from './mission-run';
 import { COSTS, dealCosts, firstCost, picksFor, resistPrice, RESIST_CHROME_DIE, type CostId } from '../../shared/costs';
@@ -30,16 +30,17 @@ import { HEAT_MAX, heatIn, repDelta, repTier, TIER_NAMES, type Check, type Cover
 import { hashSeed, postedJobs, storyDay } from '../../shared/board';
 import { rng } from '../../shared/rng';
 import { angleFlags, contractRep, guestFlags, GUEST_ABILITIES, guestId, NIGHT_ALARM_MAX, nightAlarm, WALK_AWAY_REP } from '../../shared/contract';
-import { withGuest } from './guest';
+import { guestArt, guestTraits, withGuest } from './guest';
 import { makeTerminal, playTerminal, type TerminalSetup } from '../../shared/crack';
 import { buyEvent, canBuy, fixerKey, itemName, parseFixer } from '../../shared/stock';
 import type { Deck } from '../../shared/gear';
-import { belowTier, FIREWALL, HOT_LOAD_NERVE, jobLeans, programJudge, slotsFor, type Program } from '../../shared/programs';
+import { baseProgramId, belowTier, FIREWALL, foilDrop, HOT_LOAD_NERVE, jobLeans, loadablePrograms, NO_PROGRAMS, programJudge, programOf, slotsFor, type Program } from '../../shared/programs';
 import { DEFAULT_STATS } from '../../shared/stats';
 import { kitLine } from '../../shared/kit-line';
 import { afterEffect, CARRY_ON, rerunRoll, swappedCheck, ALARM_SHIFT, gambleDie, gambleFaces, gambleResult, stepRefusal, crackTake, statDice, ALARM_MAX, effectPushRefusal, fragileDies, kindResult, poolOf, POOL_MAX, PRESS_NERVE, PUSH_NERVE, resultOf, jobTakeSize, tierLine, tradeRefusal, type DiceResult, type Pool, type Effect, type Position, type PushMode, type Trade } from '../../shared/dice';
 import { abilityCard, abilityCardId, abilityNerve, AGAIN_RISK, pressed, CONTACT_BURN, CONTACT_BURN_REASON, contactId, FAVOUR_BURN, FAVOUR_ON_HOLD, hardStartTake, type Setup, MAX_PEOPLE, SPEC_STAT, type Approach, type Call, type CallEffect } from '../../shared/hand';
 import { ceilingOf, settleTake, takeOf } from './take-run';
+import { blowsOnMiss } from '../../shared/job-template';
 import { effectTagOf, isLegacyPending, isOldRun, parseRun as parseRunOf, withGetaway, withSpring, type Choice, type JobHire, type DealtCost, type DicePending, type DiceRoll, type Roll, type SettledCost } from '../../shared/quests';
 import { canOffer, dropTake, heatLeft, lossEvents, nextPushBeat, PRESS, PUSH_BEAT, WALK, walkValue } from './push-run';
 import { actedOn, afterRefusal, alarmPlus, barredOn, bestRep, carriedOn, COVERED, filed, HELD_ALARM, jobOver, nightOpen, nothingToPay, PASS_AFTER, rollFills, scoring, settledAll, stepless, tagsOf, TALKED_DOWN, withTake, type Play } from './job-rules';
@@ -88,10 +89,12 @@ export class JobRunner {
     const qs = this.deps.quests;
     if (!qs) return null;
     // A run at a beat comes before a parked one: a contract's report can come up while another quest waits here.
-    const open = qs.status(player).filter((s) => s.contact === qs.contact && !s.run.done);
+    // A run of a job no longer in the book (a file deleted, like Found in 2026-11) is passed over: nothing could play it.
+    const book = qs.book();
+    const open = qs.status(player).filter((s) => s.contact === qs.contact && !s.run.done && book.some((e) => e.id === bookId(s.id)));
     const status = open.find((s) => s.run.beat !== null) ?? open.find((s) => s.run.wait !== null);
     if (!status) return null;
-    const file = qs.book().find((e) => e.id === bookId(status.id));
+    const file = book.find((e) => e.id === bookId(status.id));
     // A rescue (crew spec §5) plays at its post's place and tier, with its recruit named.
     const found = file && status.run.spring ? withSpring(file, status.run.spring, this.recruitName(status.run.spring.recruit)) : file;
     // On its getaway (the table spec §2): the stock beat when the file has none of its own.
@@ -198,14 +201,14 @@ export class JobRunner {
           const programs = pool && run.setup?.deck && !c.crack ? this.programPreviews(c, rctx, beat, { q, run, player }, pool) : null;
           // The route's own ALARM (a choice's [alarm +n]): it lands on the pick, whatever the dice, so the card says so.
           const routeAlarm = c.tags.reduce((n, t) => n + (t.kind === 'alarm' ? t.delta : 0), 0);
-          return { id: c.id, line: c.line, ...(pool ? { pool } : {}), ...(routeAlarm ? { alarm: routeAlarm } : {}), ...trades, ...(c.check?.red ? { red: true as const } : {}), ...(setup ? { crack: { length: setup.length, tries: setup.tries, take: crackTake(q, rctx.deck ?? null) } } : {}), ...(plays ? { plays } : {}), ...(programs ? { programs } : {}) };
+          return { id: c.id, line: c.line, ...(pool ? { pool } : {}), ...(routeAlarm ? { alarm: routeAlarm } : {}), ...trades, ...(c.check?.red ? { red: true as const } : {}), ...(blowsOnMiss(q, c) ? { blows: true as const } : {}), ...(setup ? { crack: { length: setup.length, tries: setup.tries, take: crackTake(q, rctx.deck ?? null) } } : {}), ...(plays ? { plays } : {}), ...(programs ? { programs } : {}) };
         });
       const hand = isJob(q) ? this.handView(q, run) : null;
       const costs = isJob(q) && run.pending && !isLegacyPending(run.pending) && run.pending.dealt ? this.costsView(q, beat, run, run.pending, rctx, player) : null;
       const job = isJob(q) ? { tier: q.tier, ...(run.push?.state === 'playing' ? { pressing: true as const } : {}), ...(hand ? { hand } : {}), ...(costs ? { costs } : {}), ...(scoring(q, run) ? { take: { filled: takeOf(run, q), size: jobTakeSize(q) } } : {}), ...(run.getaway ? { getaway: true as const } : {}), alarm: run.alarm ?? 0, nerve: { left: kit?.nerveLeft ?? 0, max: kit?.nerveMax ?? 0 }, heat: rctx.heat ?? 0, pay: q.payRange ?? ([0, 0] as [number, number]), ...(run.pending ? { rolled: isLegacyPending(run.pending) ? { choice: run.pending.choice, chance: run.pending.chance, rolls: run.pending.rolls } : { choice: run.pending.choice, faces: run.pending.roll.faces, keep: run.pending.roll.keep, kind: run.pending.roll.kind, cost: run.pending.cost, ...(run.pending.roll.saved ? { saved: true as const } : {}), ...(run.pending.roll.gamble ? { gamble: run.pending.roll.gamble } : {}), ...(run.pending.roll.rerun ? { rerun: true as const } : {}), ...(run.pending.roll.lessTake ? { lessTake: run.pending.roll.lessTake } : {}), ...(run.pending.roll.missTake ? { missTake: true as const } : {}), ...(run.pending.roll.effect ? { effect: run.pending.roll.effect } : {}) } } : {}) } : {};
       return {
         ...none,
-        active: { id: q.id, title: q.title, ...(q.postedBy ? { postedBy: q.postedBy } : {}), beat: beat.id, ...(beat.song && holds(beat.songWhen ?? null, rctx) ? { song: beat.song } : {}), ...(beat.room ? { room: beat.room, ...(run.setup?.guest ? { roomGuest: run.setup.guest.id } : {}) } : {}), ...(beat.onComms ? { comms: true as const } : {}), ...(beat.onLine ? { onLine: beat.onLine } : {}), choices: cards, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...job, ...(Object.keys(cracks).length ? { crack: cracks } : {}), ...(blown ? { blown } : {}) },
+        active: { id: q.id, title: q.title, ...(q.postedBy ? { postedBy: q.postedBy } : {}), beat: beat.id, ...(beat.song && holds(beat.songWhen ?? null, rctx) ? { song: beat.song } : {}), ...(beat.room ? { room: beat.room, ...(run.setup?.guest && run.setup.guest.kind !== 'guest' ? { roomGuest: run.setup.guest.id } : {}) } : {}), ...(beat.onComms ? { comms: true as const } : {}), ...(beat.onLine ? { onLine: beat.onLine } : {}), choices: cards, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...job, ...(Object.keys(cracks).length ? { crack: cracks } : {}), ...(blown ? { blown } : {}) },
       };
     }
     const quests = openQuests(
@@ -265,24 +268,45 @@ export class JobRunner {
       favour: FAVOUR_ON_HOLD,
       crew: [
         ...crew.map((m) => ({ id: m.recruit.id, name: m.recruit.name, spec: m.recruit.spec, grade: m.recruit.grade, toNext: m.toNext, face: m.recruit.face, traits: shownTraits(this.deps.quests, m), abilities: abilityLabels(this.deps.quests, m.slotted) })),
-        ...(guest ? [{ id: guestId(guest.id), name: guest.name, spec: guest.spec, grade: guest.grade, toNext: 0, face: null, traits: [], abilities: abilityLabels(this.deps.quests, guest.abilities), guest: true as const, art: `/contacts/${guest.id}.webp` }] : []),
+        ...(guest ? [{ id: guestId(guest.id), name: guest.name, spec: guest.spec, grade: guest.grade, toNext: 0, face: null, traits: guestTraits(guest), abilities: abilityLabels(this.deps.quests, guest.abilities), guest: true as const, ...((art) => (art ? { art } : {}))(guestArt(guest)) }] : []),
       ],
       contacts: [],
       deck: deck ? { name: deck.name, quality: deck.quality, slots: slotsFor(deck) } : null,
       ...(held && !deck ? { barred: held.name } : {}),
       // What SETUP can load and what the job leans on (programs spec §1.2a).
-      ...(deck ? { programs: (this.deps.quests?.programs?.() ?? []).map((p) => ({ id: p.id, name: p.name, stat: p.stat, kind: p.kind, line: p.line })) } : {}),
+      // Only what you own (owned programs): the starter, buys, and foils held.
+      ...(deck ? { programs: this.programsHeld(player).map((p) => ({ id: p.id, name: p.name, stat: p.stat, kind: p.kind, line: p.line, ...(p.foil ? { foil: true as const } : {}), ...(p.count && p.count > 1 ? { count: p.count } : {}) })) } : {}),
       leans: jobLeans(q),
       ...(q.tier >= 2 ? { tierLine: tierLine(q.tier) } : {}),
     };
   }
 
+  /**
+   * What a player can load (owned programs): owned programs and foils held, then, with a run, whatever it already has
+   * loaded (a foil stays on the run once its copy is used up).
+   */
+  private programsHeld(player: string, run?: QuestRun): Program[] {
+    const catalog = this.deps.quests?.programs?.() ?? [];
+    const list = loadablePrograms(catalog, this.deps.quests?.kit?.(player)?.programs ?? NO_PROGRAMS);
+    for (const l of run?.programs ?? []) {
+      const p = list.some((x) => x.id === l.id) ? undefined : programOf(catalog, l.id);
+      if (p) list.push(p);
+    }
+    return list;
+  }
+
   /** A contract's guest as they'd go in (guest crew spec §2): the card the lead earned, with its grade and abilities. Null: no guest, no card, or none for that trade. */
   private guestFor(q: QuestEntry): NonNullable<Setup['guest']> | null {
-    const g = q.contract?.guest;
-    const card = g && this.deps.quests?.contactCards?.().find((c) => c.id === g.id);
-    const abilities = card && GUEST_ABILITIES[card.spec];
-    return g && card && abilities ? { ...card, grade: g.grade, abilities } : null;
+    const g = questGuest(q);
+    if (!g) return null;
+    // A contact's card first; then a guest file (The Passenger spec, engine §2), who has no figure and no standing.
+    const card = this.deps.quests?.contactCards?.().find((c) => c.id === g.id);
+    const file = card ? undefined : this.deps.quests?.guestCards?.().find((c) => c.id === g.id);
+    const who = card ?? file;
+    const abilities = who && GUEST_ABILITIES[who.spec];
+    if (!who || !abilities) return null;
+    const base = { id: who.id, name: who.name, accent: who.accent, portrait: who.portrait, spec: who.spec, grade: g.grade, abilities };
+    return file ? { ...base, kind: 'guest', ...(file.art ? { art: file.art } : {}), ...(file.line ? { line: file.line } : {}) } : base;
   }
 
   /** The fixer's stock where you stand, with what you can buy (small jobs spec §5); null away from a board with stock. */
@@ -299,14 +323,17 @@ export class JobRunner {
       items: items.map((item) => {
         // A deck's numbers for its shelf card (deck effects spec §3).
         const deck = item.kind === 'deck' ? decks.find((d) => d.id === item.id) : undefined;
+        // A program's stat, kind and card line (owned programs).
+        const prog = item.kind === 'program' ? (qs.programs?.() ?? []).find((p) => p.id === item.id) : undefined;
         return {
           id: item.id,
-          name: itemName(item, decks),
+          name: itemName(item, decks, qs.programs?.() ?? []),
           kind: item.kind,
           price: item.price,
           tier: item.tier,
           ...(deck ? { quality: deck.quality, heat: deck.heat, traits: deck.traits } : {}),
-          state: canBuy({ item, sol: kit?.sol ?? 0, tier, owned: kit?.owned ?? [] }),
+          ...(prog ? { stat: prog.stat, programKind: prog.kind, line: prog.line } : {}),
+          state: canBuy({ item, sol: kit?.sol ?? 0, tier, owned: kit?.owned ?? [], programs: kit?.programs?.owned ?? [] }),
         };
       }),
     };
@@ -330,8 +357,8 @@ export class JobRunner {
     if (qs.status(this.host.pid).some((s) => !s.run.done && (s.run.beat !== null || (s.run.wait !== null && !s.run.contract)) && isJob(book.find((q) => q.id === bookId(s.id)) ?? { kind: 'quest' }))) return 'not while a job is in progress';
     const district = qs.districtOf?.(place) ?? 'unknown';
     const kit = qs.kit?.(this.host.pid);
-    const state = canBuy({ item, sol: kit?.sol ?? 0, tier: repTier(kit?.rep[district] ?? 0), owned: kit?.owned ?? [] });
-    const name = itemName(item, qs.decks?.() ?? []);
+    const state = canBuy({ item, sol: kit?.sol ?? 0, tier: repTier(kit?.rep[district] ?? 0), owned: kit?.owned ?? [], programs: kit?.programs?.owned ?? [] });
+    const name = itemName(item, qs.decks?.() ?? [], qs.programs?.() ?? []);
     if (state === 'locked') return `${name} needs ${TIER_NAMES[item.tier - 1]} in ${district}`;
     if (state === 'short') return `${name} costs ${item.price} sol`;
     if (state === 'owned') return `you already have the ${name}`;
@@ -950,21 +977,24 @@ export class JobRunner {
     const runId = mission ? jobRunId(q, day) : q.id;
     const key = questKey(this.host.pair(), runId);
     const draws = mission ? drawsFor(q, key) : {};
+    // A mission's guest brought at SETUP (The Passenger spec, engine §1): on the setup, and its flag for the beats that read it.
+    const want = mission ? questGuest(q) : null;
+    const guest = want && hand?.people.includes(guestId(want.id)) ? (this.guestFor(q) ?? undefined) : undefined;
     // Crew prep on this job tonight (crew spec §2) joins the run's flags beside its draws.
-    const flags = mission ? { ...draws, ...(this.deps.quests?.crewState?.()?.prep[runId] ?? {}) } : {};
+    const flags = mission ? { ...draws, ...(this.deps.quests?.crewState?.()?.prep[runId] ?? {}), ...guestFlags({ guest }) } : {};
     // A contract's offer has an opening for someone the contact already knows (tier 3 contracts spec §5).
     if (q.contract && (this.deps.tie?.(this.host.pid) || this.deps.db.recentMessages(this.host.pid, 200).some((m) => m.mode === 'text' || m.mode === 'encounter' || m.mode === 'quest'))) (flags as Record<string, string>).met = 'yes';
     const pay = mission ? payFor(q, key) : null;
     // HARD goes in loud (the hand spec §1): ALARM 1, and TAKE 1 from tier 2 up (none on tier 1, balancing 2026-11-01).
     const hard = hand?.approach === 'hard';
     // Each brought recruit's loadout as it stands at GO IN (crew abilities plan ruling 4), kept only when someone has one.
-    const members = this.deps.quests?.crewState?.()?.members ?? [];
+    const members = withGuest(this.deps.quests?.crewState?.()?.members ?? [], { guest });
     const loadout = Object.fromEntries((hand?.people ?? []).map((id) => [id, members.find((m) => m.recruit.id === id)?.slotted ?? []]));
     const abilities = Object.values(loadout).some((l) => l.length > 0) ? { abilities: loadout } : {};
     // The deck carried at GO IN and its slots (programs spec §3): no deck stores slots 0, so the run isn't an old one.
     const carried = carriedOn(q, ctx.deck ?? null);
     const deck = { id: carried?.id ?? '', quality: carried?.quality ?? 1, slots: slotsFor(carried) };
-    const job: Partial<QuestRun> = mission ? { draws, alarm: hard ? 1 : 0, day, startDeck: carried?.id ?? null, ...(pay !== null ? { pay } : {}), ...(hand ? { setup: { ...hand, tier: q.tier, ...abilities, at: this.deps.clockNow?.() ?? 0, deck } } : {}), ...(loads.length ? { programs: loads.map((id) => ({ id, at: this.deps.clockNow?.() ?? 0 })) } : {}), ...(hard && hardStartTake(q.tier) > 0 ? { takeFill: hardStartTake(q.tier) } : {}), ...(post ? { spring: { recruit: post.recruit, place: post.place, tier: post.tier } } : {}) } : {};
+    const job: Partial<QuestRun> = mission ? { draws, alarm: hard ? 1 : 0, day, startDeck: carried?.id ?? null, ...(pay !== null ? { pay } : {}), ...(hand ? { setup: { ...hand, tier: q.tier, ...(guest ? { guest } : {}), ...abilities, at: this.deps.clockNow?.() ?? 0, deck } } : {}), ...(loads.length ? { programs: loads.map((id) => ({ id, at: this.deps.clockNow?.() ?? 0 })) } : {}), ...(hard && hardStartTake(q.tier) > 0 ? { takeFill: hardStartTake(q.tier) } : {}), ...(post ? { spring: { recruit: post.recruit, place: post.place, tier: post.tier } } : {}) } : {};
     const rctx = this.runCtx(q, { flags, alarm: job.alarm ?? 0 } as QuestRun, ctx, this.host.pid);
     const chosen = chooseVariant(q, q.first, rctx);
     if (!chosen) return "that job isn't open here";
@@ -989,7 +1019,8 @@ export class JobRunner {
     const results = { ...status.run.contract?.results, ...Object.fromEntries(back) };
     const hard = checked.approach === 'hard';
     const at = this.deps.clockNow?.() ?? 0;
-    const guest = q.contract?.guest && checked.people.includes(guestId(q.contract.guest.id)) ? (this.guestFor(q) ?? undefined) : undefined;
+    const want = questGuest(q);
+    const guest = want && checked.people.includes(guestId(want.id)) ? (this.guestFor(q) ?? undefined) : undefined;
     const members = withGuest(this.deps.quests?.crewState?.()?.members ?? [], { guest });
     const loadout = Object.fromEntries(checked.people.map((id) => [id, members.find((m) => m.recruit.id === id)?.slotted ?? []]));
     const flags = { ...status.run.flags, ...angleFlags(results), ...guestFlags({ guest }) };
@@ -1031,7 +1062,8 @@ export class JobRunner {
     const programs = [...new Set(setup.programs ?? [])];
     if (programs.length > 0) {
       if (!offer.deck) return 'NO DECK';
-      if (programs.some((p) => !offer.programs?.some((x) => x.id === p))) return 'NOT A PROGRAM';
+      // Only what you own (owned programs).
+      if (programs.some((p) => !offer.programs?.some((x) => x.id === p))) return programs.some((p) => !programOf(this.deps.quests?.programs?.() ?? [], p)) ? 'NOT A PROGRAM' : "YOU DON'T HAVE IT";
       if (programs.length > offer.deck.slots) return 'NO FREE SLOT';
     }
     return { approach: setup.approach, people, favour: false, programs };
@@ -1180,6 +1212,9 @@ export class JobRunner {
     // A fragile deck dies on a miss that shows a 1.
     const died = check.grid && deck && deck.traits.includes('fragile') && fragileDies(faces, result) ? deck.name : null;
     if (died) events.push({ at, deck: null, lose: [deck!.id] });
+    // A foil that ran is used up (owned programs): one copy leaves the kit, and its slot reads BURNED.
+    const foils = (pool.programs ?? []).filter((p) => p.foil).map((p) => p.id);
+    for (const id of foils) events.push({ at, program: { id: baseProgramId(id), foil: -1 } });
     // The deck against the job's tier (deck effects spec §1): one that holds takes a 4–5's ALARM, an outclassed one adds to a
     // miss's; a hidden deck's grid check costs no heat (§2).
     const roll: DiceRoll = { stat: pool.stat, dice: Math.max(0, pool.dice), position: pool.position, faces, keep, kind: result.kind, pass: result.pass, ...(push ? { pushed: true as const } : {}), costs: [], ...(pool.deck?.hidden ? { hidden: true as const } : {}), ...(check.grid && deck?.heat && !pool.deck?.hidden ? { deckHeat: deck.heat } : {}), ...(pool.quiet ? { quiet: true as const } : {}), ...(pool.effect && pool.effect !== 'fair' ? { effect: pool.effect } : {}), ...(trade ? { trade } : {}), ...(progs.ran.length ? { programs: progs.ran.map((p) => p.id) } : {}), ...(setupLeft ? { setup: setupLeft } : {}), ...(acts.some((e) => e.missTake) ? { missTake: true as const } : {}) };
@@ -1202,7 +1237,8 @@ export class JobRunner {
     const spent = pushCost + pressCost;
     // The loads go on the run (programs spec §3); a deck that died on this roll runs nothing more.
     const firm = acts.some((e) => e.firm);
-    const run1: QuestRun = progs.load.length || (died && run0.setup?.deck) || firm ? { ...run0, ...(firm ? { firm: true as const } : {}), ...(progs.load.length ? { programs: [...(run0.programs ?? []), ...progs.load.map((id) => ({ id, at, hot: true as const }))] } : {}), ...(died && run0.setup?.deck ? { deckDead: true as const } : {}) } : run0;
+    const loadedNow = progs.load.length || foils.length ? [...(run0.programs ?? []), ...progs.load.map((id) => ({ id, at, hot: true as const }))].map((l) => (foils.includes(l.id) ? { ...l, burned: true as const } : l)) : null;
+    const run1: QuestRun = loadedNow || (died && run0.setup?.deck) || firm ? { ...run0, ...(firm ? { firm: true as const } : {}), ...(loadedNow ? { programs: loadedNow } : {}), ...(died && run0.setup?.deck ? { deckDead: true as const } : {}) } : run0;
     status = run1 === run0 ? status : { ...status, run: run1 };
     if (pick > 0 || this.afterCould(q, { ...run0, calls: [...(run0.calls ?? []), ...played] }, { beat: beat.id, choice: choice.id }, roll, cost, spent, played)) {
       const parked: DicePending = { beat: beat.id, choice: choice.id, at, roll, cost, ...(died ? { died } : {}), ...(call ? { call } : {}), ...(pressCall ? { after: [pressCall] } : {}), ...(dealt.length ? { dealt, pick, settled: [] } : {}) };
@@ -1243,9 +1279,10 @@ export class JobRunner {
     const slots = run.setup?.deck;
     if (!slots || isOldRun(run)) return 'NOT LOADED';
     if (run.deckDead) return 'THE DECK IS DEAD';
-    const catalog = this.deps.quests?.programs?.() ?? [];
+    // Loads from what you own (owned programs); a rerun from what's loaded.
+    const held = this.programsHeld(this.host.pid, run);
     const all = [...load, ...again];
-    if (new Set(all).size !== all.length || all.some((id) => !catalog.some((p) => p.id === id))) return 'NOTHING TO DO HERE';
+    if (new Set(all).size !== all.length || all.some((id) => !held.some((p) => p.id === id))) return 'NOTHING TO DO HERE';
     const loaded = run.programs ?? [];
     if (load.some((id) => loaded.some((l) => l.id === id))) return 'NOTHING TO DO HERE';
     if (loaded.length + load.length > slots.slots) return 'NO FREE SLOT';
@@ -1254,7 +1291,7 @@ export class JobRunner {
     // of the pick already covers (a lift or SAFE into the dark, PUSH or BOLD to BIG) is dropped, not refused: it neither
     // loads nor costs the lacquer's ALARM, and the pick goes through (final review I1).
     const ran: Program[] = [];
-    for (const p of all.map((id) => catalog.find((x) => x.id === id)!)) {
+    for (const p of all.map((id) => held.find((x) => x.id === id)!)) {
       const why = programJudge(p, poolAt, ran, check, deck);
       if (why && !COVERED.has(why)) return why;
       if (!why) ran.push(p);
@@ -1682,11 +1719,13 @@ export class JobRunner {
           return { id: aid, label: a.label, kind: a.job.kind, timing, words: jobWords(a.job), nerve, afford, used, playable };
         }),
       );
-      const guest = setup.guest && id === guestId(setup.guest.id) ? { guest: true as const, art: `/contacts/${setup.guest.id}.webp` } : {};
-      return [{ id, name: r.name, spec: r.spec, grade: r.grade, toNext: m.toNext, face: r.face, traits: shownTraits(this.deps.quests, m), free: callable && !called ? 1 : 0, risk: callable && called && !guest.guest ? AGAIN_RISK[r.grade] : null, down, abilities, ...guest }];
+      const g = setup.guest && id === guestId(setup.guest.id) ? setup.guest : null;
+      const art = g ? guestArt(g) : undefined;
+      const guest = g ? { guest: true as const, ...(art ? { art } : {}) } : {};
+      return [{ id, name: r.name, spec: r.spec, grade: r.grade, toNext: m.toNext, face: r.face, traits: g ? guestTraits(g) : shownTraits(this.deps.quests, m), free: callable && !called ? 1 : 0, risk: callable && called && !g ? AGAIN_RISK[r.grade] : null, down, abilities, ...guest }];
     });
     const contacts = (setup.contacts ?? []).map((c) => ({ ...c, used: calls.some((x) => x.card === `contact:${c.id}`) || setup.fencedBy === `contact:${c.id}` }));
-    return { approach: setup.approach, people, favour: setup.favour ? (calls.some((c) => c.card === 'favour') ? 'used' : 'ready') : null, contacts, ...(setup.deck ? { pockets: pocketsView(this.deps.quests, run, setup.deck) } : {}) };
+    return { approach: setup.approach, people, favour: setup.favour ? (calls.some((c) => c.card === 'favour') ? 'used' : 'ready') : null, contacts, ...(setup.deck ? { pockets: pocketsView(this.deps.quests, run, setup.deck, this.programsHeld(this.host.pid, run)) } : {}) };
   }
 
   /** Each program's pool on a checked choice alone (programs spec §2.1), or why it can't run here; through poolOf as the roll. */
@@ -1695,7 +1734,7 @@ export class JobRunner {
     const swap = call?.stat ?? press?.stat;
     const check = swap ? swappedCheck(c.check!, swap) : c.check!;
     return Object.fromEntries(
-      (this.deps.quests?.programs?.() ?? []).map((p): [string, ProgramPreview] => {
+      this.programsHeld(job.player, job.run).map((p): [string, ProgramPreview] => {
         const why = programJudge(p, (ps) => (ps.length ? poolOf(c.check!, { ...who, programs: ps }) : pool), [], check, ctx.deck ?? null);
         if (why) return [p.id, { why }];
         const after = poolOf(c.check!, { ...who, programs: [p] });
@@ -2037,6 +2076,11 @@ export class JobRunner {
     const cooled = tier === 'messy' ? endAbilities(this.deps.quests, run, 'heat') : [];
     for (let i = 0; i < cooled.length; i++) extra.push({ at, heat: -1, district });
     if (cooled.length && run.setup) run = { ...run, setup: { ...run.setup, ended: [...(run.setup.ended ?? []), ...cooled] } };
+    // A foil drop (owned programs): one end in about seven that isn't blown, seeded by the run, for the stat it leaned on.
+    const catalog = qs?.programs?.() ?? [];
+    // The playthrough's seed too, so another playthrough's same job on the same day draws its own.
+    const found = tier !== 'blown' ? foilDrop(`${qs?.boardSeed?.() ?? ''}|${questKey(this.host.pair(), runId)}`, jobLeans(q), catalog) : null;
+    if (found) extra.push({ at, program: { id: found, foil: 1 } });
     // The crew brought are on the job until now (the hand spec §1).
     const done: QuestRun = { ...run, beat: null, variant: 0, wait: null, done: true, endDay: this.storyDay(), pending: null, pendingCover: null, kit: [...(run.kit ?? []), ...extra, ...retainer], at: Date.now(), ...(run.setup ? { setup: { ...run.setup, endAt: at } } : {}) };
     const preview = trust !== null && trust !== 0 ? (this.deps.trust?.preview(player, trust) ?? null) : null;
@@ -2051,6 +2095,7 @@ export class JobRunner {
     const heatAfter = Math.min(HEAT_MAX, Math.max(0, heatNow + extra.reduce((n, e) => n + (e.heat ?? 0), 0) + crewHeat));
     const debrief = buildDebrief({ q, run: { ...done, kit: [...(run.kit ?? []), ...extra] }, tier, district, before, delta, cover, programs: this.deps.quests?.programs?.() ?? [], deck: deckAt, heat: { after: heatAfter, cooled: cooled.length, crew: crewHeat }, ...(trustLine !== undefined ? { trust: trustLine } : {}), ...(moved ? { trustMoved: moved } : {}) });
     if (cut > 0) debrief.cut = { name: qs!.contactName(qs!.contact), pct: deal!.a.cut, amount: cut };
+    if (found) debrief.found = catalog.find((p) => p.id === found)?.name ?? found;
     if (q.drops && tier !== 'blown') debrief.loot = { label: q.drops.toUpperCase(), ...((qs?.crewState?.()?.stash?.length ?? 0) >= STASH_MAX ? { lost: true as const } : {}) };
     const crew = debriefCrew(this.deps.quests, run, questKey(this.host.pair(), runId));
     if (crew.length) {

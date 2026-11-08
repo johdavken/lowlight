@@ -70,6 +70,11 @@ describe('a program and a slot', () => {
     expect(programInfo(p, { tier: 2, quality: 2 })).toEqual({ title: 'SOLVENT', lines: ['Strips the lacquer back a layer.', 'On TECH: a step out of danger.', 'Lifts the tier cut on any roll it runs on.'] });
     expect(programInfo(p, { tier: 2, quality: 1 }).lines).toContain('Below the job’s tier: each run costs ALARM +1, and it lifts no cut.');
   });
+  it('a foil says it runs once with a die more (owned programs)', () => {
+    const f = programInfo({ ...p, foil: true, count: 2 }, {});
+    expect(f.title).toBe('SOLVENT · FOIL');
+    expect(f.lines).toContain("Foil: its one run rolls a die more, then it's gone (you hold 2).");
+  });
   it('SCRUB says what it does', () => expect(programInfo({ ...p, stat: 'any', kind: 'quiet' }, {}).lines).toContain('Any roll: takes 1 off the heat you leave with.'));
   it('lists where it would run here', () => expect(programInfo(p, { plays: ['TECH · DARK · FAIR'] }).lines).toContain('Here: TECH · DARK · FAIR'));
   it('a dead deck or a burned program says so, and lists no plays', () => {

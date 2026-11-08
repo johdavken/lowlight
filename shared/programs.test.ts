@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Deck } from './gear';
 import type { Check } from './mission';
 import { poolOf } from './dice';
-import { belowTier, jobLeans, parsePrograms, programFits, programJudge, programQuality, slotsFor, type Program } from './programs';
+import { asFoil, baseProgramId, belowTier, foilDrop, jobLeans, loadablePrograms, parsePrograms, programFits, programJudge, programQuality, slotsFor, starterPrograms, type Program } from './programs';
 
 const deck = (quality: Deck['quality']): Deck => ({ id: `q${quality}`, name: `Q${quality}`, quality, heat: 0, traits: [] });
 const block = (o: Record<string, string>) => `---\n${Object.entries(o).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n`;
@@ -95,5 +95,60 @@ describe('jobLeans (§1.2a)', () => {
   it('the stats of its checks, most used first, at most three', () => {
     expect(jobLeans({ beats: new Map([['a', [beat('cool', 'tech', null)]], ['b', [beat('tech', 'wits', 'body')]]]) })).toEqual(['tech', 'cool', 'wits']);
     expect(jobLeans({ beats: new Map([['a', [beat(null)]]]) })).toEqual([]);
+  });
+});
+
+describe('owned programs (owned programs plan)', () => {
+  const catalog = parsePrograms(fs.readFileSync('world/gear/programs.md', 'utf8')).programs;
+  const stats = (o: Partial<Record<'body' | 'reflex' | 'tech' | 'cool' | 'wits' | 'edge', number>>) => ({ body: 3, reflex: 3, tech: 3, cool: 3, wits: 3, edge: 3, ...o });
+
+  it('the starter is FIREWALL and the program for the highest stat, ties broken tech, cool, wits, reflex, body', () => {
+    expect(starterPrograms(stats({ tech: 7, cool: 7 }), catalog)).toEqual(['firewall', 'solvent']);
+    expect(starterPrograms(stats({ cool: 7, wits: 7 }), catalog)).toEqual(['firewall', 'voicebox']);
+    expect(starterPrograms(stats({}), catalog)).toEqual(['firewall', 'solvent']);
+    expect(starterPrograms(stats({ body: 8, edge: 9 }), catalog)).toEqual(['firewall', 'spike']);
+    expect(starterPrograms(stats({ reflex: 6 }), catalog)).toEqual(['firewall', 'skeleton-key']);
+    expect(starterPrograms(stats({ wits: 6 }), catalog)).toEqual(['firewall', 'sniffer']);
+  });
+
+  it('the loadable list: owned in catalog order, then each foil held with its count', () => {
+    const list = loadablePrograms(catalog, { owned: ['solvent', 'firewall'], foil: { leech: 2, spike: 0 } });
+    expect(list.map((p) => [p.id, p.foil ?? false, p.count ?? 1])).toEqual([
+      ['solvent', false, 1],
+      ['firewall', false, 1],
+      ['foil:leech', true, 2],
+    ]);
+    expect(baseProgramId('foil:leech')).toBe('leech');
+    expect(baseProgramId('leech')).toBe('leech');
+  });
+
+  it('a foil drop is seeded by the run, about 15 %, and follows the job’s lean', () => {
+    const keys = Array.from({ length: 4000 }, (_, i) => `quest.you.job-${i}@3`);
+    const drops = keys.map((k) => foilDrop(k, ['cool', 'tech'], catalog));
+    expect(foilDrop(keys[0], ['cool'], catalog)).toEqual(foilDrop(keys[0], ['cool'], catalog));
+    const rate = drops.filter(Boolean).length / keys.length;
+    expect(rate).toBeGreaterThan(0.13);
+    expect(rate).toBeLessThan(0.17);
+    expect(new Set(drops.filter(Boolean))).toEqual(new Set(['voicebox']));
+    const tech = new Set(keys.map((k) => foilDrop(k, ['tech'], catalog)).filter(Boolean));
+    expect(tech).toEqual(new Set(['solvent', 'leech']));
+    const none = new Set(keys.map((k) => foilDrop(k, [], catalog)).filter(Boolean));
+    expect([...none].every((id) => ['solvent', 'leech', 'skeleton-key', 'voicebox', 'sniffer', 'spike'].includes(id!))).toBe(true);
+  });
+
+  it('a foil runs where its step can’t move the pool, for the die; never on a red card or the wrong stat', () => {
+    const c = (o: Partial<Check> = {}): Check => ({ stat: 'tech', base: 50, grid: false, crew: [], red: false, mods: [], ...o });
+    const solvent = asFoil(catalog.find((p) => p.id === 'solvent')!);
+    expect(solvent).toMatchObject({ id: 'foil:solvent', foil: true, kind: 'position' });
+    expect(programFits(solvent, { position: 'dark', effect: 'fair' }, c(), deck(2))).toBeNull();
+    expect(programFits(asFoil(catalog.find((p) => p.id === 'leech')!), { position: 'open' }, c(), deck(2))).toBeNull();
+    expect(programFits(solvent, { position: 'open', effect: 'fair' }, c({ red: true }), deck(2))).toBe('ONE SHOT');
+    expect(programFits(solvent, { position: 'open', effect: 'fair' }, c({ stat: 'cool' }), deck(2))).toBe('NOTHING TO DO HERE');
+    const who = { stats: stats({ tech: 7 }), deck: deck(2), with: 'x', next: { worse: true as const } };
+    const check = c({ base: 60 });
+    expect(programJudge(solvent, (ps) => poolOf(check, { ...who, programs: ps }), [], check, deck(2))).toBeNull();
+    // At the pool's cap its die is gone: in the dark it does nothing, so it's dropped, not burned.
+    const capped = { ...who, stats: stats({ tech: 10 }), push: 'dice' as const, extra: [1, 2, 3, 4].map((n) => ({ delta: 1, label: `x${n}` })) };
+    expect(programJudge(solvent, (ps) => poolOf(check, { ...capped, programs: ps }), [], check, deck(2))).toBe('ALREADY IN THE DARK');
   });
 });

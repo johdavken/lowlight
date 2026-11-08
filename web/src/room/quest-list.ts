@@ -517,7 +517,8 @@ export function mountQuestList(
       pic.type = 'button';
       pic.setAttribute('aria-pressed', String(item.id === picked));
       const img = el('img');
-      img.src = `/gear/${item.id}.webp`;
+      // A program shows its card's picture (owned programs); gear its shelf picture.
+      img.src = item.kind === 'program' ? `/programs/${item.id}.webp` : `/gear/${item.id}.webp`;
       img.alt = '';
       // No picture for it yet: the panel's hatch.
       img.onerror = () => img.replaceWith(el('span', 'ql-noart'));

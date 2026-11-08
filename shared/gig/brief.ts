@@ -161,6 +161,8 @@ const PAPERS_RESULT: Record<string, (n: number, max: number, name: string) => st
   close: (n, max) => `waved through, but risk hit ${n} of ${max}`,
   back: (_n, _max, name) => `turned back at the booth; ${name} goes back on the boat`,
 };
+/** The result as her context words it (the board's SHE HEARS line). */
+export const papersResultText = (result: 'clean' | 'close' | 'back', n: number, max: number, name: string): string => PAPERS_RESULT[result](n, max, name);
 const unstop = (s: string) => s.replace(/\.$/, '');
 
 function papersText(g: GigSnapshot): string {

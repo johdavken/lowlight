@@ -4,7 +4,7 @@
  * clears what's waiting (unseen tips come back at the next moment that offers them). Seen ever, per viewer, in
  * localStorage; SYS → TIPS turns them off or shows them again. Every number in the text is read from the rules.
  */
-import { DEALT, picksFor } from '../../../../shared/costs';
+import { DEALT, FORCED_FIRST, picksFor } from '../../../../shared/costs';
 import { ALARM_MAX, ALARM_SHIFT, EFFECT_HEAT, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE, type Position } from '../../../../shared/dice';
 import { ABILITY_NERVE, APPROACH_STATS, MAX_PEOPLE, FAVOUR_HEAT, type Approach } from '../../../../shared/hand';
 import { WARY_HEAT } from '../../../../shared/heat';
@@ -12,8 +12,8 @@ import { HEAT_MAX } from '../../../../shared/mission';
 import { HOT_LOAD_NERVE, SLOTS } from '../../../../shared/programs';
 import { el, isPhone } from './el';
 
-export type TipId = 'approach' | 'people' | 'favour' | 'contact' | 'job' | 'roll' | 'position' | 'effect' | 'take' | 'alarm' | 'nerve' | 'call' | 'program' | 'tier' | 'heat' | 'costs' | 'resist' | 'armour' | 'getaway' | 'press' | 'debrief';
-export const TIP_ORDER: readonly TipId[] = ['approach', 'people', 'favour', 'contact', 'job', 'roll', 'position', 'effect', 'take', 'alarm', 'nerve', 'call', 'program', 'tier', 'heat', 'costs', 'resist', 'armour', 'getaway', 'press', 'debrief'];
+export type TipId = 'approach' | 'people' | 'favour' | 'contact' | 'job' | 'roll' | 'position' | 'blows' | 'effect' | 'take' | 'alarm' | 'nerve' | 'call' | 'program' | 'tier' | 'heat' | 'costs' | 'resist' | 'armour' | 'getaway' | 'press' | 'debrief';
+export const TIP_ORDER: readonly TipId[] = ['approach', 'people', 'favour', 'contact', 'job', 'roll', 'position', 'blows', 'effect', 'take', 'alarm', 'nerve', 'call', 'program', 'tier', 'heat', 'costs', 'resist', 'armour', 'getaway', 'press', 'debrief'];
 export const TIPS_KEY = 'nix-room.graft-tips';
 /** How long a deal takes to settle before a callout points into it (0 with reduced motion). */
 export const SETTLE_MS = 600;
@@ -107,6 +107,18 @@ export const TIPS: Record<TipId, Tip> = {
     target: '.tb-card:has(.tb-side-word)',
     below: true,
   },
+  blows: {
+    title: 'A MISS BLOWS IT',
+    gist: 'A miss on this roll ends the job blown: no TAKE, no pay.',
+    rows: [
+      ['EVERY CARD', 'Most often every card here carries it. The choice is what you put into the roll, not which card.'],
+      ['DICE', `You keep the highest, so each die halves the risk: 2 dice miss 1 in ${2 ** 2}, 3 dice 1 in ${2 ** 3}.`],
+      ['IN THE DARK', 'Still blows. Where you stand only changes the costs.'],
+      ['COSTS', "RESIST and FIREWALL can't save it."],
+    ],
+    target: '.tb-flag.blows',
+    below: true,
+  },
   effect: {
     title: 'EFFECT',
     gist: 'How much a pass fills TAKE: SMALL, FAIR or BIG.',
@@ -163,8 +175,10 @@ export const TIPS: Record<TipId, Tip> = {
   },
   program: {
     title: 'PROGRAMS',
-    gist: 'Load programs here, free: they stay loaded for the job.',
+    gist: 'Load programs you own here, free: they stay loaded for the job.',
     rows: [
+      ['YOURS', 'FIREWALL and one for your best stat. Fixers sell the rest.'],
+      ['FOIL', 'A job can drop one: a single run, a die more, then gone.'],
       ['SLOTS', `${SLOTS[1]}, ${SLOTS[2]}, ${SLOTS[3]} or ${SLOTS[4]}, by your deck's quality.`],
       ['MID-JOB', `Loading one costs ${HOT_LOAD_NERVE} NERVE.`],
       ['BELOW TIER', "Below the job's tier the lacquer notices each run: ALARM +1."],
@@ -182,7 +196,7 @@ export const TIPS: Record<TipId, Tip> = {
     gist: 'A costly roll deals what can go wrong. Pick the cost you can live with.',
     rows: [
       ['HOW MANY', 'The more dangerous the spot, the more you pick.'],
-      ['FIRST PICK', 'How you went in decides it, if that cost was dealt.'],
+      ...(FORCED_FIRST ? [['FIRST PICK', 'How you went in decides it, if that cost was dealt.'] as [string, string]] : []),
     ],
     target: '.tb-costs',
   },
@@ -224,7 +238,7 @@ export function tipText(id: TipId): string {
 
 /** The HUD's words in their own colours: ALARM red, TAKE amber, NERVE cyan, HEAT hot (with a number after, if any). */
 const LIT = /\b(ALARM|TAKE|NERVE|HEAT)\b(?: [+−-]?\d+\+?)?/g;
-function litNodes(text: string): Node[] {
+export function litNodes(text: string): Node[] {
   const out: Node[] = [];
   let at = 0;
   for (const m of text.matchAll(LIT)) {

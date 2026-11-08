@@ -35,14 +35,14 @@ export function loadPrograms(dir: string, warn: (m: string) => void): Program[] 
 }
 
 /** The fixers' stock (small jobs spec §5): world/gear/stock.md; each bad line warns and is skipped; a missing file has none. */
-export function loadStock(dir: string, decks: Deck[], warn: (m: string) => void): Record<string, StockItem[]> {
+export function loadStock(dir: string, decks: Deck[], warn: (m: string) => void, programs: readonly Program[] = []): Record<string, StockItem[]> {
   let text: string;
   try {
     text = fs.readFileSync(path.join(dir, 'stock.md'), 'utf8');
   } catch {
     return {};
   }
-  const r = parseStock(text, new Set(decks.map((d) => d.id)));
+  const r = parseStock(text, new Set(decks.map((d) => d.id)), new Set(programs.map((p) => p.id)));
   for (const p of r.problems) warn(`stock: ${p}; skipping it`);
   return r.byPlace;
 }

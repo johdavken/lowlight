@@ -54,11 +54,11 @@ function frame(pic: HTMLElement, name: string, lines: string[], traits: { label:
 }
 
 /** An approach at SETUP: printed on a desktop, with how it goes wrong, then its rules (mockup approach-cards.html, C). */
-export function approachFace(art: CardArt, name: string, wrong: string, rules: { stats: string; start?: string; spared: string; first: string }): HTMLElement {
+export function approachFace(art: CardArt, name: string, wrong: string, rules: { stats: string; start?: string; spared: string; first?: string }): HTMLElement {
   const f = artFace(art, name);
   f.classList.add('tbc-print');
   const line = (kind: string, text: string) => el('span', `tbc-note ${kind}`, text);
-  f.querySelector('.tbc-body')!.append(el('span', 'tbc-wrong', wrong), line('tbc-stats', rules.stats), ...(rules.start ? [line('tbc-start', rules.start)] : []), line('tbc-spared', rules.spared), line('tbc-first', rules.first));
+  f.querySelector('.tbc-body')!.append(el('span', 'tbc-wrong', wrong), line('tbc-stats', rules.stats), ...(rules.start ? [line('tbc-start', rules.start)] : []), line('tbc-spared', rules.spared), ...(rules.first ? [line('tbc-first', rules.first)] : []));
   return f;
 }
 
@@ -167,10 +167,15 @@ function programPic(src: string): HTMLElement {
 }
 
 /** A program's card (programs spec §2.1): its picture, its stat, its name, what it does and the card's state. */
-export function programFace(p: { id: string; name: string; stat: string; kind: ProgramKind }, note?: string): HTMLElement {
-  const pic = programPic(`/programs/${p.id}.webp`);
+export function programFace(p: { id: string; name: string; stat: string; kind: ProgramKind; foil?: true; count?: number }, note?: string): HTMLElement {
+  // A foil (owned programs) wears its program's picture, the guest's shimmer and +1D on the corner.
+  const pic = programPic(`/programs/${p.foil ? p.id.replace(/^foil:/, '') : p.id}.webp`);
   pic.append(symbolMark(p.stat));
-  return printed(frame(pic, p.name, [PROGRAM_WORDS[p.kind], ...(note ? [note] : [])]));
+  if (p.foil) pic.append(el('span', 'tbc-grade', '+1D'));
+  const foil = p.foil ? [`FOIL${(p.count ?? 1) > 1 ? ` ×${p.count}` : ''} · ONE RUN`] : [];
+  const card = printed(frame(pic, p.name, [PROGRAM_WORDS[p.kind], ...foil, ...(note ? [note] : [])]));
+  if (p.foil) card.classList.add('tb-foil');
+  return card;
 }
 
 /** The DECK group's label (programs spec §2.1): the deck carried and its quality, or none. */

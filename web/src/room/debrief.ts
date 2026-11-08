@@ -198,6 +198,8 @@ export function debriefEl(d: Debrief, o: { cue(name: 'clean' | 'messy' | 'blown'
   keep.append(el('span', '', 'YOU KEEP'), kept);
   countUp(kept, d.sol - (d.cut?.amount ?? 0) - (d.retainer?.paid ? d.retainer.amount : 0), o.reduced);
   sums.append(keep);
+  // A foil the job dropped (owned programs), on the loot line's look.
+  if (d.found) sums.append(el('div', 'db-loot db-found', `FOUND · ${d.found.toUpperCase()} · FOIL`));
   if (d.loot) sums.append(el('div', 'db-loot', `A LOT OF ${d.loot.label}${d.loot.lost ? ' · NO ROOM IN THE STASH' : ''}`));
   totals.append(sums);
   if (d.heat.delta !== 0) totals.append(...heatLines(d));

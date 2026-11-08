@@ -7,8 +7,9 @@ const item = (id: string, price: number, tier: 1 | 2 | 3 | 4, kind: 'deck' | 'co
 
 describe('fixer stock', () => {
   it('parses the starting stock', () => {
-    const r = parseStock(fs.readFileSync('world/gear/stock.md', 'utf8'), DECKS);
-    expect(r.problems).toEqual([]);
+    const all = parseStock(fs.readFileSync('world/gear/stock.md', 'utf8'), DECKS, new Set(['solvent', 'leech', 'skeleton-key', 'voicebox', 'sniffer', 'spike', 'scrub']));
+    expect(all.problems).toEqual([]);
+    const r = { byPlace: Object.fromEntries(Object.entries(all.byPlace).map(([k, v]) => [k, v.filter((i) => i.kind !== 'program')])) };
     expect(r.byPlace['second-socket']).toEqual([item('dock-slate', 300, 1), item('pocket-deck', 600, 2), item('deaf-meridian', 4200, 3)]);
     expect(r.byPlace['the-tilt']).toEqual([item('burner', 500, 2, 'cover')]);
     expect(r.byPlace['under-the-cat']).toEqual([item('burner', 600, 1, 'cover'), item('fall-guy', 1000, 3, 'cover')]);
@@ -50,6 +51,31 @@ describe('fixer stock', () => {
     expect(canBuy({ item: item('burner', 500, 2, 'cover'), sol: 9999, tier: 1 })).toBe('locked');
     expect(canBuy({ item: item('burner', 500, 2, 'cover'), sol: 499, tier: 2 })).toBe('short');
     expect(canBuy({ item: item('burner', 500, 2, 'cover'), sol: 500, tier: 3 })).toBe('ok');
+  });
+});
+
+describe('programs at the fixer (owned programs plan)', () => {
+  const PROGS = new Set(['solvent', 'leech', 'scrub', 'firewall']);
+  it('a program id parses as a program; FIREWALL is never sold', () => {
+    const r = parseStock('---\nplace: x\nitems:\n  - solvent · 200 · 1\n  - firewall · 100 · 1\n---\n', DECKS, PROGS);
+    expect(r.byPlace.x).toEqual([{ id: 'solvent', kind: 'program', price: 200, tier: 1 }]);
+    expect(r.problems).toHaveLength(1);
+  });
+  it('buying one adds it; one you own is owned; a saved buy survives parseFixer', () => {
+    const it1: StockItem = { id: 'solvent', kind: 'program', price: 200, tier: 1 };
+    expect(buyEvent({ item: it1, at: 7 })).toEqual({ at: 7, sol: -200, program: { id: 'solvent' } });
+    expect(canBuy({ item: it1, sol: 999, tier: 1, programs: ['solvent'] })).toBe('owned');
+    expect(canBuy({ item: it1, sol: 999, tier: 1, programs: ['leech'] })).toBe('ok');
+    expect(parseFixer(JSON.stringify([{ at: 7, sol: -200, program: { id: 'solvent' } }]))).toEqual([{ at: 7, sol: -200, program: { id: 'solvent' } }]);
+  });
+  it('the shelf words for a program', () => {
+    expect(gearStat({ kind: 'program', id: 'solvent', stat: 'tech', programKind: 'position' })).toBe('PROGRAM · TECH · POSITION');
+    expect(gearRule({ kind: 'program', id: 'solvent', stat: 'tech', programKind: 'position', line: 'Strips the lacquer back a layer.' })).toBe('Strips the lacquer back a layer. Yours for good: load it free at SETUP.');
+  });
+  it('the real stock parses with programs', () => {
+    const r = parseStock(fs.readFileSync('world/gear/stock.md', 'utf8'), DECKS, new Set(['solvent', 'leech', 'skeleton-key', 'voicebox', 'sniffer', 'spike', 'scrub', 'firewall']));
+    expect(r.problems).toEqual([]);
+    expect(r.byPlace['deck-market'].filter((i) => i.kind === 'program').map((i) => i.id)).toEqual(['solvent', 'leech', 'sniffer', 'scrub']);
   });
 });
 

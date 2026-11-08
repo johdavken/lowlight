@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COSTS, dealCosts, firstCost, picksFor, resistPrice } from './costs';
+import { COSTS, dealCosts, FORCED_FIRST, firstCost, picksFor, resistPrice } from './costs';
 
 const all = { take: true, next: true, alarm: true };
 
@@ -62,7 +62,7 @@ describe('trouble has a shape (approach shapes spec §1)', () => {
       }
   });
 
-  it('dealCosts: the first-pick cost leads', () => {
+  it.runIf(FORCED_FIRST)('dealCosts: the first-pick cost leads', () => {
     for (const [approach, first] of [['quiet', 'alarm'], ['smooth', 'worse'], ['hard', 'take']] as const) for (const s of seeds) expect(dealCosts(s, all, approach)[0]).toBe(first);
   });
 
@@ -77,7 +77,12 @@ describe('trouble has a shape (approach shapes spec §1)', () => {
     for (const s of seeds) expect(dealCosts(s, { ...all, next: false }, 'smooth')).not.toContain('worse');
   });
 
-  it("firstCost: the approach's cost when it's dealt, else null", () => {
+  it.skipIf(FORCED_FIRST)('firstCost: every pick is free under removal', () => {
+    expect(firstCost('quiet', ['worse', 'alarm'])).toBeNull();
+    expect(firstCost('hard', ['take', 'worse'])).toBeNull();
+  });
+
+  it.runIf(FORCED_FIRST)("firstCost: the approach's cost when it's dealt, else null", () => {
     expect(firstCost('quiet', ['worse', 'alarm'])).toBe('alarm');
     expect(firstCost('hard', ['small', 'worse'])).toBeNull();
     expect(firstCost(null, ['alarm'])).toBeNull();

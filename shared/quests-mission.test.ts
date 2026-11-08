@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MISSION, TRAIL, WAITS } from './quests.fixture';
-import { fillRecruit, holds, parseCondition, parseQuestFile, parseRun, type CondCtx, type Condition, type QuestEntry } from './quests';
+import { fillRecruit, holds, parseCondition, parseQuestFile, parseRun, questGuest, type CondCtx, type Condition, type QuestEntry } from './quests';
 import type { Deck } from './gear';
 import { DEFAULT_STATS } from './stats';
 
@@ -171,3 +171,34 @@ describe('drops: (crew goods spec §6)', () => {
   it('reads a kind of goods', () => expect(ok(file('drops: data')).drops).toBe('data'));
   it('refuses an unknown kind', () => expect(messages(file('drops: gold')).join()).toContain('drops'));
 });
+
+describe('a guest on a mission (The Passenger spec, engine §1)', () => {
+  const WITH = MISSION.replace('pay: 400\n---', 'pay: 400\nguest: noa GREEN\n---');
+  it('a mission can have a guest, with no lead', () => {
+    const q = ok(WITH);
+    expect(q.guest).toEqual({ id: 'noa', grade: 0 });
+    expect(questGuest(q)).toEqual({ id: 'noa', grade: 0 });
+  });
+  it('a quest that is no job still has no guest', () => {
+    expect(messages(TRAIL.replace('\n---\n', '\nguest: noa GREEN\n---\n'))).toContain('guest: only a contract or a mission has a guest');
+  });
+  it('guest-note: stays a contract line', () => {
+    expect(messages(WITH.replace('*Clean.*\npay: 400', '*Clean.*\nguest-note: I was there.\npay: 400'))).toContain('paid: guest-note: needs a guest: on the contract');
+  });
+  it('a bad guest line on a mission is a problem', () => {
+    expect(messages(MISSION.replace('pay: 400\n---', 'pay: 400\nguest: noa\n---'))).toContain('guest: guest: is a contact and a grade, like ember VET');
+  });
+});
+
+describe('a mission guest must be someone (The Passenger spec, engine §2)', () => {
+  const WITH = MISSION.replace('pay: 400\n---', 'pay: 400\nguest: noa GREEN\n---');
+  it('a mission guest must be a contact or a guest file', () => {
+    const r = parseQuestFile('night-shift', WITH, { ...known, guests: new Set<string>() });
+    expect(r.ok ? [] : r.problems.map((p) => `${p.field}: ${p.message}`)).toContain("guest: no character or guest 'noa'");
+    expect(parseQuestFile('night-shift', WITH, { ...known, guests: new Set(['noa']) }).ok).toBe(true);
+  });
+  it("a contact's id is enough", () => {
+    expect(parseQuestFile('night-shift', WITH.replace('guest: noa', 'guest: ember'), { ...known, guests: new Set<string>() }).ok).toBe(true);
+  });
+});
+

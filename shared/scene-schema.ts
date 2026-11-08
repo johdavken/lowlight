@@ -198,6 +198,8 @@ export const sceneSchema = z
     resident: z.object({ character: z.string().min(1), scale: z.number().min(0.3).max(1).default(0.78) }).strict().optional(),
     /** Everyone's place (e.g. Hae's stall): any contact can take you there, not only the one whose rooms list it. */
     public: z.boolean().optional(),
+    /** A way in to someone's place (a walkway, a landing): nobody's home, so nobody wears their home clothes in it. */
+    entry: z.boolean().optional(),
     /** Rooms you reach from this one (a full room id and how you get there); a broken one is dropped at load. */
     exits: z
       .array(exitSchema)

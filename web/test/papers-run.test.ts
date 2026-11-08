@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_ORIGINS, DEFAULT_REASONS, type PapersData } from '../../shared/papers/data';
 import { papersBoard, type PapersBoard } from '../../shared/papers/generate';
 import type { Brief } from '../../shared/gig/brief';
-import type { RunEnd, RunHost } from '../src/ui/gig/run-screen';
+import type { RunEnd, RunHost } from '../src/ui/papers/run-host';
 import { PapersRun } from '../src/ui/papers/run';
+import type { DeskRegions } from '../src/ui/papers/desk-view';
 
 const faces = (['u25', 'mid', 'o40'] as const).map((p, i) => ({ id: `${p}-01`, band: (['under 25', '25–40', 'over 40'] as const)[i], looks: [(['under 25', '25–40', 'over 40'] as const)[i]] }));
 const data: PapersData = { origins: [...DEFAULT_ORIGINS], names: { given: { f: [], m: [], x: ['Ines'] }, family: ['Varga'] }, faces, reasons: [...DEFAULT_REASONS] };
@@ -11,10 +12,13 @@ const brief: Brief = { id: 'night-crossing', title: 'Night Crossing', tier: 'med
 
 let view: HTMLElement;
 let strip: HTMLElement;
+let regions: DeskRegions;
 let run: PapersRun | null = null;
 beforeEach(() => {
   view = document.createElement('div');
   strip = document.createElement('div');
+  const part = () => view.appendChild(document.createElement('div'));
+  regions = { root: view, top: part(), log: part(), middle: part(), levers: part(), bottom: part() };
   document.body.append(view, strip);
 });
 afterEach(() => {
@@ -33,14 +37,12 @@ function start(board: PapersBoard, over: Partial<RunHost> = {}) {
     disarm: () => {},
     repaint: () => {},
     ended: (e, d) => ended.push([e, d]),
-    failed: () => {},
-    restart: () => {},
     dev: false,
     reducedMotion: true,
     ...over,
   };
   run = new PapersRun(host, { brief, board }, { name: 'The Ferry Stairs' }, host.dev);
-  run.mount(view, strip);
+  run.mount(regions, strip);
   return { ended, cues };
 }
 const $ = <T extends Element = HTMLElement>(sel: string) => view.querySelector(sel) as T | null;
@@ -57,6 +59,11 @@ const press = (k: string, init: KeyboardEventInit = {}, target?: Element) => {
 };
 const button = (text: string) => $$('button').find((b) => b.textContent === text)!;
 const first = () => papersBoard('easy', 0, data);
+/** Booth nine's token picked up, then put on rule i. */
+const lookPast = (i: number) => {
+  $('.pp-token')!.click();
+  $$('.pp-booth')[i].click();
+};
 
 describe('the desk', () => {
   it('a field changed on one paper changes it on every paper, and RISK follows', () => {
@@ -97,12 +104,20 @@ describe('the desk', () => {
     expect($$('.pp-note')[1].textContent).toBe('?');
   });
 
-  it('booth nine marks one rule, and another click moves him', () => {
+  it('booth nine is a token: picked up, every rule offers a place; put down, one rule is marked and the token says which', () => {
     start(first());
+    expect($$('.pp-booth')).toHaveLength(0);
+    $('.pp-token')!.click();
+    expect($$('.pp-booth')).toHaveLength(3);
     $$('.pp-booth')[1].click();
     expect($$('.pp-booth.pp-on')).toHaveLength(1);
-    $$('.pp-booth')[2].click();
-    expect($$('.pp-booth').map((b) => b.classList.contains('pp-on'))).toEqual([false, false, true]);
+    expect($$('.pp-booth')).toHaveLength(1);
+    expect($('.pp-token')!.textContent).toBe('⌁ON RULE 2');
+    // The token takes him back; picked up again, he goes to another rule.
+    $('.pp-token')!.click();
+    expect($$('.pp-booth')).toHaveLength(0);
+    lookPast(2);
+    expect($$('li').map((li) => li.classList.contains('pp-looked'))).toEqual([false, false, true]);
   });
 
   it('a face from the pool, or a silhouette when the band has none (Review Focus 2)', () => {
@@ -173,7 +188,7 @@ describe('the handover', () => {
   it('with reduced motion every line is there at once, and the run ends with the papers detail', () => {
     const b = first();
     const { ended } = start(b);
-    $$('.pp-booth')[2].click();
+    lookPast(2);
     pick('id', 'trade', 'dock labor');
     button('HAND OVER').click();
     expect($$('.pp-check')).toHaveLength(2 + b.rules.length);
@@ -207,8 +222,15 @@ describe('the dev strip', () => {
   });
 });
 
-it('Escape is the window’s: the run never takes it', () => {
+it('Escape drops a lifted card, then the picked-up token; otherwise it is the board’s', () => {
   start(first());
+  expect(run!.escape()).toBe(false);
+  $('[data-k="field-origin"]')!.click();
+  expect(run!.escape()).toBe(true);
+  expect($('.pp-field.pp-lift')).toBeNull();
+  $('.pp-token')!.click();
+  expect(run!.escape()).toBe(true);
+  expect($$('.pp-booth')).toHaveLength(0);
   expect(run!.escape()).toBe(false);
 });
 
@@ -238,7 +260,7 @@ describe('review fixes (Task 10)', () => {
     start(first());
     pick('id', 'trade', 'dock labor');
     $$('.pp-rule-text')[0].click();
-    $$('.pp-booth')[1].click();
+    lookPast(1);
     press('r');
     expect($<HTMLSelectElement>('select[data-doc="id"][data-f="trade"]')!.value).toBe('clinic');
     expect($$('.pp-note')[0].textContent).toBe('');
@@ -247,6 +269,7 @@ describe('review fixes (Task 10)', () => {
 
   it('focus stays on the control you used across the redraw', () => {
     start(first());
+    $('.pp-token')!.click();
     $$('.pp-booth')[1].focus();
     $$('.pp-booth')[1].click();
     expect((document.activeElement as HTMLElement).dataset.k).toBe('booth-1');
@@ -298,11 +321,11 @@ describe('review fixes (Task 10)', () => {
     try {
       start(first());
       return Promise.resolve().then(() => {
-        expect($('.pp-run')!.classList.contains('pp-noart')).toBe(true);
+        expect(view.classList.contains('pp-noart')).toBe(true);
         pick('id', 'trade', 'dock labor');
-        expect($('.pp-run')!.classList.contains('pp-noart')).toBe(true);
+        expect(view.classList.contains('pp-noart')).toBe(true);
         button('HAND OVER').click();
-        expect($('.pp-run')!.classList.contains('pp-noart')).toBe(true);
+        expect(view.classList.contains('pp-noart')).toBe(true);
       });
     } finally {
       (window as unknown as { Image: unknown }).Image = real;
@@ -336,5 +359,119 @@ describe('the renewal stamp has a slot of its own', () => {
     unstamp.click();
     expect($('.pp-risk')!.textContent).toBe('0');
     expect($$('.pp-tstub button')).toHaveLength(0);
+  });
+});
+
+describe('the field hand', () => {
+  const sel = (doc: string, f: string) => $<HTMLSelectElement>(`select[data-doc="${doc}"][data-f="${f}"]`)!;
+  it('one card per field, with its value, where it prints, and what changing it costs', () => {
+    const b = first();
+    start(b);
+    const cards = $$('.pp-field');
+    expect(cards.map((c) => c.dataset.field)).toEqual(['origin', 'district', 'trade', 'age', 'sponsor', 'arrival']);
+    const origin = cards[0];
+    expect(origin.querySelector('.pp-val')!.textContent).toBe(b.truth.origin);
+    expect(origin.querySelector('.pp-on')!.textContent).toBe('ON ID · TICKET');
+    expect(origin.querySelector('.pp-cost')!.textContent).toBe('+2');
+    expect(cards[4].querySelector('.pp-on')!.textContent).toBe('ON PERMIT + LETTER');
+  });
+
+  it('lifted, a card lists its values with their cost and lights its rows on every paper; a pick rewrites them all', () => {
+    const b = first();
+    const { cues } = start(b);
+    $('[data-k="field-trade"]')!.click();
+    expect($$('.pp-row.pp-lit').map((r) => r.dataset.f)).toEqual(['trade', 'trade']);
+    const opts = $$('.pp-field.pp-lift .pp-opt');
+    expect(opts.find((o) => o.classList.contains('pp-true'))!.dataset.v).toBe(b.truth.trade);
+    const dock = opts.find((o) => o.dataset.v === 'dock labor')!;
+    expect(dock.querySelector('small')!.textContent).toBe('+2');
+    dock.click();
+    expect(sel('id', 'trade').value).toBe('dock labor');
+    expect(sel('permit', 'trade').value).toBe('dock labor');
+    expect($('.pp-field.pp-lift')).toBeNull();
+    const card = $('.pp-field[data-field="trade"]')!;
+    expect(card.classList.contains('pp-forged')).toBe(true);
+    expect(card.querySelector('.pp-tru')!.textContent).toBe(`TRUE: ${b.truth.trade}`);
+    expect($('.pp-risk')!.textContent).toBe('2');
+    expect(cues).toContain('papers:pick');
+  });
+
+  it('the sponsor card counts the letter it brings', () => {
+    const b = papersBoard('medium', 42, data);
+    start(b);
+    $('[data-k="field-sponsor"]')!.click();
+    const corp = $$('.pp-opt').find((o) => o.dataset.v === 'a corp')!;
+    const t = b.truth.sponsor;
+    expect(corp.querySelector('small')!.textContent).toBe(t === 'a corp' ? 'TRUE' : t === 'none' ? '+3' : '+2');
+  });
+
+  it('on easy the AGE card marks the ages the photo will not pass for; on medium it says nothing', () => {
+    const b = first();
+    start(b);
+    $('[data-k="field-age"]')!.click();
+    const bad = $$('.pp-opt.pp-photo-bad').map((o) => o.dataset.v);
+    expect(bad).toEqual(['under 25', '25–40', 'over 40'].filter((v) => !(b.face.looks as string[]).includes(v)));
+    run!.destroy();
+    start(papersBoard('medium', 42, data));
+    $('[data-k="field-age"]')!.click();
+    expect($$('.pp-opt.pp-photo-bad')).toHaveLength(0);
+  });
+
+  it('a pick over the cap is refused and its card stays up for another', () => {
+    const b = first();
+    start(b);
+    for (const [f, v] of [['origin', 'Varna'], ['district', 'Velvet'], ['trade', 'freight']] as const) {
+      $(`[data-k="field-${f}"]`)!.click();
+      $$('.pp-opt').find((o) => o.dataset.v === v)!.click();
+    }
+    $('[data-k="field-arrival"]')!.click();
+    $$('.pp-opt').find((o) => o.dataset.v === 'this week')!.click();
+    expect($('.pp-field.pp-lift')!.dataset.field).toBe('arrival');
+  });
+
+  it('the SPONSOR card at rest shows the cheapest change, the letter counted', () => {
+    const b = first();
+    start(b);
+    const at = $('.pp-field[data-field="sponsor"] .pp-cost')!.textContent;
+    expect(at).toBe(b.truth.sponsor === 'none' ? '+3' : '+1');
+  });
+
+  it('an UNDO that puts booth nine back never leaves the token in your hand too', () => {
+    start(first());
+    lookPast(1);
+    $('.pp-token')!.click();
+    $('.pp-token')!.click();
+    expect($('.pp-token')!.classList.contains('pp-armed')).toBe(true);
+    button('UNDO').click();
+    expect($('.pp-token')!.classList.contains('pp-armed')).toBe(false);
+    expect($('.pp-token')!.textContent).toBe('⌁ON RULE 2');
+    expect($$('.pp-booth')).toHaveLength(1);
+  });
+
+  it('a pick keeps focus on its card', () => {
+    start(first());
+    $('[data-k="field-trade"]')!.click();
+    const opt = $$('.pp-opt').find((o) => o.dataset.v === 'freight')!;
+    opt.focus();
+    opt.click();
+    expect((document.activeElement as HTMLElement).dataset.k).toBe('field-trade');
+  });
+});
+
+describe('the read on the board', () => {
+  it('the checks fill the column, the rule cards take their marks, and the verdict says what she hears', () => {
+    const b = first();
+    start(b);
+    lookPast(2);
+    pick('id', 'trade', 'dock labor');
+    button('HAND OVER').click();
+    expect(regions.log.querySelectorAll('.pp-check')).toHaveLength(2 + b.rules.length);
+    const cards = [...regions.bottom.querySelectorAll<HTMLElement>('.pp-rcard')];
+    expect(cards).toHaveLength(b.rules.length);
+    expect(cards[2].classList.contains('pp-looked')).toBe(true);
+    expect(cards[2].querySelector('.pp-rmark')!.textContent).toBe('⌁');
+    expect(regions.middle.querySelector('.pp-verdict-word')!.textContent).toBe('CLEAN');
+    expect(regions.middle.querySelector('.pp-hears')!.textContent).toBe(`SHE HEARSResult: waved through clean, risk 2 of ${b.cap}.`);
+    expect(regions.levers.childElementCount).toBe(0);
   });
 });

@@ -290,6 +290,9 @@ describe('Graft tips', () => {
     expect(tipText('program')).toContain(`${SLOTS[1]}, ${SLOTS[2]}, ${SLOTS[3]} or ${SLOTS[4]}`);
     expect(tipText('program')).toContain('ALARM +1');
     expect(tipText('program')).toContain('lacquer');
+    // Owned programs: what you start with, where more come from, and foils.
+    expect(tipText('program')).toContain('Fixers sell the rest');
+    expect(tipText('program')).toContain('FOIL');
     expect(tipText('armour')).toBe('FIREWALL cancels one cost, then burns out. Its slot stays full.');
     expect(TIP_ORDER.indexOf('program')).toBe(TIP_ORDER.indexOf('call') + 1);
   });

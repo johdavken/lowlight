@@ -20,7 +20,7 @@ import type { LeadsForTurn } from '../../shared/leads';
 import { parseMap } from '../../shared/map-schema';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { ContactCard, CrewView, LinkState, OtherInfo, Present, ServerEvent } from '../../shared/types';
+import type { ContactCard, CrewView, GuestCard, LinkState, OtherInfo, Present, ServerEvent } from '../../shared/types';
 import type { AgentRecord, SpriteRecord } from './agents';
 import { wearingEntries } from './wearing';
 import { ChatRelay } from './chat-relay';
@@ -187,6 +187,8 @@ export interface RuntimeOptions {
     gmWritten?(): Partial<Record<CostId, string[]>>;
     /** Contact cards the player holds (contact cards spec §1). */
     contactCards?(): ContactCard[];
+    /** Guest files (The Passenger spec, engine §2). */
+    guestCards?(): GuestCard[];
     /** The ids of the leads `player` holds. */
     heldLeads?(player: string): string[];
     /** Crew spec §5: the latest story minute any room's `[crew]` line told up to. */
@@ -720,6 +722,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             crewAbilities: () => opts.quests!.crewAbilities?.() ?? [],
             gmWritten: () => opts.quests!.gmWritten?.() ?? {},
             contactCards: () => opts.quests!.contactCards?.() ?? [],
+            guestCards: () => opts.quests!.guestCards?.() ?? [],
             heldLeads: (p: string) => opts.quests!.heldLeads?.(p) ?? [],
             ...(opts.quests!.jobRecruit ? { jobRecruit: opts.quests!.jobRecruit } : {}),
             ...(opts.quests!.crewToldUntil ? { crewToldUntil: opts.quests!.crewToldUntil } : {}),

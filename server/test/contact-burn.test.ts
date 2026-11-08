@@ -49,6 +49,13 @@ describe('contact cards: the cost', () => {
     await t.relay.send('hicks', 'still here');
     expect(t.trustNow()).toBe(-1);
   });
+  it('a guest file brought on a blown mission costs nobody trust (The Passenger spec, engine §2)', async () => {
+    const base = guested();
+    const noa = { ...base, run: { ...base.run, setup: { ...base.run.setup!, people: ['guest-noa'], guest: { id: 'noa', name: 'Noa Vey', accent: '#fff', portrait: null, spec: 'runner' as const, grade: 0 as const, abilities: [], kind: 'guest' as const } } } };
+    const t = intakeRelay({ contact: 'cass', clock: at(23, 0), others: () => [noa] });
+    await t.relay.send('hicks', 'hey');
+    expect(t.trustNow()).toBe(0);
+  });
   it('a blown contract waiting on its fallout costs her trust now, not after it plays (review I1)', async () => {
     const base = guested();
     const waiting = { ...base, run: { ...base.run, done: false, setup: { ...base.run.setup!, endAt: 5 }, contract: { stage: 'fallout' as const, wait: null, results: {}, reported: [] } } };

@@ -144,6 +144,21 @@ describe('a job on the table', () => {
     expect(onChoose).toHaveBeenLastCalledWith('sit', { push: 'dice', card: 'favour' });
   });
 
+  it('a miss that blows the job: on the card when only some cards do, once on the header when every rolled card does', () => {
+    const { t } = mount();
+    const flagsOf = (id: string) => [...choice(id).querySelectorAll('.tb-flag.red')].map((f) => f.textContent);
+    t.show({ ...A, choices: A.choices.map((c) => (c.id === 'swap' ? { ...c, blows: true as const } : c)) });
+    expect(flagsOf('swap')).toEqual(['MISS BLOWS IT']);
+    expect(flagsOf('sit')).toEqual([]);
+    expect($('.tb-head').textContent).not.toContain('A MISS BLOWS IT');
+    t.show({ ...A, choices: A.choices.map((c) => (c.pool ? { ...c, blows: true as const } : c)) });
+    expect($('.tb-head').textContent).toContain('A MISS BLOWS IT');
+    expect(flagsOf('swap')).toEqual([]);
+    // The getaway's GET OUT already says it.
+    t.show({ ...A, getaway: true, choices: A.choices.map((c) => (c.pool ? { ...c, blows: true as const } : c)) });
+    expect($('.tb-head').textContent).not.toContain('A MISS BLOWS IT');
+  });
+
   it('STEADY / TAKE IT, the getaway and WALK / PRESS ON deal as cards', () => {
     const { t, onChoose } = mount();
     t.show({ ...A, choices: [{ id: '!steady', line: 'STEADY (2 NERVE)' }, { id: '!take', line: 'TAKE IT' }], rolled: { choice: 'swap', faces: [5], keep: 'high', kind: 'cost' } });
@@ -337,6 +352,16 @@ describe('Graft tips on the table', () => {
     t.show({ ...A, choices: [{ id: '!take', line: 'TAKE IT' }], rolled: { choice: 'swap', faces: [3], keep: 'high', kind: 'miss', cost: { alarm: 1, heat: 1 } } });
     expect(offered(tips)).toEqual(['heat', 'alarm', 'nerve']);
     expect(document.querySelector('.tb-parked .qc-says')?.textContent).toBe('FAILED · ALARM +1 · HEAT +1');
+  });
+
+  it('a beat where a miss blows the job offers A MISS BLOWS IT after the roll and where you stand; the getaway does not', () => {
+    const { t, tips } = mountWith();
+    const blowing = { ...A, choices: A.choices.map((c) => (c.pool ? { ...c, blows: true as const } : c)) };
+    t.show(blowing);
+    const got = offered(tips)!;
+    expect(got.indexOf('blows')).toBe(got.indexOf('position') + 1);
+    t.show({ ...blowing, getaway: true });
+    expect(offered(tips)).not.toContain('blows');
   });
 
   it('a getaway offers getaway', () => {
@@ -1058,6 +1083,19 @@ describe('DECK: the carried deck and its slots (programs spec §2.1)', () => {
     expect(choice('!take').textContent).toContain('CARRY ON');
     expect(choice('!take').textContent).toContain('NOTHING TO PAY');
     expect(choice('!take').textContent).not.toContain('THE COST LANDS');
+  });
+
+  it('a foil in the tray shimmers; marked, the card rolls a die more even in the dark (owned programs)', () => {
+    const { t } = mount();
+    const foil = { id: 'foil:skeleton-key', name: 'SKELETON KEY', stat: 'reflex', kind: 'position' as const, line: 'x', foil: true as const };
+    const choices = A.choices.map((c) => (c.id === 'swap' || c.id === 'sit' ? { ...c, programs: { ...previews[c.id], 'foil:skeleton-key': c.id === 'swap' ? { position: 'dark' as const, alarm: 0 as const, dice: 99 } : NOPE } } : c));
+    t.show(withPockets(pockets({ catalog: [...CATALOG, foil] }), choices));
+    const before = Number(choice('swap').querySelector('.tb-sum')!.firstChild!.textContent);
+    slot('slot:1').click();
+    expect(slot('prog-pick:foil:skeleton-key').classList.contains('tb-foil') || slot('prog-pick:foil:skeleton-key').querySelector('.tb-foil') !== null).toBe(true);
+    slot('prog-pick:foil:skeleton-key').click();
+    expect(choice('swap').querySelector('.tb-side-word')!.textContent).toBe('DARK');
+    expect(Number(choice('swap').querySelector('.tb-sum')!.firstChild!.textContent)).toBe(before + 1);
   });
 
   it('the pool line previews programs', () => {

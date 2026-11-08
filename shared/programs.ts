@@ -8,7 +8,8 @@ import type { Pool } from './dice';
 import type { Deck } from './gear';
 import { LORE_ID, splitDrafts, splitFrontMatter } from './lore';
 import type { Check } from './mission';
-import type { StatKey } from './stats';
+import { hashSeed, rng } from './rng';
+import type { StatKey, Stats } from './stats';
 
 export const PROGRAM_KINDS = ['position', 'effect', 'quiet', 'firewall'] as const;
 export type ProgramKind = (typeof PROGRAM_KINDS)[number];
@@ -24,10 +25,71 @@ export interface Program {
   line: string;
   /** Runs a step higher against the job's tier (§1.3); none until the shop. */
   fine?: true;
+  /** A foil copy (owned programs): one run, its step and +1 die, then gone from the kit. Its id is `foil:<id>`. */
+  foil?: true;
+  /** How many of it you hold, where more than one (foils). */
+  count?: number;
 }
 
 /** FIREWALL's id: it answers a picked cost, never a check (§2.3). */
 export const FIREWALL = 'firewall';
+
+/** What you own (owned programs): permanent ids, and foil copies held by program id. */
+export interface OwnedPrograms {
+  owned: string[];
+  foil: Record<string, number>;
+}
+
+/** A foil copy's load id (owned programs): it loads beside the plain copy of the same program. */
+export const FOIL_PREFIX = 'foil:';
+export const baseProgramId = (id: string): string => (id.startsWith(FOIL_PREFIX) ? id.slice(FOIL_PREFIX.length) : id);
+export const asFoil = (p: Program): Program => ({ ...p, id: `${FOIL_PREFIX}${p.id}`, foil: true });
+
+/** A program by id, a foil id as its foil copy; undefined when the catalog has none. */
+export function programOf(catalog: readonly Program[], id: string): Program | undefined {
+  const p = catalog.find((x) => x.id === baseProgramId(id));
+  return p && id !== p.id ? asFoil(p) : p;
+}
+
+/** Owning nothing. */
+export const NO_PROGRAMS: OwnedPrograms = { owned: [], foil: {} };
+
+/** What you can load: owned programs in catalog order, then each foil held (with its count), in catalog order. */
+export function loadablePrograms(catalog: readonly Program[], own: OwnedPrograms): Program[] {
+  const plain = catalog.filter((p) => own.owned.includes(p.id));
+  const foils = catalog.flatMap((p) => ((own.foil[p.id] ?? 0) > 0 ? [{ ...asFoil(p), count: own.foil[p.id] }] : []));
+  return [...plain, ...foils];
+}
+
+/** Ties for the starter break in this order: the grid first. */
+const STARTER_ORDER = ['tech', 'cool', 'wits', 'reflex', 'body'] as const;
+
+/** The program for a stat: its position program, else its effect program. */
+const programForStat = (catalog: readonly Program[], stat: string): Program | undefined =>
+  catalog.find((p) => p.stat === stat && p.kind === 'position') ?? catalog.find((p) => p.stat === stat && p.kind === 'effect');
+
+/** What everyone starts owning (owned programs): FIREWALL, and the program for your highest stat. */
+export function starterPrograms(stats: Stats, catalog: readonly Program[]): string[] {
+  const top = STARTER_ORDER.reduce((best, s) => (stats[s] > stats[best] ? s : best), STARTER_ORDER[0]);
+  const pick = programForStat(catalog, top);
+  return [...(catalog.some((p) => p.id === FIREWALL) ? [FIREWALL] : []), ...(pick ? [pick.id] : [])];
+}
+
+/** A job that isn't blown drops a foil this often (owned programs). */
+export const FOIL_CHANCE = 0.15;
+
+/**
+ * The foil a job's end drops, or null (owned programs): seeded by the run's key, so a rewind and replay drop the same.
+ * A position or effect program for the stat the job leans on most; any of them for a job with no checks.
+ */
+export function foilDrop(key: string, leans: readonly string[], catalog: readonly Program[]): string | null {
+  if (rng(hashSeed(`${key}|foil`))() >= FOIL_CHANCE) return null;
+  const steps = catalog.filter((p) => p.kind === 'position' || p.kind === 'effect');
+  const leaning = steps.filter((p) => p.stat === leans[0]);
+  const from = leaning.length ? leaning : steps;
+  if (!from.length) return null;
+  return from[Math.floor(rng(hashSeed(`${key}|foil|pick`))() * from.length)].id;
+}
 
 /** Slots by the deck's quality (§1.1). */
 export const SLOTS: Record<Deck['quality'], number> = { 1: 1, 2: 2, 3: 2, 4: 3 };
@@ -85,6 +147,8 @@ export function programFits(p: Program, pool: Pick<Pool, 'position' | 'effect'>,
   if (check.red) return 'ONE SHOT';
   if (p.stat !== 'any' && p.stat !== check.stat) return 'NOTHING TO DO HERE';
   if (p.kind === 'firewall') return 'NOTHING TO DO HERE';
+  // A foil's die helps where its step can't (owned programs).
+  if (p.foil) return null;
   if (p.kind === 'position' && pool.position === 'dark') return 'ALREADY IN THE DARK';
   if (p.kind === 'effect') {
     if (!pool.effect) return 'NOTHING TO TAKE HERE';
@@ -98,11 +162,13 @@ export function programFits(p: Program, pool: Pick<Pool, 'position' | 'effect'>,
  * the pool so far, then a position or effect program must move its pool (NEXT ROLL WORSE, BOLD or another program
  * can leave its step doing nothing, and a run that does nothing must not cost the lacquer's ALARM).
  */
-export function programJudge(p: Program, poolAt: (programs: Program[]) => Pick<Pool, 'position' | 'effect'>, accepted: Program[], check: Check, deck: Deck | null): string | null {
+export function programJudge(p: Program, poolAt: (programs: Program[]) => Pick<Pool, 'position' | 'effect' | 'dice'>, accepted: Program[], check: Check, deck: Deck | null): string | null {
   const before = poolAt(accepted);
   const why = programFits(p, before, check, deck);
   if (why) return why;
   const after = poolAt([...accepted, p]);
+  // A foil runs for its die (owned programs); at the pool's cap it's judged on its step alone.
+  if (p.foil && after.dice > before.dice) return null;
   if (p.kind === 'position' && after.position === before.position) return 'ALREADY IN THE DARK';
   if (p.kind === 'effect' && after.effect === before.effect) return 'ALREADY BIG';
   return null;

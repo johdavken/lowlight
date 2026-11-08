@@ -6,7 +6,7 @@ import type { ContactCard, Debrief } from '../../shared/types';
 import type { QuestEntry, QuestRun } from '../../shared/quests';
 import { outcomeTier, type Tier } from '../../shared/mission';
 import { guestId } from '../../shared/contract';
-import { withGuest } from './guest';
+import { guestArt, withGuest } from './guest';
 import { ALARM_MAX, jobTakeSize } from '../../shared/dice';
 import { abilityCardId, CONTACT_VERB, contactId, crewLines, jobShares } from '../../shared/hand';
 import { takeOf } from './take-run';
@@ -129,8 +129,13 @@ export function debriefCrew(quests: QuestDeps | undefined, run: QuestRun, key: s
 export function debriefPeople(quests: QuestDeps | undefined, run: QuestRun): NonNullable<Debrief['people']> {
   const first = (name: string) => name.split(' ')[0].toUpperCase();
   const brought = (quests?.crewState?.()?.members ?? []).filter((m) => run.setup?.people.includes(m.recruit.id));
-  const guest = run.setup?.guest ? [run.setup.guest] : [];
-  return [...brought.map((m) => ({ name: first(m.recruit.name), face: m.recruit.face })), ...[...contactsPlayed(run), ...guest].map((c) => ({ name: first(c.name), face: null, art: `/contacts/${c.id}.webp` }))];
+  const g = run.setup?.guest;
+  const art = g ? guestArt(g) : undefined;
+  return [
+    ...brought.map((m) => ({ name: first(m.recruit.name), face: m.recruit.face })),
+    ...contactsPlayed(run).map((c) => ({ name: first(c.name), face: null, art: `/contacts/${c.id}.webp` })),
+    ...(g ? [{ name: first(g.name), face: null, ...(art ? { art } : {}) }] : []),
+  ];
 }
 
 /** The contacts who played (contact cards spec §3): `CASS FENCED IT · TAKE +1`, `HICKS TOOK THE WIRE`. */

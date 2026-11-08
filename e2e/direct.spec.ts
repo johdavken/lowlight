@@ -367,16 +367,25 @@ test('gig: sit down at The Tilt, walk away from the desk, she reacts', async ({ 
   await expect(page.locator('.gig-job-title')).toHaveText([E2E_GIG.title]);
   await expect(page.locator('.gig-job-go')).toHaveText('SIT DOWN');
   await page.keyboard.press('Enter');
-  await expect(page.locator('.gig-where')).toContainText('◢ DESK // THE TILT');
-
-  // WALK AWAY: turned back; LEAVE THE DESK sends it to the room, the window and map close, she answers.
-  await page.keyboard.press('Escape');
-  await page.locator('.gig-confirm-go').click();
-  await expect(page.locator('.gig-result-big')).toHaveText('TURNED BACK');
-  const before = await page.locator('.msg.agent.s-ok').count();
-  await page.keyboard.press('Enter');
+  // SIT DOWN: the window and the map go, and the board stands over the room (mockup papers-board.html, D).
   await expect(page.locator('.gig-window')).toHaveCount(0);
   await expect(page.locator('#map')).toBeHidden();
+  const board = page.locator('#game > .tb.hud.pp-hud');
+  await expect(board).toBeVisible();
+  await expect(board.locator('.pp-title h4')).toHaveText(E2E_GIG.title);
+  await expect(board.locator('.pp-field')).toHaveCount(6);
+  // Chat stays closed at the desk: a letter typed reaches nothing, and the prompt shows the desk's keys.
+  await page.keyboard.press('x');
+  await expect(page.locator('#input textarea')).toHaveValue('');
+  await expect(page.locator('#input')).toContainText('HAND OVER');
+
+  // WALK AWAY: the client back on the boat; LEAVE THE DESK sends it to the room, the board goes, she answers.
+  await page.keyboard.press('Escape');
+  await page.locator('.pp-confirm-go').click();
+  await expect(board.locator('.pp-verdict-word')).toHaveText('WALKED AWAY');
+  const before = await page.locator('.msg.agent.s-ok').count();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.pp-hud')).toHaveCount(0);
   await expect(page.locator('#feed .gig-row .gig-head').last()).toHaveText(`◢ GIG · DESK · ${E2E_GIG.title.toUpperCase()} · EASY`);
   await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
   const last = (await completions()).at(-1)!.body.messages!.at(-1)!.content ?? '';

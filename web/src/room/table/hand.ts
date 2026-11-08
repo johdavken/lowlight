@@ -44,7 +44,7 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
   // Per recruit, a card part way through a turn: a redraw puts this same card back so the turn runs on through its back
   // (playtest: a lift redraws the hand on a job with a deck, and the card jumped to the ability unseen). `to` is where
   // it's headed; a redraw that wants it elsewhere draws afresh.
-  const turning = new Map<string, { flip: HTMLElement; to: string; turn(next: HTMLElement): void }>();
+  const turning = new Map<string, { flip: HTMLElement; to: string; turn(next: HTMLElement): void; resume(): void }>();
   // Per recruit, their cards as last drawn, so a turn's second half puts up the card as it stands now.
   const stackCards = new Map<string, TableCard[]>();
   // Per recruit, turning their card to `to` with the turn's two halves (set as each stack is drawn).
@@ -119,6 +119,8 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
         const sides: HTMLElement[] = [0, 1].map((i) => (i === up ? slotEl(face(shown.get(id) ?? front.id), i ? ' tb-side-b' : '') : cardBack(i ? ' tb-side-b' : '')));
         inner.append(...sides);
         flip.append(inner);
+        // When the half turn under way started, so a redraw can pick it up where it was.
+        let at = -Infinity;
         const turn = (next: HTMLElement) => {
           const n = (Number(inner.dataset.turns ?? t) || 0) + 1;
           inner.dataset.turns = String(n);
@@ -126,9 +128,25 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
           if (i) next.classList.add('tb-side-b');
           sides[i].replaceWith(next);
           sides[i] = next;
+          inner.style.transitionDelay = '';
+          inner.style.transform = `rotateY(${n * 180}deg)`;
+          at = performance.now();
+        };
+        // Put back into a redrawn hand, the card has lost its transition and would snap to where the half turn ends
+        // (playtest: a tab on a lifted recruit drops the lift, the hand redraws, and the card jumped to its back unseen).
+        // Run the half turn again from its start, a negative delay putting it as far along as it had got.
+        const resume = () => {
+          const gone = performance.now() - at;
+          if (gone >= TURN_MS) return;
+          const n = Number(inner.dataset.turns) || 0;
+          inner.style.transition = 'none';
+          inner.style.transform = `rotateY(${(n - 1) * 180}deg)`;
+          void inner.offsetWidth;
+          inner.style.transition = '';
+          inner.style.transitionDelay = `${-Math.round(gone)}ms`;
           inner.style.transform = `rotateY(${n * 180}deg)`;
         };
-        return { flip, to: shown.get(id) ?? front.id, turn };
+        return { flip, to: shown.get(id) ?? front.id, turn, resume };
       })();
     box.append(card.flip);
     const tabs = el('div', 'tb-tabs');
@@ -240,6 +258,7 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
         return box;
       }),
     );
+    for (const c of turning.values()) if (c.flip.isConnected) c.resume();
   };
   return {
     root,

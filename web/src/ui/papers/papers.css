@@ -1,6 +1,6 @@
-/* Papers' run screen (spec §5): a lamp-lit desk and paper inside the gig window's amber frame, no
-   CRT. Every class is pp- prefixed: global class names collide across screens. The mockup's
-   play.html (docs/superpowers/specs/2026-10-11-papers-mockup/) is the reference. */
+/* Papers' paper (spec §5): the documents, their fields, the stamps and the officer's notes, as they lie on the
+   board (hud.css lays the board out; mockup docs/mockups/papers-board.html, D). Every class is pp- prefixed:
+   global class names collide across screens. */
 .pp-run {
   --pp-type: #1e1a12;
   --pp-forged: #2741b0;
@@ -14,21 +14,7 @@
   --pp-pixel: 'VT323', ui-monospace, monospace;
   color: var(--pp-amber);
 }
-.pp-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 4px; }
-.pp-head h4 { margin: 0; font: 28px var(--pp-pixel); letter-spacing: 0.06em; color: #ffe2b0; }
-.pp-head span { font-size: 12px; color: var(--pp-amber-dim); }
-.pp-head span b { color: var(--pp-cream); font-weight: 400; }
-.pp-brief { margin: 0 0 12px; font-size: calc(12.5px * var(--text-scale, 1)); line-height: 1.55; color: rgba(243, 220, 180, 0.75); max-width: 820px; }
-.pp-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; }
-
-/* the desk */
-.pp-desk { position: relative; padding: 14px; border-radius: 6px; background: linear-gradient(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.18)), url(/papers/desk.jpg) center / cover, #17120b; box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.7); }
-.pp-label { font: 17px var(--pp-pixel); letter-spacing: 0.16em; color: var(--pp-amber-dim); margin: 0 0 6px; }
-.pp-truth { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 8px 10px; margin-bottom: 16px; border: 1px dashed var(--pp-amber-dim); background: rgba(10, 7, 3, 0.7); font-size: 12px; color: var(--pp-cream); }
-.pp-truth span { white-space: nowrap; }
-.pp-truth em { font-style: normal; color: var(--pp-amber-dim); font-size: 11px; letter-spacing: 0.08em; }
-.pp-docs { display: flex; flex-wrap: wrap; gap: 18px 16px; align-items: flex-start; }
-.pp-doc { position: relative; color: var(--pp-type); transform: rotate(var(--pp-tilt, 0deg)); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), 0 8px 20px rgba(0, 0, 0, 0.6); }
+.pp-doc { position: relative; color: var(--pp-type); transform: rotate(var(--pp-tilt, 0deg)); box-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), 0 10px 24px rgba(0, 0, 0, 0.75); text-shadow: none; }
 
 /* a field on any document */
 .pp-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 0 6px; padding: 2px 0; }
@@ -91,7 +77,7 @@
 .pp-cleared { width: 110px; height: 42px; margin: 6px 0; --pp-src: url(/papers/stamps/cleared.png); --pp-inkc: rgba(61, 107, 72, 0.8); transform: rotate(-6deg); }
 .pp-letter { width: 210px; padding: 10px 12px 12px; --pp-tilt: -1.2deg; background: #f4efe2; font: 10.5px var(--pp-typewriter); line-height: 1.45; }
 .pp-lh { text-align: center; border-bottom: 1px double rgba(30, 26, 18, 0.5); padding-bottom: 4px; margin-bottom: 6px; font: 600 10px var(--pp-mono); letter-spacing: 0.16em; }
-.pp-ghost { display: grid; place-items: center; gap: 6px; width: 170px; min-height: 92px; padding: 10px; border: 1px dashed rgba(230, 219, 193, 0.35); color: rgba(230, 219, 193, 0.6); font: 11px var(--pp-mono); letter-spacing: 0.1em; text-align: center; }
+.pp-ghost { display: grid; place-items: center; gap: 6px; width: 170px; min-height: 72px; padding: 8px 10px; border: 1px dashed rgba(230, 219, 193, 0.4); background: rgba(5, 2, 10, 0.55); color: rgba(230, 219, 193, 0.7); font: 11px var(--pp-mono); letter-spacing: 0.1em; text-align: center; }
 
 /* the officer's notes on the first night */
 .pp-notes { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
@@ -99,60 +85,6 @@
 .pp-officer-note button { position: absolute; top: 3px; right: 4px; background: none; border: none; font: 13px var(--pp-mono); cursor: pointer; color: rgba(30, 26, 18, 0.6); }
 .pp-gotit { align-self: center; padding: 2px 10px; background: none; border: 1px solid var(--pp-amber); color: var(--pp-amber); font: 16px var(--pp-pixel); letter-spacing: 0.14em; cursor: pointer; }
 
-/* side column */
-.pp-side { display: flex; flex-direction: column; gap: 14px; }
-.pp-bulletin { padding: 10px 12px; border: 1px solid var(--pp-amber-dim); background: rgba(255, 197, 107, 0.04); }
-.pp-bulletin h5 { margin: 0 0 2px; font: 22px var(--pp-pixel); letter-spacing: 0.12em; color: #ffe2b0; }
-.pp-bulletin .pp-sub { font-size: 11px; color: var(--pp-amber-dim); margin-bottom: 8px; }
-.pp-bulletin ol { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.45; color: var(--pp-cream); }
-.pp-bulletin li { margin-bottom: 8px; }
-.pp-rule-text { padding: 0; background: none; border: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.pp-rule-text:focus-visible, .pp-booth:focus-visible { outline: 1px solid var(--pp-amber); }
-.pp-why { display: block; font-size: 11.5px; font-style: italic; color: rgba(255, 197, 107, 0.6); }
-.pp-rule-foot { display: flex; gap: 10px; align-items: center; margin-top: 2px; }
-.pp-note { min-width: 14px; font: 15px var(--pp-pixel); color: #7dffa0; }
-.pp-booth { padding: 0 6px; background: none; border: 1px solid var(--pp-amber-dim); color: var(--pp-amber-dim); font: 14px var(--pp-pixel); letter-spacing: 0.1em; cursor: pointer; }
-.pp-booth.pp-on { border-color: var(--pp-amber); color: #ffe2b0; background: rgba(255, 197, 107, 0.15); }
-.pp-always { margin-top: 8px; font-size: 11.5px; color: var(--pp-amber-dim); }
-.pp-bar { display: flex; gap: 3px; margin: 4px 0; }
-.pp-seg { flex: 1; height: 16px; border: 1px solid var(--pp-amber-dim); position: relative; }
-.pp-seg.pp-full { background: var(--pp-amber); box-shadow: 0 0 8px rgba(255, 197, 107, 0.5); }
-.pp-seg.pp-boothseg { background: #e07a2a; }
-.pp-seg.pp-clean::after { content: ''; position: absolute; right: -3px; top: -5px; bottom: -5px; width: 2px; background: #7dffa0; }
-.pp-read { display: flex; justify-content: space-between; font-size: 12px; color: var(--pp-amber-dim); }
-.pp-risk { color: var(--pp-amber); font: 22px var(--pp-pixel); letter-spacing: 0.1em; }
-.pp-green { color: #7dffa0; }
-.pp-meter.pp-shake { animation: pp-shake 0.3s; }
-@keyframes pp-shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
-.pp-acts { display: flex; gap: 8px; }
-.pp-acts button { flex: 1; padding: 6px 8px; background: none; border: 1px solid var(--pp-amber); color: var(--pp-amber); font: 18px var(--pp-pixel); letter-spacing: 0.14em; cursor: pointer; }
-.pp-acts button:disabled { opacity: 0.35; cursor: default; }
-.pp-acts .pp-go { background: rgba(255, 197, 107, 0.12); color: #ffe2b0; }
-.pp-hint { font-size: 11.5px; color: var(--pp-amber-dim); line-height: 1.5; }
-
-/* booth nine's walk-through */
-.pp-booth-view { position: relative; margin: -2px; padding: 44% 22px 22px; background: #0b0d0c url(/papers/booth.jpg) top center / 100% auto no-repeat; }
-.pp-booth-view::before { content: ''; position: absolute; left: 0; right: 0; top: 0; aspect-ratio: 3 / 2; background: linear-gradient(to bottom, transparent 72%, #0b0d0c 99%); pointer-events: none; }
-.pp-booth-view > * { position: relative; }
-.pp-officer { font: 20px var(--pp-pixel); letter-spacing: 0.14em; color: #ffe2b0; margin-bottom: 8px; }
-.pp-checks { list-style: none; margin: 0; padding: 0; font-size: 13px; line-height: 1.5; max-width: 760px; }
-.pp-check { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 6px; padding: 4px 0; border-bottom: 1px dotted rgba(255, 197, 107, 0.18); color: var(--pp-cream); }
-.pp-check .pp-m { font: 20px var(--pp-pixel); text-align: center; color: #7dffa0; }
-.pp-check.pp-na { color: rgba(243, 220, 180, 0.45); }
-.pp-check.pp-na .pp-m { color: rgba(125, 255, 160, 0.45); }
-.pp-check.pp-bad { color: #ffb4a8; }
-.pp-check.pp-bad .pp-m { color: #ff5a5a; }
-.pp-check.pp-looked .pp-m { color: var(--pp-amber); }
-.pp-check small { display: block; font-size: 11px; color: var(--pp-amber-dim); }
-.pp-verdict { margin-top: 14px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; font: 22px var(--pp-pixel); letter-spacing: 0.2em; }
-.pp-verdict .pp-ink { width: 240px; height: 74px; transform: rotate(-5deg); }
-.pp-verdict.pp-clean { color: #7dffa0; --pp-inkc: rgba(125, 255, 160, 0.85); }
-.pp-verdict.pp-close { color: var(--pp-amber); --pp-inkc: rgba(255, 197, 107, 0.85); }
-.pp-verdict.pp-back { color: #ff5a5a; --pp-inkc: rgba(255, 90, 90, 0.9); }
-.pp-verdict.pp-clean .pp-ink, .pp-verdict.pp-close .pp-ink { --pp-src: url(/papers/stamps/waved-through.png); }
-.pp-verdict.pp-back .pp-ink { --pp-src: url(/papers/stamps/turned-back.png); }
 .pp-dev-best { margin-left: 10px; }
 
-@media (prefers-reduced-motion: reduce) {
-  .pp-meter.pp-shake { animation: none; }
-}
+

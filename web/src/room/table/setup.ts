@@ -10,6 +10,7 @@ import { el, type TableCue } from './el';
 import { approachInfo, contactInfo, favourInfo, GOES_WRONG, mountCardInfo, programInfo, recruitInfo, slotInfo, type Info } from './card-info';
 import { mountTableShell } from './shell';
 import type { Tips } from './tips';
+import { FORCED_FIRST } from '../../../../shared/costs';
 import { approachFace, artFace, contactFace, crewFace, deckLabel, programFace, slotFace } from './faces';
 
 const APPROACH_RULES: Record<Approach, { stats: string; spared: string; first: string }> = {
@@ -74,7 +75,7 @@ export function mountSetup(
   });
   // HARD's TAKE 1 head start is from tier 2 up (balancing 2026-11-01).
   const hardStart = o.tier !== null && o.tier >= 2 ? 'START TAKE 1 · ALARM 1' : 'START ALARM 1';
-  deal.deal(APPROACHES.map((a): TableCard => ({ id: a, face: approachFace(a, a.toUpperCase(), GOES_WRONG[a], { ...APPROACH_RULES[a], ...(a === 'hard' ? { start: hardStart } : {}) }), state: 'up' })));
+  deal.deal(APPROACHES.map((a): TableCard => ({ id: a, face: approachFace(a, a.toUpperCase(), GOES_WRONG[a], { ...APPROACH_RULES[a], ...(FORCED_FIRST ? {} : { first: undefined }), ...(a === 'hard' ? { start: hardStart } : {}) }), state: 'up' })));
   const markApproach = () => {
     for (const c of how.querySelectorAll<HTMLElement>('.tb-card')) c.classList.toggle('chosen', c.dataset.id === approach);
   };

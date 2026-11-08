@@ -193,6 +193,20 @@ describe('the QUEST list', () => {
     expect(rule()).toBe("SENTINEL FIELD DECK2 program slots. Heat 3 at a job's end if you rolled a grid check. Breaker: the wire becomes open on a grid check.");
   });
 
+  it('the FIXER shelf: a program shows its card art, PROGRAM · stat · kind, and its line as the rule', () => {
+    const h = host();
+    const onBuy = vi.fn();
+    const list = mountQuestList(h, { onStart: vi.fn(), onBuy });
+    list.show(listState({ fixer: { place: 'deck-market', items: [{ id: 'leech', name: 'LEECH', kind: 'program', price: 200, tier: 1, stat: 'tech', programKind: 'effect', line: 'Drinks what the lacquer guards.', state: 'ok' }] } }));
+    const card = h.querySelector<HTMLElement>('.ql-fixer .ql-item')!;
+    expect(card.querySelector('img')!.getAttribute('src')).toBe('/programs/leech.webp');
+    expect(card.querySelector('.ql-item-name')!.textContent).toBe('LEECH');
+    expect(card.querySelector('.ql-item-stat')!.textContent).toBe('PROGRAM · TECH · EFFECT');
+    expect(h.querySelector('.ql-gear-rule')!.textContent).toBe('LEECHDrinks what the lacquer guards. Yours for good: load it free at SETUP.');
+    card.querySelector<HTMLButtonElement>('.ql-buy')!.click();
+    expect(onBuy).toHaveBeenCalledWith('leech');
+  });
+
   it('the FIXER shelf: a picture that fails to load becomes the hatch', () => {
     const h = host();
     const list = mountQuestList(h, { onStart: vi.fn() });

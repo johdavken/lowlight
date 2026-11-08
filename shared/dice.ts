@@ -65,7 +65,7 @@ export interface Pool {
   /** The job's tier against this roll (tier effect spec §1): the cut, or what lifted it; absent on tier 1 or a roll that fills no TAKE. */
   tier?: { label: string; lifted: boolean };
   /** The programs running on this roll (programs spec §1.4): `alarm` 1 when below the job's tier. */
-  programs?: { id: string; label: string; alarm: 0 | 1 }[];
+  programs?: { id: string; label: string; alarm: 0 | 1; /** A foil: used up by this run. */ foil?: true }[];
   /** A quiet program runs: HEAT +1 isn't dealt among this roll's costs. */
   quiet?: true;
 }
@@ -169,6 +169,8 @@ export function poolOf(
   for (const c of [who.call, who.press]) if (c?.dice) add(c.label.toUpperCase(), c.dice);
   if (who.next?.die) add('SET UP', 1);
   if (push === 'dice') add('PUSH', 1, 'push');
+  // A foil program (owned programs): its step below, and a die here.
+  for (const x of who.programs ?? []) if (x.foil) add(`${x.name} FOIL`, 1, 'pocket');
   const base = statDice(who.stats[check.stat]);
   const dice = Math.min(POOL_MAX, base + parts.reduce((n, p) => n + p.dice, 0));
   // A greed press's ALARM counts for its own roll (ability pass spec §2), though it lands with it.
@@ -206,7 +208,7 @@ export function poolOf(
   const start = EFFECTS.indexOf(who.tag ?? 'fair');
   const effectRaw = takes ? effectParts.reduce((n, p) => n + p.step, start) : undefined;
   const effect = effectRaw === undefined ? undefined : EFFECTS[Math.max(0, Math.min(2, effectRaw))];
-  const ran = programs.map((x) => ({ id: x.id, label: x.name, alarm: (who.deck && belowTier(who.deck, x, who.tier) ? 1 : 0) as 0 | 1 }));
+  const ran = programs.map((x) => ({ id: x.id, label: x.name, alarm: (who.deck && belowTier(who.deck, x, who.tier) ? 1 : 0) as 0 | 1, ...(x.foil ? { foil: true as const } : {}) }));
   const quiet = programs.some((x) => x.kind === 'quiet');
   return { stat: check.stat.toUpperCase(), base, dice, parts, position, path: { placed, lift: who.call?.lift === true, worse: who.next?.worse === true, ...(who.press?.lift ? { press: true as const } : {}), ...(who.next?.better ? { better: true as const } : {}) }, noDeck, ...(edge ? { deck: edge } : {}), ...(effect ? { effect, effectRaw } : {}), effectParts, ...(cut ? { tier: cut } : {}), ...(ran.length ? { programs: ran } : {}), ...(quiet ? { quiet: true as const } : {}) };
 }

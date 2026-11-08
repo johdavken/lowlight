@@ -157,6 +157,18 @@ describe('openCharacterSheet', () => {
     expect(document.querySelector('[data-section="cover"]')!.textContent).toContain('BURNER×2');
   });
 
+  it('KIT: programs owned by name, foils marked with how many', () => {
+    const programs = [
+      { id: 'solvent', name: 'SOLVENT', stat: 'tech', kind: 'position' as const },
+      { id: 'firewall', name: 'FIREWALL', stat: 'any', kind: 'firewall' as const },
+      { id: 'foil:leech', name: 'LEECH', stat: 'tech', kind: 'effect' as const, foil: true as const, count: 2 },
+    ];
+    openCharacterSheet(document.body, { player: { ...hicks, kit: { ...kit, programs } }, page: 'kit' });
+    const sec = document.querySelector('[data-section="programs"]')!;
+    expect([...sec.querySelectorAll('.cs-chip')].map((c) => c.textContent)).toEqual(['SOLVENT', 'FIREWALL', 'LEECH FOIL×2']);
+    expect(sec.querySelector('.cs-chip.foil')!.textContent).toBe('LEECH FOIL×2');
+  });
+
   it('a refusal survives turning away from KIT and back, and a fresh kit clears it', () => {
     const sheet = openCharacterSheet(document.body, { player: { ...hicks, kit }, page: 'stats' });
     sheet.refusal('Not mid-job.');

@@ -5,13 +5,13 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { ChatMessage, ContactCard, QuestState, ServerEvent } from '../../shared/types';
+import type { ChatMessage, ContactCard, GuestCard, QuestState, ServerEvent } from '../../shared/types';
 import type { TurnRequest } from '../src/backend';
 import { ChatRelay, type ChatRelayDeps } from '../src/chat-relay';
 import { fakeBackend, reply } from './fixtures/backend';
 import { fakePlayers } from './fixtures/players';
 import { openDb, type Db } from '../src/db';
-import { COSTS, type CostId } from '../../shared/costs';
+import { COSTS, FORCED_FIRST, type CostId } from '../../shared/costs';
 import { dealAs, settleLikeOld } from './settle';
 import { GM_HOLD_MS } from '../src/gm';
 import { MISSION_CLOSE, QUEST_INSTRUCTIONS } from '../src/instructions';
@@ -23,7 +23,7 @@ import { flagsOf, parseQuestFile, parseRun, questKey, type DicePending, type Dic
 import { JOB as TIER_2_JOB, TRAIL } from '../../shared/quests.fixture';
 import { foldKit, heatIn, type KitEvent } from '../../shared/mission';
 import type { Deck } from '../../shared/gear';
-import { parsePrograms } from '../../shared/programs';
+import { foilDrop, jobLeans, parsePrograms } from '../../shared/programs';
 import { nerveMax, type Stats } from '../../shared/stats';
 import { storyDay } from '../../shared/board';
 import { makeTerminal, parseWords } from '../../shared/crack';
@@ -127,7 +127,7 @@ const ABILITIES = parseCrewBook({
   ].join('\n'),
 }).book.abilities;
 
-function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?: number[]; deck?: string; rolls?: number[]; nerve?: number; heat?: number; gm?: GmComplete; book?: QuestEntry[]; stats?: Stats; clock?: () => number; burner?: number; rep?: number; sol?: number; crew?: Partial<CrewState>; contacts?: () => ContactCard[]; onLiveClock?: (relay: ChatRelay) => void } = {}) {
+function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?: number[]; deck?: string; rolls?: number[]; nerve?: number; heat?: number; gm?: GmComplete; book?: QuestEntry[]; stats?: Stats; clock?: () => number; burner?: number; rep?: number; sol?: number; crew?: Partial<CrewState>; contacts?: () => ContactCard[]; guests?: () => GuestCard[]; onLiveClock?: (relay: ChatRelay) => void; /** Programs owned (owned programs); default every one. */ programs?: string[]; foils?: Record<string, number> } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const events: ServerEvent[] = [];
@@ -149,10 +149,11 @@ function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?:
     ...(o.nerve !== undefined ? [{ at: clock() - 1, nerve: o.nerve - nerveMax(stats) }] : []),
     // Heat in karasu as the job starts (effect and NERVE spec §1), after the 06:00 that cools it.
     ...(o.heat ? [{ at: clock() - 1, heat: o.heat, district: 'karasu' }] : []),
+    ...Object.entries(o.foils ?? {}).map(([id, foil]): KitEvent => ({ at: 0, program: { id, foil } })),
   ];
   const kit = (p: string, at?: number) =>
     foldKit(
-      { deck: o.deck ?? 'stall-build', nerveMax: nerveMax(stats), from: 0 },
+      { deck: o.deck ?? 'stall-build', nerveMax: nerveMax(stats), from: 0, programs: o.programs ?? PROGRAMS.map((p) => p.id) },
       [...seed, ...status(p).flatMap((s) => (s.run.kit ?? []) as KitEvent[]), ...parseFixer(db.getMeta(fixerKey(p)))].filter((e) => at === undefined || e.at <= at),
       at ?? clock(),
       { districtOf: () => 'karasu' },
@@ -179,6 +180,7 @@ function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?:
     crewState: () => (o.crew ? { members: [], prep: {}, scouted: [], taken: [], latest: null, wages: 0, ...o.crew } : null),
     crewAbilities: () => ABILITIES,
     ...(o.contacts ? { contactCards: o.contacts } : {}),
+    ...(o.guests ? { guestCards: o.guests } : {}),
   };
   const relay: ChatRelay = new ChatRelay({
     ...(o.tie ? { tie: () => o.tie! } : {}),
@@ -340,6 +342,14 @@ describe('jobs: picks', () => {
     expect(relay.questState('hicks').active!.choices.find((c) => c.id === 'grab')!.pool).toMatchObject({ dice: 2, position: 'open' });
     db.setMeta(keyOn(d), JSON.stringify({ ...runOn(db, d)!, alarm: 2 }));
     expect(relay.questState('hicks').active!.choices.find((c) => c.id === 'grab')!.pool).toMatchObject({ dice: 2, position: 'wire' });
+  });
+  it('a card whose miss blows the job says so in the view; a card with no roll does not', async () => {
+    const d = plainDoor('easy');
+    const { relay } = relayWith({ clock: () => evening(d) });
+    await relay.startQuest('hicks', 'back-door');
+    const choices = relay.questState('hicks').active!.choices;
+    expect(choices.find((c) => c.id === 'talk')!.blows).toBe(true);
+    expect(choices.find((c) => c.id === 'wait')!.blows).toBeUndefined();
   });
   it('a red check fails straight to its fail outcome with EDGE left', async () => {
     const d = plainDoor('easy');
@@ -1617,6 +1627,25 @@ const CREW = { members: [member('dez', 'runner'), member('koji', 'muscle'), memb
 const BACK1 = job(JOB.replace('tier: 2', 'tier: 1'));
 const offerOf = (relay: ChatRelay) => relay.questState('hicks').open.find((o) => o.id === 'back-door')?.setup;
 
+describe('a run of a job no longer in the book (The Passenger spec: Found retired)', () => {
+  const run = (o: object) => JSON.stringify({ beat: null, variant: 0, wait: null, picks: [], flags: { hicks_one: 'yes' }, done: true, at: 1, day: 1, ...o });
+  it('a finished one is passed over', async () => {
+    const t = relayWith({ crew: CREW });
+    t.db.setMeta(keyOn(1, 'found'), run({}));
+    const state = t.relay.questState('hicks');
+    expect(JSON.stringify(state.open)).not.toContain('found');
+    expect(state.active ?? null).toBeNull();
+    expect(await t.relay.startQuest('hicks', 'back-door', { approach: 'quiet', people: [], favour: false })).toMatchObject({ ok: true });
+  });
+  it('one stopped mid-job is passed over too', async () => {
+    const t = relayWith({ crew: CREW });
+    t.db.setMeta(keyOn(1, 'found'), run({ beat: 'stair', done: false, setup: { approach: 'quiet', people: [], favour: false, at: 0 } }));
+    const state = t.relay.questState('hicks');
+    expect(state.active?.id).not.toBe('found');
+    expect(await t.relay.startQuest('hicks', 'back-door', { approach: 'quiet', people: [], favour: false })).toMatchObject({ ok: true });
+  });
+});
+
 describe('the hand: the setup at GO IN', () => {
   it('offers ready crew; the favour is on hold (programs spec §2.4)', () => {
     const { relay } = relayWith({ crew: CREW });
@@ -2323,7 +2352,7 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
       await card(t.relay, 'door', 'talk');
       const dealt = waiting(t).dealt!.map((d) => d.cost);
       expect(dealt).not.toContain('small');
-      expect(dealt[0]).toBe('worse');
+      if (FORCED_FIRST) expect(dealt[0]).toBe('worse');
     });
     it('HARD is never dealt ALARM', async () => {
       const t = await go([], crew(), { rolls: [4] });
@@ -2331,7 +2360,23 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
       await card(t.relay, 'door', 'talk');
       expect(waiting(t).dealt!.map((d) => d.cost)).not.toContain('alarm');
     });
-    it('the first pick is refused on another card, then the second is free', async () => {
+    it.skipIf(FORCED_FIRST)('removal: any dealt card can be picked first, and none is marked', async () => {
+      const t = await go([], crew(), { rolls: [4] });
+      await card(t.relay, 'door', 'talk');
+      dealAs(t.db, keyOn(t.d), ['worse', 'alarm', 'small'], 2);
+      expect(firsts(t.relay)).toEqual([]);
+      expect(await card(t.relay, 'door', '!cost', 'worse')).toMatchObject({ ok: true });
+      expect(await card(t.relay, 'door', '!cost', 'small')).toMatchObject({ ok: true });
+    });
+    it.skipIf(FORCED_FIRST)('removal: Stand Firm cancels whichever cost is picked first', async () => {
+      const t = await go(['dez'], crew({ dez: ['firm'] }, { dez: 3 }), { rolls: [4] });
+      as(t, 'hard');
+      await card(t.relay, 'door', 'talk', 'dez/firm');
+      dealAs(t.db, keyOn(t.d), ['take', 'worse'], 2);
+      await card(t.relay, 'door', '!cost', 'worse');
+      expect(waiting(t).settled).toEqual([{ cost: 'worse', how: 'ability' }]);
+    });
+    it.runIf(FORCED_FIRST)('the first pick is refused on another card, then the second is free', async () => {
       const t = await go([], crew(), { rolls: [4] });
       await card(t.relay, 'door', 'talk');
       dealAs(t.db, keyOn(t.d), ['worse', 'alarm', 'small'], 2);
@@ -2339,7 +2384,7 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
       expect(await card(t.relay, 'door', '!cost', 'alarm')).toMatchObject({ ok: true });
       expect(await card(t.relay, 'door', '!cost', 'small')).toMatchObject({ ok: true });
     });
-    it('the view marks the first card until it is picked', async () => {
+    it.runIf(FORCED_FIRST)('the view marks the first card until it is picked', async () => {
       const t = await go([], crew(), { rolls: [4] });
       await card(t.relay, 'door', 'talk');
       dealAs(t.db, keyOn(t.d), ['worse', 'alarm'], 2);
@@ -2366,7 +2411,7 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
       await card(late.relay, 'door', '!cost', 'alarm');
       expect(await card(late.relay, 'door', '!after', 'dez/door-hold')).toBe('before you pick a cost');
     });
-    it('Stand Firm cancels the forced pick', async () => {
+    it.runIf(FORCED_FIRST)('Stand Firm cancels the forced pick', async () => {
       const t = await go(['dez'], crew({ dez: ['firm'] }, { dez: 3 }), { rolls: [4] });
       as(t, 'hard');
       await card(t.relay, 'door', 'talk', 'dez/firm');
@@ -2380,9 +2425,11 @@ describe('crew abilities on the table (crew abilities spec §2)', () => {
       await card(t.relay, 'door', 'talk');
       await card(t.relay, 'door', '!after', 'dez/twice');
       const dealt = waiting(t).dealt!.map((d) => d.cost);
-      expect(dealt[0]).toBe('alarm');
       expect(dealt).not.toContain('take');
-      expect(await card(t.relay, 'door', '!cost', dealt[1])).toBe('pick ALARM +1 first');
+      if (FORCED_FIRST) {
+        expect(dealt[0]).toBe('alarm');
+        expect(await card(t.relay, 'door', '!cost', dealt[1])).toBe('pick ALARM +1 first');
+      } else expect(await card(t.relay, 'door', '!cost', dealt[1])).toMatchObject({ ok: true });
     });
     it('a bare TAKE IT takes the first cost', async () => {
       const t = await go([], crew(), { rolls: [2] });
@@ -4110,6 +4157,44 @@ describe('alarm becomes heat (tier template spec §2)', () => {
   });
 });
 
+describe('a guest from a guest file, on a mission (The Passenger spec, engine §2)', () => {
+  const NOA: GuestCard = { id: 'noa', name: 'Noa Vey', accent: '#9fd', portrait: null, spec: 'runner', art: null, line: 'Dark Cart' };
+  const EMBER: ContactCard = { id: 'ember', name: 'Ember Zhou', accent: '#ff4f8b', portrait: null, spec: 'runner' };
+  const WITH = (id = 'noa') => job(JOB.replace('tier: 1', `tier: 1\nguest: ${id} GREEN`).replace('# desk\n', '# desk\nroom: karasu/dead-blocks\n'));
+  const go = (people: string[]) => ({ approach: 'quiet' as const, people, favour: false });
+  const runOf = (t: ReturnType<typeof relayWith>) => parseRun(t.db.metaWithPrefix('quest.hicks.back-door@')[0]!.v)!;
+  it('a guest file is offered at SETUP on its mission, with no card or lead', () => {
+    const t = relayWith({ book: [WITH()], guests: () => [NOA] });
+    const card = offerOf(t.relay)!.crew.find((c) => c.id === 'guest-noa');
+    expect(card).toMatchObject({ name: 'Noa Vey', spec: 'runner', grade: 0, guest: true, traits: [{ label: 'Dark Cart', good: false }] });
+    expect(card).not.toHaveProperty('art');
+  });
+  it('no guest file and no card: no guest', () => {
+    const t = relayWith({ book: [WITH()] });
+    expect(offerOf(t.relay)!.crew).toEqual([]);
+  });
+  it('goes in as kind guest, sets the flag, and never sends roomGuest', async () => {
+    const t = relayWith({ book: [WITH()], guests: () => [NOA] });
+    expect(await t.relay.startQuest('hicks', 'back-door', go(['guest-noa']))).toMatchObject({ ok: true });
+    expect(runOf(t).setup?.guest).toMatchObject({ id: 'noa', kind: 'guest', grade: 0 });
+    expect(runOf(t).flags['guest.noa']).toBe('yes');
+    await t.relay.chooseQuest('hicks', { id: 'back-door', beat: 'door', choice: 'wait' });
+    expect(t.relay.questState('hicks').active).toMatchObject({ room: 'karasu/dead-blocks' });
+    expect(t.relay.questState('hicks').active!.roomGuest).toBeUndefined();
+  });
+  it('her art, when the file names one, is on the card in the hand', async () => {
+    const t = relayWith({ book: [WITH()], guests: () => [{ ...NOA, art: '/api/crew/art/noa.webp' }] });
+    await t.relay.startQuest('hicks', 'back-door', go(['guest-noa']));
+    expect(t.relay.questState('hicks').active!.hand!.people[0]).toMatchObject({ id: 'guest-noa', guest: true, art: '/api/crew/art/noa.webp' });
+  });
+  it('a contact still wins over a guest file of the same id', async () => {
+    const t = relayWith({ book: [WITH('ember')], contacts: () => [EMBER], guests: () => [{ ...NOA, id: 'ember', art: '/api/crew/art/x.webp' }] });
+    expect(offerOf(t.relay)!.crew.find((c) => c.id === 'guest-ember')).toMatchObject({ name: 'Ember Zhou', art: '/contacts/ember.webp' });
+    await t.relay.startQuest('hicks', 'back-door', go(['guest-ember']));
+    expect(runOf(t).setup?.guest).not.toHaveProperty('kind');
+  });
+});
+
 describe('a contract (tier 3 contracts spec §2)', () => {
   const CON = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]'), 'the-contract');
   const stats = { ...HICKS };
@@ -4724,5 +4809,97 @@ describe('a contract (tier 3 contracts spec §2)', () => {
     await toNight(n);
     await n.relay.startQuest('hicks', 'the-contract', go);
     expect(await n.relay.walkAway('hicks', 'the-contract')).toBe("you can't walk away now");
+  });
+});
+
+describe('owned programs (owned programs plan)', () => {
+  /** The first easy-door day whose run of `q` drops a foil (or, `drop: false`, doesn't). */
+  const dropDay = (q: QuestEntry, drop = true) => {
+    for (let d = 0; d < 400; d++) {
+      const draws = drawsFor(q, questKey('hicks', `${q.id}@${d}`));
+      if (draws.complication === 'caper-watching' || draws.door !== 'easy') continue;
+      if (Boolean(foilDrop(`pt-1|${questKey('hicks', `${q.id}@${d}`)}`, jobLeans(q), PROGRAMS)) === drop) return d;
+    }
+    throw new Error('no such day');
+  };
+
+  it('SETUP offers only what you own, then each foil held with its count', () => {
+    const offer = offerOf(relayWith({ book: [PROG], deck: 'meridian', programs: ['firewall', 'solvent'], foils: { leech: 2, spike: 1 } }).relay)!;
+    expect(offer.programs!.map((p) => p.id)).toEqual(['solvent', 'firewall', 'foil:leech', 'foil:spike']);
+    expect(offer.programs![2]).toMatchObject({ name: 'LEECH', foil: true, count: 2 });
+    expect(offer.programs![3].count).toBeUndefined();
+  });
+
+  it("GO IN refuses a program you don't own; mid-job too", async () => {
+    const d = plainDoor('easy');
+    const t = relayWith({ book: [PROG], clock: () => evening(d), deck: 'meridian', programs: ['firewall', 'solvent'] });
+    expect(await t.relay.startQuest('hicks', 'back-door', { approach: 'smooth', people: [], favour: false, programs: ['leech'] })).toBe("YOU DON'T HAVE IT");
+    expect(await t.relay.startQuest('hicks', 'back-door', { approach: 'smooth', people: [], favour: false, programs: ['solvent'] })).toMatchObject({ ok: true });
+    expect(await choose(t.relay, 'door', 'talk', { load: ['leech'] })).toBe('NOTHING TO DO HERE');
+    expect(t.relay.questState('hicks').active!.hand!.pockets!.catalog.map((p) => p.id)).toEqual(['solvent', 'firewall']);
+  });
+
+  it('a foil runs once with a die more, then leaves the kit and its slot reads BURNED', async () => {
+    const t = await go({ deck: 'meridian', programs: ['firewall'], foils: { solvent: 1 }, rolls: [6, 6] });
+    const plain = t.relay.questState('hicks').active!.choices.find((c) => c.id === 'talk')!.pool!.dice;
+    expect(t.relay.questState('hicks').active!.choices.find((c) => c.id === 'talk')!.programs!['foil:solvent']).not.toHaveProperty('why');
+    await choose(t.relay, 'door', 'talk', { load: ['foil:solvent'] });
+    const run = runOn(t.db, t.d)!;
+    expect(run.picks[0].roll).toMatchObject({ programs: ['foil:solvent'], dice: plain + 1 });
+    expect(run.programs).toEqual([{ id: 'foil:solvent', at: expect.any(Number), hot: true, burned: true }]);
+    expect(t.kit().programs!.foil.solvent).toBe(0);
+    const pockets = t.relay.questState('hicks').active!.hand!.pockets!;
+    expect(pockets.loaded).toEqual([expect.objectContaining({ id: 'foil:solvent', burned: true, foil: true })]);
+    expect(pockets.catalog.map((p) => p.id)).toEqual(['firewall']);
+    expect(await choose(t.relay, 'desk', 'grab', { run: ['foil:solvent'] })).toBe('NOT LOADED');
+  });
+
+  it('a job that ends well may drop a foil, seeded by the run: the debrief names it and the kit holds it', async () => {
+    const d = dropDay(BACK);
+    const found = foilDrop(`pt-1|${questKey('hicks', `back-door@${d}`)}`, jobLeans(BACK), PROGRAMS)!;
+    const { relay, db, kit } = relayWith({ clock: () => evening(d), rolls: [66, 66] });
+    await relay.startQuest('hicks', 'back-door');
+    await pick(relay, 'door', 'talk');
+    await pick(relay, 'desk', 'grab');
+    expect(questRows(db).at(-1)!.quest!.debrief).toMatchObject({ tier: 'clean', found: PROGRAMS.find((p) => p.id === found)!.name });
+    expect(kit().programs!.foil[found]).toBe(1);
+    const lean = PROGRAMS.find((p) => p.id === found)!.stat;
+    expect(lean).toBe(jobLeans(BACK)[0]);
+  });
+
+  it('a job that drops nothing has no found line', async () => {
+    const d = dropDay(BACK, false);
+    const { relay, db, kit } = relayWith({ clock: () => evening(d), rolls: [66, 66] });
+    await relay.startQuest('hicks', 'back-door');
+    await pick(relay, 'door', 'talk');
+    await pick(relay, 'desk', 'grab');
+    expect(questRows(db).at(-1)!.quest!.debrief!.found).toBeUndefined();
+    expect(kit().programs!.foil).toEqual({});
+  });
+
+  it('a blown job never drops', async () => {
+    const d = dropDay(BACK);
+    const { relay, db, kit } = relayWith({ clock: () => evening(d), rolls: [2], nerve: 1 });
+    await relay.startQuest('hicks', 'back-door');
+    await pick(relay, 'door', 'talk');
+    expect(questRows(db).at(-1)!.quest!.debrief).toMatchObject({ tier: 'blown' });
+    expect(questRows(db).at(-1)!.quest!.debrief!.found).toBeUndefined();
+    expect(kit().programs!.foil).toEqual({});
+  });
+});
+
+describe('programs at the fixer (owned programs plan)', () => {
+  const STOCKED = parseStock(`---\nplace: haes-noodles\nitems:\n  - solvent · 200 · 1\n  - leech · 200 · 1\n---\n`, new Set(DECKS.map((d) => d.id)), new Set(PROGRAMS.map((p) => p.id))).byPlace;
+  it('a program on the shelf; buying one makes it yours; one you own reads owned', () => {
+    const { relay, kit } = relayWith({ sol: 500, programs: ['firewall', 'solvent'] });
+    // The harness's stock is fixed: swap it for one with programs.
+    (relay as unknown as { jobs: { deps: { quests: { stock: () => typeof STOCKED } } } }).jobs.deps.quests.stock = () => STOCKED;
+    expect(relay.questState('hicks').fixer!.items).toEqual([
+      { id: 'solvent', name: 'SOLVENT', kind: 'program', price: 200, tier: 1, stat: 'tech', programKind: 'position', line: expect.any(String), state: 'owned' },
+      { id: 'leech', name: 'LEECH', kind: 'program', price: 200, tier: 1, stat: 'tech', programKind: 'effect', line: expect.any(String), state: 'ok' },
+    ]);
+    expect(relay.buy('hicks', 'solvent')).toMatch(/already have/);
+    expect(relay.buy('hicks', 'leech')).toEqual({ ok: true, text: 'ok' });
+    expect(kit()).toMatchObject({ sol: 300, programs: { owned: ['firewall', 'solvent', 'leech'] } });
   });
 });

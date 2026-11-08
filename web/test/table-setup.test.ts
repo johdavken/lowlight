@@ -282,7 +282,7 @@ describe('SETUP with the deck (programs spec §2.4)', () => {
     };
     expect(offered(DECKED)).toEqual(['approach', 'people', 'program']);
     expect(offered({ ...DECKED, deck: null, programs: undefined })).toEqual(['approach', 'people']);
-    expect(tipText('program')).toBe('Load programs here, free: they stay loaded for the job. SLOTS 1, 2, 2 or 3, by your deck\'s quality. MID-JOB Loading one costs 1 NERVE. BELOW TIER Below the job\'s tier the lacquer notices each run: ALARM +1.');
+    expect(tipText('program')).toBe('Load programs you own here, free: they stay loaded for the job. YOURS FIREWALL and one for your best stat. Fixers sell the rest. FOIL A job can drop one: a single run, a die more, then gone. SLOTS 1, 2, 2 or 3, by your deck\'s quality. MID-JOB Loading one costs 1 NERVE. BELOW TIER Below the job\'s tier the lacquer notices each run: ALARM +1.');
   });
 
   it('a tap outside the cards closes the tray', () => {

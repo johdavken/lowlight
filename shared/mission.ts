@@ -4,6 +4,7 @@
  */
 import { DAY } from './clock';
 import type { Deck } from './gear';
+import type { OwnedPrograms } from './programs';
 import type { StatKey, Stats } from './stats';
 import { holds, type CondCtx, type Condition } from './quests';
 
@@ -96,6 +97,8 @@ export interface KitEvent {
   edge?: -1;
   rep?: { district: string; delta: number };
   cover?: { id: CoverId; delta: number };
+  /** A program (owned programs): no `foil`, one owned for good (a buy); `foil`, that many foil copies more or fewer. */
+  program?: { id: string; foil?: number };
 }
 
 export type CoverId = 'burner' | 'fall-guy';
@@ -117,6 +120,8 @@ export interface Kit {
   nerveGone: boolean;
   /** Outfits endings gave (`<character>/<outfit>`), in the order earned. */
   outfits?: string[];
+  /** Programs owned (owned programs): the starter, buys, and foil copies held. */
+  programs?: OwnedPrograms;
 }
 
 export const heatIn = (k: Kit, district: string | null): number => (district ? (k.heat[district] ?? 0) : 0);
@@ -154,14 +159,14 @@ export interface KitHooks {
  * put more on the same timeline (crew); kit events go first at the same minute.
  */
 export function foldKit(
-  start: { deck: string | null; pocket?: string | null; nerveMax: number; from: number },
+  start: { deck: string | null; pocket?: string | null; nerveMax: number; from: number; /** The starter programs (owned programs). */ programs?: readonly string[] },
   events: KitEvent[],
   now: number,
   o: { districtOf?(e: KitEvent): string | null; hooks?: KitHooks } = {},
 ): Kit {
   // `pocket`: the deck everyone owns; carried only by someone who starts with no other.
   const deck = start.deck ?? start.pocket ?? null;
-  const k: Kit = { deck, owned: [...new Set([deck, start.pocket ?? null])].filter((d) => d !== null), sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: start.nerveMax, nerveMax: start.nerveMax, nerveGone: false, outfits: [] };
+  const k: Kit = { deck, owned: [...new Set([deck, start.pocket ?? null])].filter((d) => d !== null), sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: start.nerveMax, nerveMax: start.nerveMax, nerveGone: false, outfits: [], programs: { owned: [...(start.programs ?? [])], foil: {} } };
   const applyEvent = (e: KitEvent) => {
     if (e.sol) k.sol = Math.max(0, k.sol + e.sol);
     if (e.heat) {
@@ -171,6 +176,11 @@ export function foldKit(
     if (e.rep) k.rep[e.rep.district] = Math.min(100, Math.max(0, (k.rep[e.rep.district] ?? 0) + e.rep.delta));
     if (e.cover) k.cover[e.cover.id] = Math.max(0, k.cover[e.cover.id] + e.cover.delta);
     if (e.outfit && !k.outfits!.includes(e.outfit)) k.outfits!.push(e.outfit);
+    if (e.program) {
+      const own = k.programs!;
+      if (e.program.foil) own.foil[e.program.id] = Math.max(0, (own.foil[e.program.id] ?? 0) + e.program.foil);
+      else if (!own.owned.includes(e.program.id)) own.owned.push(e.program.id);
+    }
     // Decks by name first (review I2): a same-minute swap can't put a dead deck back in hand, or kill the wrong one.
     if (e.lose) {
       k.owned = k.owned.filter((d) => !e.lose!.includes(d));

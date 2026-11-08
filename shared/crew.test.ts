@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { worksInGraft, type Ability, type CrewBook, type ErrandKind, type Trait } from './crew-book';
-import { growthStep, abilityPool, crewOdds, sellErrand, traitHas, dueAt, hireAbility, offerFor, errandsFor, hiresFor, jobRecruitCard, jobRecruitId, loyaltyWord, parseInstance, rollSend, slots, vouchedFor, WAGE, type Recruit } from './crew';
+import { growthStep, abilityPool, crewOdds, sellErrand, traitHas, dueAt, hireAbility, offerFor, errandsFor, hiresFor, fitFaces, jobRecruitCard, jobRecruitId, loyaltyWord, parseInstance, rollSend, slots, vouchedFor, WAGE, type Recruit } from './crew';
 import hiresBefore from './crew-hires.fixture.json';
 import type { Extra } from './extras';
 import type { GoodsKind } from './goods';
@@ -255,6 +255,19 @@ describe('drawRecruit names and faces', () => {
     expect(one(new Set(['Daichi Mori']))).toBe('G Seven');
     expect(one(new Set(['Daichi Mori', 'G Seven']))).toBe('Daichi Mori');
   });
+  it('a home district with no name for the face takes a fitting one from another district before a clashing one', () => {
+    const two: CrewBook = { ...gbook, names: { karasu: ['Daichi Mori'], strand: ['Hana Ibe'] } };
+    const womanOnly = [face('crew-wire-02', ['crew', 'runner', 'woman'])];
+    let seen = 0;
+    for (let day = 0; day < 20; day++) {
+      // The night's first card: later ones can find both names spent.
+      const r = hiresFor({ ...gbase, book: two, faces: womanOnly, day, origins: ['karasu'] })[0].recruit;
+      if (!r?.face) continue;
+      expect(r.name).toBe('Hana Ibe');
+      seen++;
+    }
+    expect(seen).toBeGreaterThan(5);
+  });
   it('skips names already on the crew', () => {
     for (let day = 0; day < 100; day++)
       for (const c of hiresFor({ ...gbase, day, usedNames: new Set(['Daichi Mori', 'Hana Ibe']) })) if (c.recruit) expect(['Daichi Mori', 'Hana Ibe']).not.toContain(c.recruit.name);
@@ -399,5 +412,32 @@ describe('traits on a job', () => {
   it('a job reads heat, wages and the two falls; errand effects stay off its cards', () => {
     for (const e of [{ kind: 'heat-on-messy', n: 1 }, { kind: 'never-held' }, { kind: 'hurt-not-gone-once' }, { kind: 'wage-on-clean', n: 15 }] as const) expect(worksInGraft(trait(e))).toBe(true);
     for (const e of [{ kind: 'odds', errand: 'any', delta: 5 }, { kind: 'pay', errand: 'any', pct: 10 }, { kind: 'hours', pct: -33 }, { kind: 'busy', days: 2 }, { kind: 'sells-anywhere' }, { kind: 'full-route' }] as const) expect(worksInGraft(trait(e))).toBe(false);
+  });
+});
+
+describe('fitFaces (hires from before names had a man/woman mark)', () => {
+  const gbook: CrewBook = { ...book, genders: { 'Daichi Mori': 'man', 'Sal Duran': 'man', 'Hana Ibe': 'woman' } };
+  const gfaces = [face('crew-wire-04', ['crew', 'runner', 'young', 'woman']), face('crew-runner-01', ['crew', 'runner', 'woman']), face('crew-runner-07', ['crew', 'runner', 'man']), face('crew-wire-05', ['crew', 'runner', 'man']), face('crew-runner-05', ['crew', 'runner', 'young']), face('local-03', ['local', 'man'])];
+  const r = (id: string, name: string, f: string | null, spec: Recruit['spec'] = 'runner') => recruit({ id, name, face: f, spec });
+  it('gives a marked name on the other kind of face a fitting face of its specialty, not one the crew has', () => {
+    const out = fitFaces([r('r-a', 'Daichi Mori', 'crew-wire-04', 'wire' as Recruit['spec']), r('r-b', 'Sal Duran', 'crew-runner-01'), r('r-c', 'Hana Ibe', 'crew-runner-07')], gbook, gfaces);
+    expect(out[0].face).not.toBe('crew-wire-04');
+    expect(out[1].face).not.toBe('crew-runner-01');
+    for (const x of out.slice(0, 2)) expect(['crew-wire-05', 'crew-runner-07']).toContain(x.face);
+    expect(out[0].face).not.toBe(out[1].face);
+    // Hana's man's face has no free woman's face of her trade left but her own clash: both women's faces were freed.
+    expect(['crew-wire-04', 'crew-runner-01']).toContain(out[2].face);
+  });
+  it('leaves unmarked names, fitting faces and untagged faces as they are', () => {
+    const xs = [r('r-a', 'Juno Sato', 'crew-runner-01'), r('r-b', 'Sal Duran', 'crew-runner-07'), r('r-c', 'Daichi Mori', 'crew-runner-05'), r('r-d', 'Hana Ibe', null)];
+    expect(fitFaces(xs, gbook, gfaces)).toEqual(xs);
+  });
+  it('falls back to a local face that fits, and keeps the old one when nothing fits', () => {
+    expect(fitFaces([r('r-a', 'Sal Duran', 'crew-runner-01', 'fence')], gbook, gfaces)[0].face).toBe('local-03');
+    expect(fitFaces([r('r-a', 'Hana Ibe', 'crew-runner-07', 'fence')], gbook, gfaces)[0].face).toBe('crew-runner-07');
+  });
+  it('is the same every time', () => {
+    const xs = [r('r-a', 'Daichi Mori', 'crew-wire-04'), r('r-b', 'Sal Duran', 'crew-runner-01')];
+    expect(fitFaces(xs, gbook, gfaces)).toEqual(fitFaces(xs, gbook, gfaces));
   });
 });

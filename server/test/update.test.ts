@@ -100,7 +100,7 @@ describe('statusFrom', () => {
 });
 
 describe('updateChecker', () => {
-  it('asks GitHub to compare HEAD with main, once per HEAD per half hour', async () => {
+  it('asks GitHub to compare HEAD with main, once per HEAD per five minutes', async () => {
     let now = 1_000_000;
     const fetch = answer(compare());
     const check = updateChecker({ git: gitIn(clone), launcher: true, apiBase: 'https://api.test', fetch: fetch as unknown as typeof globalThis.fetch, now: () => now });
@@ -109,7 +109,10 @@ describe('updateChecker', () => {
     expect(String((fetch.mock.calls[0] as unknown[])[0])).toBe(`https://api.test/repos/${PUBLIC_REPO}/compare/${head}...main`);
     await check();
     expect(fetch).toHaveBeenCalledTimes(1);
-    now += 31 * 60_000;
+    now += 4 * 60_000;
+    await check();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    now += 2 * 60_000;
     await check();
     expect(fetch).toHaveBeenCalledTimes(2);
   });

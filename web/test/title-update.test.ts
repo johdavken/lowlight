@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { UpdateInfo, UpdateStatus } from '../../shared/update';
-import { UPDATE_POLL_MS, mountTitle, type TitleUpdate } from '../src/landing/title';
+import { UPDATE_POLL_MS, UPDATE_RECHECK_MS, mountTitle, type TitleUpdate } from '../src/landing/title';
 import type { PlaythroughApi } from '../src/net/playthroughs';
 
 const NOW = Date.UTC(2026, 10, 8, 22, 0, 0);
@@ -61,6 +61,26 @@ afterEach(() => {
 });
 
 describe('UPDATE on the title', () => {
+  it('asks again while the title is up and when the window comes back: a fresh export shows without a restart', async () => {
+    let info: UpdateInfo = { eligible: true, status: status({ available: false, behind: 0 }) };
+    const ask = vi.fn(async () => info);
+    await mount(fakeUpdate(info, { status: ask }));
+    expect(rows()).not.toContain('update');
+    info = { eligible: true, status: status() };
+    await vi.advanceTimersByTimeAsync(UPDATE_RECHECK_MS);
+    expect(rows()).toContain('update');
+    const calls = ask.mock.calls.length;
+    window.dispatchEvent(new Event('focus'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(ask.mock.calls.length).toBe(calls + 1);
+    // Already up: a re-check leaves the band (and the focused row) alone.
+    key('ArrowDown');
+    const at = focused();
+    await vi.advanceTimersByTimeAsync(UPDATE_RECHECK_MS);
+    expect(focused()).toBe(at);
+    expect(rows().filter((r) => r === 'update')).toHaveLength(1);
+  });
+
   it('has no tile without the update deps, outside a public clone, or with nothing new', async () => {
     await mount();
     expect(rows()).toEqual(['new', 'report']);

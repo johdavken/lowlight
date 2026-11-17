@@ -58,6 +58,11 @@ export const UPDATE_GIVE_UP_MS = 15 * 60_000;
 /** An update result younger than this is announced on the title, once. */
 const UPDATE_NOTICE_MS = 2 * 60_000;
 const UPDATE_SEEN_KEY = 'lowlight.updateSeen';
+/**
+ * While the title is up it asks about updates again this often, and when the window comes back into focus, so a fresh
+ * export shows without restarting the game (the server answers from its 5-minute cache in between, update.ts).
+ */
+export const UPDATE_RECHECK_MS = 5 * 60_000;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 /** "Nov 8". */
@@ -156,7 +161,8 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
 
   /** Asks whether there's an update, apart from load() so CONTINUE never waits on GitHub. */
   async function checkUpdate(): Promise<void> {
-    if (!deps.update) return;
+    // During UPDATE the wait reads lastAt to see the game come back: a re-check now would move it.
+    if (!deps.update || busy) return;
     let info: UpdateInfo;
     try {
       info = await deps.update.status();
@@ -171,7 +177,8 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
       error.textContent = last.ok ? `UPDATED · ${last.to.slice(0, 8)}` : `// UPDATE FAILED — ${last.error ?? 'see the terminal'}`;
     }
     update = info.status ?? null;
-    if (!loaded || busy || !update?.available) return;
+    // The tile shows once; a re-check that finds it already up leaves the band as it is.
+    if (!loaded || busy || !update?.available || items.includes('update')) return;
     const at = items[index];
     items = menu();
     index = Math.max(0, items.indexOf(at));
@@ -551,6 +558,12 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   window.addEventListener('keydown', onKey);
   void load();
   void checkUpdate();
+  const recheck = setInterval(() => void checkUpdate(), UPDATE_RECHECK_MS);
+  const onBack = () => {
+    if (document.visibilityState === 'visible') void checkUpdate();
+  };
+  window.addEventListener('focus', onBack);
+  document.addEventListener('visibilitychange', onBack);
 
   return {
     /** The roster changed (it arrived, or a poll): redraw what's shown, unless JACK IN is under way. */
@@ -563,6 +576,9 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
       destroyed = true;
       if (jackTimer !== null) clearTimeout(jackTimer);
       if (pollTimer !== null) clearTimeout(pollTimer);
+      clearInterval(recheck);
+      window.removeEventListener('focus', onBack);
+      document.removeEventListener('visibilitychange', onBack);
       window.removeEventListener('keydown', onKey);
       help.destroy();
       box.remove();

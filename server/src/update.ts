@@ -14,7 +14,11 @@ import type { UpdateInfo, UpdateResult, UpdateStatus } from '../../shared/update
 export const PUBLIC_REPO = 'johdavken/lowlight';
 const escaped = PUBLIC_REPO.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 const PUBLIC_REMOTE = new RegExp(`^(https://github\\.com/|git@github\\.com:|ssh://git@github\\.com/)${escaped}(\\.git)?/?$`, 'i');
-const CHECK_TTL_MS = 30 * 60_000;
+/**
+ * How long an answer stands (2026-11-16: 30 min hid a fresh export until the server restarted). The title asks again
+ * every TITLE_RECHECK and on focus; GitHub allows 60 unauthenticated calls an hour, and this is 12 at most.
+ */
+const CHECK_TTL_MS = 5 * 60_000;
 /** A failed check (offline, rate-limited) waits less before the next try, but still waits. */
 const FAIL_TTL_MS = 5 * 60_000;
 const API_TIMEOUT_MS = 10_000;
@@ -109,7 +113,7 @@ export interface CheckDeps {
   now?: () => number;
 }
 
-/** Checks GitHub at most every 30 min per HEAD (5 after a failure); a new HEAD checks again. */
+/** Checks GitHub at most every 5 min per HEAD (also after a failure); a new HEAD checks again. */
 export function updateChecker(deps: CheckDeps): () => Promise<UpdateStatus> {
   const doFetch = deps.fetch ?? fetch;
   const now = deps.now ?? Date.now;

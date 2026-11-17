@@ -302,7 +302,7 @@ export function mountSolo(root: HTMLElement, deps: SoloDeps): { destroy(): void 
 
 /** The `/solo` page. */
 export async function startSolo(): Promise<void> {
-  document.title = 'On your own · Nix Room';
+  document.title = 'On your own · Lowlight';
   const [api, art, { AudioEngine }, { createRoomAudio }] = await Promise.all([
     import('../net/playthroughs'),
     splashArt(),

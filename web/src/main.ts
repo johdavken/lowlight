@@ -2480,7 +2480,7 @@ function startRoom(agentId: string): void {
         feed.setAgentName(e.name);
         input.setAgentName(e.name);
         document.documentElement.style.setProperty('--agent', e.accent);
-        document.title = `${e.name} · Nix Room`;
+        document.title = `${e.name} · Lowlight`;
         break;
       case 'journal':
         journal.setNotes(e.notes);

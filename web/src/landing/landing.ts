@@ -1101,7 +1101,7 @@ export function mountLanding(
 
 /** Entry point from main.ts. */
 export async function startLanding(): Promise<void> {
-  document.title = 'Dial-in · Nix Room';
+  document.title = 'Dial-in · Lowlight';
   const root = document.createElement('div');
   gameRoot().append(root);
   const [{ createPreview }, { AudioEngine }, { createRoomAudio }] = await Promise.all([

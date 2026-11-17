@@ -94,7 +94,7 @@ export async function start(env: NodeJS.ProcessEnv, log: (line: string) => void 
   const address = app.server.address();
   const url = `http://127.0.0.1:${typeof address === 'object' && address ? address.port : cfg.port}`;
   const connected = built.agents().filter(isConnected).map((a) => a.info.id);
-  log(`Nix Room listening on ${url} — rooms: ${connected.join(', ') || 'none connected yet'}`);
+  log(`Lowlight listening on ${url} — rooms: ${connected.join(', ') || 'none connected yet'}`);
 
   let closed: Promise<void> | null = null;
   const close = (): Promise<void> => {

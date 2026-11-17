@@ -1,0 +1,22 @@
+/* THE GAME IS STARTING (server-gate.ts): the stage's dark, the word on two hairlines in the trace's red, a timer. */
+.game-starting {
+  --c: var(--ui-red, #ff4d4d);
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 22px;
+  background: #05020a;
+  font-family: var(--pixel);
+  animation: gs-in 0.3s steps(4, end) backwards;
+}
+.gs-word { display: flex; align-items: center; gap: 18px; font: 40px/1 var(--pixel); letter-spacing: 0.42em; color: var(--c); text-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); }
+.gs-word::before, .gs-word::after { content: ''; width: 160px; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 70%, transparent)); }
+.gs-word::after { transform: scaleX(-1); }
+.gs-line { font: 18px/1 var(--pixel); letter-spacing: 0.3em; color: #d9e4ea; animation: gs-blink 1.2s steps(2, jump-none) infinite; }
+.gs-time { font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: #8fa3ad; }
+@keyframes gs-in { 0%, 35% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes gs-blink { 50% { opacity: 0.45; } }
+@media (prefers-reduced-motion: reduce) { .game-starting, .gs-line { animation: none; } }

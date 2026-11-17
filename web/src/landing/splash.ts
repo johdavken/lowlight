@@ -126,7 +126,8 @@ export function sessionSplashArt(session: Store | undefined = globalThis.session
 /**
  * The splash for this showing (spec 2026-10-09 splash library §4.1): one of the library's images
  * switched on, at random, never the last one shown when there are two or more. Kept in the session
- * for Esc back to it. The built-in on an error, an empty list, or no answer within `timeoutMs`.
+ * for Esc back to it. The built-in on an error, an empty list, or no answer within `timeoutMs` (3 s: the dial-in has waited for the
+ * server already, server-gate.ts, but a just-started one can be slow to answer).
  */
 export async function splashArt(
   o: { fetchImpl?: typeof fetch; timeoutMs?: number; random?: () => number; local?: Store; session?: Store } = {},
@@ -136,7 +137,7 @@ export async function splashArt(
   let list: SplashArt[] = [];
   let notice: NoticeText | undefined;
   try {
-    const res = await (o.fetchImpl ?? fetch)('/api/splashes', { signal: AbortSignal.timeout(o.timeoutMs ?? 1000) });
+    const res = await (o.fetchImpl ?? fetch)('/api/splashes', { signal: AbortSignal.timeout(o.timeoutMs ?? 3000) });
     if (res.ok) {
       const body = (await res.json()) as { splashes?: { id: string; url: string; width: number; height: number; logo: ArtLogo; panel?: SplashPanel }[]; notice?: NoticeText };
       notice = body.notice;

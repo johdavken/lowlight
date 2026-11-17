@@ -14,6 +14,7 @@ import { FighterStrip, type StripModels } from './fighter-strip';
 import { glitchIn, mountStage } from './stage';
 import { mountTitle, type TitleCue } from './title';
 import { startUpdate, updateStatus } from '../net/update';
+import { waitForGame } from './server-gate';
 import { mountLoad } from './load';
 import { MENU_CUE_URL, menuCuePlayer } from './menu-sound';
 import * as playthroughs from '../net/playthroughs';
@@ -1104,6 +1105,8 @@ export async function startLanding(): Promise<void> {
   document.title = 'Dial-in · Lowlight';
   const root = document.createElement('div');
   gameRoot().append(root);
+  // A starting server (cold, or back from an UPDATE) says so here, instead of a fallback logo and an empty roster.
+  await waitForGame(gameRoot());
   const [{ createPreview }, { AudioEngine }, { createRoomAudio }] = await Promise.all([
     import('./preview'),
     import('../audio/engine'),
@@ -1124,9 +1127,9 @@ export async function startLanding(): Promise<void> {
   const menuCue = menuCuePlayer(audio);
   setFrontCue((n) => audio.cue(`/sound/front/${n}.ogg`, 0.9));
 
-  // The theme Studio picked (the built-in on an error or no answer within 1 s), fetched as soon as it's
-  // known so it's ready by the first key (the engine's fetch hits this cache).
-  const themePick = fetch('/api/menu-theme', { signal: AbortSignal.timeout(1000) })
+  // The theme Studio picked (the built-in on an error or no answer within 3 s: the server has answered by now, but its
+  // first calls can be slow), fetched as soon as it's known so it's ready by the first key (the engine's fetch hits this cache).
+  const themePick = fetch('/api/menu-theme', { signal: AbortSignal.timeout(3000) })
     .then((r) => (r.ok ? (r.json() as Promise<Partial<MenuSong>>) : null))
     .then((t): MenuSong => (typeof t?.title === 'string' && typeof t.url === 'string' ? { title: t.title, url: t.url } : THEME))
     .catch(() => THEME);

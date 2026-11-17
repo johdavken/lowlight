@@ -19,11 +19,11 @@ take jobs and gigs, crack lacquer, hire a crew, and earn trust from people who d
 It runs on your own machine. Bring an OpenRouter key; the characters' turns go to the models you pick.
 
 <p align="center">
-  <img src="docs/readme/shot-room.webp" alt="Nix answers in the Lowlight Intake, rain on the window behind her" width="100%">
+  <img src="docs/readme/shot-room.webp" alt="Nix at the Lowlight Intake past midnight, binder under her arm, a Sentinel due on the stairs; the red HUD trace across the top" width="100%">
 </p>
 <p align="center">
-  <img src="docs/readme/shot-select.webp" alt="The select screen: you play Hicks, you call Nix" width="49%">
-  <img src="docs/readme/shot-map.webp" alt="The city map at night: districts, the bay, the places you can go" width="49%">
+  <img src="docs/readme/shot-select.webp" alt="The select screen grouped by district: you play Hicks, you call Nix" width="49%">
+  <img src="docs/readme/shot-map.webp" alt="The city map at night, the Lowlight Intake picked: who's here, who runs it, what to watch for" width="49%">
 </p>
 
 ## Features
@@ -94,8 +94,8 @@ shows there once you've learned it.
 ### Quests, jobs, big jobs and gigs
 
 <p align="center">
-  <img src="docs/readme/shot-quest.webp" alt="A quest card: an SDG Sentinel at the Intake asks Nix for one page of her ledger, with three choices" width="49%">
-  <img src="docs/readme/shot-job.webp" alt="A job at the Intake: a collector on the stairs, choices with their odds, ALARM, EDGE, HEAT and PAY above" width="49%">
+  <img src="docs/readme/shot-quest.webp" alt="JOBS: Last Ferry, one of Nix's clients, a man to walk down the Ferry Stairs past a Sentinel reading faces" width="49%">
+  <img src="docs/readme/shot-job.webp" alt="Graft SETUP for Last Ferry: QUIET, SMOOTH or HARD, Noor on the crew and FIREWALL loaded in the deck" width="49%">
 </p>
 
 - **Jobs** are one night's work off a board or from a fixer, tiered by how much the district trusts you. Your
@@ -103,7 +103,7 @@ shows there once you've learned it.
   by district. Nix's own clients bring jobs to the Intake, with her trust as the stake.
 
 <p align="center">
-  <img src="docs/readme/gigs.webp" alt="The Graft table: a beat's cards, the dice, and TAKE, ALARM and NERVE above" width="100%">
+  <img src="docs/readme/gigs.webp" alt="The Graft table on the red trace: the Sentinel beat, three cards to roll, TAKE, ALARM and NERVE above" width="100%">
 </p>
 
 **Graft** is the job game, and every job ends up there. It's played at a table of cards with dice, using rules
@@ -133,7 +133,7 @@ permits, stamps and letters that gets past the clerk, before the risk adds up.
 ### The YOU panel
 
 <p align="center">
-  <img src="docs/readme/shot-you.webp" alt="Soren's YOU panel: his figure in his work outfit, six stats, and skills marked NOT YET" width="100%">
+  <img src="docs/readme/shot-you.webp" alt="YOU → STATS: Case's figure beside six stats, and skills marked NOT YET" width="100%">
 </p>
 
 YOU (Alt+Y) opens on your FILE: who you are, from the select screen or your own persona. Your figure stands
@@ -148,7 +148,7 @@ your chrome, grid and hard SOL, and CHROME.
 ### Crew
 
 <p align="center">
-  <img src="docs/readme/shot-crew.webp" alt="CREW → HIRE at the Second Socket: a wire and a runner for hire, and a locked card that needs Karasu rep" width="100%">
+  <img src="docs/readme/shot-crew.webp" alt="CREW → ROSTER: Noor Hayashi up for promotion, his traits, loyalty and abilities, three open slots" width="100%">
 </p>
 
 CREW (Alt+K) is people you send instead of going yourself. Hire them where hiring happens: a runner, ears, a
@@ -170,7 +170,7 @@ story to happen first. Things you do can set it back.
 
 <p align="center">
   <img src="docs/readme/shot-map-city.webp" alt="The whole city from above: Nexus, Velvet, Karasu, Neon Strand, Dockside and the rest around Lowlight Bay" width="49%">
-  <img src="docs/readme/shot-map-spine.webp" alt="Zoomed in on the Spine, the elevated rail, with its seven places pinned" width="49%">
+  <img src="docs/readme/shot-map-spine.webp" alt="Zoomed in over Neon Strand and the elevated rail, the Listening Post on the Spine picked: Garro keeps the back room" width="49%">
 </p>
 
 Lowlight is a rendered city map of districts, the bay and every place you can go. A story clock runs under it
@@ -181,7 +181,7 @@ dark with it.
 ### Living rooms
 
 <p align="center">
-  <img src="docs/readme/shot-encounter.webp" alt="ENCOUNTER at the Intake: three narrator events to pick from, one of them Silas at the bottom of the stairs" width="100%">
+  <img src="docs/readme/shot-encounter.webp" alt="DRAW at the Intake: three cards from the narrator, a stranger at the door with a bowl from Hae's, the pipes knocking in the wall, and the paper cup on the blotter" width="100%">
 </p>
 
 Every room is pixel art that the characters work: they dim the lights, change the mood, play a sound. Rain

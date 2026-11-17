@@ -36,14 +36,28 @@ describe('the setup card', () => {
     expect($('.ts-pitch').textContent).toContain('KARASU · KNOWN · HEAT 2');
   });
 
-  it('off a phone it is the job table (playtest): HUD regions, the line as the top strip with the tier, GO IN and BACK in the levers, no clocks', () => {
+  it('off a phone it is the trace table: HUD regions, the job on the head line with the strip after it, GO IN and BACK under how you go in, a key line, no clocks', () => {
     open();
     expect($('.tb-setup').classList.contains('hud')).toBe(true);
+    expect($('.tb-setup .tb-top .tb-head .tb-title').textContent).toBe(document.querySelector('.ts-title-t')!.textContent);
     expect($('.tb-setup .tb-top .ts-strip').textContent).toBe('TIER 1KARASU · KNOWN · HEAT 2');
-    expect($('.tb-setup .tb-levers .ts-go')).not.toBeNull();
-    expect($('.tb-setup .tb-levers .ts-back')).not.toBeNull();
+    expect($('.tb-setup .tb-middle .ts-mid .ts-buttons .ts-go')).not.toBeNull();
+    expect($('.tb-setup .tb-middle .ts-mid .ts-buttons .ts-back')).not.toBeNull();
+    expect($('.tb-setup .tb-keys').textContent).toContain('GO IN');
+    expect($('.tb-setup .tb-log .tb-log-at')).not.toBeNull();
     expect($('.tb-setup .tb-middle .ts-approach')).not.toBeNull();
     expect($$('.tb-setup :is(.tb-take, .tb-alarm, .tb-nerve)').every((c) => c.hidden)).toBe(true);
+  });
+
+  it('lights the bar JOBS run while it is up: onUp(true) on open, onUp(false) however it closes', () => {
+    const g = document.createElement('div');
+    g.id = 'game';
+    document.body.append(g);
+    const onUp = vi.fn();
+    const s = mountSetup(g, { offer: OFFER, title: 'Marked Cards', pitch: null, tier: 1, onGo: vi.fn(), onBack: vi.fn(), onUp, reduced: true });
+    expect(onUp.mock.calls).toEqual([[true]]);
+    s.close();
+    expect(onUp.mock.calls).toEqual([[true], [false]]);
   });
 
   it('on a phone it keeps the plain card: GO IN beside the approaches, no HUD', () => {

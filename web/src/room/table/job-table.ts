@@ -317,7 +317,6 @@ function callFace(f: HTMLElement, pool: NonNullable<Choice['pool']>, lifted: str
   const say = el('span', 'tb-say');
   say.append(el('span', 'tb-side-word', POS_WORD[pos]));
   if (effect) say.append(el('span', `tb-eff ${effect}`, EFFECT_NAMES[effect]));
-  foot.append(say);
   // The odds and what each result does here (shared/odds.ts): the same rules the roll lands by. A card the lifted card or
   // the trade can't go on shows neither.
   const dead = (Boolean(lifted) && !play) || why !== null;
@@ -343,7 +342,10 @@ function callFace(f: HTMLElement, pool: NonNullable<Choice['pool']>, lifted: str
   }
   const go = el('span', 'tb-go');
   go.append(el('span', 'tb-key', extra.word ?? `ROLL ${(play?.stat ?? pool.stat).toUpperCase()}`));
-  foot.append(go);
+  // EFFECT and the key on one row at the card's foot; a narrow card wraps the key under it rather than over it.
+  const act = el('span', 'tb-act');
+  act.append(say, go);
+  foot.append(act);
   const preview = play ? previewText(play.stat ?? pool.stat, pool, play) : null;
   const words = preview ?? (lifted ? `${poolText(pool)} · NO CARD HERE` : poolText(pool));
   body.append(foot, el('span', `tb-odds sr${preview ? ' preview' : ''}${lifted && !preview ? ' none' : ''}`, words));

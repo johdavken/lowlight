@@ -756,6 +756,8 @@ function startRoom(agentId: string): void {
         setupCard = null;
         setupGone();
       },
+      // JOBS takes the table's red while SETUP is up; a job's table still up keeps it.
+      onUp: (up) => hud.setJobUp(up || jobTable.isOpen()),
       tips,
     });
     setupCard = { id, card, offer: JSON.stringify(open.setup) };

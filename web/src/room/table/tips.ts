@@ -50,7 +50,7 @@ export const TIPS: Record<TipId, Tip> = {
       ['SMOOTH', `+1d ${stats('smooth')}. Never dealt NEXT ROLL SMALL${FORCED_FIRST ? '; picks NEXT ROLL WORSE first' : ''}.`],
       ['HARD', `+1d ${stats('hard')}. Starts at ALARM 1, and TAKE 1 on a job of tier 2 or more. Never dealt ALARM +1${FORCED_FIRST ? '; picks TAKE −1 first' : ''}.`],
     ],
-    target: '.ts-approach',
+    target: '.ts-mid', // the cards with GO IN and BACK under them: a tip below sits clear of the keys
   },
   people: {
     title: 'WHO YOU BRING',

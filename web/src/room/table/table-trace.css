@@ -4,16 +4,17 @@
    are cut outlines), each in its position's colour, and each says what it rolls, the odds, and what a 6, a 4–5 and a
    miss do. The hand is rows on its own rail; a leader runs from whatever you lift to every card it changes. Costs are a
    list on a rail; answers are cut keys. The desktop job table and its two boards (the last section: mockup
-   boards-trace.html, 2026-11-15); SETUP, the papers desk and a phone keep table.css. */
+   boards-trace.html, 2026-11-15) and SETUP (its own section after the table's); the papers desk and a phone keep
+   table.css. */
 
 /* The JOB column at the job table: no glass and no plate (the job's name is on the head line); its words stand on the
    left rail under the route, and scroll there. */
-:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .hf, :has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .hf-gb, :has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .jc-top { display: none; }
-:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .jc { top: var(--hud-log-y); padding: 0; background: none; border: 0; box-shadow: none; clip-path: none; -webkit-mask-image: none; mask-image: none; backdrop-filter: none; }
-:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .jc-body { padding: 0 8px 0 0; }
+:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .hf, :has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .hf-gb, :has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .jc-top { display: none; }
+:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .jc { top: var(--hud-log-y); padding: 0; background: none; border: 0; box-shadow: none; clip-path: none; -webkit-mask-image: none; mask-image: none; backdrop-filter: none; }
+:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .jc-body { padding: 0 8px 0 0; }
 
 /* The box's settings key stands on the column's top edge at its right end (style.css), which is the region's own top here. */
-#game:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { left: calc(var(--hud-log-x) + var(--hud-log-w) - 30px); top: calc(var(--hud-log-y) - 14px); }
+#game:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { left: calc(var(--hud-log-x) + var(--hud-log-w) - 30px); top: calc(var(--hud-log-y) - 14px); }
 
 /* What a phone and SETUP never show of the trace's parts. */
 .tb.phone .tb-oddsbar, .tb.phone .tb-res, .tb.phone .tb-go, .tb.phone .tb-pos, .tb.phone .tb-statname, .tb.phone .tb-of, .tb.phone .tb-leads-post, .tb.phone .tb-route, .tb.phone .tb-keys { display: none; }
@@ -22,7 +23,7 @@
 .tb.tb-deduction :is(.tb-route, .tb-keys, .tb-onroll), .tb.tb-accounting :is(.tb-route, .tb-keys, .tb-onroll) { display: none; }
 .tb.phone.tb-deduction .tb-log-at, .tb.phone.tb-accounting .tb-log-at { display: none; }
 
-.tb.hud.tb-job:not(.phone) {
+.tb.hud:is(.tb-job, .tb-setup):not(.phone) {
   /* The one red (2026-11-15): --ui is the UI's own (the head line, the job's name, section heads, cut keys, the key line), so red can't mean
      trouble here. ALARM and a cost are amber (they need you); the worst position and a miss are magenta; NERVE is yours, so cyan with your
      own stat's dice; the crew are lilac; green is the take. --c stays the cream of the job's own words (the beat's name, the route). */
@@ -36,7 +37,7 @@
 }
 /* The layout: the head line's row, then the JOB column and the moment, then the hand's rail. The right fifth is the
    contact's (her figure, her line under it). */
-.tb.hud.tb-job:not(.phone) {
+.tb.hud:is(.tb-job, .tb-setup):not(.phone) {
   grid-template-columns: 340px minmax(0, 760px) minmax(0, 1fr);
   grid-template-rows: 46px minmax(0, 1fr) auto;
   grid-template-areas: 'top top top' 'log middle .' 'bottom bottom .';
@@ -44,7 +45,7 @@
   row-gap: 0;
 }
 
-.tb.hud.tb-job:not(.phone) {
+.tb.hud:is(.tb-job, .tb-setup):not(.phone) {
   /* ---------- the head line: the job's name, then the clocks ---------- */
   & > .tb-top { align-items: flex-start; gap: 44px; padding-top: 4px; }
   & .tb-top-l { flex: none; flex-direction: row; align-items: baseline; gap: 18px; margin: 0; transform: none; }
@@ -130,6 +131,8 @@
   /* A choice: the one box on the table, cut, in its position's colour. */
   & .tb-deal > .tb-card:not(.tb-debrief) {
     --pc: rgba(230, 238, 247, 0.5);
+    /* The stat's name scales to the card's width (REFLEX ran off a narrow card). */
+    container-type: inline-size;
     position: relative; flex: 1 1 0; min-width: 0; max-width: 365px; width: auto; height: auto; min-height: 430px; max-height: 100%; padding: 0; margin: 0;
     border: 0; border-radius: 0; text-align: left; color: var(--t-text); overflow: hidden; transform: none; filter: none;
     clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
@@ -155,10 +158,10 @@
   & .tb-card .tb-side .tbc-mark { display: none; }
   & .tb-pos { position: absolute; right: 12px; top: 10px; display: flex; align-items: center; gap: 8px; font: 17px/1 var(--pixel); letter-spacing: 0.2em; color: var(--pc); text-shadow: 0 1px 3px #000, 0 0 8px #000; white-space: nowrap; }
   & .tb-pos-piece { width: 38px; height: 38px; }
-  & .tb-statname { position: absolute; left: 17px; bottom: -4px; font: 600 76px/0.8 var(--teko); letter-spacing: 0.02em; color: #fff; text-shadow: 0 2px 3px #000, 0 0 18px color-mix(in srgb, var(--pc) 40%, transparent); white-space: nowrap; }
+  & .tb-statname { position: absolute; left: 17px; bottom: -4px; font: 600 min(76px, 25cqi)/0.8 var(--teko); letter-spacing: 0.02em; color: #fff; text-shadow: 0 2px 3px #000, 0 0 18px color-mix(in srgb, var(--pc) 40%, transparent); white-space: nowrap; }
   & .tb-card .tb-main { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; padding: 10px 17px 14px; gap: 0; background: none; border: 0; }
   & .tb-card.tb-plain .tb-main, & .tb-card > .tb-face.tb-plain .tb-main { padding-top: 18px; }
-  & .tb-card .tb-line { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font: 13px/1.5 var(--mono); color: var(--t-text); text-shadow: 0 1px 2px #000; text-align: left; margin: 0; padding: 0; }
+  & .tb-card .tb-line { flex: none; display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font: 13px/1.5 var(--mono); color: var(--t-text); text-shadow: 0 1px 2px #000; text-align: left; margin: 0; padding: 0; }
   & .tb-plain .tb-line { -webkit-line-clamp: 9; line-clamp: 9; font-size: 14px; }
   /* Where a fork's card leads: the loudest line on it. */
   & .tb-leads { display: block; margin-top: 8px; font: 600 34px/0.85 var(--teko); letter-spacing: 0.03em; color: var(--t-dim); text-transform: uppercase; }
@@ -172,7 +175,7 @@
   & .tb-card .tb-tag.route, & .tb-card .tb-tag.lacquer, & .tb-card .tb-flag.red { color: #fff; background: var(--t-miss); box-shadow: none; }
   & .tb-card .tb-tag.hot { color: var(--t-ink); background: var(--k-pocket); box-shadow: none; }
   /* The dice by where they come from, the count after them. */
-  & .tb-card .tb-tray { display: flex; align-items: flex-end; gap: 6px; margin: 9px 0 0; padding: 0; background: none; border: 0; min-height: 40px; }
+  & .tb-card .tb-tray { display: flex; align-items: flex-end; gap: 6px; margin: 14px 0 0; padding: 0; background: none; border: 0; min-height: 40px; }
   & .tb-card .tb-tray .tb-stat { display: none; }
   & .tb-cells { display: inline-flex; gap: 3px; }
   & .tb-cells i { width: 20px; height: 20px; border: 0; border-radius: 0; --k: var(--t-dim); background: color-mix(in srgb, var(--k) 82%, #000); box-shadow: inset 0 0 0 1px var(--k), 0 0 8px color-mix(in srgb, var(--k) 35%, transparent); clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px); }
@@ -186,7 +189,7 @@
   & .tb-cells i.lift { animation: tt-blink 0.9s steps(2) infinite; }
   & .tb-card .tb-sum { margin-left: auto; font: 600 58px/0.66 var(--teko); color: #fff; text-shadow: 0 2px 3px #000; }
   & .tb-card .tb-sum small { font: 20px var(--pixel); color: var(--t-dim); margin-left: 2px; }
-  & .tb-card .tb-say { display: flex; align-items: baseline; gap: 7px; order: 8; margin: auto 0 0; padding-top: 12px; font: 14px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); white-space: nowrap; }
+  & .tb-card .tb-say { display: flex; align-items: baseline; gap: 7px; margin: 0; padding: 0 0 6px; font: 14px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); white-space: nowrap; }
   & .tb-card .tb-say::before { content: 'EFFECT'; }
   & .tb-card .tb-side-word { display: none; }
   & .tb-card .tb-eff { font: inherit; letter-spacing: inherit; padding: 0; background: none; border: 0; box-shadow: none; color: var(--t-text); }
@@ -226,14 +229,27 @@
   & .tb-oddsbar .miss { background: var(--t-miss); }
   /* What each result does here. */
   & .tb-res { display: grid; gap: 4px; margin-top: 10px; }
-  & .tb-res-row { display: grid; grid-template-columns: 42px 1fr; column-gap: 9px; align-items: baseline; font: 12.5px/1.4 var(--mono); color: var(--t-text); text-shadow: 0 1px 2px #000; }
+  & .tb-res-row { display: grid; grid-template-columns: 36px 1fr; column-gap: 8px; align-items: baseline; font: 12.5px/1.4 var(--mono); color: var(--t-text); text-shadow: 0 1px 2px #000; }
   & .tb-res-k { font: 600 24px/0.85 var(--teko); letter-spacing: 0.02em; white-space: nowrap; }
   & .tb-res-row.r6 .tb-res-k { color: var(--t-ok); }
   & .tb-res-row.r4 .tb-res-k { color: var(--t-amber); }
   & .tb-res-row.r1 .tb-res-k { color: var(--t-miss); }
   & .tb-res-text b { font-weight: 600; color: #fff; }
   /* The key at the card's foot: filled on the card Enter rolls. */
-  & .tb-go { order: 9; display: flex; justify-content: flex-end; margin-top: -22px; pointer-events: none; }
+  /* EFFECT and the key share the foot's last row; on a narrow card the key wraps under EFFECT instead of covering it. */
+  & .tb-act { display: flex; align-items: flex-end; gap: 10px; margin-top: auto; padding-top: 12px; }
+  & .tb-act > .tb-say { min-width: 0; overflow: hidden; }
+  & .tb-go { flex: none; display: flex; justify-content: flex-end; margin: 0 0 0 auto; pointer-events: none; }
+  /* A narrow card (three on the table): EFFECT keeps only its word and the key tightens, so the two still share a row. */
+  @container (max-width: 300px) {
+    & .tb-card .tb-say::before { content: none; }
+    & .tb-card .tb-key { padding: 6px 9px 3px; font-size: 16px; letter-spacing: 0.12em; }
+    & .tb-card.sel .tb-key::after { margin-left: 6px; }
+    /* And less height: a shorter picture, the line in two. */
+    & .tb-card .tb-side { height: 104px; }
+    & .tb-card .tb-line { -webkit-line-clamp: 2; line-clamp: 2; }
+    & .tb-card .tb-main { padding-left: 14px; padding-right: 14px; }
+  }
   & .tb-plain .tb-go { margin-top: auto; }
   & .tb-key {
     --kc: var(--pc, var(--c));
@@ -279,7 +295,7 @@
   & .tb-parked > .tb-card > .tb-face { position: static; display: block; inset: auto; width: 100%; min-height: 0; background: none; box-shadow: none; }
   & .tb-parked .tb-card .tb-side { position: relative; inset: auto; height: 104px; margin: 0; }
   & .tb-parked .tb-card .tb-side .tb-art { opacity: 0.8; filter: none; -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent), linear-gradient(#000 30%, transparent); -webkit-mask-composite: source-in; mask-image: linear-gradient(90deg, #000 40%, transparent), linear-gradient(#000 30%, transparent); mask-composite: intersect; }
-  & .tb-parked .tb-card .tb-statname { left: 0; bottom: 0; font-size: 64px; }
+  & .tb-parked .tb-card .tb-statname { left: 0; bottom: 0; font-size: min(64px, 25cqi); }
   & .tb-parked .tb-card .tb-pos { right: 0; top: 4px; }
   & .tb-parked .tb-card .tb-main { display: block; padding: 6px 0 0; }
   & .tb-parked .tb-card .tb-line { -webkit-line-clamp: 2; line-clamp: 2; color: var(--t-dim); font-size: 12.5px; }
@@ -384,6 +400,9 @@
   & .tb-hand .tb-slot.lifted .tbc-pic::after { box-shadow: inset 0 0 0 1px var(--hc, var(--k-people)); }
   & .tb-hand .tb-slot.on .tbc-pic::after { box-shadow: inset 0 0 0 1px var(--hc); }
   & .tb-hand .tb-slot.on .tbc-name { color: #fff; }
+  /* A program marked to run: its picture outlined in the deck's amber, no box (table.css's inset glow sat off the row). */
+  & .tb-hand .g-deck .tb-slot.on::after { content: none; }
+  & .tb-hand .g-deck .tb-slot.on .tbc-pic::after { box-shadow: inset 0 0 0 2px var(--k-pocket), 0 0 10px color-mix(in srgb, var(--k-pocket) 45%, transparent); }
   & .tb-crew-stack > .tb-slot .tbc { min-height: 0; }
   & .tb-crew-stack > .tb-slot .tbc-pic { margin-bottom: -30px; }
   & .tb-hand .tb-slot.locked, & .tb-hand .tb-slot[data-state='locked'] { opacity: 0.72; cursor: default; }
@@ -467,6 +486,88 @@
 
   /* The contact on the line. */
   & .tb-held-note { font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-hud); }
+}
+/* ---------- SETUP on the trace (2026-11-16): the job's name on the head line, how you go in as three cut cards with
+   GO IN and BACK as keys under them, the hand and the ready crew as rows on the rail. ---------- */
+.tb.hud.tb-setup:not(.phone) {
+  background: none;
+  & > .tb-top { gap: 24px; }
+  & .tb-top-l .tb-strip.ts-strip { display: flex; gap: 14px; align-self: center; font: 16px/1 var(--pixel); letter-spacing: 0.2em; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .ts-strip-tier { color: var(--t-text); }
+  & > .tb-log { padding-top: 16px; }
+  & > .tb-log > .ts-pitch { display: none; }
+  & .tb-log-at { margin-top: 0; }
+  & > .tb-middle { padding-top: 20px; }
+  & .ts-stage { align-content: start; }
+  & .ts-mid { display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
+  & .ts-approach { align-items: stretch; gap: 0; }
+  & .ts-approach .tb-deal { gap: 22px; }
+  & .ts-approach > .tb-group-label { --hc: var(--ui); }
+  /* A way in: the cut box, the picture fading into it, the name large, then what it rolls and what it spares. */
+  & .ts-approach .tb-deal > .tb-card { --pc: rgba(230, 238, 247, 0.5); flex: 1 1 0; max-width: 250px; min-height: 0; cursor: pointer; }
+  & .ts-approach .tb-deal > .tb-card.chosen { --pc: var(--t-nerve); box-shadow: inset 0 0 0 1px var(--pc), inset 0 0 40px color-mix(in srgb, var(--pc) 14%, transparent); }
+  & .ts-approach .tb-card::before { content: none; }
+  & .ts-approach .tb-card > .tbc-print { position: static; inset: auto; display: flex; flex-direction: column; width: 100%; height: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+  & .ts-approach .tbc-mark, & .ts-approach .tbc-symbol, & .ts-approach .tbc-rank { display: none; }
+  & .ts-approach .tbc-wrong { display: block; margin: 0 0 6px; font: 13px/1.45 var(--mono); font-style: normal; letter-spacing: 0; color: var(--t-text); text-align: left; text-shadow: 0 1px 2px #000; }
+  & .ts-approach .tbc-pic { position: relative; display: block; width: auto; height: 118px; margin: 1px 1px 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: hidden; }
+  & .ts-approach .tbc-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; opacity: 0.55; filter: saturate(0.7); -webkit-mask-image: linear-gradient(#000 35%, transparent); mask-image: linear-gradient(#000 35%, transparent); border: 0; border-radius: 0; }
+  & .ts-approach .tb-card.chosen .tbc-pic img, & .ts-approach .tb-card:hover .tbc-pic img { opacity: 0.9; filter: none; }
+  & .ts-approach .tbc-body { position: static; display: flex; flex-direction: column; gap: 4px; margin: -34px 0 0; padding: 0 16px 14px; background: none; text-align: left; z-index: 1; }
+  & .ts-approach .tbc-name { margin: 0 0 6px; font: 600 54px/0.8 var(--teko); letter-spacing: 0.02em; color: #fff; text-align: left; text-shadow: 0 2px 3px #000, 0 0 18px color-mix(in srgb, var(--pc) 40%, transparent); white-space: nowrap; }
+  & .ts-approach .tbc-note { display: block; margin: 0; font: 15px/1.15 var(--pixel); letter-spacing: 0.12em; color: var(--t-dim); text-align: left; white-space: normal; }
+  & .ts-approach .tbc-note.tbc-stats { color: var(--k-stat); }
+  & .ts-approach .tbc-note.tbc-start { color: var(--t-alarm); }
+  & .ts-approach .tbc-note.tbc-spared { color: var(--t-ok); }
+  & .ts-approach .tbc-note.tbc-first { color: var(--t-text); }
+  /* GO IN filled in the red with its key, BACK an outline. */
+  & .ts-buttons { flex-direction: row; align-items: center; gap: 12px; width: auto; margin: 0; }
+  & .ts-buttons button { --kc: var(--ui); position: relative; display: inline-flex; flex-direction: row; align-items: center; gap: 10px; height: auto; min-height: 0; margin: 0; padding: 8px 18px 5px; font: 20px/1 var(--pixel); letter-spacing: 0.24em; color: var(--kc); background: rgba(5, 2, 10, 0.35); border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px var(--kc); clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); filter: none; cursor: pointer; text-shadow: none; }
+  & .ts-buttons .ts-go { color: var(--t-ink); background: var(--ui); box-shadow: none; }
+  & .ts-buttons .ts-go::after { content: none; }
+  & .ts-buttons .ts-go:hover { background: color-mix(in srgb, var(--ui) 80%, #fff); filter: none; }
+  & .ts-buttons .ts-back { align-self: auto; }
+  & .ts-buttons .ts-back:hover { color: #fff; }
+  & .ts-key, & .ts-back kbd { order: 2; font: 13px/1 var(--pixel); letter-spacing: 0.16em; padding: 0; border: 0; opacity: 0.7; color: inherit; }
+  & .ts-back kbd { order: 0; }
+  & .ts-refusal { margin-top: 8px; font: 16px/1.2 var(--pixel); color: var(--t-miss); }
+  /* PEOPLE's open places: a hatched face-sized box each, until someone ready is tapped in. */
+  & .tb-hand .g-people .tb-slot[data-state='empty'] { width: 58px; height: 74px; opacity: 1; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-people) 35%, transparent); background: repeating-linear-gradient(135deg, transparent 0 5px, color-mix(in srgb, var(--k-people) 14%, transparent) 5px 6px); }
+  /* The ready crew: rows on the rail after the hand, in the crew's lilac. */
+  & .ts-ready { --hc: var(--k-people); flex: 0 1 auto; width: auto; min-width: 0; gap: 0; }
+  & .ts-ready:not(.ts-contacts) { width: auto; max-width: 480px; }
+  & .ts-ready .tb-group-label { color: var(--hc); }
+  & .ts-ready-strip { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: 204px; gap: 9px 14px; padding: 0; margin: 0; overflow-x: auto; }
+  & .ts-ready .tb-slot { position: relative; display: block; width: 204px; max-width: 204px; height: auto; min-height: 0; margin: 0; padding: 0; text-align: left; color: var(--t-text); background: none; border: 0; border-radius: 0; box-shadow: none; opacity: 1; transform: none; filter: none; overflow: visible; cursor: pointer; }
+  & .ts-ready .tb-slot::before { content: none; }
+  & .ts-ready .tb-slot .tbc { position: static; display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; align-items: start; width: 100%; height: auto; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; clip-path: none; }
+  & .ts-ready .tb-slot > .tbc-print { position: static; inset: auto; box-shadow: none; border-radius: 0; overflow: visible; }
+  & .ts-ready .tbc::before, & .ts-ready .tbc::after { content: none; }
+  & .ts-ready .tbc-pic { position: relative; display: block; width: 44px; height: 56px; margin: 0; padding: 0; overflow: hidden; background: #0b0614; border: 0; border-radius: 0; box-shadow: none; }
+  & .ts-ready .tbc-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; image-rendering: pixelated; border: 0; border-radius: 0; }
+  & .ts-ready .tbc-pic::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.22); }
+  & .ts-ready .tbc-mark, & .ts-ready .tbc-symbol, & .ts-ready .tbc-rank, & .ts-ready .tbc-spec, & .ts-ready .tbc-grade { display: none; }
+  & .ts-ready .tbc-body { position: static; display: block; min-width: 0; margin: 0; padding: 1px 0 0; background: none; text-align: left; }
+  & .ts-ready .tb-slot > .tbc-print .tbc-name, & .ts-ready .tbc-name { display: block; margin: 0; font: 20px/0.95 var(--pixel); letter-spacing: 0.14em; color: var(--t-text); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+  & .ts-ready .tb-slot > .tbc-print .tbc-note, & .ts-ready .tbc-note, & .ts-ready .tbc-tr, & .ts-ready .tbc-ab { display: block; margin: 3px 0 0; padding: 0; font: 13px/1.1 var(--pixel); letter-spacing: 0.1em; color: var(--t-dim); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: none; border: 0; }
+  & .ts-ready .tbc-tr { color: color-mix(in srgb, var(--t-ok) 60%, var(--t-dim)); }
+  & .ts-ready .tbc-tr.bad { color: color-mix(in srgb, var(--t-miss) 70%, var(--t-dim)); }
+  & .ts-ready .tb-slot:hover .tbc-name { color: #fff; }
+  & .ts-ready .tb-slot:hover .tbc-pic::after { box-shadow: inset 0 0 0 1px var(--hc); }
+  & .ts-ready .tb-slot.s-locked { opacity: 0.45; cursor: default; }
+  & .ts-ready > .tb-sub { font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--t-dim); }
+  & .ts-cycle { min-width: 0; min-height: 0; padding: 2px 7px 0; font: 15px/1 var(--pixel); color: var(--hc); background: none; border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hc) 60%, transparent); }
+  & .ts-cycle:hover { box-shadow: inset 0 0 0 1px var(--hc); }
+  & .ts-ready-head::after { order: 1; }
+  & .ts-ready-head .ts-cycle, & .ts-ready-head .ts-count { order: 2; }
+  & .ts-count { color: var(--t-dim); opacity: 1; }
+  /* What the tier asks and what the job leans on, under their heads. */
+  & .ts-tierline, & .g-deck .ts-lean { margin: -4px 0 8px; font: 13px/1.1 var(--pixel); letter-spacing: 0.12em; color: var(--t-dim); opacity: 1; }
+  /* The catalog over how you go in. */
+  & .ts-tray { align-items: flex-start; }
+  & .ts-tray-head .tb-group-label { --hc: var(--k-pocket); }
+  & .ts-tray-shut { color: var(--t-dim); }
+  & .ts-tray-shut:hover { color: #fff; }
 }
 @keyframes tt-blink { 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) {

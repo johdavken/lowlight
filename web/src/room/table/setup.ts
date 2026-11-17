@@ -9,6 +9,9 @@ import { cardEl, trayHead, mountDeal, type TableCard } from './deal';
 import { el, isPhone, type TableCue } from './el';
 import { approachInfo, contactInfo, favourInfo, GOES_WRONG, mountCardInfo, programInfo, recruitInfo, slotInfo, type Info } from './card-info';
 import { mountTableShell } from './shell';
+import { setHints } from '../../landing/hint-line';
+import { clearLead, hostRect, traceVia, type Pt } from '../../ui/trace-lead';
+import { headLinePoints } from '../../ui/trace-panel';
 import type { Tips } from './tips';
 import { FORCED_FIRST } from '../../../../shared/costs';
 import { approachFace, artFace, contactFace, crewFace, deckLabel, programFace, slotFace } from './faces';
@@ -38,12 +41,40 @@ export interface SetupCard {
 
 export function mountSetup(
   host: HTMLElement,
-  o: { offer: SetupOffer; title: string; pitch: string | null; tier: number | null; reduced: boolean; onGo(setup: { approach: Approach; people: string[]; favour: boolean; contacts?: string[]; programs?: string[] }): void; onBack(): void; cue?(name: TableCue): void; tips?: Tips },
+  o: { offer: SetupOffer; title: string; pitch: string | null; tier: number | null; reduced: boolean; onGo(setup: { approach: Approach; people: string[]; favour: boolean; contacts?: string[]; programs?: string[] }): void; onBack(): void; cue?(name: TableCue): void; tips?: Tips; /** Up and gone: the bar's JOBS run takes the table's red while SETUP is up (hud.setJobUp). */ onUp?(up: boolean): void },
 ): SetupCard {
   // Off a phone SETUP is the job's table (playtest 2026-11-11): the HUD's regions, the JOB column in the log, GO IN and
   // BACK where the levers go. A phone keeps its scrolling card.
   const shell = mountTableShell(host, { hud: !isPhone(host) });
   shell.root.classList.add('tb-setup');
+  // The trace's lines (as the job table's, job-table.ts drawTrace): the head line from its ring under the job's name,
+  // climbing into the bar's run under JOBS; the left rail down to the hand's row and along it.
+  const traceWatch: { disconnect(): void }[] = [];
+  let traceRaf = 0;
+  const drawTrace = () => {
+    const root = shell.root;
+    if (root.hidden || root.offsetWidth === 0 || !shell.top || isPhone(host)) {
+      clearLead(root, 'head');
+      clearLead(root, 'rail');
+      return;
+    }
+    const top = hostRect(root, shell.top);
+    const y = Math.round(top.bottom);
+    const x = Math.round(top.left - 28);
+    const kon = root.parentElement?.querySelector('.hud-trace .kon.job');
+    const k = kon ? hostRect(root, kon) : null;
+    const run: Pt | null = k && k.width > 0 ? [k.left, (k.top + k.bottom) / 2] : null;
+    traceVia(root, 'head', headLinePoints([x, y], run, root.offsetWidth - 60));
+    const bottom = hostRect(root, shell.bottom);
+    const railY = Math.round(bottom.top + 2);
+    const ends = [...shell.bottom.children].map((c) => hostRect(root, c)).filter((r) => r.width > 0).map((r) => r.right);
+    traceVia(root, 'rail', [[x, y + 6], [x, railY], [Math.round(Math.max(bottom.left + 200, ...ends)), railY]]);
+  };
+  const queueTrace = () => {
+    if (typeof requestAnimationFrame !== 'function') return;
+    cancelAnimationFrame(traceRaf);
+    traceRaf = requestAnimationFrame(drawTrace);
+  };
   let offer = o.offer;
   let approach: Approach = 'quiet';
   const people: string[] = [];
@@ -71,8 +102,11 @@ export function mountSetup(
   // No clocks before the job: nothing runs yet.
   shell.corners({});
   if (shell.top) {
+    // The trace (as the job table): the job's name on the head line, the strip after it.
+    const head = el('div', 'tb-head');
+    head.append(el('span', 'tb-title', o.title.toUpperCase()));
     const lead = el('div', 'tb-top-l');
-    lead.append(strip);
+    lead.append(head, strip);
     shell.top.prepend(lead);
   }
   const refusal = el('div', 'ts-refusal');
@@ -255,6 +289,7 @@ export function mountSetup(
       strip.append(b);
     }
     if (!offer.crew.length) ready.append(el('div', 'tb-sub', 'NO CREW READY'));
+    queueTrace();
   };
   render();
   const closeFan = () => {
@@ -270,8 +305,11 @@ export function mountSetup(
   const close = () => {
     // However it closes (BACK, travel, another job, the job leaving the board), its tip goes with it.
     o.tips?.clear();
+    cancelAnimationFrame(traceRaf);
+    traceWatch.forEach((w) => w.disconnect());
     shell.close();
     shell.root.remove();
+    o.onUp?.(false);
   };
   go.addEventListener('click', () => {
     o.tips?.clear();
@@ -285,16 +323,35 @@ export function mountSetup(
   });
   shell.prose('');
   shell.root.querySelector('.tb-prose')!.replaceWith(pitch);
+  // The JOB column's place under the head line (shell.ts publishLog), as at the job table.
+  shell.log?.append(el('div', 'tb-log-at'));
   const mid = el('div', 'ts-mid');
-  // HUD: GO IN and BACK stand in the levers column, as PUSH, SAFE and BOLD do at the table.
-  if (shell.levers) {
-    mid.append(how);
-    shell.levers.append(buttons);
-  } else mid.append(how, buttons);
+  // GO IN and BACK as cut keys under how you go in (the trace, as a card's ROLL key at the table).
+  mid.append(how, buttons);
   stage.append(mid, tray);
   shell.middle.append(stage, refusal);
   shell.bottom.append(hand, ready, ...(!decked && offer.contacts.length ? [contactRow] : []));
   shell.open();
+  o.onUp?.(true);
+  // The trace's watchers and the key line (desktop).
+  if (shell.top && !isPhone(host)) {
+    if (typeof ResizeObserver === 'function') {
+      const ro = new ResizeObserver(queueTrace);
+      ro.observe(shell.root);
+      ro.observe(shell.bottom);
+      traceWatch.push(ro);
+    }
+    const hudTrace = host.querySelector('.hud-trace');
+    if (hudTrace && typeof MutationObserver === 'function') {
+      const mo = new MutationObserver(queueTrace);
+      mo.observe(hudTrace, { childList: true });
+      traceWatch.push(mo);
+    }
+    queueTrace();
+    const keyLine = el('div', 'tb-keys');
+    shell.root.append(keyLine);
+    setHints(keyLine, '[ENTER] GO IN · [ESC] BACK');
+  }
   // Graft tips (tips spec §1): how you go in, who you bring when there's anyone ready, and the favour slot.
   o.tips?.offer(['approach', ...(offer.crew.length ? (['people'] as const) : []), ...(decked ? [] : (['favour'] as const)), ...(decked && (offer.deck?.slots ?? 0) > 0 ? (['program'] as const) : []), ...(offer.tierLine ? (['tier'] as const) : []), ...(!decked && offer.contacts.length ? (['contact'] as const) : [])], shell.root);
   return {
@@ -311,6 +368,7 @@ export function mountSetup(
       loads.splice(0, loads.length, ...kept);
       fan = null;
       render();
+      queueTrace();
     },
     close,
     // With the tray open GO IN and BACK are out of sight: both keys close it first.

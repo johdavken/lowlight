@@ -11,6 +11,7 @@ once: true
 starts: zhou-flat
 after: null
 trust: 1 / 2
+people: [Lusk, Pell]
 pitch: A house wants its runaway back. The fixer pays finder's rates, and the photo's on paper.
 posted-by: Lusk, under the Cat. A finder's card off Second Socket's board.
 brief: "A placement house wants a nineteen-year-old back. Lusk is paying finder's rates and a retainer up front. Ember's on Hicks's ear, whether he asked or not."
@@ -19,6 +20,8 @@ loot: Lusk's retainer
 ---
 
 # ask
+title: The Card
+song: The Passenger
 
 *Silas lays the card on the workbench like it might go off. Lusk's card, off the board at Second Socket: finder's work, a retainer folded inside it, more than finder's work pays. A placement house wants a girl back. She walked off her contract eleven days ago.*
 
@@ -40,7 +43,9 @@ view ember: Hicks has a finder's job: a house runaway, nineteen, a cart slot beh
 → trail
 
 # trail
+title: The Open Hand
 room: karasu/ripper-clinic
+song: The Passenger
 
 *The serial is a cart's, and carts get serviced. It takes you to the Open Hand, low on the Ribbon, behind the shutter that never goes all the way up. The ripper is wiping down the chair that's already clean. She cooled a girl's slot two nights ago. She hasn't slept right since.*
 
@@ -62,7 +67,9 @@ view ember if ear1=allowed: He didn't want you here. You're here. Be useful, qui
 → wall
 
 # wall
+title: The Wall
 room: karasu/dead-blocks
+song: The Passenger
 
 *Old Town, the back end of the night. The paying block's windows are warm behind their blinds. Across the broken wall the tower is dark except for one lantern on the sixth floor. Pell's. You carried bread up those stairs when you were twelve. Nobody with a record goes past the wall. Nobody with a record knows to.*
 
@@ -84,7 +91,9 @@ view ember: You've never been past the dead blocks' wall. You can hear the fire 
 → sixth
 
 # sixth
+title: The Sixth Floor
 room: karasu/sixth-floor
+song: The Passenger
 
 *Pell's armchair has someone in it. The girl from the photo, in a man's wool coat two sizes too big, blood dried at one nostril. Pell stands behind the chair with a hand on its back, and doesn't look surprised to see you. She never has.*
 
@@ -112,6 +121,8 @@ take: none
 → seen
 
 # home
+title: The Landing
+song: The Passenger
 
 *Back at the Zhous' you stand on the landing with the handset and call Lusk under the Cat. "Trail's warm," you tell him. "Give me a few nights." He says the house is patient. He says it in a voice that isn't.*
 
@@ -139,6 +150,8 @@ hire-pitch: Pell says you look after your people. I hear everything in the dead 
 → end
 
 # seen
+title: The Couch
+song: The Passenger
 
 *Back at the Zhous' you sit on the couch where you used to sleep and don't take your coat off. Lusk's other finder has the girl's face and yours. Pell has moved her somewhere even you don't know. You call Lusk and tell him the trail's warm. He says he's heard.*
 
@@ -158,7 +171,9 @@ view ember: It went wrong. The other finder saw the girl, and saw him. He lied t
 → end
 
 # getaway
+title: The Stairwell
 room: karasu/dead-blocks
+song: The Passenger
 
 *The stairwell's full of lamp and somebody at the drum fire is shouting. You've got the girl by the coat sleeve, and she's bleeding again. The other finder's at the top of the stair behind you.*
 

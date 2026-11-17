@@ -18,6 +18,7 @@ loot: a Kestrel run sheet, three years old
 ---
 
 # ask
+title: His Door
 
 *It took you two nights to find where he lives, and you didn't need the second. Top ring of Pylon Forty, a door like every other door. You knock once and he opens it as if he'd been standing behind it.*
 
@@ -30,7 +31,7 @@ loot: a Kestrel run sheet, three years old
 view soren: She found your door. Nobody's told you she was coming, and you won't ask how. You're paying because the branch would want the yard watched, and because you want her to have it. She'll refuse it. Make sure she has it anyway, and don't explain. You asked to be on her ear; if she asks why, give her nothing she can use.
 
 - take: Take the hundred. Clerks do. → taken
-- leave: Leave it on the shelf. → left
+- leave: Leave it on the shelf. → left [set hundred=left]
 
 ## taken
 *You fold it into your father's jacket. He watches you do it and doesn't say thank you either. He gives you a bead for your ear and shuts the door.*
@@ -41,6 +42,7 @@ view soren: She found your door. Nobody's told you she was coming, and you won't
 → yard
 
 # yard
+title: The Yard
 room: spine/long-haul
 
 *Kestrel's night yard sits behind the Long Haul at deck level: forty rigs nose to tail and the rain coming through the road above. The dispatch hut has one lit window. A loader sits on a crate outside it and watches the gate, not the rigs.*
@@ -61,6 +63,7 @@ view soren: You're on her ear, and you've got Kestrel's own yard cameras up on y
 → hut
 
 # hut
+title: The Hut
 room: spine/long-haul
 
 *Dispatch runs on a grey terminal with a cracked corner. Three years back is in cold store, behind a coat of Kestrel's cheapest lacquer. The paper's in a steel press in the corner, under a padlock bought by the crate.*
@@ -81,6 +84,7 @@ view soren: You can hear her keys. You know what Kestrel's lacquer is like, beca
 → gate
 
 # gate
+title: The Gate
 room: spine/long-haul
 
 *You read the stamp into the bead, number and all, because he's the one who'd know. The line goes very quiet. Outside, the clerk is coming back across the yard with his collar up, and the loader has stood up.*
@@ -105,10 +109,13 @@ take: none
 → owed
 
 # home
+title: His Door Again
 
 *You climb back up to his door with it, because you said he'd hear what was on it, and he did. You hold it up so he can see the stamp, and you watch his face instead of the paper.*
 
 *He touches his temple. He doesn't say anything yet.*
+
+[hundred=left] *His hundred's still in the jacket, where he put it. You haven't spent it, and you didn't climb up here to give it back.*
 
 view soren: She's at your door with the sheet, holding up your branch's stamp, and she's watching your face, not the paper. You touched your temple before you meant to. Whatever you say now is the test, and she'll know it was. A straight answer will cost you, and a smooth one costs more later. She hasn't asked yet.
 
@@ -128,6 +135,7 @@ hire-pitch: I loaded for Kestrel nine years. I knew your father's jacket before 
 → end
 
 # owed
+title: The Grey Car
 room: spine/long-haul
 
 *It takes four minutes. A grey car comes down the ramp with no plates. The clerk remembers he has somewhere else to be, and the loader lets go of your arm and looks at his boots. You walk out of Kestrel's yard without the sheet and without anyone writing your name down.*
@@ -148,6 +156,7 @@ view soren: You just called the branch to get her out of a freight yard, and she
 → end
 
 # getaway
+title: The Horn
 room: spine/long-haul
 
 *The yard horn's going. Every lit window on the row has someone in it, and a torch is coming down the rigs toward you.*

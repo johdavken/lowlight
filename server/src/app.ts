@@ -1,3 +1,6 @@
+import { verdictsOf } from '../../shared/cases';
+import { caseBarks, DEFAULT_CASES_DIR, loadCases } from './cases';
+import { DEFAULT_ACCOUNTS_DIR, loadAccounts } from './accounts';
 import { photoMoment } from './photos';
 import { keysFor, routeFor } from './model-route';
 import { fittingPhotos } from '../../shared/photos';
@@ -7,7 +10,7 @@ import { loadGuests } from './guests-load';
 import { crewView, freeDraw, freeHireWaiting } from './crew-view';
 import type { CrewState } from '../../shared/crew-fold';
 import { jobRecruitCard, rescueOpen } from '../../shared/crew';
-import { fillRecruit, flagsOf, questKey } from '../../shared/quests';
+import { fillRecruit, flagsOf, ownedBy, questKey } from '../../shared/quests';
 import { bookId } from './mission-run';
 import { boardPlaces, postedJobs, storyDay } from '../../shared/board';
 import { registerScenarioRoutes } from './scenario-routes';
@@ -26,6 +29,7 @@ import { cityPlaces } from './places';
 import { bookPage, loadLoreBook, loreArtFile, withArt } from './lore';
 import { DEFAULT_LEADS_DIR, loadLeadBook } from './leads';
 import { DEFAULT_QUESTS_DIR, loadQuestBook } from './quests';
+import { loadQuestVoice } from './quest-voice';
 import { DEFAULT_EXTRAS_DIR, extraImages, loadExtras } from './extras';
 import { DEFAULT_GEAR_DIR, loadDecks, loadPrograms, loadStock, loadWords } from './gear';
 import { loadablePrograms, NO_PROGRAMS, starterPrograms } from '../../shared/programs';
@@ -58,7 +62,7 @@ import fastifyStatic from '@fastify/static';
 import { registerSplashRoutes } from './splash-routes';
 import { registerDistrictRoutes } from './district-routes';
 import type { AgentInfo, ChatMessage, LinkState, OtherInfo, PlaythroughInfo, Present, ServerEvent } from '../../shared/types';
-import { DEFAULT_GIGS_DIR, DEFAULT_MAP_FILE, DEFAULT_PAPERS_DIR, OPENROUTER_BASE_URL, type Config } from './config';
+import { DEFAULT_GIGS_DIR, DEFAULT_MAP_FILE, DEFAULT_PAPERS_DIR, NANOGPT_BASE_URL, OPENROUTER_BASE_URL, type Config } from './config';
 import { AGENT_ID_RE, isConnected, loadAgents, type AgentRecord } from './agents';
 import { baseOutfitOf } from './wearing';
 import { characterFile, knowsReader, knowsStartsReader, loadCharacter, scheduleReader, standingConfigReader } from './character';
@@ -66,15 +70,19 @@ import { roomRegistry, SPLASH_DISTRICT } from './rooms';
 import { loadPacks, type SceneRegistry } from './scenes';
 import { createDeck, type Deck } from './deck';
 import { createPromiseChecker } from './promises';
+import { createJobTextChecker } from './job-texts';
 import { createAgentRuntime, type AgentRuntime } from './runtime';
 import { readPersonaCharacterId } from './persona';
 import { createPlayers, whosHereBlock } from './players';
 import { splitBio } from './character-profile';
 import { createThumbs } from './thumb';
+import { parseFit, readFit, writeFit } from './figure-fit';
+import { readFigure } from './persona-figure';
 import { registerGigRoute } from './gigs';
 import { registerPapersRoutes } from './papers';
 import { registerMapRoute } from './map-route';
 import { registerPlaythroughRoutes } from './playthrough-routes';
+import { registerPeopleRoutes, STAND_IN } from './people-routes';
 import { loadResidents, residentInfo, sceneResidents } from './residents';
 import { beatSongs, districtSongFiles, gameSongs } from './songs';
 import { soundPresent } from './sound-present';
@@ -84,7 +92,7 @@ import { parseMap } from '../../shared/map-schema';
 import type { Playthroughs } from './playthroughs';
 import { openSettings, type Settings } from './settings';
 import { registerLinkRoutes } from './link-routes';
-import { createAnthropicCatalog, createModelCatalog, createRoutedCatalog } from './model-catalog';
+import { createAnthropicCatalog, createModelCatalog, createNanoGptCatalog, createRoutedCatalog } from './model-catalog';
 import { registerBugReportRoutes } from './bug-report-routes';
 import { registerUpdateRoutes, type UpdateDeps } from './update';
 import { readTurns } from './bug-report';
@@ -185,6 +193,10 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   /** The crew's seed: the playthrough's id. Test-only (e2e): NIX_TEST_CREW_SEED pins it, so hires and rolls repeat. */
   const crewSeed = (ptId: string) => process.env.NIX_TEST_CREW_SEED || ptId;
   const settings = deps.settings ?? openSettings(cfg.dataDir);
+  // NanoGPT's list, shared by every runtime and the link routes: which models its plan covers decides their route.
+  const nanoHost = cfg.nanogptBaseUrl ?? NANOGPT_BASE_URL;
+  const nanoCatalog = createNanoGptCatalog({ host: nanoHost });
+  if (settings.key('nanogpt')) nanoCatalog.warm();
   let records: AgentRecord[] = [];
   const reloadAgents = (): AgentRecord[] => {
     records = loadAgents({
@@ -229,19 +241,29 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   const extras = loadExtras(extrasDir, (m) => console.warn(m));
   const extrasPng = extraImages(extrasDir, extras);
   // The quest book: read once at startup, against the contacts, the map and the extras as they are now (restart after editing).
+  // Deduction board cases (spec 2026-11-09): read before the quest book, which checks its `gives: clue` against them.
+  const cases = loadCases(cfg.casesDir ?? DEFAULT_CASES_DIR, { extras: new Set(extras.map((e) => e.id)) }, (m) => console.warn(m));
+  const roster = new Set(records.filter(isConnected).map((r) => r.info.id));
+  // Two Stories accounts files (spec 2026-11-10 §2): their cards are given like clue cards, so the quest book checks both.
+  const accounts = loadAccounts(cfg.accountsDir ?? DEFAULT_ACCOUNTS_DIR, { roster, caseIds: new Set(cases.map((c) => c.id)) }, (m) => console.warn(m));
   const questBook = loadQuestBook(
     cfg.questsDir ?? DEFAULT_QUESTS_DIR,
     {
-      roster: new Set(records.filter(isConnected).map((r) => r.info.id)),
+      roster,
       places: places.placeIds(),
       extras: extrasKnown(extras),
       decks: new Set(decks.map((d) => d.id)),
       outfits: new Set(records.flatMap((r) => Object.keys(r.sprite?.outfits ?? {}).map((n) => `${r.info.id}/${n}`))),
       guests: new Set(guestBook.map((g) => g.id)),
+      cases: new Map([...cases.map((c) => [c.id, new Set(c.cards.keys())] as const), ...accounts.map((a) => [a.id, new Set(a.cards.keys())] as const)]),
+      accounts: new Set(accounts.map((a) => a.id)),
+      caseVerdicts: new Map(cases.map((c) => [c.id, verdictsOf(c)])),
     },
     (m) => console.warn(m),
     leadBook,
   );
+  // Voiced job beats (2026-11-08): recorded clips for the book's sections, checked against their text once here.
+  const questVoice = loadQuestVoice(cfg.questsDir ?? DEFAULT_QUESTS_DIR, questBook, (m) => console.warn(m));
   const lore = (sceneId: string, recent: readonly LoreLine[], force?: readonly string[], present?: readonly string[]) =>
     selectLore(loreBook, { ...places.locate(sceneId), recent, ...(force ? { force } : {}), ...(present ? { present } : {}) });
   /** What a room's art shows: its art prompt's narration (art/scenes/<folder>.md, see artNarration), else its scene description. */
@@ -270,6 +292,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   }
 
   const runtimes = new Map<string, AgentRuntime>();
+  /** The record each runtime was made from: ADJUST FIGURE patches it, so a saved fit shows without a restart. */
+  const runtimeRecs = new Map<string, AgentRecord>();
   /**
    * Whether a world switch has closed the first runtimes. Those were health-checked by whoever
    * started the server; a rebuilt one checks its own link, or it reads down until the next poll.
@@ -291,6 +315,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   };
   let deck: Deck | null = null;
   let promises: { check(): Promise<void> } | null = null;
+  let jobTexts: { check(): Promise<void> } | null = null;
   const playthroughs = createPlaythroughs(cfg.playthroughsDir);
   /** A bad `knows` warns once per message, not on every contacts read. */
   const warned = new Set<string>();
@@ -342,7 +367,10 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
   /** The encounter narrator's few words on each other here, at most. */
   const OTHER_VOICE_MAX = 200;
   const world = createWorld({
-    onClockMoved: () => void promises?.check(),
+    onClockMoved: () => {
+      void promises?.check();
+      void jobTexts?.check();
+    },
     outfitUnlocks: (id) => records.find((r) => r.info.id === id)?.sprite?.outfitUnlocks,
     playthroughs,
     basePlayers: players,
@@ -478,6 +506,28 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     fire: (id, o) => deck?.promised(id, o) ?? Promise.resolve(false),
     log: (line) => console.log(`[promises] ${line}`),
   });
+  // Job texts (spec 2026-11-09 §3): a contact's own job goes out as her text when its gate opens, through the deck.
+  const knownContacts = () => world.contacts().filter((c) => records.some((r) => r.info.id === c.id && isConnected(r))).map((c) => c.id);
+  jobTexts = createJobTextChecker({
+    active: () => world.active(),
+    now: () => world.clockNow(),
+    senders: () => [...new Set(questBook.flatMap((q) => (q.text && ownedBy(q) ? [ownedBy(q)!] : [])))],
+    known: (id) => knownContacts().includes(id),
+    due: async (id, player) => (await runtime(id))?.relay.jobTextsDue(player) ?? [],
+    read: metaOf,
+    store: async (id) => (await runtime(id))?.db ?? null,
+    withYou: (id) => {
+      const pt = world.active();
+      return !!pt && !pt.solo && pt.location?.contactId === id;
+    },
+    awake: (id, clock) => world.awakeAt(id, clock),
+    tableUp: () => {
+      const pt = world.active();
+      return !!pt && (world.questStatus(pt.player) ?? []).some((s) => s.run.beat !== null);
+    },
+    fire: (id, o) => deck?.jobText(id, o) ?? Promise.resolve(false),
+    log: (line) => console.log(`[job texts] ${line}`),
+  });
   if (cfg.autoPlaythrough && !world.active()) {
     const first = records.find(isConnected);
     if (first) world.create(players.defaultId, first.info.id);
@@ -500,6 +550,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         unreadTexts: () => deck?.unreadNow() ?? [],
         settings,
         ...(cfg.anthropicBaseUrl ? { anthropicBaseUrl: cfg.anthropicBaseUrl } : {}),
+        nanogpt: nanoCatalog,
         planPlaces,
         dataDir: cfg.dataDir,
         stateDir: world.stateDir(),
@@ -509,6 +560,12 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         gigsDir: cfg.gigsDir ?? DEFAULT_GIGS_DIR,
         papersDir: cfg.papersDir ?? DEFAULT_PAPERS_DIR,
         loreIds: () => loreIds,
+        // Cipher (2026-11-08): the quests this player started and every guest are written; truths leave them alone.
+        cipherWritten: (player) => {
+          const started = new Set((world.questStatus(player) ?? []).map((s) => bookId(s.id)));
+          const threads = questBook.filter((q) => started.has(q.id)).map((q) => ({ title: q.title, pitch: q.pitch, ...(q.people ? { people: q.people } : {}) }));
+          return { threads, guests: guestBook.map((g) => g.name) };
+        },
         residents,
         describeOther,
         wardrobe: (who) => records.find((r) => r.info.id === who)?.sprite ?? residents.get(who)?.sprite ?? null,
@@ -539,6 +596,23 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
             return pt ? world.contactCards(pt.player) : [];
           },
           guestCards: () => guestBook,
+          cases: () => cases,
+          accounts: () => accounts,
+          // A listener's name and face, as PEOPLE shows a contact's (contacts.ts).
+          listener: (id: string) => {
+            const r = records.find((x) => x.info.id === id);
+            return r ? { name: r.info.name, accent: r.info.accent, portrait: r.info.thumb !== null ? `/api/agents/${id}/thumb` : r.avatarFile !== null ? `/api/agents/${id}/avatar` : null } : null;
+          },
+          // A case's recorded barks (The Fourteenth voice script): world/cases/voice/<case>/<group>[-<take>].ogg.
+          caseBarks: (caseId: string) => caseBarks(cfg.casesDir ?? DEFAULT_CASES_DIR, caseId),
+          // A card's picture, when there is one: world/cases/art/<case>/<card, lower case>.webp|png.
+          caseArt: (caseId: string, card: string) => {
+            for (const ext of ['webp', 'png']) {
+              const file = `${card.toLowerCase()}.${ext}`;
+              if (fs.existsSync(path.join(cfg.casesDir ?? DEFAULT_CASES_DIR, 'art', caseId, file))) return `/api/cases/art/${caseId}/${file}`;
+            }
+            return undefined;
+          },
           crewToldUntil: () => {
             const pt = world.active();
             return pt ? world.crewToldUntil(pt.player) : null;
@@ -552,6 +626,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
             return jobRecruitCard({ ...draw, ...j }).recruit!;
           },
           districtName: (id) => world.districtName(id),
+          clips: (quest, texts) => questVoice.clips(quest, texts),
         },
         // Leads apply to the playthrough's player only; a take being rewritten doesn't hold what it replaces.
         leads: (contactId, player, recent, replaced) => {
@@ -566,6 +641,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         },
       });
       runtimes.set(id, rt);
+      runtimeRecs.set(id, rec);
       if (rebuilt) void rt.checkHealth().catch((err: Error) => console.error(`agent ${id}: health check failed: ${err.message}`));
       return rt;
     })();
@@ -795,13 +871,14 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     if (!p) return { persona: null };
     // The character sheet's look: her accent and outfit names come from the roster record.
     const rec = records.find((r) => r.info.id === p.id);
-    const outfits = outfitNames(p.id);
+    // A persona's own figure (spec 2026-11-12) has one set of clothes and no faces: no wardrobe, no expressions.
+    const outfits = p.figure ? [] : outfitNames(p.id);
     // What the active playthrough's player wears; one the character file no longer has reads as none.
     const pt = world.active();
     const outfit = pt?.player === p.id && pt.outfit !== undefined && outfits.includes(pt.outfit) ? pt.outfit : undefined;
-    const baseOutfit = (rec?.sprite ? baseOutfitOf(rec.sprite) : null) ?? undefined;
+    const baseOutfit = (!p.figure && rec?.sprite ? baseOutfitOf(rec.sprite) : null) ?? undefined;
     // Faces from actions: the player's figure shows their faces, on the route theirs use as a contact.
-    const faces = Object.keys(rec?.sprite?.expressions ?? {});
+    const faces = p.figure ? [] : Object.keys(rec?.sprite?.expressions ?? {});
     // FILE on YOU (spec 2026-10-28 §1): under a persona, its background and no facts, as the city is told; else the select screen's file.
     const persona = pt?.player === p.id ? pt.persona : undefined;
     const bio = persona ? splitBio(persona.background) : (rec?.info.bio ?? []);
@@ -812,7 +889,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       persona: {
         id: p.id,
         name: p.name,
-        sprite: p.sprite ? { url: `/api/persona/sprite?as=${encodeURIComponent(p.id)}`, crop: p.sprite.crop, ...(p.sprite.waist !== undefined ? { waist: p.sprite.waist } : {}), ...(p.sprite.pixel ? { pixel: true } : {}) } : null,
+        sprite: p.sprite ? { url: `/api/persona/sprite?as=${encodeURIComponent(p.id)}${p.figureMade ? `&v=${encodeURIComponent(p.figureMade)}` : ''}`, crop: p.sprite.crop, ...(p.sprite.waist !== undefined ? { waist: p.sprite.waist } : {}), ...(p.sprite.pixel ? { pixel: true } : {}) } : null,
         ...(rec ? { accent: rec.info.accent } : {}),
         ...(p.tagline ? { tagline: p.tagline } : {}),
         ...(outfits.length > 0 ? { outfits } : {}),
@@ -822,6 +899,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
         ...(bio.length > 0 ? { bio } : {}),
         ...(facts.length > 0 ? { facts } : {}),
         ...(secret ? { secret } : {}),
+        // Their own figure's face, by playthrough, versioned so a new KEEP isn't the cached one.
+        ...(p.figure && pt ? { figure: true as const, thumb: `/api/persona/thumb?pt=${encodeURIComponent(pt.id)}&v=${encodeURIComponent(p.figureMade ?? '')}` } : {}),
       },
     };
   });
@@ -830,6 +909,8 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     if (!originAllowed(req.headers.origin)) return reply.code(403).send({ error: 'origin' });
     const pt = world.active();
     if (!pt) return reply.code(409).send({ error: 'no-playthrough' });
+    // Their own figure has no wardrobe.
+    if (world.players.resolve(undefined).figure) return reply.code(409).send({ error: 'figure' });
     const body = req.body;
     const outfit = typeof body === 'object' && body !== null ? (body as Record<string, unknown>).outfit : undefined;
     if (outfit !== null && (typeof outfit !== 'string' || !outfitNames(pt.player).includes(outfit))) return reply.code(400).send({ error: 'unknown-outfit' });
@@ -854,11 +935,12 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     // A locked one (outfits as rewards) is left out: her room dresses her.
     return Object.fromEntries(Object.entries(pt.contactOutfits ?? {}).filter(([id, o]) => world.outfitOpen?.(id, o) ?? true));
   });
-  // A character's figure (the persona never changes the body): `?as=<id>` names the character,
+  // A character's figure (a persona keeps the body unless it has its own figure): `?as=<id>` names the character,
   // whichever playthrough is active (the load screen asks for each one's); no `?as=`, the visitor's.
   app.get<{ Querystring: { as?: string } }>('/api/persona/sprite', (req, reply) => {
     const id = typeof req.query.as === 'string' ? req.query.as : visitor(undefined)?.id;
-    const p = id === undefined ? null : players.resolve(id);
+    // The active playthrough's player through the world (their own figure, spec 2026-11-12); anyone else as the roster has them.
+    const p = id === undefined ? null : world.active()?.player === id ? world.players.resolve(undefined) : players.resolve(id);
     const sprite = p && p.id === id ? p.sprite : null;
     if (!sprite) return reply.code(404).send({ error: 'no persona sprite' });
     return reply.type('image/png').header('Cache-Control', 'no-cache').send(fs.createReadStream(sprite.file));
@@ -874,6 +956,13 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     const rec = records.find((r) => r.info.id === req.params.id);
     const file = rec?.sprite && Object.hasOwn(rec.sprite.expressions, req.params.name) ? rec.sprite.expressions[req.params.name] : undefined;
     if (!file) return reply.code(404).send({ error: 'no expression' });
+    return reply.type('image/png').header('Cache-Control', 'no-cache').send(fs.createReadStream(file));
+  });
+
+  // Her figure while she's on the line (2026-11-08).
+  app.get<{ Params: { id: string } }>('/api/agents/:id/comms', (req, reply) => {
+    const file = records.find((r) => r.info.id === req.params.id)?.sprite?.comms;
+    if (!file) return reply.code(404).send({ error: 'no comms figure' });
     return reply.type('image/png').header('Cache-Control', 'no-cache').send(fs.createReadStream(file));
   });
 
@@ -927,6 +1016,30 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     if (!file || !fs.existsSync(file)) return reply.code(404).send({ error: 'no such picture' });
     return reply.type(m![1] === 'jpg' ? 'image/jpeg' : `image/${m![1]}`).header('Cache-Control', 'no-cache').send(fs.readFileSync(file));
   });
+  // A case card's picture (deduction board spec §1): world/cases/art/<case>/<card>.webp|png.
+  const CASE_PART = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  app.get<{ Params: { case: string; file: string } }>('/api/cases/art/:case/:file', (req, reply) => {
+    const m = /^([A-Za-z0-9_-]+)\.(webp|png)$/.exec(req.params.file);
+    const at = m && CASE_PART.test(req.params.case) ? path.join(cfg.casesDir ?? DEFAULT_CASES_DIR, 'art', req.params.case, req.params.file) : null;
+    if (!at || !fs.existsSync(at)) return reply.code(404).send({ error: 'no such picture' });
+    return reply.type(`image/${m![2]}`).header('Cache-Control', 'no-cache').send(fs.readFileSync(at));
+  });
+  // A case's bark (The Fourteenth voice script): world/cases/voice/<case>/<group>[-<take>].ogg.
+  app.get<{ Params: { case: string; file: string } }>('/api/cases/voice/:case/:file', (req, reply) => {
+    const ok = CASE_PART.test(req.params.case) && /^[a-z0-9]+(?:-[a-z0-9]+)?\.ogg$/.test(req.params.file);
+    const at = ok ? path.join(cfg.casesDir ?? DEFAULT_CASES_DIR, 'voice', req.params.case, req.params.file) : null;
+    if (!at || !fs.existsSync(at)) return reply.code(404).send({ error: 'no such clip' });
+    return reply.type('audio/ogg').header('Cache-Control', 'no-cache').send(fs.readFileSync(at));
+  });
+  // A voiced beat's clip (voiced job beats, 2026-11-08): world/quests/voice/<quest>/<section>.ogg.
+  const VOICE_PART = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  app.get<{ Params: { quest: string; file: string } }>('/api/quests/voice/:quest/:file', (req, reply) => {
+    const { quest, file } = req.params;
+    const section = file.endsWith('.ogg') ? file.slice(0, -4) : '';
+    const at = VOICE_PART.test(quest) && VOICE_PART.test(section) ? path.join(cfg.questsDir ?? DEFAULT_QUESTS_DIR, 'voice', quest, file) : null;
+    if (!at || !fs.existsSync(at)) return reply.code(404).send({ error: 'no such clip' });
+    return reply.type('audio/ogg').header('Cache-Control', 'no-cache').send(fs.readFileSync(at));
+  });
   // A goods picture (crew goods spec §8): world/crew/art/<file>.
   app.get<{ Params: { file: string } }>('/api/crew/art/:file', (req, reply) => {
     const m = QUEST_ART.exec(req.params.file);
@@ -940,6 +1053,24 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     if (req.headers['if-none-match'] === face.etag) return reply.code(304).header('Cache-Control', 'no-cache').header('ETag', face.etag).send();
     return reply.type('image/png').header('Cache-Control', 'no-cache').header('ETag', face.etag).send(face.png);
   });
+  /** A thumbnail with its ETag, or a 304 when the browser has it. */
+  const sendThumb = (req: import('fastify').FastifyRequest, reply: import('fastify').FastifyReply, thumb: { etag: string; png: Buffer }) => {
+    if (req.headers['if-none-match'] === thumb.etag) return reply.code(304).header('Cache-Control', 'no-cache').header('ETag', thumb.etag).send();
+    return reply.type('image/png').header('Cache-Control', 'no-cache').header('ETag', thumb.etag).send(thumb.png);
+  };
+  /** The thumbnail of `pt`'s persona figure (spec 2026-11-12); null when it has none. */
+  const figureThumb = (pt: string) => {
+    const fig = readFigure(playthroughs.personaDir(pt));
+    return fig ? thumbs.get(fig.file, fig.meta.face) : null;
+  };
+  // A playthrough's player face, for LOAD's strips of playthroughs that aren't active: their figure, else the character's.
+  app.get<{ Querystring: { pt?: string } }>('/api/persona/thumb', (req, reply) => {
+    const pt = typeof req.query.pt === 'string' ? playthroughs.get(req.query.pt) : null;
+    if (!pt) return reply.code(404).send({ error: 'no playthrough' });
+    const thumb = figureThumb(pt.id);
+    if (thumb) return sendThumb(req, reply, thumb);
+    return reply.redirect(`/api/agents/${encodeURIComponent(pt.player)}/thumb`);
+  });
   app.get<{ Params: { id: string } }>('/api/agents/:id/thumb', (req, reply) => {
     const rec = records.find((r) => r.info.id === req.params.id);
     if (!rec?.sprite) return reply.code(404).send({ error: 'no thumbnail' });
@@ -948,6 +1079,37 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     if (req.headers['if-none-match'] === thumb.etag) return reply.code(304).header('Cache-Control', 'no-cache').header('ETag', thumb.etag).send();
     return reply.type('image/png').header('Cache-Control', 'no-cache').header('ETag', thumb.etag).send(thumb.png);
   });
+
+  // ADJUST FIGURE (PEOPLE, dev checkouts only): her waist and portrait centre, read and written in her character.json.
+  app.get('/api/figure-edits', () => ({ on: cfg.figureEdits === true }));
+  if (cfg.figureEdits) {
+    const fitFile = (id: string) => path.join(cfg.charactersDir, id, 'character.json');
+    app.get<{ Params: { id: string } }>('/api/agents/:id/figure', (req, reply) => {
+      const { id } = req.params;
+      const rec = AGENT_ID_RE.test(id) ? records.find((r) => r.info.id === id) : undefined;
+      if (!rec?.sprite || !fs.existsSync(fitFile(id))) return reply.code(404).send({ error: 'no figure' });
+      const fit = readFit(fs.readFileSync(fitFile(id), 'utf8'));
+      return { own: fit.own, waist: fit.waist ?? rec.sprite.waist ?? null, face: fit.face ?? rec.info.face, sprite: `/api/agents/${encodeURIComponent(id)}/sprite` };
+    });
+    app.put<{ Params: { id: string }; Body: unknown }>('/api/agents/:id/figure', (req, reply) => {
+      if (!originAllowed(req.headers.origin)) return reply.code(403).send({ error: 'origin' });
+      const { id } = req.params;
+      const rec = AGENT_ID_RE.test(id) ? records.find((r) => r.info.id === id) : undefined;
+      if (!rec?.sprite || !fs.existsSync(fitFile(id))) return reply.code(404).send({ error: 'no figure' });
+      const fit = parseFit(req.body);
+      if (typeof fit === 'string') return reply.code(400).send({ error: fit });
+      if (writeFit(fitFile(id), fit) === 'not-own') return reply.code(409).send({ error: 'her figure is her base character\'s: fit it there' });
+      // The open room keeps the record it was made from: patch it and the roster's, then read the roster fresh.
+      for (const r of [rec, runtimeRecs.get(id)]) {
+        if (!r) continue;
+        if (r.sprite) r.sprite.waist = fit.waist;
+        if (r.info.sprite) r.info.sprite.waist = fit.waist;
+        r.info.face = fit.face;
+      }
+      reloadAgents();
+      return fit;
+    });
+  }
 
   /** Looks an id up in the roster (reloaded, so a just-added character.json is seen) and decides the GET/POST 404/409s. */
   async function findDirectRuntime(
@@ -1001,15 +1163,28 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     settings,
     baseUrl: openrouterUrl,
     ...(cfg.anthropicBaseUrl ? { anthropicBaseUrl: cfg.anthropicBaseUrl } : {}),
+    nanogptHost: nanoHost,
+    nanogpt: nanoCatalog,
     catalog: createRoutedCatalog({
       openrouter: createModelCatalog({ baseUrl: openrouterUrl, apiKey: () => settings.key('openrouter') }),
       anthropic: createAnthropicCatalog({ apiKey: () => settings.key('anthropic'), ...(cfg.anthropicBaseUrl ? { baseUrl: cfg.anthropicBaseUrl } : {}) }),
-      keys: () => ({ openrouter: settings.key('openrouter'), anthropic: settings.key('anthropic') }),
+      nanogpt: nanoCatalog,
+      keys: () => ({ openrouter: settings.key('openrouter'), anthropic: settings.key('anthropic'), nanogpt: settings.key('nanogpt') }),
     }),
     runtimes: () => [...runtimes.values()],
     originAllowed,
   });
-  registerPlaythroughRoutes(app, world, playthroughs, originAllowed);
+  // Made people (character creator spec 2026-11-14): drafts a closed creator left behind go at start.
+  const people = registerPeopleRoutes(app, {
+    dir: path.join(cfg.dataDir, 'people'),
+    dataDir: cfg.dataDir,
+    charactersDir: cfg.charactersDir,
+    paletteFile: cfg.castPaletteFile ?? './shared/cast-palette.json',
+    openrouterBaseUrl: cfg.openrouterBaseUrl ?? OPENROUTER_BASE_URL,
+    originAllowed,
+  });
+  people.sweepDrafts();
+  registerPlaythroughRoutes(app, world, playthroughs, originAllowed, { isStandIn: (id) => records.some((r) => r.info.id === id && r.info.standIn === true), standIn: STAND_IN, people });
   // UPDATE on the title: a public clone whose main has moved on (plan 2026-11-08).
   registerUpdateRoutes(app, deps.update ? { ...deps.update, dataDir: cfg.dataDir, originAllowed } : null);
   // Bug reports: the game's state as the player left it, sent to the relay or saved (spec 2026-10-11 bug report).
@@ -1019,7 +1194,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
     reportsDir: cfg.reportsDir ?? path.join(cfg.dataDir, 'bug-reports'),
     version: cfg.appVersion ?? '0.0.0',
     build: cfg.appBuild ?? null,
-    keys: () => [settings.key('openrouter') ?? '', settings.key('anthropic') ?? ''],
+    keys: () => [settings.key('openrouter') ?? '', settings.key('anthropic') ?? '', settings.key('nanogpt') ?? ''],
     originAllowed,
     context: () => {
       const pt = world.active();
@@ -1072,13 +1247,17 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       return {
         kind: 'direct',
         // A key her model's route can use (none needed for an address without auth).
-        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel) !== null,
+        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel, nanoCatalog) !== null,
         narrate: async (messages) => {
           const rt = await runtime(ai);
           if (!rt?.narrate) throw new Error('her model is not reachable');
           return rt.narrate(messages);
         },
       };
+    },
+    story: async (ai) => {
+      const rt = records.some((r) => r.info.id === ai) ? await runtime(ai) : null;
+      return rt ? rt.relay.storyFor(world.players.resolve(undefined).id) : null;
     },
     // The arrival screen's opening (spec 2026-10-27 §3): the playthrough's player, persona and all, in her room as it stands.
     promptFor: async (ai, steer) => {
@@ -1137,7 +1316,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       if (!direct) return null;
       return {
         kind: 'direct',
-        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel) !== null,
+        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel, nanoCatalog) !== null,
         narrate: async (messages) => {
           const rt = await runtime(ai);
           if (!rt?.narrate) throw new Error('her model is not reachable');
@@ -1196,7 +1375,7 @@ export async function buildApp(cfg: Config, deps: BuildAppDeps = {}): Promise<Bu
       if (!direct) return null;
       return {
         kind: 'direct',
-        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel) !== null,
+        ready: () => routeFor(direct, keysFor(settings, direct), settings.characterModel(ai) ?? direct.defaultModel, nanoCatalog) !== null,
         narrate: async (messages) => {
           const rt = await runtime(ai);
           if (!rt?.narrate) throw new Error('her model is not reachable');

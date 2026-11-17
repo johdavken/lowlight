@@ -26,7 +26,7 @@ export function desktopFolders(userData: string, contentDir: string, webDist: st
  */
 const SERVER_VARS = [
   'ART_SCENES_DIR', 'CHARACTERS_DIR', 'DATA_DIR', 'LORE_DIR', 'LEADS_DIR', 'QUESTS_DIR', 'EXTRAS_DIR', 'GEAR_DIR', 'CREW_DIR', 'STANDING_FILE', 'GIGS_DIR', 'PAPERS_DIR', 'DISTRICTS_DIR',
-  'MAP_FILE', 'NIX_ROOM_PORT', 'NIX_ROOM_TOKEN', 'NODE_ENV', 'OPENROUTER_API_KEY', 'OPENROUTER_BASE_URL', 'PERSONA_DIR',
+  'MAP_FILE', 'CAST_PALETTE_FILE', 'NIX_ROOM_PORT', 'NIX_ROOM_TOKEN', 'NODE_ENV', 'OPENROUTER_API_KEY', 'OPENROUTER_BASE_URL', 'PERSONA_DIR',
   'PLAYTHROUGHS_DIR', 'SCENES_DIR', 'SPLASH_DIR', 'WEB_DIST', 'APP_VERSION', 'APP_BUILD', 'BUG_RELAY_URL', 'LOG_FILE',
 ];
 
@@ -56,6 +56,7 @@ export function serverEnv(
     PAPERS_DIR: path.join(f.content, 'world', 'papers'),
     DISTRICTS_DIR: path.join(f.content, 'world', 'districts'),
     ART_SCENES_DIR: path.join(f.content, 'art', 'scenes'),
+    CAST_PALETTE_FILE: path.join(f.content, 'shared', 'cast-palette.json'),
     WEB_DIST: f.webDist,
     NIX_ROOM_PORT: '0',
     NODE_ENV: 'production',

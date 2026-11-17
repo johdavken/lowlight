@@ -1,10 +1,9 @@
 /**
- * The line stack (spec 2026-10-16 subtitle chat box §5): the latest line's options in the box's
- * bottom-left corner, as glyphs or words (SYS → CHAT KEYS), folding under one arrow. The feed says
- * which line they act on; the actions come from message-controls.
+ * The line's actions (the room HUD, docs/mockups/hud-frames.html CHAT → HOVER): the latest line's options as small glass
+ * keys on the subtitle box's top edge, there while the pointer is on the box or them (style.css), as glyphs or words
+ * (SYS → CHAT KEYS). The feed says which line they act on; the actions come from message-controls.
  */
 import type { ChatMessage } from '../../../shared/types';
-import { foldArrow } from './chat-keys';
 import { keyButton } from './key-glyphs';
 import { latestActions, type ControlAction } from './message-controls';
 
@@ -20,7 +19,6 @@ export interface LineKeysState {
 
 export class LineKeys {
   readonly el = document.createElement('div');
-  private readonly arrow: HTMLButtonElement;
   private key = '';
 
   constructor() {
@@ -28,8 +26,6 @@ export class LineKeys {
     this.el.setAttribute('role', 'toolbar');
     this.el.setAttribute('aria-label', 'Line options');
     this.el.hidden = true;
-    this.arrow = foldArrow(this.el, 'line');
-    this.el.append(this.arrow);
   }
 
   /** The line the keys act on (null: none, and the stack hides). Rebuilt only when the line, its keys or busy change. */
@@ -54,7 +50,7 @@ export class LineKeys {
       });
       return b;
     });
-    this.el.replaceChildren(...buttons, this.arrow);
+    this.el.replaceChildren(...buttons);
   }
 
   dispose(): void {

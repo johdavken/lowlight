@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { CityWeather } from '../../shared/city-weather';
 import type { Outage } from '../../shared/outage';
 import type { Location, PlaythroughInfo, SaveInfo } from '../../shared/types';
+import { copyFigure, PERSONA_DIR } from './persona-figure';
 import { parsePersona, type PlaythroughPersona } from '../../shared/persona';
 import { currentSceneId } from '../../shared/scene-aliases';
 import { copyIdentityOverrides } from './playthrough-identity';
@@ -26,6 +27,8 @@ export interface Playthroughs {
   create(o: { player: string; startContact: string; name?: string; personaName?: string; persona?: PlaythroughPersona }): PlaythroughInfo;
   setActive(id: string): void;
   rename(id: string, name: string): void;
+  /** Who you are in it (Studio PERSONA page, spec 2026-11-13); null plays as the character again. A kept figure stays in persona/ but plays only under a persona. */
+  setPersona(id: string, persona: PlaythroughPersona | null): void;
   /** Throws for the active one. */
   remove(id: string): void;
   /** Location and updatedAt; `solo: false` also ends solo, in the same write. */
@@ -46,6 +49,8 @@ export interface Playthroughs {
   setOutages(id: string, list: Outage[]): void;
   /** `<pt>/chars`, the runtimes' stateDir. */
   charsDir(id: string): string;
+  /** `<pt>/persona`: the persona's own figure, made in Studio (spec 2026-11-12). */
+  personaDir(id: string): string;
   /** `<root>/.lobby/chars`: where runtimes keep their state while no playthrough is active. */
   lobbyCharsDir(): string;
   /** Newest first. */
@@ -158,6 +163,31 @@ const svId = (id: string) => {
 const entries = (f: SaveInfo['fingerprint']) => Object.entries(f).sort(([a], [b]) => (a < b ? -1 : 1));
 const sameFingerprint = (a: SaveInfo['fingerprint'], b: SaveInfo['fingerprint']) => JSON.stringify(entries(a)) === JSON.stringify(entries(b));
 
+/**
+ * Playthroughs read-only, for another process (Studio): no folder made, no restore recovered, no index repaired,
+ * no warnings. Studio must never run `createPlaythroughs` on the game's folder, whose recovery would undo a load
+ * the game is in the middle of.
+ */
+export function readPlaythroughs(root: string): { list(): PlaythroughInfo[]; get(id: string): PlaythroughInfo | null; activeId(): string | null; dir(id: string): string } {
+  const get = (id: string): PlaythroughInfo | null => (PT_ID.test(id) ? asPlaythrough(readJson(path.join(root, id, 'playthrough.json')), id) : null);
+  return {
+    get,
+    list() {
+      if (!fs.existsSync(root)) return [];
+      return fs
+        .readdirSync(root, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
+        .flatMap((e) => get(e.name) ?? [])
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+    activeId() {
+      const v = readJson(path.join(root, 'index.json'));
+      return isRecord(v) && typeof v.active === 'string' ? v.active : null;
+    },
+    dir: (id) => path.join(root, id),
+  };
+}
+
 export function createPlaythroughs(
   root: string,
   now: () => number = Date.now,
@@ -245,6 +275,13 @@ export function createPlaythroughs(
     writeJsonAtomic(file(id), info);
   };
 
+  /** Who you are, as the playthrough has it now: a LOAD or a branch rewinds the story, not a persona set since (spec 2026-11-13). */
+  const withLivePersona = (info: PlaythroughInfo, live: PlaythroughInfo | null) => {
+    if (!live) return;
+    delete info.persona;
+    if (live.persona) info.persona = live.persona;
+  };
+
   const saves = (id: string): SaveInfo[] => {
     ptId(id);
     const parent = savesDir(id);
@@ -305,6 +342,13 @@ export function createPlaythroughs(
     rename(id, name) {
       update(id, (info) => {
         info.name = name;
+      });
+    },
+
+    setPersona(id, persona) {
+      update(id, (info) => {
+        if (persona) info.persona = persona;
+        else delete info.persona;
       });
     },
 
@@ -380,6 +424,7 @@ export function createPlaythroughs(
     },
 
     charsDir: (id) => path.join(dir(id), 'chars'),
+    personaDir: (id) => path.join(dir(id), PERSONA_DIR),
     lobbyCharsDir: () => path.join(root, '.lobby', 'chars'),
 
     saves,
@@ -449,11 +494,15 @@ export function createPlaythroughs(
       // Solo as the save has it (the snapshot copy can't disagree, but the save is what the load screen shows).
       delete info.solo;
       if (save.solo) info.solo = true;
+      // Who you are is the source's as it is now, like its figure (set in Studio's PERSONA, spec 2026-11-13).
+      withLivePersona(info, get(found.playthrough));
       const target = dir(id);
       try {
         // A save with no databases (the contact in its location was never opened) still forks to an empty chars/.
         fs.mkdirSync(path.join(target, 'chars'), { recursive: true });
         fs.cpSync(path.join(found.dir, 'chars'), path.join(target, 'chars'), { recursive: true });
+        // The figure belongs to the playthrough, not the save: the branch gets the source's current one.
+        copyFigure(dir(found.playthrough), target);
         writeJsonAtomic(file(id), info);
       } catch (err) {
         fs.rmSync(target, { recursive: true, force: true });
@@ -490,6 +539,7 @@ export function createPlaythroughs(
       };
       delete info.starred;
       if (live.starred) info.starred = true;
+      withLivePersona(info, live);
       delete info.solo;
       if (save.solo) info.solo = true;
 
@@ -548,6 +598,7 @@ export function createPlaythroughs(
           db.vacuumInto(path.join(target, 'chars', contact, 'room.db'));
         }
         copyIdentityOverrides(path.join(dir(id), 'chars'), path.join(target, 'chars'));
+        copyFigure(dir(id), target);
         writeJsonAtomic(file(newId), info);
       } catch (err) {
         fs.rmSync(target, { recursive: true, force: true });

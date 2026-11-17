@@ -419,7 +419,7 @@ test('dice: DICE opens the tray, Esc closes it', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('YOU, PEOPLE, TEXTS, QUEST, CREW and MAP: a bar word switches between them, and Tab cycles YOU → PEOPLE → TEXTS → QUEST → CREW → MAP → BOOK', async ({ page }) => {
+test('YOU, PEOPLE, QUEST, CREW and MAP: a bar word switches between them, and Tab cycles YOU → PEOPLE (FILE, TEXTS, JOURNAL) → QUEST → CREW → MAP → BOOK', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await skipSplash(page);
   await page.goto(`/room/${DIRECT.id}?as=hicks`);
@@ -432,15 +432,16 @@ test('YOU, PEOPLE, TEXTS, QUEST, CREW and MAP: a bar word switches between them,
   await expect(page.locator('.people-screen')).toBeVisible();
   await expect(page.locator('.character-sheet')).toHaveCount(0);
   await expect(page.locator('.pe-tab[data-tab="journal"]')).toBeEnabled();
+  // TEXTS is PEOPLE's middle tab: the cycle walks FILE → TEXTS → JOURNAL before it goes on.
+  await page.keyboard.press('Tab');
+  await expect(page.locator('.pe-tab.on')).toHaveText('TEXTS');
+  await expect(page.locator('.people-screen .tx-deck')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.locator('.pe-tab.on')).toHaveText('JOURNAL');
-  await page.keyboard.press('Tab');
-  await expect(page.locator('.tx-pane')).toBeVisible();
-  await expect(page.locator('.people-screen')).toHaveCount(0);
   await expect(page.locator('.hud-quest')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(page.locator('.ql-pane')).toBeVisible();
-  await expect(page.locator('.tx-root')).toHaveCount(0);
+  await expect(page.locator('.people-screen')).toHaveCount(0);
   await page.keyboard.press('Tab');
   await expect(page.locator('.crew-screen')).toBeVisible();
   await expect(page.locator('.ql-pane')).toBeHidden();

@@ -15,6 +15,7 @@ const SUBJECT_MAX = 60;
 const REMOVED = '[key removed]';
 const OPENROUTER_KEY_RE = /sk-or-[A-Za-z0-9-]+/g;
 const ANTHROPIC_KEY_RE = /sk-ant-[A-Za-z0-9_-]+/g;
+const NANOGPT_KEY_RE = /sk-nano-[A-Za-z0-9_-]+/g;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface BugInput {
@@ -46,7 +47,7 @@ export interface BugState {
 
 /** Replaces each of `keys` and anything shaped like an OpenRouter key with `[key removed]`. */
 export function scrub(s: string, keys: string[]): string {
-  let out = s.replace(OPENROUTER_KEY_RE, REMOVED).replace(ANTHROPIC_KEY_RE, REMOVED);
+  let out = s.replace(OPENROUTER_KEY_RE, REMOVED).replace(ANTHROPIC_KEY_RE, REMOVED).replace(NANOGPT_KEY_RE, REMOVED);
   for (const k of keys) if (k) out = out.split(k).join(REMOVED);
   return out;
 }

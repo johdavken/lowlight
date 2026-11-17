@@ -53,7 +53,7 @@ if (!trail.ok) throw new Error('fixture');
 const KEY = questKey('hicks', 'night-shift@0');
 
 /** Hicks (TECH 7, stall build, EDGE 4 → 2 rerolls) on a mission with Nix at Hae's: Ember's bonus never applies. */
-function relayWith(o: { rolls?: number[]; nerve?: number; book?: QuestEntry[]; deck?: string | null; stats?: Stats; clock?: () => number } = {}) {
+function relayWith(o: { rolls?: number[]; nerve?: number; book?: QuestEntry[]; deck?: string | null; stats?: Stats; clock?: () => number; clips?: NonNullable<ChatRelayDeps['quests']>['clips'] } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const events: ServerEvent[] = [];
@@ -81,6 +81,7 @@ function relayWith(o: { rolls?: number[]; nerve?: number; book?: QuestEntry[]; d
     },
     kit,
     decks: () => DECKS,
+    ...(o.clips ? { clips: o.clips } : {}),
   };
   const relay = new ChatRelay({
     players: fakePlayers(),
@@ -280,6 +281,21 @@ describe('missions: the end', () => {
     expect(sent).not.toMatch(/\[mission summary[^\]]*(%|\d)/);
     expect(kit()).toMatchObject({ sol: 400, deck: 'deaf-meridian' });
     expect(run(db)!.kit!.filter((e) => e.sol === 400)).toHaveLength(1);
+  });
+});
+
+describe('missions: voiced job beats', () => {
+  it("a job's ending row carries its outcome's clip, matched on the part, not the joined text", async () => {
+    const voiced = new Map([['*You keep a copy.*', '/api/quests/voice/night-shift/kept.ogg']]);
+    const clips = (_q: string, texts: readonly string[]) => texts.flatMap((t) => (voiced.has(t) ? [voiced.get(t)!] : []));
+    const { relay, db } = relayWith({ rolls: [6], clips });
+    await relay.startQuest('hicks', 'night-shift');
+    await pick(relay, 'door', 'roof');
+    await pick(relay, 'desk', 'copy');
+    expect(run(db)!.done).toBe(true);
+    const end = questRows(db).find((m) => m.quest?.debrief)!;
+    expect(end.text).toContain('*You keep a copy.*');
+    expect(end.quest!.clips).toEqual(['/api/quests/voice/night-shift/kept.ogg']);
   });
 });
 
@@ -517,5 +533,45 @@ describe('the shipped jobs say who posted them', () => {
     const q = withSpring(r.entry, { place: 'haes-noodles', tier: 1 }, 'Dez');
     expect(q.postedBy).toContain('Dez');
     expect(q.brief).toContain('Dez');
+  });
+});
+
+describe('outcome versions (routes and posts spec §1)', () => {
+  const FORK = `---\ntitle: Night Shift\nkind: mission\nwith: [hicks, ember, nix-direct]\nstarts: haes-noodles\nafter: null\npay: 400\n---\n\n# door\n\n*A door.*\n\n- held: Wedge it open behind you. → in [set door=held]\n- shut: Let it close. → in\n\n## in\n*You're in.*\n→ desk\n\n# desk\n\n*The manifest is on the screen.*\n\n- wipe: Wipe the manifest. → paid / caught [check tech 50 grid]\n- copy: Copy it and walk. → paid\n\n## paid\n*Clean.*\npay: 400\n→ end\n\n## caught if door=held\n*You go back out the way you wedged.*\ntake: part\n→ end\n\n## caught\n*The door is shut. They have you.*\ntake: none\n→ end\n`;
+  const fork = parseQuestFile('night-shift', FORK, known);
+  if (!fork.ok) throw new Error(JSON.stringify(fork.problems));
+  const play = async (first: 'held' | 'shut') => {
+    const { relay, db, events } = relayWith({ rolls: [2], book: [fork.entry] });
+    await relay.startQuest('hicks', 'night-shift');
+    await pick(relay, 'door', first);
+    const blows = states(events).at(-1)!.active!.choices.find((c) => c.id === 'wipe')!.blows;
+    await pick(relay, 'desk', 'wipe');
+    return { text: questRows(db).at(-1)!.text, take: run(db)!.take, blows };
+  };
+  it('a miss plays the version whose condition holds', async () => {
+    const r = await play('held');
+    expect(r.text).toContain('You go back out the way you wedged.');
+    expect(r.take).toBe('part');
+    expect(r.blows).toBeUndefined();
+  });
+  it('and the plain one when none does', async () => {
+    const r = await play('shut');
+    expect(r.text).toContain('They have you.');
+    expect(r.take).toBe('none');
+    expect(r.blows).toBe(true);
+  });
+});
+
+describe('a save standing on a beat the file no longer has (routes and posts plan, Review Focus 1)', () => {
+  it('the room still reads, shows no cards for it, and a pick is refused', async () => {
+    const { relay, db } = relayWith({ rolls: [6] });
+    await relay.startQuest('hicks', 'night-shift');
+    // Night Clerk's corridor went when it was routed: a run saved there has nowhere to stand.
+    db.setMeta(KEY, JSON.stringify({ ...run(db)!, beat: 'corridor', variant: 0 }));
+    const state = relay.questState('hicks');
+    expect(state.active ?? null).toBeNull();
+    expect(state.changed).toBe('Night Shift has changed since you started it');
+    expect(await relay.chooseQuest('hicks', { id: 'night-shift', beat: 'corridor', choice: 'slip' })).toBe('that choice has passed');
+    expect(run(db)!.beat).toBe('corridor');
   });
 });

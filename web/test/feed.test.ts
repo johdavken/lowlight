@@ -527,10 +527,12 @@ describe('Feed stage mode (the dialogue box)', () => {
   }
   const shown = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.feed > *')].filter((n) => !n.classList.contains('hidden-collapsed'));
 
-  it('subtitles: a scrim instead of the box frame, and one line stack beside the feed', () => {
+  it('subtitles: a scrim and no pane (no glass frame layer), and one line stack beside the feed', () => {
     const { root } = stageFeed();
     expect(root.querySelector('.sub-scrim')).not.toBeNull();
     expect(root.querySelector('.box-frame')).toBeNull();
+    // B TRACE (2026-11-15): the head line and rail are the list's own (style.css), not a holo frame.
+    expect(root.querySelector('.hf')).toBeNull();
     expect(root.querySelectorAll('.line-keys')).toHaveLength(1);
     expect(root.querySelector('.feed .line-keys')).toBeNull();
   });
@@ -1950,6 +1952,45 @@ describe('quest rows stay out of the box (the panel above shows them)', () => {
   });
 });
 
+describe('her reply over the line goes to the JOB column, not the box (2026-11-11)', () => {
+  const mountBox = (rows: ChatMessage[]) => {
+    document.body.innerHTML = '';
+    const root = document.createElement('div');
+    document.body.append(root);
+    const feed = new Feed(root, vi.fn(), undefined, { stage: true, onControl: vi.fn() });
+    allFeeds.push(feed);
+    feed.setHistory(rows);
+    feed.setInColumn((m) => m.replyTo === 'q1');
+    return { root, feed };
+  };
+  const before = msg({ id: 'a0', role: 'agent', text: 'Earlier line.', ts: 1 });
+  const pickRow = msg({ id: 'q1', role: 'user', mode: 'quest', text: 'Wait.', ts: 2, quest: { id: 'x', title: 'X', beat: 'door', ride: { beat: 'door', variant: 0, line: true } } });
+  const hidden = (root: HTMLElement, id: string) => root.querySelector(`[data-id="${id}"]`)!.classList.contains('hidden-collapsed');
+  it('hidden in the box, and the line before it does not come back', () => {
+    const { root } = mountBox([before, pickRow, msg({ id: 'a1', text: 'Keep walking.', ts: 3, mode: 'quest', replyTo: 'q1' })]);
+    expect(root.querySelector('[data-id="a1"]')!.classList.contains('in-column')).toBe(true);
+    expect(hidden(root, 'a1')).toBe(true);
+    expect(hidden(root, 'a0')).toBe(true);
+    expect(root.querySelector('button.continue')).toBeNull();
+  });
+  it("her first words of a line the column shows don't pulse the box", () => {
+    const { root, feed } = mountBox([before, pickRow, msg({ id: 'a1', text: '', status: 'streaming', ts: 3, mode: 'quest', replyTo: 'q1' })]);
+    root.classList.add('job-col');
+    feed.delta('a1', 'Keep');
+    expect(root.classList.contains('line-new')).toBe(false);
+  });
+  it('a failed reply stays in the box, where RETRY is', () => {
+    const { root } = mountBox([before, pickRow, msg({ id: 'a1', text: '', status: 'failed', ts: 3, mode: 'quest', replyTo: 'q1' })]);
+    expect(root.querySelector('[data-id="a1"]')!.classList.contains('in-column')).toBe(false);
+    expect(hidden(root, 'a1')).toBe(false);
+  });
+  it('the archive keeps it', () => {
+    const { root, feed } = mountBox([before, pickRow, msg({ id: 'a1', text: 'Keep walking.', ts: 3, mode: 'quest', replyTo: 'q1' })]);
+    feed.expand();
+    expect(hidden(root, 'a1')).toBe(false);
+  });
+});
+
 describe('quest rows in the feed', () => {
   const mount = (rows: ChatMessage[]) => {
     document.body.innerHTML = '';
@@ -2172,5 +2213,274 @@ describe('actionSpans', () => {
       [1, 11],
       [19, 24],
     ]);
+  });
+});
+
+describe('AUTO PAGE (the box settings)', () => {
+  /** A box whose reply runs to five pages (1000px of text in 200px pages), shown at once (reduced motion: no typing). */
+  function autoFeed() {
+    for (const f of allFeeds.splice(0)) f.dispose();
+    HTMLElement.prototype.scrollBy ??= () => {};
+    document.body.innerHTML = '';
+    const root = document.createElement('div');
+    document.body.append(root);
+    const feed = new Feed(root, vi.fn(), () => ({ content: 1000, available: 200, lineHeight: 25 }), { stage: true, reducedMotion: true });
+    allFeeds.push(feed);
+    feed.setHistory([msg({ id: 'u1', role: 'user', text: 'go' }), msg({ id: 'a1', text: 'long' })]);
+    return { root, feed };
+  }
+  const page = (root: HTMLElement) => root.querySelector('button.continue')?.textContent ?? null;
+  const key = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('off by default: a finished page waits for the reader, with no timer', () => {
+    const { root } = autoFeed();
+    expect(page(root)).toBe('[CONTINUE ▸ 1/5]');
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(60_000);
+    expect(page(root)).toBe('[CONTINUE ▸ 1/5]');
+  });
+
+  it('on: a finished page turns itself after the wait, page by page, and stops on the last', () => {
+    const { root, feed } = autoFeed();
+    feed.setAutoPage(3000);
+    expect(vi.getTimerCount()).toBe(1);
+    vi.advanceTimersByTime(2999);
+    expect(page(root)).toBe('[CONTINUE ▸ 1/5]');
+    vi.advanceTimersByTime(1);
+    expect(page(root)).toBe('[CONTINUE ▸ 2/5]');
+    vi.advanceTimersByTime(3000 * 2);
+    expect(page(root)).toBe('[CONTINUE ▸ 4/5]');
+    vi.advanceTimersByTime(3000);
+    // The last page: the counter goes (she's done), and nothing waits to turn it.
+    expect(page(root)).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a refresh while it waits doesn't start the wait again", () => {
+    const { root, feed } = autoFeed();
+    feed.setAutoPage(3000);
+    vi.advanceTimersByTime(2000);
+    feed.relayout();
+    vi.advanceTimersByTime(1000);
+    expect(page(root)).toBe('[CONTINUE ▸ 2/5]');
+  });
+
+  it('the reader turning first restarts the wait for the new page; the archive and switching it off let it go', () => {
+    const { root, feed } = autoFeed();
+    feed.setAutoPage(3000);
+    vi.advanceTimersByTime(2000);
+    key('Enter');
+    expect(page(root)).toBe('[CONTINUE ▸ 2/5]');
+    vi.advanceTimersByTime(2000);
+    expect(page(root)).toBe('[CONTINUE ▸ 2/5]');
+    vi.advanceTimersByTime(1000);
+    expect(page(root)).toBe('[CONTINUE ▸ 3/5]');
+    key('PageUp');
+    expect(feed.expanded).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+    key('Escape');
+    expect(vi.getTimerCount()).toBe(1);
+    feed.setAutoPage(null);
+    expect(vi.getTimerCount()).toBe(0);
+    vi.advanceTimersByTime(10_000);
+    expect(page(root)).toBe('[CONTINUE ▸ 3/5]');
+  });
+});
+
+describe('AUTO PAGE holds and lets go (review)', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('held (pause, a screen): a page out of sight waits, and turns a full wait after it is in sight again', () => {
+    for (const f of allFeeds.splice(0)) f.dispose();
+    HTMLElement.prototype.scrollBy ??= () => {};
+    document.body.innerHTML = '';
+    const root = document.createElement('div');
+    document.body.append(root);
+    const feed = new Feed(root, vi.fn(), () => ({ content: 1000, available: 200, lineHeight: 25 }), { stage: true, reducedMotion: true });
+    allFeeds.push(feed);
+    feed.setHistory([msg({ id: 'u1', role: 'user', text: 'go' }), msg({ id: 'a1', text: 'long' })]);
+    let held = true;
+    feed.setHold(() => held);
+    feed.setAutoPage(3000);
+    vi.advanceTimersByTime(9000);
+    expect(root.querySelector('button.continue')!.textContent).toBe('[CONTINUE ▸ 1/5]');
+    held = false;
+    vi.advanceTimersByTime(3000);
+    expect(root.querySelector('button.continue')!.textContent).toBe('[CONTINUE ▸ 2/5]');
+  });
+
+  it('a reply removed while it types takes its typing and timers with it', () => {
+    for (const f of allFeeds.splice(0)) f.dispose();
+    document.body.innerHTML = '';
+    const root = document.createElement('div');
+    document.body.append(root);
+    const feed = new Feed(root, vi.fn(), () => ({ content: 50, available: 450, lineHeight: 25 }), { stage: true, reducedMotion: false });
+    allFeeds.push(feed);
+    feed.setTextEffect('decode');
+    feed.upsert(msg({ id: 'a1', text: 'Two knocks, then one.', status: 'streaming' }));
+    vi.advanceTimersByTime(100);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    feed.remove(['a1']);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('TEXT EFFECT DECODE (the box settings)', () => {
+  function decodeFeed(reducedMotion = false) {
+    for (const f of allFeeds.splice(0)) f.dispose();
+    HTMLElement.prototype.scrollBy ??= () => {};
+    document.body.innerHTML = '';
+    const root = document.createElement('div');
+    document.body.append(root);
+    const feed = new Feed(root, vi.fn(), () => ({ content: 50, available: 450, lineHeight: 25 }), { stage: true, reducedMotion });
+    allFeeds.push(feed);
+    return { root, feed };
+  }
+  /** The noise painted over the words ahead (each word's data-n), spaces between. */
+  const noise = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.text .unshown.noise .nw')].map((n) => n.dataset.n).join(' ');
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('off (TYPE): the text ahead is hidden, not noise', () => {
+    const { root, feed } = decodeFeed();
+    feed.upsert(msg({ id: 'a1', text: 'Two knocks, then one.', status: 'streaming' }));
+    vi.advanceTimersByTime(100);
+    expect(root.querySelector('.noise')).toBeNull();
+    expect(root.querySelector('.unshown')).not.toBeNull();
+  });
+
+  it('on: the text ahead of the cursor is noise of its shape, it flickers, and the letters lock in to the plain line', () => {
+    const { root, feed } = decodeFeed();
+    feed.setTextEffect('decode');
+    const text = 'Two knocks, then one.';
+    feed.upsert(msg({ id: 'a1', text, status: 'streaming' }));
+    vi.advanceTimersByTime(1000 / 60 * 4);
+    // While she still sends, the glyphs come first: no letter locks in yet (playtest, 2026-11-16).
+    const first = noise(root);
+    expect(first).toHaveLength(13);
+    expect(first.split(' ').map((w) => w.length)).toEqual([2, 4, 2, 2]);
+    // The real letters are all still there under it.
+    expect(textOf(root, 'a1').textContent).toBe(text);
+    const before = noise(root);
+    vi.advanceTimersByTime(66 * 3);
+    expect(noise(root)).not.toBe(before);
+    feed.upsert(msg({ id: 'a1', text, status: 'ok' }));
+    // She's done: the letters lock in from the left, the rest still noise.
+    vi.advanceTimersByTime(1000 / 60 * 4);
+    expect(noise(root).length).toBeGreaterThan(0);
+    expect(noise(root).length).toBeLessThan(13);
+    vi.runAllTimers();
+    expect(root.querySelector('.noise')).toBeNull();
+    expect(textOf(root, 'a1').textContent).toBe(text);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('a long reply still streaming: the letters keep a lead of glyphs ahead of them', () => {
+    const { root, feed } = decodeFeed();
+    feed.setTextEffect('decode');
+    const text = 'word '.repeat(120).trim();
+    feed.upsert(msg({ id: 'a1', text, status: 'streaming' }));
+    vi.advanceTimersByTime(60_000);
+    // 599 characters in: the letters stop 360 short of the newest glyph, however long they're given.
+    const hidden = [...root.querySelectorAll('.unshown')].reduce((n, e) => n + (e.textContent?.length ?? 0), 0);
+    expect(hidden).toBe(360);
+    feed.upsert(msg({ id: 'a1', text, status: 'ok' }));
+    vi.runAllTimers();
+    expect(root.querySelector('.noise')).toBeNull();
+  });
+
+  it('reduced motion: no noise, the line shows at once', () => {
+    const { root, feed } = decodeFeed(true);
+    feed.setTextEffect('decode');
+    feed.upsert(msg({ id: 'a1', text: 'Two knocks.', status: 'ok' }));
+    expect(root.querySelector('.noise')).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+describe('the box held while the job table is up (playtest: it surfaced as a job started, and after a delete)', () => {
+  function boxed(content: Record<string, number> = {}) {
+    for (const f of allFeeds.splice(0)) f.dispose();
+    HTMLElement.prototype.scrollBy ??= () => {};
+    document.body.innerHTML = '';
+    const root = document.createElement('div');
+    document.body.append(root);
+    const feed = new Feed(root, vi.fn(), (id) => ({ content: content[id] ?? 50, available: 450, lineHeight: 25 }), { stage: true, reducedMotion: true });
+    allFeeds.push(feed);
+    return { root, feed };
+  }
+  const shownIds = (root: HTMLElement) => [...root.querySelectorAll<HTMLElement>('.feed > .msg')].filter((n) => !n.classList.contains('hidden-collapsed')).map((n) => n.dataset.id);
+
+  it('held: no line shows in the box (hers from before the job, yours, hers now) and the box reads empty; let go, the current line is back', () => {
+    const { root, feed } = boxed();
+    feed.setHistory([msg({ id: 'a0', text: 'before the job' }), msg({ id: 'u1', role: 'user', text: 'go in', mode: 'quest' }), msg({ id: 'u2', role: 'user', text: 'my line' })]);
+    expect(shownIds(root)).toEqual(['u2']);
+    feed.setBoxHeld(true);
+    expect(shownIds(root)).toEqual([]);
+    expect(root.classList.contains('box-empty')).toBe(true);
+    // A delete at the table: the line before it doesn't come back into the box.
+    feed.remove(['u2']);
+    expect(shownIds(root)).toEqual([]);
+    expect(root.classList.contains('box-empty')).toBe(true);
+    feed.setBoxHeld(false);
+    expect(shownIds(root)).toEqual(['a0']);
+    expect(root.classList.contains('box-empty')).toBe(false);
+  });
+
+  it('your line that failed to send stays in the box while held, where its NOT DELIVERED and RETRY are (review)', () => {
+    const { root, feed } = boxed();
+    feed.setBoxHeld(true);
+    feed.setHistory([msg({ id: 'a0', text: 'before' }), msg({ id: 'u1', role: 'user', text: 'go', status: 'failed' })]);
+    expect(shownIds(root)).toEqual(['u1']);
+    expect(root.querySelector('[data-id="u1"]')!.classList.contains('held-out')).toBe(false);
+  });
+
+  it('a reply of hers that was lost stays in the box while held', () => {
+    const { root, feed } = boxed();
+    feed.setBoxHeld(true);
+    feed.setHistory([msg({ id: 'u1', role: 'user', text: 'go' }), msg({ id: 'a1', text: 'half', status: 'lost' })]);
+    expect(shownIds(root)).toEqual(['a1']);
+  });
+
+  it('a long line held out is not paged: no CONTINUE, no page keys, no fitted box (review)', () => {
+    const { root, feed } = boxed({ a0: 1000 });
+    feed.setHistory([msg({ id: 'a0', text: 'x' })]);
+    expect(root.classList.contains('paging')).toBe(true);
+    feed.setBoxHeld(true);
+    expect(root.classList.contains('paging')).toBe(false);
+    expect(root.querySelector('button.continue')).toBeNull();
+    expect(document.documentElement.style.getPropertyValue('--box-fit')).toBe('');
+  });
+
+  it('her reply typing out while held is no page key\'s to skip: Enter goes to the table (review)', () => {
+    vi.useFakeTimers();
+    try {
+      for (const f of allFeeds.splice(0)) f.dispose();
+      document.body.innerHTML = '';
+      const root = document.createElement('div');
+      document.body.append(root);
+      const feed = new Feed(root, vi.fn(), () => ({ content: 50, available: 450, lineHeight: 25 }), { stage: true, reducedMotion: false });
+      allFeeds.push(feed);
+      feed.setHistory([msg({ id: 'u1', role: 'user', text: 'go' })]);
+      feed.upsert(msg({ id: 'a1', text: 'A long line typing out, one letter at a time.', status: 'streaming' }));
+      expect(feed.pageWaiting()).toBe(true);
+      feed.setBoxHeld(true);
+      expect(feed.pageWaiting()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('the archive still shows every line', () => {
+    const { root, feed } = boxed();
+    feed.setHistory([msg({ id: 'a0', text: 'one' }), msg({ id: 'a1', text: 'two' })]);
+    feed.setBoxHeld(true);
+    feed.expand();
+    expect(shownIds(root)).toEqual(['a0', 'a1']);
   });
 });

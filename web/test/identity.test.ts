@@ -68,7 +68,7 @@ describe('agent identity in the room', () => {
     hud.setBackLink(nav);
     const link = document.querySelector('.hud-back') as HTMLElement;
     expect(link.textContent).toBe('‹');
-    expect(link.title).toBe('Title (Alt+T)');
+    expect(link.dataset.tip).toBe('Title (Alt+T)');
     link.click();
     expect(nav).toHaveBeenCalled();
     hud.dispose();
@@ -280,5 +280,15 @@ describe('district screen skip flag', () => {
         },
       }),
     ).not.toThrow();
+  });
+});
+
+describe('a remembered made person (character creator spec 2026-11-14)', () => {
+  it('their tile id comes back as the player; a stray @ id does not', async () => {
+    const { lastMatch, rememberMatch } = await import('../src/room/identity');
+    rememberMatch({ player: '@p-1794679903080-aaaaaa', ai: 'nix' });
+    expect(lastMatch()).toEqual({ player: '@p-1794679903080-aaaaaa', ai: 'nix' });
+    localStorage.setItem('lowlight.lastMatch', JSON.stringify({ player: '@../x', ai: 'nix' }));
+    expect(lastMatch()).toBeNull();
   });
 });

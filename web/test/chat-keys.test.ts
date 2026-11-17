@@ -72,7 +72,7 @@ describe('foldArrow', () => {
     arrow.click();
     expect(stack.classList.contains('folded')).toBe(true);
     expect(arrow.getAttribute('aria-expanded')).toBe('false');
-    expect(arrow.title).toBe('Show the line options');
+    expect(arrow.dataset.tip).toBe('Show the line options');
     expect(loadFold().line).toBe(true);
     const again = document.createElement('div');
     foldArrow(again, 'line');
@@ -83,7 +83,7 @@ describe('foldArrow', () => {
     const stack = document.createElement('div');
     const arrow = foldArrow(stack, 'scene');
     expect(arrow.textContent).toBe('▸');
-    expect(arrow.title).toBe('Hide the scene actions');
+    expect(arrow.dataset.tip).toBe('Hide the scene actions');
     arrow.click();
     expect(loadFold()).toEqual({ line: false, scene: true });
   });

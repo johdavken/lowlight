@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TRAIL } from './quests.fixture';
-import { QUEST_CHOICE_MAX, QUEST_PITCH_MAX, QUEST_NODES_MAX, QUEST_TEXT_MAX, QUEST_VIEW_MAX, holds, parseCondition, parseQuestFile, type CondCtx, type Condition, type QuestEntry } from './quests';
+import { QUEST_CHOICE_MAX, QUEST_PITCH_MAX, QUEST_NODES_MAX, QUEST_TEXT_MAX, QUEST_VIEW_MAX, QUEST_JOB_TEXT_MAX, toldKey, toldOf, beatAway, holds, parseCondition, parseQuestFile, type CondCtx, type Condition, type QuestEntry } from './quests';
 
 const roster = new Set(['nix-direct', 'hicks', 'cass']);
 const places = new Set(['lowlight-intake', 'haes-noodles']);
@@ -499,6 +499,40 @@ describe('mentionsFlag (crew spec §2)', () => {
   });
 });
 
+// House Glass (2026-11-08): Nix walks into the Orchid with Hicks; a room: beat alone would leave her ON COMMS.
+describe('here: on a beat', () => {
+  const file = (lines: string) => TRAIL.replace(/^(# sentinel)$/m, `$1\n${lines}`);
+  const hereBeat = () => {
+    const r = parseQuestFile('t', file('room: karasu/dead-blocks\nhere: yes'), { roster, places });
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    return { q: r.entry, beat: [...r.entry.beats.values()].flat().find((b) => b.here === true)! };
+  };
+  it('marks the contact in the room', () => {
+    const { beat } = hereBeat();
+    expect(beat).toMatchObject({ here: true, room: 'karasu/dead-blocks' });
+    expect(JSON.stringify(beat)).not.toContain('here: yes');
+  });
+  it('needs a room, and not comms', () => {
+    const messages = (lines: string) => {
+      const r = parseQuestFile('t', file(lines), { roster, places });
+      return r.ok ? '' : r.problems.map((p) => p.message).join(' ');
+    };
+    expect(messages('here: yes')).toMatch(/here/);
+    expect(messages('room: karasu/dead-blocks\nhere: yes\ncomms: yes')).toMatch(/here/);
+  });
+  it('is not away: she hears the whole beat', () => {
+    expect(beatAway({ room: 'x', here: true })).toBe(false);
+    expect(beatAway({ room: 'x' })).toBe(true);
+    const { q, beat } = hereBeat();
+    const b = questBlock(q, beat, { flags: {}, trust: 'mid', warmth: 'mid', with: 'hicks' }, (s) => s.replace(/\s+/g, ' ').trim(), false, 'Hicks');
+    expect(b).toContain('Boots on the stairs');
+    expect(b).not.toContain('heard on the line');
+    expect(b).toContain('there with them');
+    // Live check: in the room, she acted the client card out herself; the cards stay theirs (House Glass).
+    expect(b).toContain("You're in the room with them, but these choices are theirs");
+  });
+});
+
 // Silas was in the player's ear with no tag: the tag needed a room, and the job had none yet (playtest).
 describe('comms: on a beat', () => {
   const file = (line: string) => TRAIL.replace(/^(# \S+)$/m, `$1\n${line}`);
@@ -510,5 +544,200 @@ describe('comms: on a beat', () => {
   it("doesn't reach the beat's text", () => {
     const r = parseQuestFile('t', file('comms: yes'), { roster, places });
     if (r.ok) expect(JSON.stringify([...r.entry.beats.values()])).not.toContain('comms: yes');
+  });
+});
+
+// Job texts (spec 2026-11-09 §1): a contact's own job may be handed over by her text, or in the room.
+describe('text: a contact hands you her job', () => {
+  const own = (front: string) => TRAIL.replace('with: [nix-direct, hicks]', 'with: [nix-direct]').replace('after: null', 'after: lark=hers').replace('starts: lowlight-intake', `starts: lowlight-intake\n${front}`);
+  const messages = (text: string) => {
+    const r = parse(text);
+    return r.ok ? [] : r.problems.map((p) => p.message);
+  };
+  it("a job's text: parses onto the entry", () => {
+    const r = parse(own('text: You need him up the stairs.\nkind: mission'));
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect(r.entry.text).toBe('You need him up the stairs.');
+  });
+  it('text: with no with: contact, or two, is a problem', () => {
+    const two = TRAIL.replace('after: null', 'after: lark=hers').replace('starts: lowlight-intake', 'starts: lowlight-intake\ntext: Come up.');
+    const none = two.replace('with: [nix-direct, hicks]\n', '');
+    expect(messages(two)).toContain("text: needs one with: contact (she's the one who texts)");
+    expect(messages(none)).toContain("text: needs one with: contact (she's the one who texts)");
+  });
+  it('text: without after: is a problem', () => {
+    expect(messages(own('text: Come up.').replace('after: lark=hers\n', ''))).toContain("text: needs an after: (it's sent when the gate opens)");
+  });
+  it('text: over 300 characters is a problem', () => {
+    expect(QUEST_JOB_TEXT_MAX).toBe(300);
+    expect(fields(own(`text: ${'x'.repeat(301)}`))).toContain('text');
+  });
+  it('text: goes only on a job (Important 2: a contract or story quest lists outside the told check)', () => {
+    expect(messages(own('text: Come up.'))).toContain('text: goes only on a job (kind: mission)');
+    expect(messages(own('text: Come up.\nkind: mission'))).not.toContain('text: goes only on a job (kind: mission)');
+  });
+  it('toldKey and toldOf', () => {
+    expect(toldKey('hicks', 'x')).toBe('told.hicks.x');
+    expect(toldOf('{"how":"room","at":5}')).toEqual({ how: 'room', at: 5 });
+    expect(toldOf('nope')).toBeNull();
+    expect(toldOf(null)).toBeNull();
+  });
+});
+
+// The deduction board (spec 2026-11-09 §2): an ending gives clue cards.
+describe('gives: clue', () => {
+  const CASES = new Map([['the-fourteenth', new Set(['HAND', 'BOWL', 'DOOR'])]]);
+  const giving = (lines: string) => JOB.replace('## paid\n*All of it.*\n', `## paid\n*All of it.*\n${lines}\n`);
+  const open = { roster: null, places: null };
+  it('parses, several to an ending', () => {
+    const r = parseQuestFile('t', giving('gives: clue the-fourteenth BOWL\ngives: clue the-fourteenth DOOR'), { ...open, cases: CASES });
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect(r.entry.outcomes.get('paid')!.effects.clues).toEqual([{ case: 'the-fourteenth', card: 'BOWL' }, { case: 'the-fourteenth', card: 'DOOR' }]);
+  });
+  it('an unknown case or card is a problem', () => {
+    const msgs = (l: string) => {
+      const r = parseQuestFile('t', giving(l), { ...open, cases: CASES });
+      return r.ok ? '' : r.problems.map((p) => p.message).join(' ');
+    };
+    expect(msgs('gives: clue no-case HAND')).toMatch(/no case 'no-case'/);
+    expect(msgs('gives: clue the-fourteenth NOPE')).toMatch(/no card 'NOPE' in the-fourteenth/);
+  });
+});
+
+
+// The deduction board (spec 2026-11-09 §3): a beat can be the board; ACCUSE resolves it into its verdict's outcome.
+describe('board: on a beat', () => {
+  const BOARD = JOB.replace('# desk', '# desk\nboard: mini')
+    .replace(/- grab: [^\n]*\n- skim: [^\n]*\n/, '')
+    .replace('## paid\n*All of it.*\npay: full\ntake: full\n→ end', '## holds\n*It holds.*\npay: full\ntake: full\n→ end\n\n## thin\n*Thin.*\ntake: part\n→ end\n\n## hunch\n*A hunch.*\ntake: part\n→ end\n\n## wrong-b\n*Wrong.*\ntake: none\n→ end')
+    .replace(/## part\n[\s\S]*?→ end\n?/, '');
+  const known = { roster: null, places: null, cases: new Map([['mini', new Set(['ONE'])]]), caseVerdicts: new Map([['mini', ['holds', 'thin', 'hunch', 'wrong-b']]]) };
+  const msgs = (text: string, k = known) => {
+    const r = parseQuestFile('t', text, k);
+    return r.ok ? '' : r.problems.map((p) => `${p.field}: ${p.message}`).join(' / ');
+  };
+  it('a board beat parses and needs every verdict outcome', () => {
+    const r = parseQuestFile('t', BOARD, known);
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect([...r.entry.beats.get('desk')!][0].board).toBe('mini');
+    expect(msgs(BOARD.replace(/## wrong-b\n[\s\S]*?→ end/, ''))).toMatch(/board: needs an outcome ## wrong-b/);
+    expect(msgs(BOARD.replace('board: mini', 'board: nope'))).toMatch(/board: no case 'nope'/);
+  });
+  it('a board beat with choices is a problem', () => {
+    expect(msgs(BOARD.replace('board: mini', 'board: mini\n- grab: Take it all. → holds'))).toMatch(/a board beat has no choices/);
+  });
+});
+
+describe('her block on a board beat (deduction board spec §3)', () => {
+  it('says the player is working the board, with no empty choices line, and that she never names anyone for them', async () => {
+    const { questBlock } = await import('./quests');
+    const BOARD = JOB.replace('# desk', '# desk\nboard: mini').replace(/- grab: [^\n]*\n- skim: [^\n]*\n/, '').replace('## paid\n*All of it.*\npay: full\ntake: full\n→ end', '## holds\n*It holds.*\ntake: full\n→ end').replace(/## part\n[\s\S]*?→ end\n?/, '');
+    const r = parseQuestFile('t', BOARD, { roster: null, places: null });
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    const beat = [...r.entry.beats.get('desk')!][0];
+    const b = questBlock(r.entry, beat, { flags: {}, trust: 'mid', warmth: 'mid', with: 'nix-direct' }, (s) => s, false, 'Hicks');
+    expect(b).not.toContain('The choices in front of them');
+    expect(b).toContain("Hicks is working the case on the board: pairing what they've found, filing what holds, naming who");
+    expect(b).toContain("Don't name anyone or solve it for them");
+    expect(b).not.toContain('These are the only choices');
+  });
+});
+
+describe('[unheard] cards (The Fourteenth final review, Critical 1)', () => {
+  const UNHEARD = TRAIL.replace('- stall: Stall him till morning. → stalled [clock +6h]', '- stall: Stall him till morning. → stalled [clock +6h, unheard]');
+  it("parses, and the contact's choice list leaves the card out", () => {
+    expect(UNHEARD).toContain('unheard]');
+    const q = ok(UNHEARD);
+    const stall = q.beats.get('sentinel')![0].choices.find((c) => c.id === 'stall')!;
+    expect(stall.tags.some((t) => t.kind === 'unheard')).toBe(true);
+    const b = questBlock(q, q.beats.get('sentinel')![0], ctx({ trust: 'high' }), flat);
+    expect(b).toContain('hand it over');
+    expect(b).not.toContain('stall him');
+  });
+  it('an unheard card keeps its id unique in the file', () => {
+    const text = UNHEARD.replace('- face: Face him.', '- stall: Face him.');
+    expect(text).not.toBe(UNHEARD);
+    const r = parseQuestFile('dup', text, { roster: null, places: null });
+    expect(r.ok ? [] : r.problems.map((p) => p.message)).toContain("an [unheard] card's id is used by another card in this file: stall");
+  });
+});
+
+// Two Stories (spec 2026-11-10 §3): an accounts beat, accounts cards given like clues, settles: with a condition.
+import { settledFor } from './quests';
+describe('accounts: on a beat', () => {
+  const STORY = JOB.replace('# desk', '# desk\naccounts: mini-story')
+    .replace(/- grab: [^\n]*\n- skim: [^\n]*\n/, '')
+    .replace('## paid\n*All of it.*\npay: full\ntake: full\n→ end', '## told\n*Told.*\n→ end')
+    .replace(/## part\n[\s\S]*?→ end\n?/, '');
+  const known = { roster: null, places: null, cases: new Map([['mini-story', new Set(['DESK'])]]), accounts: new Set(['mini-story']) };
+  const msgs = (text: string, k: Parameters<typeof parseQuestFile>[2] = known) => {
+    const r = parseQuestFile('t', text, k);
+    return r.ok ? '' : r.problems.map((p) => `${p.field}: ${p.message}`).join(' / ');
+  };
+  it('an accounts beat parses', () => {
+    const r = parseQuestFile('t', STORY, known);
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    expect([...r.entry.beats.get('desk')!][0].accounts).toBe('mini-story');
+  });
+  it('an accounts beat needs told, no choices, a known file', () => {
+    expect(msgs(STORY.replace('## told', '## said'))).toMatch(/needs an outcome ## told/);
+    expect(msgs(STORY.replace('accounts: mini-story', 'accounts: mini-story\n- grab: Take it. → told'))).toMatch(/an accounts beat has no choices/);
+    expect(msgs(STORY.replace('accounts: mini-story', 'accounts: nope'))).toMatch(/no accounts file 'nope'/);
+  });
+  it('gives: clue takes an accounts id', () => {
+    const giving = STORY.replace('## told\n*Told.*\n', '## told\n*Told.*\ngives: clue mini-story DESK\n');
+    expect(msgs(giving)).toBe('');
+  });
+  it('her block says they are working out what to say, with no choices line', () => {
+    const r = parseQuestFile('t', STORY, known);
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    const beat = [...r.entry.beats.get('desk')!][0];
+    const b = questBlock(r.entry, beat, { flags: {}, trust: 'mid', warmth: 'mid', with: 'nix-direct' }, (s) => s, false, 'Soren');
+    expect(b).toContain('Soren is working out what to say about that night');
+    expect(b).toContain("Don't say what you already know about that night or answer for them");
+    expect(b).not.toContain('The choices in front of them');
+  });
+});
+
+describe('settles: with a condition', () => {
+  const END = (lines: string) => JOB.replace('## paid\n*All of it.*\npay: full\ntake: full\n→ end', `## paid\n*All of it.*\npay: full\ntake: full\n${lines}\n→ end`);
+  it('a conditional settles parses', () => {
+    const r = parseQuestFile('t', END('settles: nix-direct if story.rue=caught: She caught it.'), { roster: null, places: null });
+    if (!r.ok) throw new Error(JSON.stringify(r.problems));
+    const s = r.entry.outcomes.get('paid')!.effects.settles!;
+    expect(s).toEqual([{ who: 'nix-direct', text: 'She caught it.', when: [{ kind: 'flag', name: 'story.rue', op: '=', value: 'caught' }] }]);
+  });
+  it('settledFor: the first conditional that holds, else the plain line', () => {
+    const lines = [
+      { who: 'rue', text: 'Plain.' },
+      { who: 'rue', text: 'Caught.', when: [{ kind: 'flag' as const, name: 'story.rue', op: '=' as const, value: 'caught' }] },
+      { who: 'rue', text: 'Also caught.', when: [{ kind: 'flag' as const, name: 'story.rue', op: '!=' as const, value: 'held' }] },
+      { who: 'adebayo', text: 'Only if.', when: [{ kind: 'flag' as const, name: 'story.adebayo', op: '=' as const, value: 'held' }] },
+    ];
+    const c = (flags: Record<string, string>): CondCtx => ({ flags, trust: null, warmth: null, with: 'rue' });
+    expect(settledFor(lines, c({ 'story.rue': 'caught' }))).toEqual([{ who: 'rue', text: 'Caught.' }]);
+    expect(settledFor(lines, c({ 'story.rue': 'held' }))).toEqual([{ who: 'rue', text: 'Plain.' }]);
+    expect(settledFor(lines, c({ 'story.rue': 'thin', 'story.adebayo': 'held' }))).toEqual([{ who: 'rue', text: 'Also caught.' }, { who: 'adebayo', text: 'Only if.' }]);
+    expect(settledFor(lines, c({ 'story.rue': 'held', 'story.adebayo': 'thin' }))).toEqual([{ who: 'rue', text: 'Plain.' }]);
+  });
+  it('the run schema keeps accounts', () => {
+    const accounts = { placed: { adebayo: { WHERE: 'POST' }, rue: {} }, pressed: { adebayo: ['DESK|KESTREL'], rue: [] }, marked: ['KESTREL'], patience: { adebayo: 1, rue: 3 }, leaked: [], told: true };
+    const r = parseRun(JSON.stringify({ beat: 'desk', variant: 0, wait: null, picks: [], flags: {}, done: false, at: 1, accounts }));
+    expect(r?.accounts).toEqual(accounts);
+  });
+});
+
+describe('story flags across jobs (playtest 2026-11-10: Quiet never saw nix4 from The Fourteenth)', () => {
+  it("a job run's story flags are what its cards set and a board's verdict, never its draws, prep or guest", async () => {
+    const { storyFlagsOf } = await import('./quests');
+    const q = ok(TRAIL);
+    const run = { flags: { ledger: 'given', intake_ledger: 'faced', complication: 'caper-watching', scouted: 'clean', 'guest.noa': 'yes', 'case.mini': 'thin' } } as unknown as QuestRun;
+    expect(storyFlagsOf(q, run)).toEqual({ ledger: 'given', intake_ledger: 'faced', 'case.mini': 'thin' });
+  });
+  it("an accounts board's verdicts and the flags its cards cost carry too (Two Stories)", async () => {
+    const { storyFlagsOf } = await import('./quests');
+    const q = ok(TRAIL);
+    const run = { flags: { 'story.rue': 'caught', 'story.rue-true': 'no', kade: 'told', clerk: 'burned', scouted: 'clean' } } as unknown as QuestRun;
+    expect(storyFlagsOf(q, run, ['kade', 'clerk'])).toEqual({ 'story.rue': 'caught', 'story.rue-true': 'no', kade: 'told', clerk: 'burned' });
   });
 });

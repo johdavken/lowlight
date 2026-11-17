@@ -1,12 +1,15 @@
 // Her Residual (spec 2026-10-29-st-residual-design): after each of her replies in a Lowlight chat, one quiet call on
 // the chat's own connection keeps her notes, a recap every RECAP_EVERY replies, and the lights she forgot. What it
 // changed is saved on her message (ledger.ts), so the ledger is always the chat folded from the top.
-import { applyAnswer, changeOf, exchangesFor, isRecapRun, journalLineOf, ledgerOf, parseResidualAnswer, residualMessages, takeOf, withChange } from './lowlight-room.js';
+import { HABITS_MAX_TOKENS, applyAnswer, changeOf, exchangesFor, habitsDue, habitsInput, habitsLine, habitsMessages, isRecapRun, journalLineOf, ledgerOf, parseHabitsAnswer, parseResidualAnswer, residualMessages, takeOf, withChange } from './lowlight-room.js';
 
 const LEDGER_KEY = 'lowlight-ledger';
+/** What she keeps writing (the game's Habits): `[worn thin — leave out: …]` before each reply. */
+const HABITS_KEY = 'lowlight-habits';
 const ON_KEY = 'lowlight-residual';
-/** Her answer's cap: SillyTavern can't turn thinking off for one call, so a thinking model needs room before it answers. */
-const MAX_TOKENS = { turn: 1500, recap: 1800 };
+/** Her answer's cap: SillyTavern can't turn thinking off for one call, so a thinking model needs room before it answers.
+ * Habits too: the game's 400 (HABITS_MAX_TOKENS, thinking off there) ran out mid-thought on GLM, both runs of a live night. */
+const MAX_TOKENS = { turn: 1500, recap: 1800, habits: Math.max(HABITS_MAX_TOKENS, 1500) };
 /** How many of the newest lines her notes' keywords are looked for in. */
 const RECENT = 5;
 
@@ -25,16 +28,20 @@ export function mountResidual({ room, roomTools }) {
     return ledgerOf(upTo === undefined ? chat : chat.slice(0, upTo));
   };
 
-  /** Her journal and recap lines before each reply, in Lowlight chats only. */
+  /** Her journal and recap lines, and what she keeps writing, before each reply, in Lowlight chats only. */
   function refresh() {
     const c = ctx();
     let text = '';
+    let habits = '';
     if (roomTools.ours()) {
       const l = ledger();
       const recent = (c.chat ?? []).filter((m) => !m.is_system && m.mes).slice(-RECENT).reverse().map((m) => m.mes);
       text = [journalLineOf(l.notes, recent), l.recap ? `[recap: ${l.recap}]` : null].filter(Boolean).join('\n');
+      // Only on her ordinary turns, as the game: not her greeting, a travel turn, or a line written as you.
+      habits = roomTools.plainTurn() ? (habitsLine(l.habits) ?? '') : '';
     }
     c.setExtensionPrompt(LEDGER_KEY, text, 1, 0, false, 0);
+    c.setExtensionPrompt(HABITS_KEY, habits, 1, 0, false, 0);
   }
 
   /** What a run is for: the chat, the message, its take and text. Anything changed by the time it answers drops it. */
@@ -69,6 +76,12 @@ export function mountResidual({ room, roomTools }) {
     const recapRun = isRecapRun(c.chat, at);
     const scene = room.scene();
     const take = takeOf(msg);
+    // She changed the lights herself since your last line (a set_light or a mood among her tool calls): the lights
+    // backstop isn't asked, since it would only be refused (light groups).
+    let herLights = false;
+    for (let i = at - 1; i >= 0 && !c.chat[i]?.is_user; i--) {
+      if ((c.chat[i]?.extra?.tool_invocations ?? []).some((t) => t?.name === 'set_light' || t?.name === 'apply_mood')) herLights = true;
+    }
     const messages = residualMessages({
       kind: recapRun ? 'recap' : 'turn',
       self: { name: who.name, pronoun: who.pronoun ?? 'they' },
@@ -77,6 +90,8 @@ export function mountResidual({ room, roomTools }) {
       standing: false,
       jobs: false,
       nights: false,
+      lightGroups: true,
+      ...(herLights ? { lights: false } : {}),
       notes: l.notes,
       exchanges: exchangesFor(c.chat, at),
       recap: l.recap,
@@ -98,8 +113,21 @@ export function mountResidual({ room, roomTools }) {
     if (tokenOf(at) !== token) return;
     const lightIds = new Set((scene?.lights ?? []).map((x) => x.id));
     const change = result.answer
-      ? applyAnswer(l, result.answer, lightIds, [who.name, c.name1], { recap: recapRun })
+      ? applyAnswer(l, result.answer, herLights ? new Set() : lightIds, [who.name, c.name1], { recap: recapRun, ...(herLights ? {} : { roomLights: room.state()?.lights, painted: scene?.lights }) })
       : { notes: [], lights: [], run: result };
+    // Every dozen of her replies or so, a second call names what she keeps writing (the game's Habits), saved on the
+    // same message so a swipe or delete takes it back with the rest.
+    if (habitsDue(c.chat, at) && tokenOf(at) === token) {
+      const { input, hers } = habitsInput(c.chat, at, who.name, c.name1, l.habits);
+      try {
+        const text = answerText(await complete(habitsMessages(input), MAX_TOKENS.habits));
+        const parsed = text ? parseHabitsAnswer(text, hers) : null;
+        change.habits = parsed ? { rules: parsed.rules } : { failed: text ? 'not JSON' : 'no answer' };
+      } catch (e) {
+        change.habits = { failed: String(e?.message ?? e) };
+      }
+      if (tokenOf(at) !== token) return;
+    }
     change.take = take;
     last = change.run;
     // Her lights only while the room is the one it read and this is still the newest message (its room is the one saved).

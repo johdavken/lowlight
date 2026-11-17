@@ -114,3 +114,39 @@ describe('parseCipherAnswer', () => {
     expect(r.truths[0].clueIdeas.length).toBeLessThanOrEqual(200);
   });
 });
+
+describe("written threads stay the quests' own (2026-11-08)", () => {
+  const written = { threads: [{ title: 'The Passenger', pitch: "A house wants its runaway back." }], guests: ['Noa Vey'] };
+  it('lists the started quests and the guests, with the rule', () => {
+    const [sys, user] = cipherRunMessages(input({ written }));
+    expect(user.content).toContain('[written: The Passenger — A house wants its runaway back.]');
+    expect(user.content).toContain('[guests: Noa Vey]');
+    expect(sys.content).toMatch(/written quest/);
+  });
+  it('says nothing about them when there are none', () => {
+    const [sys, user] = cipherRunMessages(input());
+    expect(user.content).not.toContain('[written:');
+    expect(user.content).not.toContain('[guests:');
+    expect(sys.content).not.toMatch(/written quest/);
+  });
+  it("refuses a truth that names a guest, in any field (the voice in Noa got a made-up name)", () => {
+    const named = t('self', ['nix'], "Noa's other voice has a name it uses for itself.");
+    const later = { ...t('place', ['hae']), changes: 'Vey stops trusting the twins.' };
+    const r = parseCipherAnswer(JSON.stringify({ truths: [named, later, t('city', [])] }), input({ written }));
+    expect(r.truths.map((x) => x.kind)).toEqual(['city']);
+    expect(r.refused).toEqual(["truths[0]: names someone a written quest owns (Noa)", "truths[1]: names someone a written quest owns (Vey)"]);
+  });
+  it("a quest's people: are listed with it and refused like guests", () => {
+    const w = { threads: [{ title: 'Check-In', pitch: null, people: ['Lusk', 'Pell'] }], guests: [] };
+    const [, user] = cipherRunMessages(input({ written: w }));
+    expect(user.content).toContain('[written: Check-In; people: Lusk, Pell]');
+    const r = parseCipherAnswer(JSON.stringify({ truths: [t('between', [], "Lusk knew the Aegis man at the van."), t('city', [])] }), input({ written: w }));
+    expect(r.refused).toEqual(['truths[0]: names someone a written quest owns (Lusk)']);
+    expect(r.truths.map((x) => x.kind)).toEqual(['city']);
+  });
+  it('a guest name inside another word is not the guest', () => {
+    const r = parseCipherAnswer(JSON.stringify({ truths: [t('self', ['nix'], 'Nix owes Noah a favour from the convoy.')] }), input({ written }));
+    expect(r.refused).toEqual([]);
+  });
+});
+

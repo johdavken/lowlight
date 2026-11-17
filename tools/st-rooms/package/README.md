@@ -20,7 +20,8 @@ extension brings its world into SillyTavern:
 - **The rooms' songs.**
 - **Lowlight's look.**
 
-Your contact can change the room as you talk: the mood, the weather, the lights, or walking you both somewhere else.
+Your contact can change the room as you talk: the mood, the weather, the lights (the whole room at once, the way you'd notice it), or walking you both somewhere else.
+Now and then the room gives her something small to notice (a neighbour through the wall, the stair creaking), and she's told when she keeps writing the same thing. Her replies keep to one beat, a short action and a line or two, and leave your part to you; come back after six hours or more and she's told how long you were gone.
 And her **Residual** remembers: after each of her replies it keeps her notes on you and on herself, and a recap of
 the chat so far, so a long chat doesn't forget what mattered.
 
@@ -35,7 +36,7 @@ the chat so far, so a long chat doesn't forget what mattered.
 ## What's in it
 
 **15 characters.** Ten you can talk to or play as, each also a persona: Nix, Cass, Ember, Silas, Hicks, Ines,
-Mother Rot, Soren, Adebayo and Rue. Five more to talk to: Hae, Tilly, Vesna, Garro and Oksana.
+Mother Rot, Soren, Kroll and Rue. Five more to talk to: Hae, Tilly, Vesna, Garro and Oksana.
 
 **34 rooms,** district by district:
 
@@ -67,7 +68,7 @@ In SillyTavern, her reply and her Residual's quiet call are the only model calls
 Everything below lives in the game and isn't in this extension. More of the game's features will come over if there's enough interest.
 
 **Memory and the Residual**
-- **The rest of the Residual:** here it keeps her notes, a recap and the lights she forgot (see [Her Residual](#her-residual)), but not her dossier on you, and it doesn't move the clock.
+- **The rest of the Residual:** here it keeps her notes, a recap, what she keeps writing and the lights she forgot (see [Her Residual](#her-residual)), but not her dossier on you, and it doesn't move the clock.
 - **Cipher and LOOSE ENDS:** no hidden truths, no clues, no record of what you've noticed.
 - **Standing and romance:** no trust or warmth, no wants or kept secrets, and no romance gates. She feels about you however the chat says.
 
@@ -121,11 +122,12 @@ After each of her replies, a second, quiet call reads what just happened and kee
 - **Notes:** what she learns about you and what's going on in her own life, each with a few keywords. Pinned notes are always in front of her; the rest come back when their words come up in the chat.
 - **A recap** of where things stand, every 10th reply, so a long chat keeps its older events.
 - **Lights:** if she says the lamp went off but didn't turn it off, it does.
+- **What she keeps writing:** after her 8th reply, then every 12th, one more call reads her recent replies and names up to five habits (a gesture she keeps making, the same way of ending a reply), which she's told to leave out. It never quotes her, since quoting a phrase only brings it back.
 
 It's saved with each of her messages, so deleting, swiping or branching the chat takes the ledger back with it. A new
 chat starts a new ledger. Read it with **SYS → RESIDUAL → LEDGER**, or type `/ledger` (on a phone too).
 
-**It costs one more call per reply**, on the same connection and model as the chat. Switch it off in SYS → RESIDUAL, or
+**It costs one more call per reply**, and one more every dozen replies, on the same connection and model as the chat. Switch it off in SYS → RESIDUAL, or
 with **O** in `/ledger`. A model that thinks before it answers costs more here, and one that runs out of room before
 answering just leaves that reply unread.
 

@@ -49,7 +49,7 @@ describe('message controls in the box', () => {
 
   it('her latest line shows the swipe arrows and the action row; older lines show none', () => {
     const { root } = setup(story());
-    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE']);
     expect(node(root, 'a2').querySelector('.meta .takes')!.textContent).toContain('2/3');
     expect(root.querySelector('.controls')).toBeNull();
     expect(node(root, 'a1').querySelector('.takes')).toBeNull();
@@ -67,7 +67,7 @@ describe('message controls in the box', () => {
 
   it("when the story ends on the player's line it offers REGENERATE · EDIT · DELETE", () => {
     const { root, actions } = setup([msg({ id: 'u1', role: 'user', text: 'hi' })]);
-    expect(buttons(root, 'u1')).toEqual(['REGENERATE', 'EDIT', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 'u1')).toEqual(['REGENERATE', 'EDIT', 'DELETE']);
     click(root, 'u1', 'REGENERATE');
     expect(actions).toEqual([{ kind: 'regenerate', id: 'u1' }]);
   });
@@ -115,7 +115,7 @@ describe('edit, delete, rewind', () => {
     expect(stack.hidden).toBe(true);
     node(root, 'a2').querySelector<HTMLTextAreaElement>('textarea.edit-box')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(stack.hidden).toBe(false);
-    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE']);
     click(root, 'a2', 'EDIT');
     const box = node(root, 'a2').querySelector<HTMLTextAreaElement>('textarea.edit-box')!;
     box.value = 'take 2, fixed';
@@ -132,7 +132,7 @@ describe('edit, delete, rewind', () => {
     feed.collapse();
     const stack = root.querySelector<HTMLElement>('.line-keys')!;
     expect(stack.hidden).toBe(false);
-    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE']);
   });
 
   it('the archive hides the line stack and gives every line its row', () => {
@@ -149,7 +149,7 @@ describe('edit, delete, rewind', () => {
     click(root, 'a2', 'DELETE');
     expect(actions).toEqual([{ kind: 'delete', id: 'a2' }]);
     feed.expand();
-    expect(buttons(root, 'a1')).toEqual(['EDIT', 'DELETE', 'REWIND HERE', 'BRANCH HERE']);
+    expect(buttons(root, 'a1')).toEqual(['EDIT', 'DELETE', 'REWIND HERE']);
     const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     click(root, 'a1', 'REWIND HERE');
     click(root, 'a1', 'REWIND HERE');
@@ -159,18 +159,11 @@ describe('edit, delete, rewind', () => {
     confirm.mockRestore();
   });
 
-  it('BRANCH HERE sends the branch with no confirm (the name prompt asks), on the latest line and in the archive', () => {
-    const { root, feed, actions } = setup(story());
-    const confirm = vi.spyOn(window, 'confirm');
-    click(root, 'a2', 'BRANCH HERE');
+  it('no BRANCH HERE on any line: a rewind checkpoints first, and B on a save forks a game (playtest 2026-11-11)', () => {
+    const { root, feed } = setup(story());
+    expect(buttons(root, 'a2')).not.toContain('BRANCH HERE');
     feed.expand();
-    click(root, 'u1', 'BRANCH HERE');
-    expect(confirm).not.toHaveBeenCalled();
-    expect(actions).toEqual([
-      { kind: 'branch', id: 'a2' },
-      { kind: 'branch', id: 'u1' },
-    ]);
-    confirm.mockRestore();
+    expect(buttons(root, 'u1')).not.toContain('BRANCH HERE');
   });
 
   it('an undone delete returns to its place in time, not the bottom (I1)', () => {
@@ -179,7 +172,7 @@ describe('edit, delete, rewind', () => {
     feed.remove(['a1']);
     feed.upsert(lines[1]);
     expect([...root.querySelectorAll<HTMLElement>('.msg')].map((n) => n.dataset.id)).toEqual(['u1', 'a1', 'u2', 'a2']);
-    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 'a2')).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE']);
   });
 
   it('remove(ids) drops lines; a notice can offer UNDO', () => {
@@ -309,13 +302,13 @@ describe('message controls on a move (travel line)', () => {
 
   it('as the latest line: REGENERATE and DELETE, no EDIT (the line is the server’s)', () => {
     const { root } = setup([move]);
-    expect(buttons(root, 't1')).toEqual(['REGENERATE', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 't1')).toEqual(['REGENERATE', 'DELETE']);
   });
 
   it('in the archive: DELETE and REWIND HERE, no EDIT', () => {
     const { root, feed } = setup([move, msg({ id: 'a1', text: 'Two, no greens.', replyTo: 't1', mode: 'travel' })]);
     feed.expand();
-    expect(buttons(root, 't1')).toEqual(['DELETE', 'REWIND HERE', 'BRANCH HERE']);
+    expect(buttons(root, 't1')).toEqual(['DELETE', 'REWIND HERE']);
   });
 });
 
@@ -328,13 +321,13 @@ describe('message controls on a gig run', () => {
 
   it('as the latest line: REGENERATE and DELETE, no EDIT', () => {
     const { root } = setup([run]);
-    expect(buttons(root, 'g1')).toEqual(['REGENERATE', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 'g1')).toEqual(['REGENERATE', 'DELETE']);
   });
 
   it('in the archive: DELETE and REWIND HERE, no EDIT', () => {
     const { root, feed } = setup([run, msg({ id: 'a1', text: 'Clean.', replyTo: 'g1', mode: 'gig' })]);
     feed.expand();
-    expect(buttons(root, 'g1')).toEqual(['DELETE', 'REWIND HERE', 'BRANCH HERE']);
+    expect(buttons(root, 'g1')).toEqual(['DELETE', 'REWIND HERE']);
   });
 });
 
@@ -347,7 +340,7 @@ describe('message controls on a dice game', () => {
 
   it('as the latest line: REGENERATE and DELETE, no EDIT', () => {
     const { root } = setup([game]);
-    expect(buttons(root, 'd1')).toEqual(['REGENERATE', 'DELETE', 'BRANCH HERE']);
+    expect(buttons(root, 'd1')).toEqual(['REGENERATE', 'DELETE']);
   });
 });
 
@@ -359,11 +352,11 @@ describe('latestActions (one list for the box row and the line stack)', () => {
 
   it('her line, the player’s line, and the server’s lines get the keys they get today', () => {
     const cases: [ChatMessage, string[]][] = [
-      [msg({ id: 'a', takes: { index: 0, count: 2 } }), ['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE', 'BRANCH HERE']],
-      [msg({ id: 'u', role: 'user' }), ['REGENERATE', 'EDIT', 'DELETE', 'BRANCH HERE']],
-      [msg({ id: 't', role: 'user', mode: 'travel' }), ['REGENERATE', 'DELETE', 'BRANCH HERE']],
-      [msg({ id: 'g', role: 'user', mode: 'gig' }), ['REGENERATE', 'DELETE', 'BRANCH HERE']],
-      [msg({ id: 'd', role: 'user', mode: 'dice' }), ['REGENERATE', 'DELETE', 'BRANCH HERE']],
+      [msg({ id: 'a', takes: { index: 0, count: 2 } }), ['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE']],
+      [msg({ id: 'u', role: 'user' }), ['REGENERATE', 'EDIT', 'DELETE']],
+      [msg({ id: 't', role: 'user', mode: 'travel' }), ['REGENERATE', 'DELETE']],
+      [msg({ id: 'g', role: 'user', mode: 'gig' }), ['REGENERATE', 'DELETE']],
+      [msg({ id: 'd', role: 'user', mode: 'dice' }), ['REGENERATE', 'DELETE']],
     ];
     for (const [m, want] of cases) {
       expect(labels(m)).toEqual(want);
@@ -374,7 +367,7 @@ describe('latestActions (one list for the box row and the line stack)', () => {
   it('each action carries its glyph id and runs its control', () => {
     const acts: ControlAction[] = [];
     const list = latestActions(msg({ id: 'a' }), (a) => acts.push(a), noop);
-    expect(list.map((a) => a.id)).toEqual(['regenerate', 'continue', 'edit', 'delete', 'branch']);
+    expect(list.map((a) => a.id)).toEqual(['regenerate', 'continue', 'edit', 'delete']);
     list[0].run();
     list[1].run();
     list[3].run();

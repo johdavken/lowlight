@@ -20,7 +20,7 @@ import { readSummary, summaryDue, summaryMessages, writeSummary } from './summar
 import type { StandingControl } from './standing';
 import type { CompletionMessage } from './turn';
 import { CIPHER, cipherDue, cipherKey, parseCipherEvents, storyProse, type CipherEvent, type CipherState } from '../../shared/cipher';
-import { CIPHER_MAX_TOKENS, cipherRunMessages, parseCipherAnswer, type CipherRunInput } from './cipher-run';
+import { CIPHER_MAX_TOKENS, cipherRunMessages, parseCipherAnswer, type CipherRunInput, type WrittenThreads } from './cipher-run';
 import { HABITS, habitsDue, herReplies, readHabits, repliesCount, writeHabits } from './habits';
 import { HABITS_MAX_TOKENS, habitsMessages, parseHabitsAnswer, type HabitsRunInput } from './habits-run';
 
@@ -97,6 +97,8 @@ export interface ResidualRunnerDeps {
   cipherCast?: (player: string) => CipherRunInput['cast'];
   /** The lore book's titles, for the cipher run. */
   loreTitles?: () => string[];
+  /** The written quests `player` has started and the quest guests, for the cipher run to leave alone. */
+  cipherWritten?: (player: string) => WrittenThreads;
   now?: () => number;
 }
 
@@ -466,9 +468,10 @@ export class ResidualRunner {
       this.d.log(devLine);
     };
     const you = this.d.playerName(job.player);
+    // A job's beats are written story (2026-11-08): left out, so truths grow from play, not a quest's own threads.
     const recent = db
       .allMessages(job.player)
-      .filter((m) => m.mode !== 'ooc' && !m.promised && m.text.trim() !== '')
+      .filter((m) => m.mode !== 'ooc' && m.mode !== 'quest' && !m.promised && m.text.trim() !== '')
       .slice(-24)
       .map((m) => ({ speaker: m.mode === 'encounter' ? 'Narrator' : m.role === 'user' ? you : this.d.selfName, text: m.text }));
     const input: CipherRunInput = {
@@ -479,6 +482,7 @@ export class ResidualRunner {
       recent,
       state,
       room: CIPHER.openMax - state.truths.filter((x) => x.state === 'open').length,
+      ...(this.d.cipherWritten ? { written: this.d.cipherWritten(job.player) } : {}),
     };
     let answer: { text: string; tokensIn?: number; tokensOut?: number };
     try {
@@ -635,8 +639,12 @@ export class ResidualRunner {
     const cipher = this.d.cipher?.(job.player) ?? null;
     const openTruths = cipher?.truths.filter((t) => t.state === 'open') ?? [];
     const labels = new Map(openTruths.map((t, i) => [`T${i + 1}`, t.id]));
+    // She changed the lights herself: the lights backstop would only be refused, so it isn't asked (light groups).
+    const herLightsNow = job.kind === 'turn' && (db.getMessage(job.player, job.reply.id)?.toolLines ?? []).some((l) => ROOM_LIGHT_LINE.test(l));
     const messages = residualMessages({
       kind: job.kind,
+      lightGroups: true,
+      ...(herLightsNow ? { lights: false } : {}),
       self: { name: this.d.selfName, pronoun: this.d.selfPronoun },
       player: { id: job.player, name: this.d.playerName(job.player) },
       roomLine: this.d.roomLine(),

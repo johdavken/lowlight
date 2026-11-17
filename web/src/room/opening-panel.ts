@@ -5,6 +5,7 @@
  * Esc goes back to the screen. Text goes in through textContent.
  */
 import type { SceneKind, SceneOption } from '../../../shared/scenario';
+import { playerFace } from '../net/player-face';
 import type { OpeningSet } from '../net/scenario';
 import { CardsPanel, el } from './cards-panel';
 import { withActions } from './suggest-panel';
@@ -44,7 +45,7 @@ export function pairHead(her: { id: string; name: string }, where: string): { el
   return {
     el: head,
     fill(pair) {
-      you.style.backgroundImage = `url("${thumb(pair.player.id)}")`;
+      you.style.backgroundImage = `url("${playerFace(pair.player.id)}")`;
       youName.textContent = (pair.player.name || 'YOU').toUpperCase();
       // Her note on you, written to her ("you signed his slip"): said as hers.
       tie.textContent = pair.tie ? `${her.name.toUpperCase()} ON ${(pair.player.name || 'YOU').toUpperCase()}: ${pair.tie}` : '';

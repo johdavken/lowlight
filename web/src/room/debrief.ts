@@ -5,6 +5,7 @@
  * graft-results.html D) the same node reads as the bag picture, the sums and the crew's cards (table.css); the rolls go
  * to the JOB column (`debriefRolls`).
  */
+import { graftCue } from './table/el';
 import { heatEffects, WARY_HEAT } from '../../../shared/heat';
 import { repTier, TIER_NAMES } from '../../../shared/mission';
 import type { Debrief } from '../../../shared/types';
@@ -105,6 +106,9 @@ function crewEl(d: Debrief): HTMLElement {
   return list;
 }
 
+const PAY_CUE_MS = 700;
+const KEEP_CUE_MS = 1900;
+
 /** Counts `node` up to `to` (`N SOL`), or sets it. */
 function countUp(node: HTMLElement, to: number, reduced: boolean): void {
   const say = (n: number) => (node.textContent = `${n < 0 ? `−${-n}` : n} SOL`);
@@ -155,6 +159,8 @@ export function debriefEl(d: Debrief, o: { cue(name: 'clean' | 'messy' | 'blown'
   // gives: recruit (crew spec §5): someone from the job wants in.
   if (d.recruit) row.append(el('div', 'db-recruit', d.recruit));
   if (d.outfit) row.append(el('div', 'db-recruit db-outfit', d.outfit));
+  // Clue cards (deduction board spec §2): a line each.
+  for (const c of d.clues ?? []) row.append(el('div', 'db-recruit db-clue', c));
   // Programs that ran (programs spec §2.5): a line each.
   if (d.programs?.length) {
     const list = el('div', 'db-programs');
@@ -187,6 +193,11 @@ export function debriefEl(d: Debrief, o: { cue(name: 'clean' | 'messy' | 'blown'
   const sol = el('span', 'db-sol');
   pay.append(el('span', 'db-pay-word', 'PAY'), sol);
   countUp(sol, d.sol, o.reduced);
+  // The pay and what you keep sound after the tier's own cue, one then the other (a debrief drawn again is quiet).
+  if (!o.reduced && d.sol > 0) {
+    setTimeout(() => graftCue('pay'), PAY_CUE_MS);
+    setTimeout(() => graftCue('keep'), KEEP_CUE_MS);
+  }
   sums.append(pay);
   // Her cut of the job (Tier 2 spec 2026-11-01 §3).
   if (d.cut) sums.append(sumRow('db-cut', `${d.cut.name.toUpperCase()}'S CUT · ${d.cut.pct}%`, ' · ', `−${d.cut.amount} SOL`));

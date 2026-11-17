@@ -2,6 +2,7 @@
 // Mirage Heights and the landmarks, plus the lit windows the live layer twinkles. Same data, same city.
 import { checkDistricts, placeEmergency } from './emergency';
 import { emptyGeometry, type Geometry } from './geometry';
+import { joinGeometry } from './joins';
 import { landmarkGeometry } from './landmarks';
 import type { CityData } from './load';
 import { CLEARANCE, cityLots } from './lots';
@@ -23,7 +24,7 @@ import { ribbonGeometry, type StructureGeometry } from './structure';
 import { spineGeometry } from './spine';
 import { terrainGeometry } from './terrain';
 import { litWindows, type LitWindow3 } from './windows';
-import { coastEdges, followShore, gapRuns, landGrid, landPolygonIds, landPolygons, naturalShore, onLand, type LandGrid, type ShoreShift } from './water';
+import { coastEdges, fillShores, followShore, gapRuns, landGrid, landPolygonIds, landPolygons, naturalShore, onLand, type LandGrid, type ShoreShift } from './water';
 import { waterfrontGeometry } from './waterfront';
 import { insideBorder } from '../../shared/map-schema';
 import { MAP_H, MAP_W } from '../../shared/map-projection';
@@ -41,7 +42,10 @@ export interface Generated {
   land: LandGrid;
 }
 
-export function generate(city: CityData): Generated {
+/** `joins: false` leaves out everything that joins the districts up (the filler land's smooth shores, the streets and
+ * blocks between districts): the city as each district's own generator makes it. */
+export function generate(city: CityData, opts: { joins?: boolean } = {}): Generated {
+  const joins = opts.joins !== false;
   const g = emptyGeometry();
   // Districts gone under (the Marsh) are water, not land.
   const under = city.map.districts.filter((d) => city.styles[d.id]?.flooded).map((d) => d.id);
@@ -78,6 +82,17 @@ export function generate(city: CityData): Generated {
   const shoreWater = (x: number, y: number) => water(x, y) && !quayside(x, y);
   g.land = g.land.map((poly, k) => naturalShore(poly, shoreWater, `shore:${k}`, city.render.shore ?? 20, 6, shifts));
   const alongShore = followShore(shifts);
+  // The filler land's own coast (under the Spine, the ridge by the Marsh): smooth strips over its stepped edge, after the
+  // districts' slabs so their shores keep their seeds, and with shifts of their own so nothing on a coast moves.
+  const fillFrom = g.land.length;
+  if (joins)
+    fillShores(city.map, land).forEach((poly, k) => {
+      // A port's quay keeps its straight line: no fill shore beside it.
+      if (poly.some(([x, y]) => quayside(x, y))) return;
+      // By a district gone under the edge stays where the water is: what stands in the shallows there stays in them.
+      const drownedBy = poly.some(([x, y]) => [[-16, 0], [16, 0], [0, -16], [0, 16]].some(([dx, dy]) => under.some((id) => clip(x + dx!, y + dy!) === false && insideBorder([((x + dx!) / MAP_W) * 100, ((y + dy!) / MAP_H) * 100], borderOf(id)!))));
+      g.land.push(naturalShore(poly, shoreWater, `shore:fill:${k}`, drownedBy ? 0 : FILL_SHORE, 6, []));
+    });
   // Seafronts (the Strand): a boardwalk, a wheel and a pier on the district's coast; blocks keep back from the boardwalk.
   const fronts = city.map.districts.flatMap((d) => {
     const cfg = city.styles[d.id]?.waterfront;
@@ -341,6 +356,21 @@ export function generate(city: CityData): Generated {
   g.curves.push(...marks.curves);
   g.props.push(...marks.props);
   g.lights.push(...marks.lights);
+  // What stands between the districts, once every district is built: border streets, the districts' streets carried on
+  // to them, low blocks on the empty ground.
+  if (joins) {
+    const px = (b: { x: number; y: number }[]) => b.map((a) => [(a.x / 100) * MAP_W, (a.y / 100) * MAP_H] as [number, number]);
+    const j = joinGeometry(g, {
+      districts: city.map.districts.filter((d) => d.border && d.border.length >= 3).map((d) => ({ id: d.id, border: px(d.border!), style: city.styles[d.id] })),
+      isLand,
+      blocked: (x, y) => Math.min(keepOut(x, y), keepIsle(x, y)),
+      spines: city.spines,
+    });
+    g.buildings.push(...j.buildings);
+    g.props.push(...j.props);
+    g.strips.push(...j.strips);
+    g.lights.push(...j.lights);
+  }
   // Nothing in the city stands up into a raised deck: roofs under it stay below the deck by its clearance.
   const spineUnder = (x: number, y: number) => spines.some((sp) => sp.under(x, y));
   const caps = city.spines;
@@ -351,7 +381,7 @@ export function generate(city: CityData): Generated {
     });
     return cap;
   };
-  const CAPPED = new Set(['building', 'stack', 'tier', 'wall', 'bridge']);
+  const CAPPED = new Set(['building', 'stack', 'tier', 'wall', 'bridge', 'infill']);
   g.buildings = g.buildings.flatMap((b) => {
     if (!CAPPED.has(b.kind)) return [b];
     const cap = capAt(b.x, b.y);
@@ -361,10 +391,16 @@ export function generate(city: CityData): Generated {
   const LOOSE = new Set(['tank', 'ac', 'mast', 'sign', 'billboard', 'board-frame', 'hanging-sign']);
   g.props = g.props.filter((p) => !LOOSE.has(p.kind) || p.z0 < capAt(p.x, p.y) - 2 || !spineUnder(p.x, p.y) || p.z0 >= (caps[0]?.deckHeight ?? Infinity));
   fillDistricts(g, city);
+  // A fill shore goes dark with the district whose lamps reach it, as the water beside it does (the mask floor's rule).
+  for (let k = fillFrom; k < g.land.length; k++) {
+    const poly = g.land[k]!;
+    const i = ownerAt([poly.reduce((s, p) => s + p[0], 0) / poly.length, poly.reduce((s, p) => s + p[1], 0) / poly.length], g.districts, REACH);
+    g.landDistricts[k] = i ? g.districts[i - 1]!.id : '';
+  }
   placeEmergency(g, city.styles);
   checkDistricts(g);
   const deepAreas = spines.map((sp) => sp.along.map(([x, y]) => [Math.round((x / 4608) * 1000) / 10, Math.round((y / 3072) * 1000) / 10] as [number, number]));
-  return { geometry: g, windows: litWindows(g.buildings, 'windows'), ribbonDistance: toStructure, spineUnder, deepAreas, land };
+  return { geometry: g, windows: litWindows(g.buildings.filter((b) => b.kind !== 'infill'), 'windows'), ribbonDistance: toStructure, spineUnder, deepAreas, land };
 }
 
 function segDistance(x: number, y: number, a: [number, number], b: [number, number]) {
@@ -372,6 +408,9 @@ function segDistance(x: number, y: number, a: [number, number], b: [number, numb
   const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
   return Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy);
 }
+
+/** How far a fill shore wanders out (map px): less than a district's coast, it has less water to itself. */
+const FILL_SHORE = 10;
 
 type Owned = { district?: string };
 /** Lamp pools reach up to about 170 map px: that far past its edge, water, gaps and shore things go dark with a district. */

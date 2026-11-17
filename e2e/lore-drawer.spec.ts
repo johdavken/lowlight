@@ -53,6 +53,39 @@ test('Alt+B and the word open it, Alt+B and Esc close it, and Esc does not open 
   await expect(page.locator('.pause-menu, .pm-root')).toHaveCount(0);
 });
 
+test('dense, on the trace: no pane, a red head line, one-line rows, ALL as an index in two columns', async ({ page }) => {
+  await room(page);
+  await box(page).fill('the velvet orchid');
+  await page.keyboard.press('Alt+b');
+  await expect(drawer(page)).toBeVisible();
+  // No glass frame; a head line in the UI's red runs from the drawer up to the bar's BOOK word; the count on the bar is amber.
+  await expect(page.locator('.lb-layer .hf')).toHaveCount(0);
+  await expect(page.locator('.lb-layer > svg.hv-lead[data-lead="head"] path')).toHaveCSS('stroke', 'rgb(255, 77, 77)');
+  await expect(page.locator('.lb-title')).toHaveCSS('color', 'rgb(255, 77, 77)');
+  expect(await word(page).evaluate((n) => getComputedStyle(n, '::after').color)).toBe('rgb(255, 197, 107)');
+  // A row is one line: its title, and at the right the word that brought it up, in amber.
+  const said = row(page, 'E2E Orchid Lore');
+  // 23px on the 1600-wide stage, which this window scales up.
+  const scale = (await page.locator('#game').boundingBox())!.width / 1600;
+  expect((await said.boundingBox())!.height).toBeLessThanOrEqual(24 * scale);
+  await expect(said.locator('.lb-row-sub b')).toHaveText('"velvet orchid"');
+  await expect(said.locator('.lb-row-sub b')).toHaveCSS('color', 'rgb(255, 197, 107)');
+  // Open, its text reads under it in small type.
+  await said.click();
+  expect(parseFloat(await page.locator('.lb-body').evaluate((n) => getComputedStyle(n).fontSize))).toBeLessThan(14);
+  // ALL: a category opens as an index, its entries in two columns.
+  await page.locator('.lb-tab[data-tab="all"]').click();
+  await page.locator('.lb-cat').first().click();
+  const cells = page.locator('.lb-in').first().locator('.lb-row');
+  expect(await cells.count()).toBeGreaterThan(1);
+  const [a, b] = [(await cells.nth(0).boundingBox())!, (await cells.nth(1).boundingBox())!];
+  expect(b.y).toBe(a.y);
+  expect(b.x).toBeGreaterThan(a.x + a.width - 1);
+  await page.keyboard.press('Escape');
+  await expect(drawer(page)).toBeHidden();
+  await expect(page.locator('.lb-layer > svg.hv-lead path')).toHaveCount(0);
+});
+
 test('Tab comes to it from MAP and goes on to YOU, Shift+Tab the other way, with the draft kept', async ({ page }) => {
   await room(page);
   await box(page).fill('A half-written line');
@@ -83,6 +116,8 @@ test('with nothing open Tab opens YOU from the box, Shift+Tab opens it, and the 
   await expect(page.locator('.hud-you')).toHaveClass(/open/);
   await page.keyboard.press('Escape');
   await expect(page.locator('.hud-you')).not.toHaveClass(/open/);
+  // YOU holds Esc while it steps off (so it never reaches the room behind it): wait until it's gone.
+  await expect(page.locator('.character-sheet')).toHaveCount(0);
   await box(page).focus();
   await page.keyboard.press('Shift+Tab');
   await expect(drawer(page)).toBeVisible();
@@ -192,7 +227,7 @@ test('your file and the contact’s show, and identity.md never does', async ({ 
   await expect(drawer(page)).not.toContainText(DIRECT.identityLine);
 });
 
-for (const [screen, cls] of [['you', '.hud-you'], ['people', '.hud-people'], ['texts', '.hud-tx'], ['crew', '.hud-crew'], ['map', '.hud-map']] as const) {
+for (const [screen, cls] of [['you', '.hud-you'], ['people', '.hud-people'], ['crew', '.hud-crew'], ['map', '.hud-map']] as const) {
   test(`opening ${screen} closes it, and ${screen}'s word stays lit`, async ({ page }) => {
     await room(page);
     await page.keyboard.press('Alt+b');
@@ -221,7 +256,7 @@ test('the word over MAP closes MAP and opens it', async ({ page }) => {
   await expect(page.locator('.hud-map')).not.toHaveClass(/open/);
 });
 
-for (const [screen, cls] of [['you', '.hud-you'], ['people', '.hud-people'], ['crew', '.hud-crew'], ['texts', '.hud-tx']] as const) {
+for (const [screen, cls] of [['you', '.hud-you'], ['people', '.hud-people'], ['crew', '.hud-crew']] as const) {
   test(`the word and Alt+B over ${screen} close it and open the drawer`, async ({ page }) => {
     await room(page);
     await page.locator(cls).click();
@@ -283,14 +318,14 @@ test('it opens over a Graft table, Esc closes only it, and the table is as it wa
   await expect(drawer(page)).toBeHidden();
   await goIn(page);
   await expect(replies).toHaveCount(before + 1, { timeout: 10_000 });
-  const strip = await page.locator('.tb-strip').textContent();
+  const strip = await page.locator('.tb-job .tb-role').textContent();
   await page.keyboard.press('Alt+b');
   await expect(drawer(page)).toBeVisible();
   await expect(box(page)).toBeEnabled();
   await page.keyboard.press('Escape');
   await expect(drawer(page)).toBeHidden();
-  await expect(page.locator('.tb-strip')).toBeVisible();
-  expect(await page.locator('.tb-strip').textContent()).toBe(strip);
+  await expect(page.locator('.tb-job .tb-role')).toBeVisible();
+  expect(await page.locator('.tb-job .tb-role').textContent()).toBe(strip);
 });
 
 test('in a phone’s window it scales with the stage, clear of the input', async ({ page }) => {

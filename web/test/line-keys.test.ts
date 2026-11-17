@@ -16,7 +16,6 @@ const state = (over: { msg?: ChatMessage; busy?: boolean } = {}) => ({
   startEdit: vi.fn(),
 });
 const keyButtons = () => [...keys.el.querySelectorAll<HTMLButtonElement>('button.key')];
-const fold = () => keys.el.querySelector<HTMLButtonElement>('button.fold')!;
 
 beforeEach(() => {
   localStorage.clear();
@@ -27,27 +26,26 @@ beforeEach(() => {
 afterEach(() => keys.dispose());
 
 describe('LineKeys', () => {
-  it('her latest line: five keys then the fold arrow, as a labelled toolbar', () => {
+  it('her latest line: five keys and no fold arrow, as a labelled toolbar', () => {
     keys.set(state());
     expect(keys.el.hidden).toBe(false);
     expect(keys.el.getAttribute('role')).toBe('toolbar');
     expect(keys.el.getAttribute('aria-label')).toBe('Line options');
-    expect(keyButtons().map((b) => b.textContent)).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE', 'BRANCH HERE']);
-    expect(keys.el.lastElementChild).toBe(fold());
+    expect(keyButtons().map((b) => b.textContent)).toEqual(['REGENERATE', 'KEEP GOING', 'EDIT', 'DELETE']);
+    expect(keys.el.querySelector('button.fold')).toBeNull();
   });
 
   it('keys carry their shortcut in the title and run their control', () => {
     keys.set(state());
-    expect(keys.el.querySelector<HTMLButtonElement>('[data-key="regenerate"]')!.title).toBe('REGENERATE (Alt+R)');
-    expect(keys.el.querySelector<HTMLButtonElement>('[data-key="continue"]')!.title).toBe('KEEP GOING (Alt+C)');
+    expect(keys.el.querySelector<HTMLButtonElement>('[data-key="regenerate"]')!.dataset.tip).toBe('REGENERATE (Alt+R)');
+    expect(keys.el.querySelector<HTMLButtonElement>('[data-key="continue"]')!.dataset.tip).toBe('KEEP GOING (Alt+C)');
     keys.el.querySelector<HTMLButtonElement>('[data-key="regenerate"]')!.click();
     expect(acts).toEqual([{ kind: 'regenerate', id: 'a1' }]);
   });
 
-  it('busy or streaming: every key disabled, never the fold arrow', () => {
+  it('busy or streaming: every key disabled', () => {
     keys.set(state({ busy: true }));
     expect(keyButtons().every((b) => b.disabled)).toBe(true);
-    expect(fold().disabled).toBe(false);
     keys.set(state({ msg: msg({ id: 'a1', status: 'streaming' }) }));
     expect(keyButtons().every((b) => b.disabled)).toBe(true);
     keys.set(state());
@@ -63,17 +61,6 @@ describe('LineKeys', () => {
   it('a new latest line swaps the keys (the player’s line has no KEEP GOING)', () => {
     keys.set(state());
     keys.set(state({ msg: msg({ id: 'u1', role: 'user' }) }));
-    expect(keyButtons().map((b) => b.textContent)).toEqual(['REGENERATE', 'EDIT', 'DELETE', 'BRANCH HERE']);
-  });
-
-  it('a fold survives refreshes while she transmits (Review Focus 5)', () => {
-    keys.set(state());
-    fold().click();
-    expect(keys.el.classList.contains('folded')).toBe(true);
-    keys.set(state({ busy: true }));
-    keys.set(state({ busy: true }));
-    keys.set(state({ busy: false }));
-    expect(keys.el.classList.contains('folded')).toBe(true);
-    expect(keyButtons().every((b) => !b.disabled)).toBe(true);
+    expect(keyButtons().map((b) => b.textContent)).toEqual(['REGENERATE', 'EDIT', 'DELETE']);
   });
 });

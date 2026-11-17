@@ -35,6 +35,7 @@
     "pixel": true,
     "waist": 0.358
   },
+  "commsFigure": "rue-comms.png",
   "expressions": {
     "smile": "rue-smile.png",
     "annoyed": "rue-annoyed.png",
@@ -126,6 +127,7 @@
       "from": "02:00",
       "to": "11:00",
       "room": "spine/rue-hab",
+      "sleeps": true,
       "days": [
         "mon",
         "wed",
@@ -136,6 +138,7 @@
       "from": "01:00",
       "to": "11:00",
       "room": "spine/rue-hab",
+      "sleeps": true,
       "days": [
         "tue",
         "thu",

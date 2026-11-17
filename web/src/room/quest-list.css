@@ -1,163 +1,107 @@
-/* QUEST (quest panel 2026-10-31): TEXTS' holo pane in the quest cyan, a size up; tabs over a list and the picked quest's file. ql- only. */
-.ql-host {
-  position: absolute;
-  inset: 0;
-  z-index: 29;
-  pointer-events: auto;
-  background: rgba(2, 1, 6, 0.35);
-  backdrop-filter: blur(3px) brightness(0.45) saturate(0.8);
+/*
+ * JOBS in the HUD trace (mockup jobs-trace.html, picked 2026-11-15): the trace panel's parts (ui/trace-panel.css
+ * `tp-*`). The list on the panel's rail at the left; the picked job's file on its own rail at the right, its picture
+ * standing in the room behind the text. --c is the panel's red, or on a row and its file the colour of whoever's job
+ * it is. A state is a filled tag: white (.has: yours, in hand), amber (.warn: needs you), grey (can't yet); never red.
+ * LEADS and LOOSE ENDS are pages to read (.ql-read). Every class is ql- (global names collide).
+ */
+.quest-screen {
+  --ql-list: 330px;
+  --ql-gap: 42px;
 }
 .ql-host[hidden] { display: none; }
+/* The parts the list keeps across opens sit inside the panel's own head slots without a box of their own. */
+.ql-tabs, .ql-notes, .ql-nums { display: contents; }
+.ql-tabs .ql-tab { letter-spacing: 0.18em; }
+.quest-screen .tp-tabs { gap: 26px; }
+.ql-nums .ql-hot, .ql-nums .ql-nerve { color: var(--tp-amber); }
 
-.ql-pane {
-  --ql-teko: var(--cs-teko, 'Teko', var(--pixel));
-  position: absolute;
-  left: 14%;
-  top: 9%;
-  width: 72%;
-  height: 84%;
-  display: flex;
-  flex-direction: column;
-  color: #e3f6fb;
-  background: linear-gradient(135deg, rgba(127, 233, 255, 0.16), rgba(255, 79, 139, 0.05) 60%, rgba(9, 4, 18, 0.6));
-  border: 1px solid rgba(127, 233, 255, 0.55);
-  box-shadow: 0 0 34px rgba(127, 233, 255, 0.14) inset;
-  clip-path: polygon(0 0, 96% 0, 100% 4%, 100% 100%, 4% 100%, 0 96%);
-  backdrop-filter: blur(3px);
-}
-/* A projection coming up: TEXTS' flicker. */
-/* (ql-flicker, not ql-in: .ql-in is the file column below, and its -38px margin lifted the whole pane under the keys bar.) */
-.ql-pane.ql-flicker { animation: ql-flicker-in 0.32s steps(1, end); }
-@keyframes ql-flicker-in {
-  0% { opacity: 0; }
-  20% { opacity: 0.7; }
-  35% { opacity: 0.1; }
-  55% { opacity: 0.9; }
-  70% { opacity: 0.4; }
-  85% { opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .ql-pane.ql-flicker { animation: none; }
-}
+.ql-pane { position: relative; flex: 1; min-height: 0; padding-left: 28px; }
+.ql-body { display: grid; grid-template-columns: var(--ql-list) minmax(0, 1fr); gap: 0 var(--ql-gap); height: 100%; min-height: 0; }
+.ql-none { padding: 10px 0; font: 15px/1.4 var(--pixel); letter-spacing: 0.16em; color: var(--tp-dim); }
 
-.ql-head { display: flex; align-items: baseline; padding: 16px 25px 6px; font: 27px var(--pixel); letter-spacing: 0.3em; color: #7fe9ff; }
-.ql-esc { margin-left: auto; font-size: 18px; letter-spacing: 0.2em; color: #8fb3bd; }
-.ql-nerve,
-.ql-changed { margin: 6px 25px 0; padding: 5px 13px; font: 18px var(--pixel); letter-spacing: 0.18em; color: #ff5a5a; border: 1px solid rgba(255, 90, 90, 0.55); background: rgba(255, 90, 90, 0.08); }
-.ql-changed { font: 16px var(--mono); letter-spacing: 0; color: #ffb3a6; border-color: rgba(255, 179, 166, 0.45); background: none; }
+/* ───────── the list on the rail ───────── */
+.ql-list { display: flex; flex-direction: column; gap: 12px; min-height: 0; padding-top: 5px; padding-bottom: 5px; }
+.ql-group { flex: none; margin-top: 6px; }
+.ql-group::before { left: -26px; }
+.ql-group:first-child { margin-top: 0; }
+.ql-row { flex: none; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 0; border: 0; background: none; text-align: left; cursor: pointer; }
+.ql-row:focus-visible { outline: none; }
+.ql-row::before { top: 12px; }
+.ql-row.on::before { top: 12px; }
+.ql-title { grid-column: 1; font: 24px/1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-text); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ql-row:hover .ql-title, .ql-row:focus-visible .ql-title { color: #fff; }
+.ql-row.on .ql-title { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent); }
+.ql-row > .ql-mission, .ql-row > .ql-kind, .ql-row > .ql-line, .ql-row > .ql-item-stat { grid-column: 1 / -1; font: 15px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Someone's job: their colour on the line under it (the row's --c is theirs). */
+.ql-row[style*='--c'] > .ql-mission, .ql-row[style*='--c'] > .ql-kind, .ql-row[style*='--c'] > .ql-line { color: var(--c); }
+.ql-once-tag { vertical-align: 4px; }
+/* Can't be started now (NERVE gone, the nights used up, not posted yet, can't be bought): dim, never red. */
+.ql-row.ql-locked .ql-title, .ql-row.ql-capped .ql-title, .ql-row.ql-later .ql-title, .ql-row.ql-item:not(.ok) .ql-title, .ql-row.ql-item:not(.ok) .ql-item-price { color: var(--tp-dim); }
+.ql-row.on.ql-locked .ql-title, .ql-row.on.ql-capped .ql-title, .ql-row.on.ql-later .ql-title, .ql-row.on.ql-item .ql-title { color: #fff; }
+.ql-item-price { grid-column: 2; grid-row: 1; align-self: center; font: 20px/1 var(--pixel); letter-spacing: 0.1em; color: var(--tp-text); white-space: nowrap; }
+.ql-row-why { font-weight: normal; color: var(--tp-text); }
 
-.ql-tabs { display: flex; gap: 4px; padding: 11px 25px 0; }
-.ql-tab { font: 19px var(--pixel); letter-spacing: 0.2em; padding: 4px 18px; cursor: pointer; color: #8fb3bd; background: none; border: 1px solid rgba(127, 233, 255, 0.25); border-bottom: 0; }
-.ql-tab[aria-selected='true'] { color: #04131a; background: #7fe9ff; }
-.ql-tab i { font-style: normal; opacity: 0.7; }
+/* ───────── the picked one's file ───────── */
+.ql-file { position: relative; display: flex; flex-direction: column; min-height: 0; min-width: 0; --hv-c: var(--c); }
+/* Its picture stands in the room at the right, unframed, fading into it. */
+.ql-art { position: absolute; right: 0; top: -16px; width: 560px; height: 420px; background: center / cover no-repeat; image-rendering: pixelated; opacity: 0.9; pointer-events: none;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 34%), linear-gradient(#000 62%, transparent); -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(90deg, transparent, #000 34%), linear-gradient(#000 62%, transparent); mask-composite: intersect; }
+.ql-art.ql-noart { display: none; }
+/* A fixer's item: its card, whole. */
+.ql-art.ql-gear { top: 0; width: 300px; height: 400px; opacity: 1; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); -webkit-mask-composite: source-over; mask-composite: add; }
+.ql-art.ql-gear > img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: top right; }
+.ql-in { position: relative; flex: 1; min-height: 0; max-width: 620px; padding-bottom: 76px; overflow-y: auto; scrollbar-width: none; }
+.ql-file-title { color: #fff; text-shadow: 0 0 18px color-mix(in srgb, var(--c) 45%, transparent), 0 2px 3px #000; padding-top: 4px; line-height: 0.8; overflow: visible; }
+.ql-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 10px; }
+.ql-file-tag { font: 20px/1 var(--pixel); letter-spacing: 0.2em; color: var(--c); text-transform: uppercase; }
+.ql-meta .ql-chip { margin-left: 0; vertical-align: 0; background: var(--tp-dim); }
+.ql-meta .ql-chip.has { background: #fff; }
+.ql-meta .ql-chip.warn { background: var(--tp-amber); }
+.ql-pitch { margin: 16px 0 0; max-width: 560px; font: italic calc(15px * var(--text-scale, 1)) / 1.5 var(--mono); color: #fff; text-shadow: 0 1px 2px #000; }
+.ql-sub { margin-top: 16px; }
+.ql-sub::before { display: none; }
+.ql-postedby, .ql-brief { margin: 9px 0 0; font-size: calc(13px * var(--text-scale, 1)); }
+.ql-scouted, .ql-line.ql-piece { margin: 9px 0 0; font: 15px/1.3 var(--pixel); letter-spacing: 0.14em; color: var(--tp-text); text-transform: uppercase; }
+.ql-capped-note, .ql-locked-note { margin: 16px 0 0; font: 15px/1.3 var(--pixel); letter-spacing: 0.16em; color: var(--tp-amber); }
+.ql-checks { margin: 10px 0 0; padding: 0; list-style: none; font: 15px/1.5 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); }
+.ql-check { display: flex; gap: 10px; }
+.ql-check.ok { color: var(--tp-text); }
+.ql-check.ok .ql-check-mark { color: var(--tp-ok); }
+.ql-check-progress { margin-left: auto; }
+.ql-gear-rule-name { display: none; }
 
-.ql-body { flex: 1; display: grid; grid-template-columns: 36% 1fr; min-height: 0; border-top: 1px solid rgba(127, 233, 255, 0.3); }
-.ql-pane[data-tab='fixer'] .ql-body, .ql-pane[data-tab='loose'] .ql-body { grid-template-columns: 1fr; }
+/* The foot: what the key does, over the key. Enter's key is the filled one. */
+.ql-go { position: absolute; right: 0; bottom: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 10px 12px; max-width: 70%; }
+.ql-hint { flex-basis: 100%; text-align: right; font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--tp-dim); }
+.ql-hint:empty { display: none; }
+.ql-go .tp-key.go { padding: 10px 30px 6px; font-size: 26px; }
+.ql-go .tp-key:disabled { font-size: 26px; padding: 10px 30px 6px; }
 
-/* The list, as TEXTS' contacts. */
-.ql-list { overflow-y: auto; padding: 0 11px 13px 18px; border-right: 1px solid rgba(127, 233, 255, 0.25); scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
-.ql-group { padding: 11px 0 4px; font: 16px var(--pixel); letter-spacing: 0.24em; color: #8fb3bd; }
-.ql-list .ql-row { display: flex; align-items: center; gap: 11px; width: 100%; margin-top: 2px; padding: 8px 9px; text-align: left; cursor: pointer; color: #e3f6fb; background: none; border: 0; border-left: 3px solid transparent; }
-.ql-list .ql-row:hover,
-.ql-list .ql-row[aria-selected='true'] { background: rgba(127, 233, 255, 0.1); border-left-color: #7fe9ff; }
-.ql-list .ql-row:first-child { margin-top: 11px; }
-.ql-icon { flex: none; display: grid; place-items: center; width: 34px; height: 45px; object-fit: cover; image-rendering: pixelated; font: 20px var(--pixel); color: #7fe9ff; background: repeating-linear-gradient(135deg, rgba(127, 233, 255, 0.1) 0 6px, rgba(127, 233, 255, 0.03) 6px 12px), #0b0618; }
-.ql-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.ql-title { font: 22px/1 var(--ql-teko); letter-spacing: 0.04em; }
-.ql-mission,
-.ql-kind { font: 16px var(--pixel); letter-spacing: 0.14em; color: #ffb347; }
-.ql-kind { color: #7fe9ff; }
-.ql-once-tag { align-self: flex-start; padding: 0 5px; font: 14px var(--pixel); letter-spacing: 0.16em; color: #05020a; background: #b48cff; }
-.ql-row.ql-locked,
-.ql-row.ql-capped { opacity: 0.45; }
-/* A locked Tier 2 Chair (spec 2026-11-01 §1): the row dims but its checklist doesn't; the list shows on hover or focus. */
-.ql-list .ql-row.ql-locked:has(.ql-checks) { flex-wrap: wrap; opacity: 1; }
-.ql-row.ql-locked:has(.ql-checks) > .ql-icon,
-.ql-row.ql-locked:has(.ql-checks) > .ql-text { opacity: 0.45; }
-.ql-checks { margin: 0; padding: 8px 10px; list-style: none; font: 15px/1.35 var(--pixel); letter-spacing: 0.08em; color: #e3f6fb; background: #0b0618; border: 1px solid rgba(127, 233, 255, 0.5); }
-/* Opened under the row, inside the list: the list scrolls, so a card beside it would be clipped. */
-.ql-row > .ql-checks { display: none; flex-basis: 100%; margin-top: 4px; }
-.ql-row:hover > .ql-checks,
-.ql-row:focus-visible > .ql-checks { display: block; }
-.ql-check { display: grid; grid-template-columns: 18px 1fr auto; gap: 8px; color: #ff8fa3; }
-.ql-check.ok { color: #a8ff60; }
-.ql-check-progress { color: #8fb3bd; }
-.ql-in .ql-checks { margin-top: 10px; }
-.ql-waiting .ql-title,
-.ql-elsewhere .ql-title { color: #8fb3bd; }
-.ql-waiting .ql-kind,
-.ql-elsewhere .ql-kind { color: #8fb3bd; }
-/* Another place's board (2026-11-01): someone else's job, or one not posted yet, sits back a little. */
-.ql-row.ql-later { opacity: 0.6; }
-
-/* The file, as TEXTS' thread: banner art, the terms, the pitch, START at the foot. */
-.ql-file { display: flex; flex-direction: column; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
-.ql-art { flex: none; height: 168px; background: center / cover; image-rendering: pixelated; mask-image: linear-gradient(#000 60%, transparent); }
-.ql-noart { background: repeating-linear-gradient(135deg, rgba(127, 233, 255, 0.1) 0 6px, rgba(127, 233, 255, 0.03) 6px 12px), #0b0618; }
-.ql-in { position: relative; flex: 1; display: flex; flex-direction: column; gap: 11px; margin-top: -38px; padding: 0 29px 22px; }
-.ql-file-title { font: 49px/0.9 var(--ql-teko); letter-spacing: 0.03em; color: #fff; text-shadow: 0 0 11px #000; }
-.ql-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 9px 16px; }
-.ql-file-tag { font: 16px var(--pixel); letter-spacing: 0.14em; color: #ffb347; }
-.ql-file-tag.ql-trust { color: #ff4f8b; }
-.ql-file-tag.ql-storytag { color: #7fe9ff; }
-.ql-chip { padding: 0 7px; font: 15px var(--pixel); letter-spacing: 0.14em; border: 1px solid currentColor; }
-.ql-timed { color: #ffb3a6; }
-.ql-file-once { color: #b48cff; }
-.ql-cased { color: #7dff9b; }
-.ql-with { color: #b48cff; }
-.ql-pitch,
-.ql-line { margin: 0; font: 17px/1.5 var(--chat-font, var(--mono)); color: #e3f6fb; }
-.ql-line { color: #8fb3bd; }
-.ql-postedby { font: 16px var(--pixel); letter-spacing: 0.12em; color: #ffb347; }
-.ql-brief { margin: 0; font: 16px/1.45 var(--chat-font, var(--mono)); color: #a9cdd6; }
-.ql-scouted { font: 16px var(--pixel); letter-spacing: 0.12em; color: #7dff9b; }
-.ql-capped-note,
-.ql-locked-note { font: 16px var(--pixel); letter-spacing: 0.16em; color: #ff7fa8; }
-.ql-go { margin-top: auto; display: flex; align-items: center; justify-content: flex-end; gap: 16px; }
-.ql-hint { margin-right: auto; font: 16px var(--pixel); letter-spacing: 0.14em; color: #8fb3bd; }
-.ql-start,
-.ql-goto { font: 20px var(--pixel); letter-spacing: 0.2em; padding: 4px 20px; cursor: pointer; color: #04131a; background: #7fe9ff; border: 0; }
-.ql-start:disabled { cursor: default; color: rgba(207, 239, 247, 0.4); background: rgba(127, 233, 255, 0.18); }
-.ql-walk { font: 18px var(--pixel); letter-spacing: 0.18em; padding: 3px 13px; cursor: pointer; color: #ff8fa3; background: none; border: 1px solid #ff8fa3; }
-
-/* FIXER: what you can buy here, the whole pane. */
-.ql-fixer { overflow-y: auto; padding: 30px 29px 22px; scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
-/* The shelf (mock fixer-gear.html, A): 3:4 cards from web/public/gear/, at most four a place. */
-.ql-shelf { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-start; gap: 20px; }
-.ql-item { width: 248px; display: flex; flex-direction: column; gap: 8px; }
-.ql-gear { position: relative; display: block; width: 100%; aspect-ratio: 3 / 4; padding: 0; overflow: hidden; cursor: pointer; text-align: left; background: #0b0618; border: 1px solid rgba(127, 233, 255, 0.3); }
-.ql-gear > img, .ql-gear > .ql-noart { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
-.ql-gear:hover, .ql-gear:focus-visible, .ql-picked .ql-gear { border-color: #7fe9ff; box-shadow: 0 0 18px rgba(127, 233, 255, 0.3); outline: none; }
-/* The picture's bottom third is kept empty for these. */
-.ql-gear-words { position: absolute; left: 0; right: 0; bottom: 0; height: 33.3%; padding: 0 12px 10px; display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
-.ql-item-name { font: 30px/0.9 var(--ql-teko); letter-spacing: 0.03em; color: #fff; text-shadow: 0 0 8px #000; }
-.ql-item-stat { font: 16px var(--pixel); letter-spacing: 0.14em; color: #7fe9ff; text-shadow: 0 0 6px #000; }
-.ql-gear-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px; }
-.ql-item-price { font: 20px var(--pixel); letter-spacing: 0.14em; color: #ffe1c8; }
-.ql-item-why { font: 15px var(--pixel); letter-spacing: 0.16em; color: #ffb3a6; }
-.ql-item.locked .ql-gear > img { filter: grayscale(0.8) brightness(0.55); }
-.ql-item.locked .ql-item-name { color: #6f8a92; }
-.ql-item.owned .ql-item-why { color: #8fb3bd; }
-.ql-buy { font: 18px var(--pixel); letter-spacing: 0.16em; padding: 2px 14px; cursor: pointer; color: #04131a; background: #ffb347; border: 0; }
-/* The picked item's rule, under the row. */
-.ql-gear-rule { display: flex; align-items: baseline; gap: 22px; margin-top: 18px; padding-top: 12px; border-top: 1px dashed rgba(255, 179, 71, 0.25); }
-.ql-gear-rule-name { flex: none; font: 16px var(--pixel); letter-spacing: 0.14em; color: #7fe9ff; }
-.ql-gear-rule .ql-brief { flex: 1; }
-
-/* LEADS (from PEOPLE, 2026-11-04): QUEST's list and file, with no art over the file. */
-.ql-in.ql-plain { flex: none; margin-top: 0; padding-top: 22px; }
-.ql-followed { opacity: 0.5; }
-.ql-lead-text { margin: 0; font: calc(17px * var(--text-scale, 1))/1.5 var(--chat-font, var(--mono)); color: #e3f6fb; white-space: pre-wrap; }
-.ql-body > .ql-none { grid-column: 1 / -1; }
-.ql-none { padding: 24px 29px; font: 18px var(--pixel); letter-spacing: 0.2em; color: #8fb3bd; }
-
-/* LOOSE ENDS (cipher spec §2.8): unlabelled clusters of what you noticed, then what you solved, the whole pane. */
-.ql-loose-tab { display: flex; flex-direction: column; gap: 16px; min-height: 0; overflow-y: auto; padding: 16px 29px 22px; scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
-.ql-loose-tab > .ql-none { padding: 8px 0; }
-.ql-loose-group { display: flex; flex-direction: column; gap: 8px; padding-bottom: 16px; border-bottom: 1px solid rgba(127, 233, 255, 0.18); }
+/* ───────── pages to read: LEADS, LOOSE ENDS ───────── */
+.ql-read { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 64px; align-content: start; height: 100%; min-height: 0; padding-top: 5px; overflow-y: auto; scrollbar-width: none; }
+.ql-read .tp-head { margin-top: 0; }
+/* The page takes the list's column and the file's. */
+.ql-body > .ql-read { grid-column: 1 / -1; }
+.ql-read > .ql-none { grid-column: 1 / -1; }
+.ql-read .tp-head::before { display: none; }
+.ql-read .tp-head small { font-size: 15px; letter-spacing: 0.14em; color: var(--tp-dim); }
+.ql-solved-head { --hc: var(--tp-ok); }
+.ql-solved-head::before, .ql-loose-label::before { display: none; }
+.ql-lead, .ql-loose-line { position: relative; margin-top: 14px; padding-left: 14px; }
+.ql-lead::before, .ql-loose-line::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 3px; width: 1px; background: color-mix(in srgb, var(--c) 55%, transparent); }
+.ql-lead .ql-title { font-size: 20px; color: #fff; white-space: normal; }
+.ql-lead-text { margin: 4px 0 0; font: calc(13.5px * var(--text-scale, 1)) / 1.5 var(--chat-font, var(--mono)); color: var(--tp-text); text-shadow: 0 1px 2px #000; white-space: pre-wrap; }
+.ql-lead .ql-kind { display: block; margin-top: 4px; font: 15px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); text-transform: uppercase; }
+.ql-lead.ql-followed .ql-title, .ql-lead.ql-followed .ql-lead-text { color: var(--tp-dim); text-decoration: line-through; }
+.ql-loose-group { margin-top: 4px; }
+.ql-loose-group + .ql-loose-group { margin-top: 20px; }
 .ql-loose-line { display: flex; flex-direction: column; gap: 2px; }
-.ql-loose-text { font: calc(17px * var(--text-scale, 1))/1.5 var(--chat-font, var(--mono)); color: #e3f6fb; }
-.ql-loose-where { font: 15px var(--pixel); letter-spacing: 0.16em; color: #8fb3bd; text-transform: uppercase; }
-.ql-loose-solved { display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-left: 2px solid #7fe9ff; background: rgba(127, 233, 255, 0.06); }
-.ql-loose-truth { font: 28px/1.1 var(--ql-teko); letter-spacing: 0.03em; color: #7fe9ff; }
-.ql-loose-label { margin-top: 4px; font: 15px var(--pixel); letter-spacing: 0.24em; color: #8fb3bd; }
+.ql-loose-text { font: calc(13.5px * var(--text-scale, 1)) / 1.5 var(--chat-font, var(--mono)); color: var(--tp-text); text-shadow: 0 1px 2px #000; }
+.ql-loose-where { font: 15px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); text-transform: uppercase; }
+.ql-loose-note { margin: 22px 0 0; font: calc(12px * var(--text-scale, 1)) / 1.5 var(--mono); color: var(--tp-dim); }
+.ql-loose-solved { margin-top: 14px; }
+.ql-loose-solved + .ql-loose-solved { margin-top: 26px; }
+.ql-loose-truth { font: 600 30px/1 var(--tp-teko); letter-spacing: 0.03em; color: #fff; text-transform: uppercase; text-shadow: 0 2px 3px #000; }
+.ql-loose-label { margin-top: 12px; }

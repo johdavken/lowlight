@@ -2,8 +2,9 @@
  * The end of a job, as pure functions of the run and the book (`deps.quests`): its tier, the AT THE END
  * abilities on the take, heat and pay, and the debrief's crew, people and contact lines.
  */
+import type { CaseCard } from '../../shared/cases';
 import type { ContactCard, Debrief } from '../../shared/types';
-import type { QuestEntry, QuestRun } from '../../shared/quests';
+import { posted, type QuestEntry, type QuestRun } from '../../shared/quests';
 import { outcomeTier, type Tier } from '../../shared/mission';
 import { guestId } from '../../shared/contract';
 import { guestArt, withGuest } from './guest';
@@ -24,7 +25,8 @@ export function endAbilities(quests: QuestDeps | undefined, run: QuestRun, kind:
   if (!setup?.abilities) return [];
   const book = quests?.crewAbilities?.() ?? [];
   const calls = run.calls ?? [];
-  return setup.people.flatMap((rid) => (calls.some((c) => c.card === rid && c.loss) ? [] : (setup.abilities?.[rid] ?? []).filter((aid) => book.some((a) => a.id === aid && a.job.kind === kind)).map((aid) => abilityCardId(rid, aid))));
+  // Someone at a post is away (routes and posts spec §2): none of their abilities play, the end's included.
+  return setup.people.flatMap((rid) => (calls.some((c) => c.card === rid && c.loss) || posted(run, rid) !== null ? [] : (setup.abilities?.[rid] ?? []).filter((aid) => book.some((a) => a.id === aid && a.job.kind === kind)).map((aid) => abilityCardId(rid, aid))));
 }
 
 /** TAKE +1 for each AT THE END take ability, while TAKE isn't full; each that adds goes in `setup.ended`. `end-take` also leaves HEAT +1 (ability pass spec §2). */
@@ -154,6 +156,11 @@ export function contactLines(quests: QuestDeps | undefined, run: QuestRun): stri
 export function trustDelta(q: QuestEntry, tier: Tier): number | null {
   if (!q.trust) return null;
   return tier === 'clean' ? q.trust[0] : tier === 'blown' ? -q.trust[1] : 0;
+}
+
+/** `CLUE · HAE`: the debrief's line for a clue card a job gave (deduction board spec §2). */
+export function clueLine(card: CaseCard): string {
+  return `CLUE · ${card.source}`;
 }
 
 /** `OUTFIT · HICKS · TIE`: the debrief's line for an outfit an ending gives. */

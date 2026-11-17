@@ -58,6 +58,16 @@ describe('EffectsLayer', () => {
     expect(s.disabled).toEqual([]);
   });
 
+  it('SYS → EFFECTS: a left-out kind is never built (dust here); screens, LEDs and lightning stay', () => {
+    const layer = new EffectsLayer(scene(), art(), { reducedMotion: false, seed: 1, leftOut: new Set(['dust', 'glass', 'plume', 'passing']) });
+    layer.update({ dt: 0.1, t: 0, state: room('none', 0) });
+    const s = layer.state();
+    expect(s.dust).toBe(0);
+    expect(s.screens.map((x) => x.on)).toEqual([true]);
+    expect(s.leds).toBe(2);
+    expect(s.flashArea).not.toBeNull();
+  });
+
   it("a light's dust amount scales its motes", () => {
     const heavy = { ...scene(), lights: [{ ...screens, dust: 2.5 }] };
     const layer = new EffectsLayer(heavy, art(), { reducedMotion: false, seed: 1 });

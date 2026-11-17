@@ -235,6 +235,16 @@ describe('audioStatus', () => {
     expect(audioStatus(text)('scenes/karasu/stall/sound/keep/bed.ogg')).toBe('public');
   });
 
+  it('a voiced beat credited to ElevenLabs is public (voiced job beats)', () => {
+    const text = '## Voice: ElevenLabs\n\n| File | Used by | Source | Edits |\n| --- | --- | --- | --- |\n| `world/quests/voice/q/ask.ogg` | Q, section ask | ElevenLabs · text to speech v3 · Sadie | loudnorm |\n';
+    expect(audioStatus(text)('world/quests/voice/q/ask.ogg')).toBe('public');
+  });
+
+  it("a case's bark credited to ElevenLabs is public (The Fourteenth voice script)", () => {
+    const text = '## License: ElevenLabs voices\n\n| File | Used by | Source | Edits |\n|---|---|---|---|\n| `world/cases/voice/c/kat.ogg` | C · deduction board | ElevenLabs · Text to Speech · voice “Berna” · “Hi.” | loudnorm |\n';
+    expect(audioStatus(text)('world/cases/voice/c/kat.ogg')).toBe('public');
+  });
+
   it('knows every audio file on disk', () => {
     // Read from disk, not git: the public export has no .git, and holds the restricted files back.
     const audio = ['scenes', 'web/public/sound', 'world']

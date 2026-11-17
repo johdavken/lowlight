@@ -1,3 +1,5 @@
+import type { CaseFile } from '../../shared/cases';
+import type { AccountsFile } from '../../shared/accounts';
 import { fittingPhotos } from '../../shared/photos';
 import { photoMoment } from './photos';
 import { rollsFromEnv } from './mission-run';
@@ -12,6 +14,7 @@ import type { Program } from '../../shared/programs';
 import type { RoomRegistry } from './rooms';
 import { completeOnce, completeOnceWithUsage, NARRATOR_MAX_TOKENS, NARRATOR_TEMPERATURE } from './scenario';
 import { RESIDUAL_TEMPERATURE, RESIDUAL_TIMEOUT_MS, ResidualRunner, plansApply, promisesApply, witnessSceneFor, type WitnessScene } from './residual-runner';
+import type { WrittenThreads } from './cipher-run';
 import type { CompletionMessage } from './turn';
 import { GM_TEMPERATURE } from './gm';
 import type { CostId } from '../../shared/costs';
@@ -28,7 +31,7 @@ import { openDb, type Db, type RebuildResult } from './db';
 import { isConnected } from './agents';
 import type { Backend } from './backend';
 import { createDirectBackend, type DirectBackend } from './direct';
-import { createAnthropicCatalog, createModelCatalog, createModelPicker, createRoutedCatalog, type ModelPicker } from './model-catalog';
+import { createAnthropicCatalog, createModelCatalog, createModelPicker, createRoutedCatalog, type ModelPicker, type NanoCatalog } from './model-catalog';
 import { keysFor, routeFor, type AnthropicRoute, type Route } from './model-route';
 import type { AnthropicUsage } from './anthropic-convert';
 import { createExpressionControl, type ExpressionControl } from './expressions';
@@ -127,6 +130,8 @@ export interface RuntimeOptions {
   settings: Settings;
   /** Where Anthropic is reached (tests point it at a stub). */
   anthropicBaseUrl?: string;
+  /** NanoGPT's model list, one per server: which models its plan covers decides where they route. Absent: no NanoGPT. */
+  nanogpt?: NanoCatalog;
   /** The player's data folder (settings.json, playthroughs/). */
   dataDir: string;
   /** The world's state: her room.db is `<stateDir>/<id>/room.db` (the active playthrough's chars/). */
@@ -146,6 +151,8 @@ export interface RuntimeOptions {
   papersDir?: string;
   /** The lore book's ids, for papers' reasons. */
   loreIds?: () => ReadonlySet<string>;
+  /** The written quests a player has started and the quest guests: the cipher run leaves them alone. */
+  cipherWritten?: (player: string) => WrittenThreads;
   /** Every place's resident (fixed characters), by id; the rooms name theirs. */
   residents?: Map<string, ResidentRecord>;
   /** What another contact's model is told about one she shares a room with: her who's-here block, voice.md, faces, tagline; null when unknown. */
@@ -189,6 +196,14 @@ export interface RuntimeOptions {
     contactCards?(): ContactCard[];
     /** Guest files (The Passenger spec, engine §2). */
     guestCards?(): GuestCard[];
+    /** Deduction board cases (spec 2026-11-09 §1). */
+    cases?(): CaseFile[];
+    /** Two Stories accounts files (spec 2026-11-10 §2). */
+    accounts?(): AccountsFile[];
+    caseArt?(caseId: string, card: string): string | undefined;
+    /** A Two Stories listener's name and face (the roster's, as PEOPLE shows them). */
+    listener?(id: string): { name: string; portrait: string | null } | null;
+    caseBarks?(caseId: string): Record<string, string[]>;
     /** The ids of the leads `player` holds. */
     heldLeads?(player: string): string[];
     /** Crew spec §5: the latest story minute any room's `[crew]` line told up to. */
@@ -196,6 +211,8 @@ export interface RuntimeOptions {
     /** Crew spec §5: the recruit a job's `gives: recruit` card draws. */
     jobRecruit?(o: { runKey: string; title: string; place: string; district: string; spec: Specialty; grade: Grade }): Recruit;
     districtName?(id: string): string;
+    /** Voiced job beats: the recorded clips for a row's texts. */
+    clips?(quest: string, texts: readonly string[]): string[];
   };
 }
 
@@ -263,11 +280,16 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
   // Her identity: this playthrough's own (chars/<id>/identity.md) when it has one, else the shared file.
   const direct = rec.direct && { ...rec.direct, identity: identityWithOverride(dir, rec.direct.identity) };
   const settings = opts.settings;
+  /** Her model's calls go to OpenRouter now (its reasoning switches are OpenRouter's), read per call. */
+  const onOpenRouter = (): boolean => {
+    const m = modelStore?.get();
+    return m !== undefined && routeNow(m)?.provider === 'openrouter';
+  };
   /** SYS → NARRATOR THINKING, read on every call (OpenRouter only): the narrator's calls and her dice lines. */
-  const narratorThinking = () => (direct?.provider === 'openrouter' ? { thinking: settings.narratorThinking() } : {});
+  const narratorThinking = () => (onOpenRouter() ? { thinking: settings.narratorThinking() } : {});
   const apiKey = (): string | null => (direct?.keyName == null ? '' : settings.key(direct.keyName));
   /** Where a call on `model` goes now (Anthropic backend spec §2): read per call, so linking or unlinking applies at once. */
-  const routeNow = (model: string): Route | null => (direct ? routeFor(direct, keysFor(settings, direct), model) : null);
+  const routeNow = (model: string): Route | null => (direct ? routeFor(direct, keysFor(settings, direct), model, opts.nanogpt) : null);
   const onUsage = (u: AnthropicUsage) =>
     hub.emit({ type: 'dev_log', level: 'info', text: `[anthropic] ${u.model} · in ${u.input} · out ${u.output} · cache read ${u.cacheRead} · write ${u.cacheWrite}` });
   /** A one-shot call's address, key and model on her model's route now. */
@@ -286,12 +308,13 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
         },
       }
     : null;
-  // OpenRouter's list, or Anthropic's for a player with only that key; her own address's list for openai-compatible.
+  // OpenRouter's list, else NanoGPT's, else Anthropic's (by which keys are linked); her own address's list for openai-compatible.
   const catalog = direct
     ? direct.provider === 'openrouter'
       ? createRoutedCatalog({
           openrouter: createModelCatalog({ baseUrl: direct.baseUrl, apiKey }),
           anthropic: createAnthropicCatalog({ apiKey: () => settings.key('anthropic'), ...(opts.anthropicBaseUrl ? { baseUrl: opts.anthropicBaseUrl } : {}) }),
+          ...(opts.nanogpt ? { nanogpt: opts.nanogpt } : {}),
           keys: () => keysFor(settings, direct),
         })
       : createModelCatalog({ baseUrl: direct.baseUrl, apiKey })
@@ -306,9 +329,10 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           curated: () => [...MODEL_PICKS.map((p) => p.id), ...settings.recentModels()],
           store: modelStore,
           shown: (m) => routeNow(m)?.model ?? m,
+          providerFor: (m) => routeNow(m)?.provider ?? direct.provider,
           via: (m) => {
             const r = routeNow(m);
-            return r?.provider === 'anthropic' && r.model === m;
+            return (r?.provider === 'anthropic' || r?.provider === 'nanogpt') && r.model === m ? r.provider : null;
           },
           credit: async () => {
             await directBackend!.probe();
@@ -502,6 +526,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           selfId: id,
           // The lore book's ids read as titles ("old-karasu-deck" → "old karasu deck"), so a truth doesn't fight it.
           ...(opts.loreIds ? { loreTitles: () => [...opts.loreIds!()].map((l) => l.replace(/-/g, ' ')) } : {}),
+          ...(opts.cipherWritten ? { cipherWritten: opts.cipherWritten } : {}),
           // Promised texts (spec 2026-10-23 §4): from any stamped in-character reply, comms included.
           promise: (p, r) => {
             const reply = db.getMessage(p, r.id);
@@ -517,7 +542,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
               messages,
               temperature: RESIDUAL_TEMPERATURE,
               maxTokens: o.maxTokens,
-              ...(direct.provider === 'openrouter' ? { thinking: 'auto' as const } : {}),
+              ...(onOpenRouter() ? { thinking: 'auto' as const } : {}),
               signal: o.signal,
             }).then((r) => ({ text: r.text, ...(r.tokensIn !== null ? { tokensIn: r.tokensIn } : {}), ...(r.tokensOut !== null ? { tokensOut: r.tokensOut } : {}) })),
           log: (text) => hub.emit({ type: 'dev_log', level: 'info', text }),
@@ -551,7 +576,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             messages: pickCheckMessages({ beat: at.beat, choices: at.choices, recent, line }),
             temperature: 0,
             maxTokens: PICK_CHECK_MAX_TOKENS,
-            ...(direct.provider === 'openrouter' ? { thinking: 'auto' as const } : {}),
+            ...(onOpenRouter() ? { thinking: 'auto' as const } : {}),
             timeoutMs: PICK_CHECK_TIMEOUT_MS,
             signal,
           });
@@ -611,9 +636,11 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
       apiKey,
       route: routeNow,
       ...(opts.anthropicBaseUrl ? { anthropicBaseUrl: opts.anthropicBaseUrl } : {}),
+      ...(opts.nanogpt ? { nanoAllowance: opts.nanogpt } : {}),
       onUsage,
       onNotice: (text) => hub.emit({ type: 'notice', text }),
       labelFor: (m) => catalog.labelFor(m),
+      chatThinking: () => settings.chatThinking(),
     });
   }
   // Only a connected (direct) character gets a runtime.
@@ -621,12 +648,14 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
   const backend: Backend = directBackend;
   relay = new ChatRelay({
     rollDice,
+    replyLength: () => settings.replyLength(),
     // The GM (roll lifecycle spec §1.4): her link's model, thinking low, a line per dealt cost. No link: written lines.
     ...(direct
       ? {
           gm: {
             complete: (messages: CompletionMessage[], o: { maxTokens: number; signal: AbortSignal }) =>
-              completeOnceWithUsage({ ...wire(), messages, temperature: GM_TEMPERATURE, maxTokens: o.maxTokens, thinking: 'low', signal: o.signal }).then((r) => ({
+              // NanoGPT's models take their own efforts (GLM: none/high/max): its calls go without one.
+              completeOnceWithUsage({ ...wire(), messages, temperature: GM_TEMPERATURE, maxTokens: o.maxTokens, ...(wire().route || onOpenRouter() ? { thinking: 'low' as const } : {}), signal: o.signal }).then((r) => ({
                 text: r.text,
                 ...(r.tokensIn !== null ? { tokensIn: r.tokensIn } : {}),
                 ...(r.tokensOut !== null ? { tokensOut: r.tokensOut } : {}),
@@ -723,10 +752,16 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             gmWritten: () => opts.quests!.gmWritten?.() ?? {},
             contactCards: () => opts.quests!.contactCards?.() ?? [],
             guestCards: () => opts.quests!.guestCards?.() ?? [],
+            cases: () => opts.quests!.cases?.() ?? [],
+            accounts: () => opts.quests!.accounts?.() ?? [],
+            caseArt: (caseId: string, card: string) => opts.quests!.caseArt?.(caseId, card),
+            listener: (id: string) => opts.quests!.listener?.(id) ?? null,
+            caseBarks: (caseId: string) => opts.quests!.caseBarks?.(caseId) ?? {},
             heldLeads: (p: string) => opts.quests!.heldLeads?.(p) ?? [],
             ...(opts.quests!.jobRecruit ? { jobRecruit: opts.quests!.jobRecruit } : {}),
             ...(opts.quests!.crewToldUntil ? { crewToldUntil: opts.quests!.crewToldUntil } : {}),
             ...(opts.quests!.districtName ? { districtName: (id: string) => opts.quests!.districtName!(id) } : {}),
+            ...(opts.quests!.clips ? { clips: (quest: string, texts: readonly string[]) => opts.quests!.clips!(quest, texts) } : {}),
           },
         }
       : {}),

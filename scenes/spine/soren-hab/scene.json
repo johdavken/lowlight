@@ -326,7 +326,11 @@
   ],
   "sound": {
     "indoor": true,
-    "hum": 0.2
+    "hum": 0.2,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    }
   },
   "effects": [
     {

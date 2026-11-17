@@ -12,10 +12,10 @@ describe('resolveRelease', () => {
   });
   afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  it('adds extends bases and notes them', () => {
+  it('adds extends bases and notes them, and always the made person\'s stand-in', () => {
     const r = resolveRelease(root, { version: 1, packs: ['p'], characters: ['b', 'player'], defaultPlayer: 'player' });
-    expect(r.characters).toEqual(['b', 'player', 'a']);
-    expect(r.notes).toEqual(['copied a as the base of b']);
+    expect(r.characters).toEqual(['b', 'player', 'stand', 'a']);
+    expect(r.notes).toEqual(['shipped stand, the stand-in made people play on', 'copied a as the base of b']);
     expect(r.errors).toEqual([]);
   });
 

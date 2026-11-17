@@ -1,140 +1,127 @@
-/* YOU (panel 2026-11-04, docs/mockups/you-panel.html): the shared holo pane in your accent, the figure where QUEST has its
-   list, the file beside it. Not built yet is `.planned`: grey, tagged NOT YET. Every class is cs- (global names collide). */
+/* YOU in the HUD trace (mockup you-trace.html, picked 2026-11-15): the trace panel's parts (ui/trace-panel.css `tp-*`).
+   The figure stands unframed at the left, the wardrobe a line under its feet; the file on its own rail at the right.
+   The panel's lines are the UI's red (--screen-accent); what is yours is cyan (--c on .cs-wrap). Not built yet is
+   `.planned`: dim, its head grey, tagged NOT YET. Every class is cs- (global names collide). */
 .character-sheet {
-  --cs-side: #7fe9ff;
+  /* Read by the job table and BOOK too. */
   --cs-teko: 'Teko', 'VT323', sans-serif;
-  --screen-accent: var(--cs-side);
-  --cs-ink: color-mix(in srgb, var(--cs-side) 8%, #f4f1f2);
-  --cs-dim: color-mix(in srgb, var(--cs-side) 22%, #a9a6ad);
-  --cs-rule: color-mix(in srgb, var(--cs-side) 28%, transparent);
-  --cs-terms: #ffc56b;
-  --cs-nyet: #ffb347;
 }
-/* .scr-root's own colour is as specific as a single class. */
-.scr-root.character-sheet { color: var(--cs-ink); }
+.cs-strip .cs-hot { color: var(--tp-amber); }
+/* No list here: the figure stands where the panel's rail would run. */
+.character-sheet .scr-frame::before { display: none; }
 
-.cs-strip { margin-left: auto; font-size: 18px; letter-spacing: 0.2em; color: var(--cs-dim); }
-.cs-esc { margin-left: 1em; font-size: 18px; letter-spacing: 0.2em; color: var(--cs-dim); }
+.cs-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 346px minmax(0, 1fr); gap: 0 42px; --c: var(--tp-cyan); --hv-c: var(--tp-cyan); }
 
-.cs-pages { flex: none; display: flex; gap: 4px; padding: 11px 25px 0; }
-.cs-page-tab { padding: 4px 18px; font: 19px var(--pixel); letter-spacing: 0.2em; color: var(--cs-dim); background: none; border: 1px solid var(--cs-rule); border-bottom: 0; cursor: pointer; }
-.cs-page-tab:hover, .cs-page-tab:focus-visible { outline: none; color: var(--cs-ink); }
-.cs-page-tab.on { color: #05020a; background: var(--cs-side); }
-.cs-next { margin-left: auto; align-self: center; font: 16px var(--pixel); letter-spacing: 0.16em; color: var(--cs-dim); }
-
-.cs-wrap { flex: 1; min-height: 0; display: grid; grid-template-columns: 36% minmax(0, 1fr); border-top: 1px solid var(--cs-rule); }
-
-/* The figure, whole, on the wardrobe. */
-.cs-figure { position: relative; min-height: 0; overflow: hidden; border-right: 1px solid var(--cs-rule); }
-.cs-mono { position: absolute; left: 10px; top: 2px; font: 600 300px/1 var(--cs-teko); color: var(--cs-side); opacity: 0.08; }
+/* The figure, whole, in the room; the wardrobe under its feet. */
+.cs-figure { position: relative; min-height: 0; }
+.cs-mono { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); font: 600 300px/1 var(--cs-teko); color: var(--c); opacity: 0.1; }
 .cs-img {
   position: absolute;
-  bottom: 56px;
+  bottom: 52px;
   left: 50%;
   transform: translateX(-50%);
-  height: calc(100% - 68px);
-  max-width: 100%;
+  height: calc(100% - 56px);
+  max-width: none;
   object-fit: contain;
   object-position: bottom;
-  filter: drop-shadow(0 0 26px color-mix(in srgb, var(--cs-side) 30%, transparent));
+  filter: drop-shadow(0 0 18px rgba(5, 2, 10, 0.9));
+  -webkit-mask-image: linear-gradient(#000 86%, transparent);
+  mask-image: linear-gradient(#000 86%, transparent);
+  pointer-events: none;
 }
 .cs-img.pixel { image-rendering: pixelated; }
-.cs-wardrobe {
-  position: absolute;
-  inset: auto 0 0;
-  height: 48px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  white-space: nowrap;
-  font: 21px var(--pixel);
-  letter-spacing: 0.16em;
-  background: rgba(9, 4, 18, 0.72);
-  border-top: 1px solid var(--cs-rule);
-}
-.cs-wardrobe .cs-arrow { padding: 0 8px; font: 30px/1 var(--pixel); color: var(--cs-side); background: none; border: 0; cursor: pointer; }
-.cs-wardrobe .cs-arrow:hover:not(:disabled) { text-shadow: 0 0 10px var(--cs-side); }
+.cs-anchor { position: absolute; left: 78%; top: 21%; width: 1px; height: 1px; }
+.cs-wardrobe { position: absolute; inset: auto 0 0; height: 44px; display: flex; align-items: center; justify-content: center; gap: 12px; white-space: nowrap; font: 17px/1 var(--pixel); letter-spacing: 0.2em; color: #fff; text-shadow: 0 1px 2px #000; }
+.cs-wardrobe .cs-arrow { padding: 0 6px; font: 24px/1 var(--pixel); color: var(--screen-accent); background: none; border: 0; cursor: pointer; }
+.cs-wardrobe .cs-arrow:hover:not(:disabled) { color: #fff; }
+.cs-wardrobe .cs-arrow:focus-visible { outline: none; color: #fff; }
 .cs-wardrobe .cs-arrow:disabled { cursor: default; opacity: 0.3; }
-.cs-outfit { min-width: 150px; text-align: center; }
-.cs-wardrobe .cs-scale { min-width: 3ch; font-size: 16px; color: var(--cs-dim); }
+.cs-outfit { min-width: 130px; text-align: center; }
+.cs-wardrobe .cs-scale { min-width: 3ch; }
 
-/* The file: QUEST's banner and title, then the page. */
-.cs-file { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-.cs-art { flex: none; height: 118px; background: center 42% / cover; image-rendering: pixelated; mask-image: linear-gradient(#000 45%, transparent); }
-.cs-noart { background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--cs-side) 10%, transparent) 0 6px, color-mix(in srgb, var(--cs-side) 3%, transparent) 6px 12px), #0b0618; }
-.cs-in { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: -42px; padding: 0 27px 16px; }
-.cs-name { font: 600 49px/0.9 var(--cs-teko); letter-spacing: 0.03em; color: #fff; text-shadow: 0 0 11px #000; overflow-wrap: anywhere; }
-.cs-tagline { margin-top: 3px; font: 16px var(--pixel); letter-spacing: 0.14em; color: var(--cs-terms); }
-.cs-page { flex: 1; min-height: 0; margin-top: 10px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--cs-side) 55%, transparent) transparent; }
+/* The file: your name in your colour on its rail, the tagline, then the page. */
+.cs-file { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.cs-in { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+/* Two classes: it must beat .tp-name whichever stylesheet loads last. */
+.cs-file .cs-name { flex: none; font-size: 92px; line-height: 0.8; padding-top: 4px; }
+.cs-tagline { flex: none; margin-top: 8px; font: 600 30px/0.9 var(--cs-teko); letter-spacing: 0.04em; color: #fff; text-transform: uppercase; text-shadow: 0 2px 3px #000; }
+.cs-page { flex: 1; min-height: 0; margin-top: 4px; overflow-y: auto; scrollbar-width: none; }
 
-.cs-dh { display: flex; justify-content: space-between; margin-bottom: 7px; padding-bottom: 2px; font: 17px var(--pixel); letter-spacing: 0.3em; color: var(--cs-side); border-bottom: 1px solid var(--cs-rule); }
-.cs-scale { font: 15px var(--pixel); letter-spacing: 0.16em; color: var(--cs-dim); }
-.cs-sec + .cs-sec, .cs-bio + .cs-facts { margin-top: 13px; }
-.cs-line { margin-bottom: 8px; font: 15px/1.1 var(--pixel); letter-spacing: 0.06em; color: var(--cs-dim); }
-.cs-after { margin-top: 8px; margin-bottom: 0; }
-.cs-nofile { padding: 24px 0; font: 18px var(--pixel); letter-spacing: 0.2em; color: var(--cs-dim); }
-
-/* Not built yet: the heading grey, its tag amber, the rows dim. */
-.planned .cs-dh { color: var(--cs-dim); border-bottom-color: rgba(255, 255, 255, 0.12); }
-.planned .cs-scale, .cs-nyet { color: var(--cs-nyet); }
-.cs-nyet { font: 15px var(--pixel); letter-spacing: 0.16em; }
+/* Section heads are the panel's (red); the tick back to a rail isn't wanted inside a page. */
+.cs-dh { --c: var(--screen-accent); margin-top: 14px; }
+.cs-dh::before { display: none; }
+.cs-scale { font: 15px/1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); }
+.cs-line { margin: 9px 0 0; font: calc(12px * var(--text-scale, 1)) / 1.5 var(--mono); color: var(--tp-dim); text-shadow: 0 1px 2px #000; }
+.cs-nofile { padding: 24px 0; font: 17px var(--pixel); letter-spacing: 0.2em; color: var(--tp-dim); }
+.planned { opacity: 0.5; }
+.cs-nyet { margin-left: 8px; font: 15px var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); opacity: 0.7; }
 
 /* FILE */
-.cs-bio p { margin: 0 0 9px; font: 15px/1.45 var(--chat-font, var(--mono)); }
-.cs-facts dl { display: grid; grid-template-columns: 148px 1fr; gap: 5px 14px; margin: 0; }
-.cs-facts dt { font: 15px/1.35 var(--pixel); letter-spacing: 0.16em; color: var(--cs-terms); }
-.cs-facts dd { margin: 0; font: 14px/1.35 var(--chat-font, var(--mono)); }
+.cs-filepage { max-width: 640px; }
+.cs-bio p { margin: 9px 0 0; font-size: calc(13px * var(--text-scale, 1)); }
+.cs-facts dl { margin-top: 10px; --c: var(--screen-accent); font-size: calc(12.5px * var(--text-scale, 1)); }
 
-/* STATS */
-.cs-cols { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0 26px; }
-.cs-cols .cs-sec + .cs-sec { margin-top: 0; }
-.cs-stat { display: grid; grid-template-columns: 74px 22px 1fr; align-items: center; gap: 2px 8px; margin-bottom: 7px; }
-.cs-k { font: 18px/1 var(--pixel); letter-spacing: 0.14em; }
-.cs-v { font: 20px/1 var(--pixel); color: var(--cs-side); text-align: right; }
-.cs-bar { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; height: 12px; }
-.cs-bar i { background: rgba(255, 255, 255, 0.1); clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%); }
-.cs-bar i.on { background: var(--cs-side); }
-.cs-hint { grid-column: 1 / -1; font: 15px/1.05 var(--pixel); letter-spacing: 0.06em; color: var(--cs-dim); }
-.cs-skill { display: flex; align-items: center; justify-content: space-between; padding: 3px 0; color: var(--cs-dim); opacity: 0.6; }
-.cs-skill small { display: block; font: 15px/1 var(--pixel); letter-spacing: 0.06em; }
+/* STATS: the number is the thing; ten cells beside it, in your colour. */
+.cs-cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 56px; }
+.cs-stat { display: grid; grid-template-columns: 96px 44px 1fr; align-items: center; gap: 0 12px; margin-top: 11px; }
+.cs-k { font: 20px/1 var(--pixel); letter-spacing: 0.2em; color: var(--tp-text); }
+.cs-v { padding-top: 5px; font: 600 38px/0.8 var(--cs-teko); color: #fff; text-align: right; }
+.cs-bar { display: flex; gap: 3px; }
+.cs-bar i { width: 22px; height: 7px; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.28); }
+.cs-bar i.on { background: var(--c); box-shadow: 0 0 6px color-mix(in srgb, var(--c) 50%, transparent); }
+.cs-hint { grid-column: 1 / -1; margin-top: 2px; font: calc(12px * var(--text-scale, 1)) / 1.3 var(--mono); color: var(--tp-dim); }
+.cs-skill { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.cs-skill small { margin-left: 10px; font: 15px/1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); text-transform: uppercase; }
 .cs-pips { display: flex; gap: 3px; }
-.cs-pips i { width: 10px; height: 10px; background: rgba(255, 255, 255, 0.12); }
+.cs-pips i { width: 14px; height: 7px; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.28); }
 
-/* STREET */
-.cs-meter { margin-bottom: 6px; }
-.cs-top { display: flex; justify-content: space-between; font: 18px var(--pixel); letter-spacing: 0.14em; color: var(--user); }
-.cs-track { --t: var(--user); position: relative; height: 8px; background: rgba(255, 255, 255, 0.1); }
-.cs-meter .cs-track { margin-top: 3px; }
+/* STREET: NERVE is yours (cyan), REP plain light, HEAT amber: red is the UI's, so it can't mean trouble. */
+.cs-street { max-width: 800px; }
+.cs-meter { margin-top: 10px; }
+.cs-top { display: flex; align-items: baseline; gap: 14px; font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--tp-text); }
+.cs-top > :last-child { order: -1; font: 600 64px/0.8 var(--cs-teko); letter-spacing: 0; color: #fff; }
+.cs-track { --t: var(--tp-text); position: relative; height: 5px; background: rgba(230, 238, 247, 0.14); }
+.cs-meter .cs-track { margin-top: 8px; width: 240px; height: 10px; }
 .cs-track::before { content: ''; position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%); background: var(--t); }
-.cs-track.cs-heat { --t: var(--alert); }
-.cs-dist { display: grid; grid-template-columns: 118px 1fr 40px 1fr 30px; align-items: center; gap: 0 10px; padding: 6px 8px; border-left: 2px solid transparent; font: 18px var(--pixel); letter-spacing: 0.1em; }
-.cs-dist-head { padding-top: 0; padding-bottom: 2px; font-size: 15px; letter-spacing: 0.2em; color: var(--cs-dim); }
-.cs-dist.here { background: color-mix(in srgb, var(--cs-side) 12%, transparent); border-left-color: var(--cs-side); }
+.cs-track.cs-nerve { --t: var(--c); }
+.cs-track.cs-heat { --t: var(--tp-amber); }
+.cs-track.cs-heat::before { box-shadow: 0 0 6px color-mix(in srgb, var(--tp-amber) 50%, transparent); }
+.cs-dist { display: grid; grid-template-columns: 190px 1fr 34px 1fr 34px; align-items: center; gap: 0 14px; margin-top: 11px; font: 17px/1 var(--pixel); letter-spacing: 0.16em; color: var(--tp-text); }
+.cs-dist-head { font-size: 15px; color: var(--tp-dim); }
+.cs-dist.here .cs-dist-name { color: #fff; }
+.cs-dist.here .cs-dist-name::after { content: '● HERE'; margin-left: 8px; font-size: 15px; color: var(--tp-ok); }
 .cs-dist-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.cs-rep-n { color: var(--user); text-align: right; }
-.cs-heat-n { color: var(--alert); text-align: right; }
-.cs-heat-n.none { color: var(--cs-dim); }
+.cs-rep-n { text-align: right; }
+.cs-heat-n { color: var(--tp-amber); text-align: right; }
+.cs-heat-n.none { color: rgba(230, 238, 247, 0.3); }
+.cs-slot { display: grid; grid-template-columns: 96px 1fr; gap: 0 14px; margin-top: 8px; font: 12.5px/1.45 var(--mono); color: var(--tp-text); }
+.cs-slot > :first-child { font: 15px/1.2 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); }
 
-/* KIT */
-.cs-wallets { display: flex; gap: 10px; }
-.cs-wallet { flex: 1; min-width: 0; padding: 6px 12px 7px; background: rgba(9, 4, 18, 0.55); border: 1px solid rgba(255, 255, 255, 0.12); opacity: 0.5; }
-.cs-wallet.live { border-color: var(--cs-rule); opacity: 1; }
-.cs-wallet .cs-k { display: flex; justify-content: space-between; font-size: 16px; letter-spacing: 0.2em; color: var(--cs-dim); }
-.cs-amt { font: 600 38px/1 var(--cs-teko); color: var(--cs-dim); }
-.cs-wallet.live .cs-amt { color: var(--cs-side); }
-.cs-amt small { margin-left: 5px; font: 15px var(--pixel); letter-spacing: 0.14em; color: var(--cs-dim); }
-.cs-deck { display: flex; align-items: center; gap: 12px; padding: 6px 8px; border-left: 2px solid transparent; }
-.cs-deck.on { background: color-mix(in srgb, var(--cs-side) 12%, transparent); border-left-color: var(--cs-side); }
-.cs-deck-name { font: 600 23px/1 var(--cs-teko); letter-spacing: 0.03em; }
-.cs-deck-terms { margin-top: 2px; font: 15px/1 var(--pixel); letter-spacing: 0.14em; color: var(--cs-terms); }
-.cs-carried { margin-left: auto; font: 15px var(--pixel); letter-spacing: 0.2em; color: var(--cs-side); }
-.cs-carry { margin-left: auto; padding: 2px 13px; font: 17px var(--pixel); letter-spacing: 0.16em; color: #05020a; background: var(--cs-side); border: 0; cursor: pointer; }
-.cs-deck-why { margin-top: 5px; font: 15px var(--pixel); letter-spacing: 0.1em; color: var(--alert); }
+/* KIT: what you hold. The carried deck is a white filled tag, the others a small key; programs and cover are words. */
+.cs-kit { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 56px; align-content: start; }
+.cs-kit > [data-section='sol'], .cs-kit > [data-section='decks'] { grid-column: 1; }
+.cs-kit > [data-section='programs'], .cs-kit > [data-section='cover'], .cs-kit > [data-section='chrome'] { grid-column: 2; }
+.cs-kit > [data-section='sol'] { grid-row: 1; }
+.cs-kit > [data-section='decks'] { grid-row: 2 / span 4; }
+.cs-wallets { display: flex; align-items: flex-end; gap: 22px; margin-top: 10px; }
+.cs-wallet { opacity: 0.5; white-space: nowrap; }
+.cs-wallet.live .cs-k { display: none; }
+.cs-wallet.live { opacity: 1; }
+.cs-wallet .cs-k { font-size: 15px; letter-spacing: 0.16em; color: var(--tp-dim); }
+.cs-amt { font: 600 30px/0.9 var(--cs-teko); color: var(--tp-dim); }
+.cs-wallet.live .cs-amt { font-size: 64px; line-height: 0.8; color: #fff; }
+.cs-amt small { margin-left: 10px; font: 15px var(--pixel); letter-spacing: 0.16em; color: var(--tp-text); }
+.cs-deck { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 12px; }
+.cs-deck-name { font: 600 30px/0.9 var(--cs-teko); letter-spacing: 0.04em; color: var(--tp-text); text-transform: uppercase; }
+.cs-deck.on .cs-deck-name { color: #fff; }
+.cs-deck-terms { margin-top: 2px; font: 15px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); }
+.cs-deck .cs-carried { flex: none; margin-left: 0; background: #fff; vertical-align: 0; }
+.cs-carry { --c: var(--screen-accent); flex: none; }
+.cs-deck-why { margin-top: 10px; font: 15px var(--pixel); letter-spacing: 0.14em; color: var(--tp-amber); }
 .cs-deck-why:empty { display: none; }
-.cs-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.cs-chip { padding: 1px 9px; font: 17px var(--pixel); letter-spacing: 0.14em; border: 1px solid var(--cs-rule); }
-.cs-chip b { margin-left: 4px; font-weight: 400; color: var(--cs-side); }
-/* A foil program (owned programs): the table's foil sheen, still. */
-.cs-chip.foil { border-color: rgba(160, 230, 255, 0.6); background: linear-gradient(115deg, rgba(255, 240, 200, 0.10), rgba(160, 230, 255, 0.16), rgba(255, 170, 230, 0.10)); }
-.cs-slot { display: flex; justify-content: space-between; padding: 3px 0; font: 18px var(--pixel); letter-spacing: 0.14em; color: var(--cs-dim); opacity: 0.7; }
+.cs-chips { margin-top: 10px; font: 17px/1.5 var(--pixel); letter-spacing: 0.16em; color: var(--tp-text); }
+.cs-chip + .cs-chip::before { content: '//'; margin: 0 10px; color: rgba(230, 238, 247, 0.3); }
+.cs-chip b { margin-left: 6px; font-weight: 400; color: var(--tp-dim); }
+/* A foil program (owned programs): rarer, so amber. */
+.cs-chip.foil { color: var(--tp-amber); }
+.cs-chip.foil::before { color: rgba(230, 238, 247, 0.3); }

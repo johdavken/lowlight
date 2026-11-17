@@ -257,6 +257,7 @@ export function effectEvent(e: Effects, at: number, o: { pay?: number | null; di
   }
   if (e.deck !== undefined) ev.deck = e.deck;
   if (e.outfit) ev.outfit = `${e.outfit.who}/${e.outfit.name}`;
+  if (e.clues?.length) ev.clue = e.clues.map((c) => `${c.case}/${c.card}`);
   return Object.keys(ev).length > 1 ? ev : null;
 }
 

@@ -143,12 +143,15 @@ test('landing lists both contacts; each room renders its own pack, presets apply
 
   await skipSplash(page);
   await newGame(page);
-  // 1P: RANDOM + the leads; 2P (after Hicks): the contacts (nix-direct, cass, Hicks and whoever else
+  // 1P: + (make someone) and the leads; 2P (after Hicks): the contacts (nix-direct, cass, Hicks and whoever else
   // characters/ holds, and the e2e-only SECOND). Select leads spec §4.
   const ids = () => page.locator('.tile').evaluateAll((ns) => ns.map((n) => (n as HTMLElement).dataset.id));
-  expect(await ids()).toEqual(expect.arrayContaining(['?random', 'hicks']));
+  expect(await ids()).toEqual(expect.arrayContaining(['+new', 'hicks']));
+  expect(await ids()).not.toContain('newcomer');
   await lockPlayer(page, 'hicks');
-  expect(await ids()).toEqual(expect.arrayContaining(['?random', DIRECT.id, SECOND.id, 'cass', 'hicks']));
+  expect(await ids()).toEqual(expect.arrayContaining([DIRECT.id, SECOND.id, 'cass', 'hicks']));
+  expect(await ids()).not.toContain('+new');
+  expect(await ids()).not.toContain('newcomer');
   await expect(page.locator(`.tile[data-id="${SECOND.id}"]`)).not.toHaveClass(/offline/);
   await expect(page.locator('.tile[data-id="cass"]')).not.toHaveClass(/offline/);
   // Hicks has a mind of his own since he became a contact (GLM).
@@ -252,6 +255,9 @@ test('sound: locked until a click, then follows the room (indoor rain, neon, roo
   await expect(page.locator('.sys-row[data-row="sound"] .sys-value')).toHaveText(/^\d+%$/);
   await page.keyboard.press('Escape');
   await expect(page.locator('.sys-menu')).toBeHidden();
+  // Back to PAUSED's rows (SYS opens on its SETTINGS page); Esc again for the room.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pause-menu')).toHaveCount(0);
 
   await send(page, { type: 'dev_action', tool: 'set_atmosphere', args: { weather: 'rain', weather_level: 0.8, duration: 0 } });
   await expect.poll(async () => (await audio()).mix?.rain.level ?? 0).toBeCloseTo(0.6 * 0.8 ** 0.8, 5);
@@ -528,12 +534,12 @@ test('paging fit: a reply that fits never pages, and a long one keeps one page s
     });
 
   // A 7-line reply on the 1600×900 stage: fits once the name row is counted and the box's bottom
-  // padding borrowed. Being 7 lines depends on the font and the subtitle's width (about 915 is the most
-  // that fits between the corner stacks): wait for the font.
+  // padding borrowed. Being 7 lines depends on the font and the subtitle's width (about 870 is the most
+  // that fits inside the box's frame, held in from its edges): wait for the font.
   await page.evaluate(() => document.fonts.ready);
-  const short = await reply(880);
+  const short = await reply(830);
   await expect(short).toHaveClass(/s-ok/, { timeout: 10_000 });
-  await expect(page.locator('.line-keys button.key')).toHaveCount(5);
+  await expect(page.locator('.line-keys button.key')).toHaveCount(4);
   await resize();
   await expect(page.locator('button.continue')).toHaveCount(0);
   // The box eases to its new height (the s-ok refresh can still be growing it): measure it settled.
@@ -578,7 +584,7 @@ test('box fit: at 1000px tall (the stage letterboxed), a 7-line reply grows the 
   await page.evaluate(() => document.fonts.ready);
   const replies = page.locator('#feed .msg.agent');
   const before = await replies.count();
-  await send(page, { type: 'user_message', text: 'len:880' });
+  await send(page, { type: 'user_message', text: 'len:830' });
   await expect(replies).toHaveCount(before + 1, { timeout: 10_000 });
   const last = replies.last();
   await expect(last).toHaveClass(/s-ok/, { timeout: 10_000 });
@@ -871,10 +877,16 @@ test('map: opens on the whole city with your pin lit and no card; a pin opens it
   const tilt = page.locator('.map-places .row[data-place="the-tilt"]');
   await tilt.click();
   await expect(page.locator('.map-strip .t')).toHaveText('THE TILT');
+  // A leader runs from the picked pin to the card's rail, in the UI's red; the key line lies along the foot.
+  const lead = page.locator('.map-overlay > svg.hv-lead[data-lead="pin"] path');
+  await expect(lead).toHaveCount(1);
+  expect(await lead.evaluate((l) => getComputedStyle(l).stroke)).toBe('rgb(255, 77, 77)');
+  await expect(page.locator('.map-hint b')).toHaveText(['[SCROLL]', '[DRAG]', '[↑↓]', '[ENTER]', '[ESC]']);
   await tilt.click();
   await expect.poll(async () => (await view())[2]).toBeGreaterThan(1.5);
   await page.keyboard.press('Escape');
   await expect(page.locator('.map-strip')).toHaveCount(0);
+  await expect(lead).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect.poll(async () => (await view())[2]).toBeCloseTo(1, 2);
   await page.locator('.map-places .thr[data-district="karasu"] .group').click();
@@ -1042,7 +1054,7 @@ test('persona: play Rue as Vee — the room names you Vee and her turn says who 
   expect(said).toContain("[who's here: Vee (she)]");
 });
 
-test('the YOU panel: QUEST’s box, Hicks whole on the left, every page fits at 1600×900', async ({ page }) => {
+test('the YOU panel: JOBS’s box on the trace, Hicks whole on the left, every page fits at 1600×900', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await skipSplash(page);
   await newGame(page);
@@ -1062,16 +1074,32 @@ test('the YOU panel: QUEST’s box, Hicks whole on the left, every page fits at 
     await page.waitForURL(`**/room/${SECOND.id}*`, { timeout: 2_000 });
   }).toPass({ timeout: 45_000 });
   await page.waitForFunction(() => window.__nixRoom !== undefined);
+  // JOBS and YOU are the same trace panel: the same box, no frame, a head line in the UI's red.
   await page.locator('.hud-quest').click();
   await expect(page.locator('.ql-pane')).toBeVisible();
-  const quest = await page.locator('.ql-pane').boundingBox();
+  const quest = await page.locator('.quest-screen .scr-frame').boundingBox();
+  await expect(page.locator('.quest-screen > svg.hv-lead[data-lead="head"] path')).toHaveCSS('stroke', 'rgb(255, 77, 77)');
+  // A leader runs from the picked job to its title; ← → turn the tab and wrap.
+  await expect(page.locator('.quest-screen > svg.hv-lead[data-lead="pick"] path')).toHaveCount(1);
+  const first = await page.locator('.ql-tab.on').getAttribute('data-tab');
+  const turns = (await page.locator('.ql-tab').count()) > 1;
+  await page.keyboard.press('ArrowLeft');
+  if (turns) await expect(page.locator('.ql-tab.on')).not.toHaveAttribute('data-tab', first!);
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.ql-tab.on')).toHaveAttribute('data-tab', first!);
   await page.keyboard.press('Escape');
+  await expect(page.locator('.quest-screen')).toHaveCount(0);
   await page.locator('.hud-you').click();
   const frame = page.locator('.character-sheet .scr-frame');
   await expect(frame).toBeVisible();
   expect(await frame.boundingBox()).toEqual(quest);
-  // The banner is the room you're in, and the figure stands inside its column.
-  await expect(page.locator('.cs-art')).toHaveAttribute('style', /\/scenes\//);
+  await expect(page.locator('.character-sheet .hf')).toHaveCount(0);
+  // Your name is yours: cyan, with a leader from the figure in the same; the panel's own lines are red.
+  await expect(page.locator('.character-sheet .cs-name')).toHaveCSS('color', 'rgb(127, 233, 255)');
+  await expect(page.locator('.character-sheet > svg.hv-lead[data-lead="you"] path')).toHaveCSS('stroke', 'rgb(127, 233, 255)');
+  await expect(page.locator('.character-sheet > svg.hv-lead[data-lead="head"] path')).toHaveCSS('stroke', 'rgb(255, 77, 77)');
+  // The figure stands inside its column, with no banner over the file.
+  await expect(page.locator('.cs-art')).toHaveCount(0);
   const img = page.locator('.cs-img');
   await expect.poll(() => img.evaluate((n: HTMLImageElement) => n.naturalWidth)).toBeGreaterThan(0);
   const [fig, col] = [await img.boundingBox(), await page.locator('.cs-figure').boundingBox()];
@@ -1081,12 +1109,12 @@ test('the YOU panel: QUEST’s box, Hicks whole on the left, every page fits at 
     await page.locator(`.cs-page-tab[data-page="${p}"]`).click();
     await expect(page.locator('.cs-page-tab.on')).toHaveAttribute('data-page', p);
     expect(await page.locator('.cs-page').evaluate((n) => n.scrollHeight <= n.clientHeight)).toBe(true);
-    await page.waitForTimeout(p === 'file' ? 500 : 0); // past the flicker, for the screenshot
+    await page.waitForTimeout(p === 'file' ? 700 : 0); // past the step-on, for the screenshot
     await page.screenshot({ path: `test-results/you-${p}.png` });
   }
 });
 
-test('the PEOPLE panel: QUEST’s box, the roster beside the file, JOURNAL for the one you are with, off for another', async ({ page }) => {
+test('the PEOPLE panel: the trace panel under the bar, the list beside the file, JOURNAL for the one you are with, off for another', async ({ page }) => {
   await page.setViewportSize({ width: 1600, height: 900 });
   await skipSplash(page);
   await newGame(page);
@@ -1106,34 +1134,37 @@ test('the PEOPLE panel: QUEST’s box, the roster beside the file, JOURNAL for t
     await page.waitForURL(`**/room/${SECOND.id}*`, { timeout: 2_000 });
   }).toPass({ timeout: 45_000 });
   await page.waitForFunction(() => window.__nixRoom !== undefined);
-  await page.locator('.hud-quest').click();
-  await expect(page.locator('.ql-pane')).toBeVisible();
-  const quest = await page.locator('.ql-pane').boundingBox();
-  await page.keyboard.press('Escape');
   await page.locator('.hud-people').click();
+  // No pane (it was QUEST's box until 2026-11-15): the panel fills the stage under the bar, with no holo frame.
   const frame = page.locator('.people-screen .scr-frame');
   await expect(frame).toBeVisible();
-  expect(await frame.boundingBox()).toEqual(quest);
+  await expect(page.locator('.people-screen .hf')).toHaveCount(0);
+  const box = (await frame.boundingBox())!;
+  expect(box.width).toBeGreaterThan(1400);
+  expect(box.y).toBeGreaterThan(60);
   const you = page.locator('.pe-tile.on');
   await expect(you.locator('.pe-here')).toHaveText('● HERE');
   await expect(page.locator('.pe-file .pe-fig')).toBeVisible();
-  await page.waitForTimeout(500); // past the flicker, for the screenshot
-  await page.screenshot({ path: 'test-results/people-file.png' });
+  await page.waitForTimeout(450); // past the panel's step-on, for the screenshot
+  await page.screenshot({ path: 'test-results/people-smoke-file.png' });
   await page.locator('.pe-tab[data-tab="journal"]').click();
   await expect(page.locator('.pe-right .jd-root')).toBeVisible();
-  await page.screenshot({ path: 'test-results/people-journal.png' });
+  await page.screenshot({ path: 'test-results/people-smoke-journal.png' });
   await page.locator('.pe-tile:not(.on)').first().click();
   await expect(page.locator('.pe-tab.on')).toHaveText('FILE');
   await expect(page.locator('.pe-tab[data-tab="journal"]')).toBeDisabled();
-  await page.screenshot({ path: 'test-results/people-other.png' });
+  await page.screenshot({ path: 'test-results/people-smoke-other.png' });
   // Alt+L goes on to QUEST.
   const lead = { title: 'SDG at the Tilt', details: 'A man in plain clothes asked after you. He stayed two hours.', place: 'The Tilt', portrait: null };
   await page.route(/\/api\/.*leads/, (r) => r.fulfill({ json: [{ ...lead, id: 'a', to: 'nix', toName: 'Nix', met: false, followed: false }, { ...lead, id: 'b', to: 'nix', toName: 'Nix', met: true, followed: true, title: 'The Orchid owes' }] }));
   await page.keyboard.press('Alt+KeyL');
   await expect(page.locator('.people-screen')).toHaveCount(0);
   await expect(page.locator('.ql-pane')).toHaveAttribute('data-tab', 'leads');
-  await expect(page.locator('.ql-file .ql-lead-text')).toContainText('plain clothes');
-  await page.waitForTimeout(500); // past the flicker, for the screenshot
+  // LEADS is a page to read: the open lead with what was said, the followed one apart and struck.
+  await expect(page.locator('.ql-read .ql-lead:not(.ql-followed) .ql-lead-text')).toContainText('plain clothes');
+  await expect(page.locator('.ql-read .ql-lead.ql-followed')).toHaveCount(1);
+  await expect(page.locator('.quest-screen.scr-trace')).toBeVisible();
+  await page.waitForTimeout(700); // past the step-on, for the screenshot
   await page.screenshot({ path: 'test-results/quest-leads.png' });
 });
 
@@ -1184,7 +1215,13 @@ test('YOU sheet wardrobe: ← dresses Hicks in another outfit, in the room too, 
   await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'file');
   await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('OUTDOORS');
   await expect(page.locator('.cs-wardrobe')).not.toHaveClass(/planned/);
+  // ← → turn the page and wrap (FILE ← is KIT); ↑ ↓ dress you.
   await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'kit');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.locator('.character-sheet .cs-page-tab.on')).toHaveAttribute('data-page', 'file');
+  await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('OUTDOORS');
+  await page.keyboard.press('ArrowUp');
   await expect(page.locator('.character-sheet .cs-outfit')).toHaveText('SLEEPWEAR');
   await expect(page.locator('.character-sheet .cs-img')).toHaveAttribute('src', '/api/agents/hicks/outfit/sleepwear');
   await expect(art).toHaveAttribute('style', /\/api\/agents\/hicks\/outfit\/sleepwear/);

@@ -1,4 +1,5 @@
 /** The scene.json schema, pure zod (no file IO), so the browser can validate drafts too. */
+import { ROOM_DETAIL_MAX, ROOM_DETAILS_MAX } from './room-details';
 import { z } from 'zod';
 import { normalizeHex } from './color';
 import { FLAT_FRAME, isFlat } from './frame';
@@ -209,6 +210,8 @@ export const sceneSchema = z
     /** A venue's hours (story moods spec §5): last call, closing and closed follow them. */
     // A bad value is dropped, not the room (the loader says so): a typo mustn't strand a contact's start room.
     hours: z.object({ open: hhmm, close: hhmm }).strict().optional().catch(undefined),
+    /** Small things that happen or can be noticed here, one per turn in rotation (shared/room-details.ts). */
+    details: z.array(z.string().trim().min(1).max(ROOM_DETAIL_MAX)).max(ROOM_DETAILS_MAX).optional(),
   })
   .refine(
     (s) => {

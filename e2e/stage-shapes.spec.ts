@@ -72,20 +72,23 @@ test('TEXT SIZE 150 % pages a reply that fits at 100 %', async ({ page }) => {
   const replies = page.locator('#feed .msg.agent');
   const reply = async () => {
     const before = await replies.count();
-    await send(page, { type: 'user_message', text: 'len:880' });
+    // 7 lines in the framed box (about 870 characters fit; smoke's paging fit uses the same).
+    await send(page, { type: 'user_message', text: 'len:830' });
     await expect(replies).toHaveCount(before + 1, { timeout: 10_000 });
     await expect(replies.last()).toHaveClass(/s-ok/, { timeout: 10_000 });
   };
   await reply();
   await expect(page.locator('button.continue')).toHaveCount(0);
 
-  await page.locator('.hud-sys').click();
-  await expect(page.locator('.sys-menu')).toBeVisible();
-  for (let i = 0; i < 5 && (await page.locator('.sys-row.on').getAttribute('data-row')) !== 'size'; i++) await page.keyboard.press('ArrowDown');
-  await expect(page.locator('.sys-row.on')).toHaveAttribute('data-row', 'size');
+  // TEXT SIZE is on the box's settings key now (box-settings.ts), its second row.
+  await page.locator('.bs-key').click();
+  await expect(page.locator('.bs-panel')).toBeVisible();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.bs-row.on')).toHaveAttribute('data-row', 'size');
   for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
-  await expect(page.locator('.sys-size')).toHaveText('‹ 150% ›');
+  await expect(page.locator('.bs-row[data-row="size"] .bs-num')).toHaveText('150%');
   await page.keyboard.press('Escape');
+  await expect(page.locator('.bs-panel')).toBeHidden();
 
   await expect(page.locator('button.continue')).toHaveText(/\[CONTINUE ▸ 1\/[2-9]\]/);
   // The setting is kept for the next page load.

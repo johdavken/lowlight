@@ -36,6 +36,7 @@ describe('serverEnv', () => {
       PAPERS_DIR: path.join(content, 'world', 'papers'),
       DISTRICTS_DIR: path.join(content, 'world', 'districts'),
       ART_SCENES_DIR: path.join(content, 'art', 'scenes'),
+      CAST_PALETTE_FILE: path.join(content, 'shared', 'cast-palette.json'),
       WEB_DIST: web,
       NIX_ROOM_PORT: '0',
       NODE_ENV: 'production',

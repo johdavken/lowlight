@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { COLUMNS, GAP, LABEL_H, ROW_H, TILE_H, TILE_W, VISIBLE_ROWS, RosterGrid, topRowFor, type GridTile } from '../src/landing/roster-grid';
-import { RANDOM } from '../src/landing/select-flow';
+import { NEW_PERSON } from '../src/landing/select-flow';
 
 function tile(id: string, name: string, extra: Partial<GridTile> = {}): GridTile {
   return { id, name, accent: '#3dff7a', thumb: null, avatar: null, avatarKind: 'monogram', offline: false, noLink: false, ...extra };
 }
 
 function makeTiles(n: number): GridTile[] {
-  const out: GridTile[] = [tile(RANDOM, 'RANDOM')];
+  const out: GridTile[] = [tile(NEW_PERSON, 'MAKE SOMEONE')];
   for (let i = 0; i < n; i++) out.push(tile(`c${i}`, `Char ${i}`));
   return out;
 }
@@ -32,24 +32,24 @@ describe('RosterGrid', () => {
     return { onHover: vi.fn(), onPick: vi.fn(), onWheel: vi.fn() };
   }
 
-  it('renders RANDOM first, then the tiles, with data-id and names', () => {
+  it('renders + first, then the tiles, with data-id and names', () => {
     const host = makeHost();
     const cb = makeCb();
     const grid = new RosterGrid(host, cb);
-    grid.render([tile(RANDOM, 'RANDOM'), tile('aria', 'Aria'), tile('bolt', 'Bolt')]);
+    grid.render([tile(NEW_PERSON, 'MAKE SOMEONE'), tile('aria', 'Aria'), tile('bolt', 'Bolt')]);
 
     const tiles = grid.el.querySelectorAll('.tile');
     expect(tiles.length).toBe(3);
-    expect((tiles[0] as HTMLElement).dataset.id).toBe(RANDOM);
+    expect((tiles[0] as HTMLElement).dataset.id).toBe(NEW_PERSON);
     expect((tiles[1] as HTMLElement).dataset.id).toBe('aria');
     expect((tiles[2] as HTMLElement).dataset.id).toBe('bolt');
 
     const names = Array.from(tiles).map((t) => t.querySelector('.tile-name')?.textContent);
-    expect(names).toEqual(['RANDOM', 'ARIA', 'BOLT']);
+    expect(names).toEqual(['MAKE SOMEONE', 'ARIA', 'BOLT']);
 
-    const randomTile = tiles[0] as HTMLElement;
-    expect(randomTile.querySelector('.tile-art')).toBeNull();
-    expect(randomTile.textContent).toContain('?');
+    const newTile = tiles[0] as HTMLElement;
+    expect(newTile.querySelector('.tile-art')).toBeNull();
+    expect(newTile.textContent).toContain('+');
 
     // geometry: tile 0 at col0/row0, tile 1 at col1/row0 etc.
     const t1 = tiles[1] as HTMLElement;
@@ -62,7 +62,7 @@ describe('RosterGrid', () => {
   it('places tiles at the right column/row for COLUMNS and GAP', () => {
     const host = makeHost();
     const grid = new RosterGrid(host, makeCb());
-    const tiles = makeTiles(COLUMNS * 2); // enough for 2 full rows + RANDOM
+    const tiles = makeTiles(COLUMNS * 2); // enough for 2 full rows + NEW_PERSON
     grid.render(tiles);
     const els = grid.el.querySelectorAll('.tile');
     const last = els[els.length - 1] as HTMLElement;
@@ -79,7 +79,7 @@ describe('RosterGrid', () => {
 
     // Case 1: thumb present, errors -> falls to mask avatar.
     grid.render([
-      tile(RANDOM, 'RANDOM'),
+      tile(NEW_PERSON, 'MAKE SOMEONE'),
       tile('a', 'Aria', { thumb: '/thumb-a.png', avatar: '/avatar-a.png', avatarKind: 'mask', accent: '#fff' }),
     ]);
     const tileA = grid.el.querySelectorAll('.tile')[1] as HTMLElement;
@@ -94,7 +94,7 @@ describe('RosterGrid', () => {
 
     // Case 2: thumb present, no avatar, errors -> monogram.
     grid.render([
-      tile(RANDOM, 'RANDOM'),
+      tile(NEW_PERSON, 'MAKE SOMEONE'),
       tile('b', 'Bolt', { thumb: '/thumb-b.png', avatar: null, avatarKind: 'monogram' }),
     ]);
     const tileB = grid.el.querySelectorAll('.tile')[1] as HTMLElement;
@@ -106,7 +106,7 @@ describe('RosterGrid', () => {
     expect(mono.textContent).toBe('B');
 
     // Case 3: no thumb, no avatar -> straight to monogram.
-    grid.render([tile(RANDOM, 'RANDOM'), tile('c', 'Cora', { thumb: null, avatar: null })]);
+    grid.render([tile(NEW_PERSON, 'MAKE SOMEONE'), tile('c', 'Cora', { thumb: null, avatar: null })]);
     const tileC = grid.el.querySelectorAll('.tile')[1] as HTMLElement;
     expect(tileC.querySelector('.tile-mono')?.textContent).toBe('C');
     expect(tileC.querySelector('.tile-art')).toBeNull();
@@ -170,7 +170,7 @@ describe('RosterGrid', () => {
     const host = makeHost();
     const cb = makeCb();
     const grid = new RosterGrid(host, cb);
-    const tiles = makeTiles(COLUMNS * 2 - 1); // RANDOM + 2*COLUMNS-1 = exactly 2 rows
+    const tiles = makeTiles(COLUMNS * 2 - 1); // NEW_PERSON + 2*COLUMNS-1 = exactly 2 rows
     grid.render(tiles);
 
     grid.scrollTo(5);
@@ -234,7 +234,7 @@ describe('RosterGrid', () => {
     const host = makeHost();
     const grid = new RosterGrid(host, makeCb());
     grid.render([
-      tile(RANDOM, 'RANDOM'),
+      tile(NEW_PERSON, 'MAKE SOMEONE'),
       tile('a', 'Alice', { offline: true }),
       tile('b', 'Bob', { offline: false }),
     ]);
@@ -265,7 +265,7 @@ describe('RosterGrid', () => {
   it('a no-link tile carries the NO LINK chip and is not dimmed as offline', () => {
     const host = makeHost();
     const grid = new RosterGrid(host, makeCb());
-    grid.render([tile(RANDOM, 'RANDOM'), tile('nix', 'Nix', { noLink: true }), tile('cass', 'Cass')]);
+    grid.render([tile(NEW_PERSON, 'MAKE SOMEONE'), tile('nix', 'Nix', { noLink: true }), tile('cass', 'Cass')]);
     const [, nix, cass] = [...grid.el.querySelectorAll<HTMLElement>('.tile')];
     expect(nix!.querySelector('.tile-chip')!.textContent).toBe('NO LINK');
     expect(nix!.classList.contains('offline')).toBe(false);
@@ -275,7 +275,7 @@ describe('RosterGrid', () => {
   it('setNoLink adds and removes the chip in place', () => {
     const host = makeHost();
     const grid = new RosterGrid(host, makeCb());
-    grid.render([tile(RANDOM, 'RANDOM'), tile('nix', 'Nix', { noLink: true }), tile('cass', 'Cass')]);
+    grid.render([tile(NEW_PERSON, 'MAKE SOMEONE'), tile('nix', 'Nix', { noLink: true }), tile('cass', 'Cass')]);
     grid.setNoLink(new Set(['cass']));
     const [, nix, cass] = [...grid.el.querySelectorAll<HTMLElement>('.tile')];
     expect(nix!.querySelector('.tile-chip')).toBeNull();
@@ -289,8 +289,8 @@ describe('RosterGrid: grouped by district (spec 2026-10-25)', () => {
     return document.getElementById('host')!;
   };
   const cb = () => ({ onHover: vi.fn(), onPick: vi.fn(), onWheel: vi.fn() });
-  // RANDOM + karasu (a, b) on row 0, spine (c, d, e) on row 1 — as district-groups would lay them out.
-  const tiles = [tile(RANDOM, 'RANDOM'), tile('a', 'A'), tile('b', 'B'), tile('c', 'C'), tile('d', 'D'), tile('e', 'E')];
+  // NEW_PERSON + karasu (a, b) on row 0, spine (c, d, e) on row 1 — as district-groups would lay them out.
+  const tiles = [tile(NEW_PERSON, 'MAKE SOMEONE'), tile('a', 'A'), tile('b', 'B'), tile('c', 'C'), tile('d', 'D'), tile('e', 'E')];
   const layout = {
     pos: [{ col: 0, row: 0 }, { col: 1, row: 0 }, { col: 2, row: 0 }, { col: 0, row: 1 }, { col: 1, row: 1 }, { col: 2, row: 1 }],
     rows: 2,

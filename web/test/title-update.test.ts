@@ -29,8 +29,8 @@ function fakeUpdate(info: UpdateInfo, o: Partial<TitleUpdate> = {}) {
 }
 
 const key = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, cancelable: true }));
-const tiles = () => [...document.querySelectorAll<HTMLElement>('.title-menu .tile')].map((t) => t.dataset.id);
-const focused = () => document.querySelector<HTMLElement>('.title-menu .tile.on')?.dataset.id;
+const rows = () => [...document.querySelectorAll<HTMLElement>('.title-menu .tm-item')].map((t) => t.dataset.id);
+const focused = () => document.querySelector<HTMLElement>('.title-menu .tm-item.on')?.dataset.id;
 const text = (sel: string) => document.querySelector(`.title-menu ${sel}`)?.textContent ?? null;
 const facts = (side: 'p1' | 'p2') =>
   Object.fromEntries([...document.querySelectorAll(`.title-menu .fighter.${side} .fighter-file dt`)].map((dt) => [dt.textContent, dt.nextElementSibling?.textContent]));
@@ -46,8 +46,8 @@ async function mount(update?: TitleUpdate) {
 }
 /** NEW GAME → REPORT A BUG → UPDATE. */
 const toUpdate = () => {
-  key('ArrowRight');
-  key('ArrowRight');
+  key('ArrowDown');
+  key('ArrowDown');
 };
 
 beforeEach(() => {
@@ -63,17 +63,17 @@ afterEach(() => {
 describe('UPDATE on the title', () => {
   it('has no tile without the update deps, outside a public clone, or with nothing new', async () => {
     await mount();
-    expect(tiles()).toEqual(['new', 'report']);
+    expect(rows()).toEqual(['new', 'report']);
     await mount(fakeUpdate({ eligible: false }));
-    expect(tiles()).toEqual(['new', 'report']);
+    expect(rows()).toEqual(['new', 'report']);
     await mount(fakeUpdate({ eligible: true, status: status({ available: false }), last: null }));
-    expect(tiles()).toEqual(['new', 'report']);
+    expect(rows()).toEqual(['new', 'report']);
   });
 
   it('adds a last tile tagged NEW, whose card counts the changes', async () => {
     await mount(fakeUpdate({ eligible: true, status: status(), last: null }));
-    expect(tiles()).toEqual(['new', 'report', 'update']);
-    expect(document.querySelector('.tile[data-id="update"] .band-tag')?.textContent).toBe('NEW');
+    expect(rows()).toEqual(['new', 'report', 'update']);
+    expect(document.querySelector('.tm-item[data-id="update"] .tm-tag')?.textContent).toBe('NEW');
     toUpdate();
     expect(focused()).toBe('update');
     expect(text('.title-logo')).toBe('UPDATE');
@@ -170,7 +170,7 @@ describe('UPDATE on the title', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(text('.title-error')).toBe("// COULDN'T UPDATE — launcher");
     expect(text('.jack-in')).toBe('JACK IN');
-    key('ArrowLeft');
+    key('ArrowUp');
     expect(focused()).toBe('report');
   });
 

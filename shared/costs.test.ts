@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { COSTS, dealCosts, FORCED_FIRST, firstCost, picksFor, resistPrice } from './costs';
+import { COSTS, dealCosts, FORCED_FIRST, firstCost, picksFor, resistPrice, takePreview } from './costs';
 
 const all = { take: true, next: true, alarm: true };
 
@@ -87,5 +87,21 @@ describe('trouble has a shape (approach shapes spec §1)', () => {
     expect(firstCost('hard', ['small', 'worse'])).toBeNull();
     expect(firstCost(null, ['alarm'])).toBeNull();
     expect(firstCost(undefined, ['alarm'])).toBeNull();
+  });
+});
+
+describe('the TAKE preview (2026-11-08, playtest)', () => {
+  it('at TAKE 0 shows the roll earning 1 and the cost taking it back', () => {
+    expect(takePreview({ banked: 0, gain: 1, size: 4, other: 0 })).toEqual({ banked: 0, earned: 1, other: 0, after: 0, size: 4 });
+  });
+  it('takes a banked segment when the roll earns nothing (a miss)', () => {
+    expect(takePreview({ banked: 2, gain: 0, size: 4, other: 0 })).toEqual({ banked: 2, earned: 0, other: 0, after: 1, size: 4 });
+  });
+  it('caps the gain at the clock before the cost comes off, so a full clock still loses a segment', () => {
+    expect(takePreview({ banked: 3, gain: 2, size: 4, other: 0 })).toEqual({ banked: 3, earned: 1, other: 0, after: 3, size: 4 });
+  });
+  it('counts other deductions on the roll (a trade, a greed press), never below 0', () => {
+    expect(takePreview({ banked: 1, gain: 1, size: 4, other: 1 })).toEqual({ banked: 1, earned: 1, other: 1, after: 0, size: 4 });
+    expect(takePreview({ banked: 0, gain: 1, size: 4, other: 2 })).toEqual({ banked: 0, earned: 1, other: 2, after: 0, size: 4 });
   });
 });

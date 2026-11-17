@@ -26,8 +26,8 @@ function unit(n: number, name: string): string {
   return `${n} ${name}${n === 1 ? '' : 's'}`;
 }
 
-/** A time away, rounded down to its largest readable unit. */
-function duration(ms: number): string {
+/** A time away, rounded down to its largest readable unit ("6 hours"); the SillyTavern package uses it too. */
+export function awayFor(ms: number): string {
   if (ms < HOUR) return `${Math.max(1, Math.floor(ms / MINUTE))} min`;
   if (ms < 2 * DAY) return unit(Math.floor(ms / HOUR), 'hour');
   if (ms < 2 * WEEK) return unit(Math.floor(ms / DAY), 'day');
@@ -43,6 +43,6 @@ export function arrivalLine(previous: ChatMessage | undefined, now: number, o: {
   // `known`: a first meeting this story with someone she knows from before (a tie).
   if (!previous) return o.known ? '[arrival: first time this story, but you know them]' : '[arrival: first meeting]';
   const story = o.clock !== undefined && o.clock !== null && previous.clock !== undefined;
-  const away = duration(story ? (o.clock! - previous.clock!) * MINUTE : now - previous.ts);
+  const away = awayFor(story ? (o.clock! - previous.clock!) * MINUTE : now - previous.ts);
   return endsScene(previous) ? `[arrival: back ${away} after the scene ended]` : `[arrival: back after ${away}]`;
 }

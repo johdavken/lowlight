@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { keyButton, keyGlyph, type KeyId } from '../src/ui/key-glyphs';
 
-const IDS: KeyId[] = ['regenerate', 'continue', 'edit', 'delete', 'branch', 'draw', 'end', 'leave'];
+const IDS: KeyId[] = ['regenerate', 'continue', 'edit', 'delete', 'draw', 'end', 'leave'];
 
 describe('key glyphs', () => {
   it('every key has an aria-hidden svg with something drawn in it', () => {
@@ -25,12 +25,12 @@ describe('key glyphs', () => {
     expect(b.dataset.key).toBe('end');
     expect(b.textContent).toBe('END SCENE');
     expect(b.getAttribute('aria-label')).toBe('END SCENE');
-    expect(b.title).toBe('End the scene (Alt+E)');
+    expect(b.dataset.tip).toBe('End the scene (Alt+E)');
     expect(b.querySelector('svg.glyph')).not.toBeNull();
     expect(b.querySelector('.lb')!.textContent).toBe('END SCENE');
   });
 
   it('keyButton: the title is the label when none is given', () => {
-    expect(keyButton('delete', 'DELETE').title).toBe('DELETE');
+    expect(keyButton('delete', 'DELETE').dataset.tip).toBe('DELETE');
   });
 });

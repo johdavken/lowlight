@@ -1,4 +1,5 @@
 /** One side of the character-select screen: full-body art plus the file strip (name, tagline, file, extras). View only — see spec §4.3, §4.4, §12. */
+import { personOf } from './district-groups';
 import { COPY } from './copy';
 import type { PlaythroughPersona } from '../../../shared/persona';
 import type { LandingAgent } from './landing';
@@ -44,6 +45,8 @@ function linkStatus(a: LandingAgent): string | null {
  */
 export function liveFacts(a: LandingAgent, o: { side?: Side; player?: string | null } = {}): Fact[] {
   const out: Fact[] = [...a.facts];
+  // A made person (character creator spec 2026-11-14) is played, never dialled: no link, room or mind to report.
+  if (personOf(a.id) !== null) return out;
   const labels = new Set(out.map((f) => f.label));
   const recap = o.player != null ? a.recaps[o.player] : undefined;
   if (o.side === 'p2' && recap !== undefined && !labels.has(COPY.livePreviously)) out.push({ label: COPY.livePreviously, value: recap });
@@ -163,7 +166,7 @@ export class FighterStrip {
     this.file = el('div', 'fighter-file');
     this.extraEl = el('div', 'extra');
     this.fileStrip.append(this.nameEl, this.taglineEl, this.file, this.extraEl);
-    this.tagEl = el('div', 'tag', side === 'p1' ? COPY.tagP1 : COPY.tagP2);
+    this.tagEl = el('div', 'tag rail-head', side === 'p1' ? COPY.tagP1 : COPY.tagP2);
     this.el.append(this.fileStrip, this.tagEl);
     host.append(this.el);
   }

@@ -1,14 +1,14 @@
 {
-  "name": "Adebayo",
+  "name": "Kroll",
   "pronoun": "she",
-  "description": "Senior case officer in SDG's plainclothes branch, sixty-first floor of the Sentinel Tower. Forty-two, Spine-born, never says so. Buys people over tea.",
-  "accent": "#c9a227",
-  "tagline": "SDG handler. Sixty-first floor. Always offers tea.",
+  "description": "Senior case officer in SDG's plainclothes branch, sixty-first floor of the Sentinel Tower. Forty-two, Spine-born, never says so. Pours you tea, lights a cigarette, and tells you what you're afraid of.",
+  "accent": "#e3dcc8",
+  "tagline": "SDG handler. Sixty-first floor. The only cigarette on it.",
   "bio": "bio.md",
   "facts": [
     {
       "label": "KNOWN FOR",
-      "value": "Never raising her voice. Never needing to."
+      "value": "Saying the thing you hoped she hadn't noticed."
     },
     {
       "label": "DON'T ASK ABOUT",
@@ -16,7 +16,7 @@
     },
     {
       "label": "TELL",
-      "value": "Pours the tea before she asks for anything."
+      "value": "Lights a cigarette before she asks for anything."
     },
     {
       "label": "DANGEROUS",
@@ -32,7 +32,7 @@
   "sprite": {
     "src": "adebayo-outfit-work.png",
     "pixel": true,
-    "waist": 0.329
+    "waist": 0.355
   },
   "expressions": {
     "smile": "adebayo-smile.png",
@@ -41,17 +41,36 @@
     "concerned": "adebayo-concerned.png"
   },
   "outfits": {
-    "work": "adebayo-outfit-work.png"
+    "work": "adebayo-outfit-work.png",
+    "sunday": "adebayo-outfit-sunday.png",
+    "ivory": "adebayo-outfit-ivory.png",
+    "trench": "adebayo-outfit-trench.png",
+    "holding": "adebayo-outfit-holding.png"
   },
   "outfitByScene": {
-    "nexus/sdg-floor": "work"
+    "nexus/sdg-floor": "work",
+    "spine/long-haul": "ivory",
+    "spine/deck-market": "sunday",
+    "spine/catwalk": "trench",
+    "spine/oksanas-counter": "trench",
+    "karasu/noodle-stall": "trench",
+    "karasu/public-landing": "trench",
+    "karasu/intake-back-alley": "trench",
+    "karasu/dead-blocks": "trench",
+    "karasu/ribbon-rooftop": "trench",
+    "strand/old-pier": "trench",
+    "tidal/ferry-stairs": "trench"
   },
   "outfitWears": {
-    "work": "long charcoal wool coat open over a fitted black turtleneck and tailored charcoal trousers, black ankle boots, a small enamel eye-in-hexagon pin, a gold watch, small gold hoops"
+    "work": "long black wool coat open over a fitted black roll-neck, tailored black trousers, black ankle boots, a small eye-in-hexagon pin, a gold watch, pearl studs, a cigarette",
+    "sunday": "a worn grey hooded parka open over an old oatmeal jumper, faded work trousers, scuffed boots, a cloth bag of bread and leeks, and no watch, pin or cigarette",
+    "ivory": "a fitted white roll-neck knit dress to mid-calf under an ivory wool coat worn open, nude heeled ankle boots, a gold watch, pearl studs, a cigarette between two fingers",
+    "trench": "a cream trench belted tight, collar up, rain on the shoulders, a white silk blouse buttoned to the throat, charcoal trousers, black ankle boots, the eye-in-hexagon pin, a gold watch, a cigarette",
+    "holding": "coat off: a fitted black silk shirt open at the collar with the sleeves pushed up, black trousers and a thin belt, black ankle boots, the eye-in-hexagon pin on the collar, a gold watch, a cigarette"
   },
   "face": {
-    "x": 0.53,
-    "y": 0.08
+    "x": 0.5,
+    "y": 0.1
   },
   "identity": "identity.md",
   "backend": {
@@ -100,12 +119,12 @@
   },
   "knows": {
     "soren": {
-      "line": "Adebayo. Your handler since the holding room, when you were nineteen and she was thirty-two; she offered the deal over tea. Senior case officer on the sixty-first floor. Calls you Xander. You owe her the Ninth Grant's clean ledger, and there is something between you that neither of you has ever named, and you both know what it would cost.",
+      "line": "Kroll. Ilse, with the door shut; nobody else calls her that. Your handler since the holding room, when you were nineteen and she was thirty-two: she lit a cigarette, told you why you'd done it before you'd said a word, and offered you tea. Senior case officer on the sixty-first floor. Calls you Xander. You owe her the Ninth Grant's clean ledger, and there is a game between you, played in plain sight, that you have never known whether she means, and you both know what it would cost.",
       "trust": 4,
       "warmth": 3
     },
     "garro": {
-      "line": "Adebayo. Your handler for the last six years, since your old one retired. She remembers your kids' names and your blood pressure, and she has never once asked you to like her.",
+      "line": "Kroll. Your handler for the last six years, since your old one retired. She knows your kids' names, your blood pressure and what you tell your ex-wife, and she has never once asked you to like her.",
       "trust": 3,
       "warmth": 2
     }

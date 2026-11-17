@@ -1,0 +1,125 @@
+/*
+ * The three-card panel in the HUD trace (2026-11-15; cards-panel.ts): DRAW's events in the UI's one red, SUGGEST's
+ * lines and a new game's openings in cyan, the player's. No pane: the room dims and blurs as under a trace panel; the
+ * name on two hairlines, the cards on a rail, each a cut outline (something you hold), the lit one in the colour with
+ * a ring on the rail; the keys on the key line. Classes are the panel's own (ep-, sp-, op-).
+ */
+.encounter-host {
+  --c: var(--ui-red, #ff4d4d);
+  --tp-text: #d9e4ea;
+  --tp-dim: #8fa3ad;
+  --tp-ink: #05020a;
+  --tp-amber: #ffc56b;
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 16px 18px;
+  color: var(--tp-text);
+  background:
+    radial-gradient(ellipse 65% 75% at 50% 50%, rgba(5, 2, 10, 0.6), rgba(5, 2, 10, 0.4)),
+    linear-gradient(rgba(5, 2, 10, 0.5), transparent 16%, transparent 84%, rgba(5, 2, 10, 0.6));
+  backdrop-filter: blur(calc(4px * var(--ui-blur, 1))) brightness(0.62) saturate(0.85);
+  animation: cards-dim 0.2s ease-out;
+}
+.encounter-host.suggest-host { --c: #7fe9ff; }
+/* Over the arrival screen: a touch darker, the panel wider for the pair's head. */
+.encounter-host.opening-host { padding-top: 40px; background-color: rgba(5, 2, 10, 0.25); }
+@keyframes cards-dim { from { opacity: 0; } }
+@keyframes cards-on { 0%, 35% { opacity: 0; } 60% { opacity: 0.5; } 100% { opacity: 1; } }
+.encounter-host .ep-title, .encounter-host .scene-panel, .encounter-host .ep-hints { animation: cards-on 0.3s steps(4, end) backwards; }
+@media (prefers-reduced-motion: reduce) { .encounter-host, .encounter-host * { animation: none !important; } }
+
+/* The name, centred on two hairlines that fade out (the front end's titles). */
+.encounter-host .ep-title { display: flex; justify-content: center; align-items: center; gap: 18px; margin-bottom: 22px; font: 34px/1 var(--pixel); letter-spacing: 0.42em; color: var(--c); text-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); }
+.encounter-host .ep-title::before, .encounter-host .ep-title::after { content: ''; flex: none; width: 160px; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 70%, transparent)); }
+.encounter-host .ep-title::after { transform: scaleX(-1); }
+
+/* The column: the rail down its left edge (it stays put while the cards scroll), the cards in from it. */
+.encounter-host .scene-panel {
+  position: relative;
+  box-sizing: border-box;
+  width: min(900px, 100%);
+  max-height: calc(900px - 230px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 0 4px 2px 34px;
+  font: 14px/1.6 var(--mono);
+  background: linear-gradient(color-mix(in srgb, var(--c) 60%, transparent), color-mix(in srgb, var(--c) 10%, transparent)) 4px 10px / 1px calc(100% - 10px) no-repeat;
+}
+.encounter-host.opening-host .scene-panel { width: min(980px, 100%); }
+
+/* The head: who, where and when on a head line; its ring on the rail. */
+.encounter-host .sp-head { position: relative; display: flex; align-items: baseline; gap: 14px; margin-bottom: 18px; padding-bottom: 8px; font: 15px/1.2 var(--pixel); letter-spacing: 0.2em; color: var(--tp-dim); text-shadow: 0 1px 2px #000; }
+.encounter-host .sp-head::after, .encounter-host .op-pair::after { content: ''; position: absolute; left: -30px; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 15%, transparent)); box-shadow: 0 0 4px color-mix(in srgb, var(--c) 40%, transparent); }
+.encounter-host .sp-head::before, .encounter-host .op-pair::before { content: ''; position: absolute; left: -34px; bottom: -4px; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: var(--tp-ink); z-index: 1; }
+.encounter-host .sp-gap { flex: 1; }
+.encounter-host .sp-model { color: var(--tp-text); }
+.encounter-host .sp-note, .encounter-host .sp-why { margin: -6px 0 14px; font: 13px/1.5 var(--mono); color: var(--tp-amber); }
+.encounter-host .sp-loading, .encounter-host .sp-error { padding: 22px 0; font: 18px var(--pixel); letter-spacing: 0.24em; color: var(--tp-dim); }
+.encounter-host .sp-error { color: var(--tp-amber); }
+
+/* The opening's head: both faces in a plain outline, YOU × HER, where and when, her note on you. */
+.op-pair { position: relative; display: flex; align-items: center; gap: 18px; margin-bottom: 18px; padding-bottom: 12px; }
+.op-face { flex: none; width: 64px; height: 80px; background: #0b0614 center top / cover no-repeat; box-shadow: inset 0 0 0 1px rgba(127, 233, 255, 0.55); }
+.op-face.op-her { box-shadow: inset 0 0 0 1px rgba(255, 79, 139, 0.6); }
+.op-mid { flex: 1; text-align: center; text-shadow: 0 1px 2px #000; }
+.op-names { font: 30px var(--pixel); letter-spacing: 0.24em; }
+.op-you { color: #7fe9ff; }
+.op-x { margin: 0 10px; color: var(--tp-dim); }
+.op-hername { color: #ff4f8b; }
+.op-where { font: 15px var(--pixel); letter-spacing: 0.2em; color: var(--tp-dim); }
+.op-tie { margin-top: 4px; font: italic 12.5px var(--mono); color: var(--tp-dim); }
+
+/*
+ * A card: its cut outline (and the lit one's tint) on ::after, clipped; ::before is its tick on the rail, outside the
+ * clip. The lit one: the outline in the colour, a ring on the rail.
+ */
+.encounter-host .sp-card { position: relative; isolation: isolate; margin-bottom: 12px; padding: 12px 16px 12px 52px; color: rgba(217, 228, 234, 0.72); cursor: pointer; text-shadow: 0 1px 2px #000; }
+.encounter-host .sp-card::after {
+  --k: rgba(230, 238, 247, 0.2);
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  box-shadow: inset 0 0 0 1px var(--k);
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--k) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 11px 11px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--k) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 11px 11px no-repeat,
+    rgba(5, 2, 10, 0.45);
+}
+.encounter-host .sp-card::before { content: ''; position: absolute; left: -30px; top: 50%; width: 9px; height: 1px; background: var(--c); opacity: 0.6; }
+.encounter-host .sp-card:hover { color: rgba(217, 228, 234, 0.9); }
+.encounter-host .sp-card.on { color: var(--tp-text); }
+.encounter-host .sp-card.on::after { --k: var(--c); background-color: color-mix(in srgb, var(--c) 7%, rgba(5, 2, 10, 0.55)); }
+.encounter-host .sp-card.on::before { left: -34px; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: var(--tp-ink); opacity: 1; }
+.encounter-host .sp-n { position: absolute; left: 16px; top: 11px; font: 26px/1 var(--pixel); color: var(--tp-dim); }
+.encounter-host .sp-card.on .sp-n { color: var(--c); }
+.encounter-host .sp-title { margin-bottom: 3px; font: 22px/1.1 var(--pixel); letter-spacing: 0.2em; color: color-mix(in srgb, var(--c) 75%, #8fa3ad); text-transform: uppercase; }
+.encounter-host .sp-card.on .sp-title { color: var(--c); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 45%, transparent), 0 1px 2px #000; }
+.encounter-host .sp-sub-what { margin-left: 12px; font: 12px var(--mono); letter-spacing: 0; text-transform: none; color: var(--tp-dim); text-shadow: none; }
+.encounter-host .sp-card-text em { color: #a9b8c2; }
+
+/* A card's picture: a 3:4 tile down its left edge in a plain outline, the number on its corner; dim until lit. */
+.encounter-host .sp-card.has-art { min-height: 120px; padding-left: 120px; }
+.encounter-host .sp-art { position: absolute; left: 12px; top: 12px; bottom: 12px; width: 92px; background-size: cover; background-position: center; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.18); filter: saturate(0.8) brightness(0.72); transition: filter 150ms; }
+.encounter-host .sp-card.on .sp-art { filter: none; box-shadow: inset 0 0 0 1px var(--c), 0 0 0 3px rgba(5, 2, 10, 0.8); }
+.encounter-host .sp-card.has-art .sp-n { z-index: 1; left: 16px; top: 14px; padding: 1px 5px 0; font-size: 22px; line-height: 22px; background: rgba(5, 2, 10, 0.85); }
+/* DRAW's stranger: a face, so its top (the head) stays in the tile. */
+.encounter-host:not(.suggest-host) .sp-art { background-position: center 15%; }
+/* The stranger who comes in with an event: an amber tag. */
+.encounter-host .ep-who { display: inline-block; margin-top: 7px; padding: 2px 7px 0; font: 15px/1.2 var(--pixel); letter-spacing: 0.18em; color: var(--tp-ink); background: var(--tp-amber); text-shadow: none; }
+.encounter-host .ep-voice { margin-left: 8px; font: 12px var(--mono); font-style: normal; letter-spacing: 0.04em; color: #3a2a10; }
+
+/* REDRAW and CANCEL as soft cut keys under the cards. */
+.encounter-host .sp-options { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
+.encounter-host .ep-foot { margin-top: 14px; padding-top: 8px; font-size: 12.5px; color: var(--tp-dim); border-top: 1px solid rgba(230, 238, 247, 0.12); }
+
+/* The key line under a hairline, its keys in the colour. */
+.encounter-host .ep-hints { width: min(900px, 100%); margin-top: 14px; padding-top: 11px; text-align: center; border-top: 1px solid rgba(230, 238, 247, 0.16); }
+.encounter-host.opening-host .ep-hints { width: min(980px, 100%); }
+.encounter-host .ep-hints.hint-line b { color: var(--c); }

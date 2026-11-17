@@ -32,7 +32,9 @@
     "st-rooms": "tsx tools/st-rooms/build.ts",
     "st-cast": "tsx tools/st-rooms/export-cast.ts",
     "map-render": "tsx tools/map3d/render.ts",
-    "st-publish": "tsx tools/st-rooms/publish.ts"
+    "st-publish": "tsx tools/st-rooms/publish.ts",
+    "case-check": "tsx tools/case-check/run.ts",
+    "story-check": "tsx tools/story-check/run.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.3.0",

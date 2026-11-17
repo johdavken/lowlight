@@ -1,0 +1,110 @@
+/*
+ * The trace panel's parts (mockup crew-trace.html, picked 2026-11-14; trace-panel.ts), the nine rules as classes. The
+ * panel's colour is --screen-accent, read here as --c. No pane and no frame (screen.css `scr-trace`); only things you
+ * hold (a card, a key) get a cut outline.
+ */
+.scr-trace {
+  --c: var(--screen-accent, #7fe9ff);
+  --hv-c: var(--c);
+  --tp-text: #d9e4ea;
+  --tp-dim: #8fa3ad;
+  --tp-ink: #05020a;
+  --tp-ok: #3dff7a;
+  --tp-amber: #ffc56b;
+  --tp-cyan: #7fe9ff;
+  --tp-teko: 'Teko', var(--pixel);
+  font-family: var(--mono);
+}
+
+/* The head line and the leaders: in the panel's colour, with the trace's glow; over the content, never in the way. */
+.scr-trace > svg.hv-lead { z-index: 3; }
+.scr-trace > svg.hv-lead path { stroke-opacity: 0.9; filter: drop-shadow(0 0 2px var(--hv-c)); }
+.scr-trace > svg.hv-lead[data-lead='head'] .dot { display: none; }
+
+/* The head: the panel's name, its tabs with their counts, and tonight's numbers, standing on the head line. */
+.tp-title { flex: none; margin-right: 24px; font: 34px/1 var(--pixel); letter-spacing: 0.42em; color: var(--c); text-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); }
+.tp-tabs { display: flex; align-items: flex-end; gap: 34px; margin-left: 10px; }
+.tp-tab { position: relative; padding: 0 0 3px; border: 0; background: none; font: 20px/1 var(--pixel); letter-spacing: 0.24em; color: rgba(230, 238, 247, 0.5); cursor: pointer; }
+.tp-tab:hover, .tp-tab:focus-visible { outline: none; color: var(--tp-text); }
+.tp-tab .tp-n { margin-left: 8px; font-size: 15px; letter-spacing: 0.14em; color: var(--tp-dim); }
+.tp-tab.on { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent); }
+.tp-tab.on .tp-n { color: var(--c); }
+/* A count that needs you (unread texts): amber, open or not. */
+.tp-tab .tp-n.new, .tp-tab.on .tp-n.new { color: var(--tp-amber); }
+/* The open tab's bright run, on the head line. */
+.tp-tab.on::after { content: ''; position: absolute; left: 0; right: 4px; bottom: -7px; height: 2px; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.tp-note { margin-left: 28px; padding-bottom: 4px; font: 15px/1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-amber); overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tp-nums { flex: none; margin-left: auto; padding: 0 0 4px 24px; font: 15px/1 var(--pixel); letter-spacing: 0.18em; color: var(--tp-dim); }
+.tp-nums b { font-weight: normal; color: var(--tp-text); }
+.tp-nums b.neg { color: var(--c); }
+.tp-nums i { font-style: normal; margin: 0 10px; color: rgba(230, 238, 247, 0.3); }
+
+/* The list's rail: down from the head line's ring to the key line. */
+.scr-trace .scr-frame::before { content: ''; position: absolute; left: 0; top: calc(var(--tp-line, 42px) + 5px); bottom: 34px; width: 1px; background: linear-gradient(var(--c), color-mix(in srgb, var(--c) 12%, transparent)); filter: drop-shadow(0 0 2px var(--c)); pointer-events: none; }
+/* The key line at the foot, under a hairline. */
+.tp-keys { flex: none; margin-top: 12px; padding-top: 11px; text-align: center; border-top: 1px solid rgba(230, 238, 247, 0.16); }
+
+/* A list on the rail. It scrolls; the ticks and the pick's ring live in its left padding, on the rail. */
+.tp-list { --tp-gutter: 34px; margin-left: calc(-1 * var(--tp-gutter)); padding-left: var(--tp-gutter); overflow-y: auto; scrollbar-width: none; }
+.tp-row { position: relative; }
+.tp-row::before { content: ''; position: absolute; left: -26px; top: 50%; width: 9px; height: 1px; background: var(--c); opacity: 0.6; }
+.tp-row.on::before { left: -33px; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: var(--tp-ink); opacity: 1; }
+
+/* A section head: pixel caps in the panel's colour on a hairline that fades; a tick back to its rail. */
+.tp-head { position: relative; display: flex; align-items: center; gap: 10px; font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--hc, var(--c)); white-space: nowrap; }
+.tp-head::after { content: ''; flex: 1; min-width: 16px; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--hc, var(--c)) 60%, transparent), transparent); }
+.tp-head::before { content: ''; position: absolute; left: -28px; top: 50%; width: 9px; height: 1px; background: var(--hc, var(--c)); opacity: 0.6; }
+.tp-head.hot { --hc: var(--tp-amber); }
+.tp-head.quiet { --hc: var(--tp-dim); }
+
+/* A file on its own rail: the name in Teko, a line of pixel caps, prose in mono. */
+.tp-file { position: relative; padding-left: 28px; border-left: 1px solid; border-image: linear-gradient(var(--c), color-mix(in srgb, var(--c) 8%, transparent)) 1; }
+.tp-name { margin: 0; font: 600 84px/0.82 var(--tp-teko); letter-spacing: 0.02em; color: var(--c); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 0 18px color-mix(in srgb, var(--c) 35%, transparent), 0 2px 3px #000; }
+.tp-role { font: 15px/1.35 var(--pixel); letter-spacing: 0.16em; color: var(--tp-dim); text-transform: uppercase; }
+.tp-prose { font: 13px/1.6 var(--mono); color: var(--tp-text); text-shadow: 0 1px 2px #000; }
+
+/* Keyed rows: a pixel-caps key in the colour, its line in mono. */
+.tp-rows { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; margin: 0; font: 12.5px/1.45 var(--mono); color: var(--tp-text); text-shadow: 0 1px 2px #000; }
+.tp-rows > dt, .tp-rows > .k { font: 15px/1.2 var(--pixel); letter-spacing: 0.14em; color: var(--c); opacity: 0.9; text-transform: uppercase; white-space: nowrap; }
+.tp-rows > dd { margin: 0; }
+/* A tag: something on this row needs you. */
+.tp-tag { display: inline-block; margin-left: 8px; padding: 1px 6px 0; font: 13px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-ink); background: var(--tp-amber); vertical-align: 3px; text-shadow: none; }
+
+/* The cut key: an outline in the panel's colour; the one Enter does is filled. */
+.tp-key { position: relative; padding: 8px 20px 5px; border: 0; font: 20px/1 var(--pixel); letter-spacing: 0.24em; color: var(--kc, var(--c)); white-space: nowrap; cursor: pointer;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); box-shadow: inset 0 0 0 1px var(--kc, var(--c));
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc, var(--c)) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 8px 8px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc, var(--c)) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 8px 8px no-repeat,
+    rgba(5, 2, 10, 0.4); }
+.tp-key:hover, .tp-key:focus-visible { outline: none; color: var(--tp-ink); background: var(--kc, var(--c)); }
+.tp-key.go { color: var(--tp-ink); background: var(--c); box-shadow: none; }
+.tp-key.go:hover, .tp-key.go:focus-visible { background: #fff; }
+.tp-key.soft { --kc: rgba(230, 238, 247, 0.45); color: var(--tp-dim); }
+.tp-key.soft:hover, .tp-key.soft:focus-visible { --kc: var(--tp-text); }
+.tp-key.sm { padding: 5px 12px 3px; font-size: 15px; letter-spacing: 0.2em; }
+.tp-key:disabled, .tp-key:disabled:hover { --kc: rgba(230, 238, 247, 0.2); color: rgba(230, 238, 247, 0.38); background: rgba(5, 2, 10, 0.4); box-shadow: inset 0 0 0 1px var(--kc); cursor: default; }
+.tp-key:focus-visible { box-shadow: inset 0 0 0 1px #fff; }
+
+/* A face: a plain 1px outline; the pick takes the panel's colour, a dark gap and a faint ring (select's cursor). */
+.tp-face { position: relative; flex: none; display: block; overflow: hidden; background: #0b0614; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.22); }
+.tp-face > img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 50% 8%; image-rendering: pixelated; }
+.tp-face::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.22); pointer-events: none; }
+.scr-trace .on > .tp-face, .tp-face.on { box-shadow: 0 0 0 3px rgba(5, 2, 10, 0.8), 0 0 0 4px color-mix(in srgb, var(--c) 40%, transparent); }
+.scr-trace .on > .tp-face::after, .tp-face.on::after { box-shadow: inset 0 0 0 1px var(--c); }
+
+/* A cut card: something you hold. */
+.tp-card { position: relative; padding: 9px 12px 10px; clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 55%, transparent);
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), color-mix(in srgb, var(--c) 55%, transparent) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 10px 10px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), color-mix(in srgb, var(--c) 55%, transparent) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 10px 10px no-repeat,
+    rgba(5, 2, 10, 0.4); }
+.tp-slot { display: grid; place-items: center; min-height: 96px; border: 1px dashed rgba(230, 238, 247, 0.28); font: 15px var(--pixel); letter-spacing: 0.2em; color: rgba(230, 238, 247, 0.4); }
+
+/* A slanted track, as the room's clocks: segments that fill. */
+.tp-track { display: flex; gap: 4px; height: 22px; padding: 0 6px; }
+.tp-track > * { display: grid; place-items: center; min-width: 0; transform: skewX(-24deg); font: 15px/1 var(--pixel); letter-spacing: 0.12em; color: var(--tp-ink); overflow: hidden; white-space: nowrap; }
+.tp-track > * > span { transform: skewX(24deg); }
+
+/* The key line's keys in the panel's colour (the front end's are cyan, landing/trace.css). */
+.scr-trace .hint-line b { color: var(--c); }

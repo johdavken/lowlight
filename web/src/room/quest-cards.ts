@@ -9,6 +9,7 @@ import { debriefEl } from './debrief';
 import { hhmmOf, minuteOfDay } from '../../../shared/clock';
 import { passiveLabels } from '../ui/passive';
 import { markLore } from '../ui/lore-hover';
+import { setTip } from '../ui/hover-tag';
 
 type Active = NonNullable<QuestState['active']>;
 type Waiting = NonNullable<QuestState['waiting']>;
@@ -176,7 +177,7 @@ export function mountQuestCards(host: HTMLElement, o: { onChoose(choice: string,
     if (ended !== null) {
       const close = el('button', 'qc-close', '✕');
       close.type = 'button';
-      close.title = 'Close';
+      setTip(close, 'Close');
       close.onclick = (e) => {
         e.stopPropagation();
         ended = null;
@@ -367,10 +368,17 @@ function rewardsEl(rewards: readonly string[]): HTMLElement | null {
   return box;
 }
 
-export function latestQuestStory(rows: readonly ChatMessage[]): { id: string; title: string; text: string; ended: boolean; rewards?: string[] } | null {
+/**
+ * The newest quest row's story, without its pick line. `before` (a ride-along pick, 2026-11-08): the story up to the
+ * next beat, which the column shows while the contact answers the move; absent when nothing of the move would show.
+ */
+export function latestQuestStory(rows: readonly ChatMessage[]): { id: string; title: string; text: string; before?: string; ended: boolean; rewards?: string[] } | null {
   const m = rows.findLast((r) => r.role === 'user' && r.mode === 'quest' && r.quest);
   if (!m?.quest) return null;
   const pick = m.quest.pick?.line;
-  const text = pick && m.text.startsWith(pick) ? m.text.slice(pick.length).replace(/^\n+/, '') : m.text;
-  return { id: m.id, title: m.quest.title, text, ended: m.quest.beat === null && m.quest.waiting !== true, ...(m.quest.rewards?.length ? { rewards: m.quest.rewards } : {}) };
+  const unpicked = (t: string) => (pick && t.startsWith(pick) ? t.slice(pick.length).replace(/^\n+/, '') : t);
+  const text = unpicked(m.text);
+  const held = m.quest.held;
+  const before = held && held.at > 0 && held.at < m.text.length ? unpicked(m.text.slice(0, held.at)).trimEnd() : '';
+  return { id: m.id, title: m.quest.title, text, ...(before ? { before } : {}), ended: m.quest.beat === null && m.quest.waiting !== true, ...(m.quest.rewards?.length ? { rewards: m.quest.rewards } : {}) };
 }

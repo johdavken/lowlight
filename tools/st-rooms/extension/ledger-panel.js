@@ -14,7 +14,7 @@ export function closeLedger() {
   open?.();
 }
 
-/** `ledger`: { notes, recap } (ledger.ts); `name`: hers, for the title; `residual`: its isOn/set, for the switch. */
+/** `ledger`: { notes, recap, habits } (ledger.ts); `name`: hers, for the title; `residual`: its isOn/set, for the switch. */
 export function openLedger(ledger, name, residual) {
   closeLedger();
   const root = el('div', 'llw-root llr-root');
@@ -37,6 +37,10 @@ export function openLedger(ledger, name, residual) {
   section('ABOUT YOU', notes.filter((n) => !n.pinned && n.about === 'you'));
   if (ledger.recap) {
     body.append(el('div', 'llr-head', 'RECAP'), el('div', 'llr-recap', ledger.recap));
+  }
+  if (ledger.habits?.length) {
+    body.append(el('div', 'llr-head', 'WORN THIN'));
+    for (const r of ledger.habits) body.append(el('div', 'llr-note', r));
   }
   if (!body.childElementCount) body.append(el('div', 'llw-small', 'Nothing in the ledger yet.'));
   const keys = el('div', 'llw-keys');

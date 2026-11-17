@@ -81,6 +81,8 @@ export interface KitEvent {
   deck?: string | null;
   /** An outfit an ending gave (`<character>/<outfit>`, outfits as rewards): open to wear from here on. */
   outfit?: string;
+  /** Clue cards an ending gave (deduction board spec §2), `<case>/<card>`. */
+  clue?: string[];
   /** Decks you own that leave, by name: a lost push takes back the ones it gave, a fragile deck dies. Carried, you carry none. */
   lose?: string[];
   /** `deck` is a swap (CARRY): it does nothing unless you still own that deck. */
@@ -120,6 +122,8 @@ export interface Kit {
   nerveGone: boolean;
   /** Outfits endings gave (`<character>/<outfit>`), in the order earned. */
   outfits?: string[];
+  /** Clue cards earned (`<case>/<card>`), in the order earned (deduction board spec §2). */
+  clues?: string[];
   /** Programs owned (owned programs): the starter, buys, and foil copies held. */
   programs?: OwnedPrograms;
 }
@@ -166,7 +170,7 @@ export function foldKit(
 ): Kit {
   // `pocket`: the deck everyone owns; carried only by someone who starts with no other.
   const deck = start.deck ?? start.pocket ?? null;
-  const k: Kit = { deck, owned: [...new Set([deck, start.pocket ?? null])].filter((d) => d !== null), sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: start.nerveMax, nerveMax: start.nerveMax, nerveGone: false, outfits: [], programs: { owned: [...(start.programs ?? [])], foil: {} } };
+  const k: Kit = { deck, owned: [...new Set([deck, start.pocket ?? null])].filter((d) => d !== null), sol: 0, heat: {}, rep: {}, cover: { burner: 0, 'fall-guy': 0 }, nerveLeft: start.nerveMax, nerveMax: start.nerveMax, nerveGone: false, outfits: [], clues: [], programs: { owned: [...(start.programs ?? [])], foil: {} } };
   const applyEvent = (e: KitEvent) => {
     if (e.sol) k.sol = Math.max(0, k.sol + e.sol);
     if (e.heat) {
@@ -176,6 +180,7 @@ export function foldKit(
     if (e.rep) k.rep[e.rep.district] = Math.min(100, Math.max(0, (k.rep[e.rep.district] ?? 0) + e.rep.delta));
     if (e.cover) k.cover[e.cover.id] = Math.max(0, k.cover[e.cover.id] + e.cover.delta);
     if (e.outfit && !k.outfits!.includes(e.outfit)) k.outfits!.push(e.outfit);
+    for (const c of e.clue ?? []) if (!k.clues!.includes(c)) k.clues!.push(c);
     if (e.program) {
       const own = k.programs!;
       if (e.program.foil) own.foil[e.program.id] = Math.max(0, (own.foil[e.program.id] ?? 0) + e.program.foil);

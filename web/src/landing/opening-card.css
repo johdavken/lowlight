@@ -1,10 +1,9 @@
-/* The opening card before the splash: black, a red title, pale lines typed with a red cursor. */
+/* The opening card before the splash: black, a red block-letter name over small pale text in a scrolling window,
+   glyphs flying on a canvas over it (mockup docs/mockups/intro-story.html). */
 .opening-card {
   position: absolute;
   inset: 0;
   z-index: 60;
-  display: flex;
-  align-items: center;
   background: #000;
   font-family: var(--pixel);
   cursor: pointer;
@@ -15,53 +14,110 @@
   content: '';
   position: absolute;
   inset: 0;
+  z-index: 5;
   pointer-events: none;
   background:
     radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.75)),
     repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 2px, transparent 2px 4px);
 }
-.oc-text { margin-left: 260px; width: 1100px; }
-.oc-title {
-  font-size: 96px;
-  letter-spacing: 22px;
-  margin-bottom: 34px;
+/* One page: the name, then the text, a column on the left third, centred top to bottom. */
+.oc-page {
+  position: absolute;
+  left: 190px;
+  top: 0;
+  bottom: 0;
+  width: 900px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.oc-name {
+  margin-bottom: 30px;
+  font-size: 80px;
+  letter-spacing: 18px;
   color: #ff2a2a;
   text-shadow: 0 0 22px rgba(255, 30, 30, 0.8);
 }
+/* The block-letter name: the canvas carries the look, the text stays for screen readers. */
+.oc-name.blocks { letter-spacing: 0; line-height: 0; text-shadow: none; }
+.oc-name.blocks .oc-name-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.oc-title-canvas {
+  display: block;
+  filter: drop-shadow(0 0 10px rgba(255, 30, 30, 0.7));
+}
 .oc-line {
-  font-size: 44px;
-  line-height: 1.45;
-  letter-spacing: 1px;
-  white-space: pre;
+  font-size: 24px;
+  line-height: 1.35;
+  min-height: calc(24px * 1.35);
+  white-space: pre-wrap;
   color: #ddd6d4;
   text-shadow: 0 0 6px rgba(255, 200, 190, 0.25);
 }
-.oc-line.dim { opacity: 0.6; }
+.oc-line.dim { opacity: 0.55; }
+.oc-line.gap { min-height: calc(24px * 0.7); }
+.oc-line.label,
+.oc-line.tag {
+  font-size: 20px;
+  letter-spacing: 4px;
+  color: #ff2a2a;
+  text-shadow: 0 0 8px rgba(255, 30, 30, 0.5);
+}
+.oc-line.label { margin-bottom: 4px; }
+.oc-line.tag { opacity: 0.8; margin-bottom: 10px; }
+/* A visual row in the scroll window keeps its line's look; it never wraps again. */
+.oc-line.oc-row { white-space: pre; }
+.oc-window { position: relative; overflow: hidden; }
+.oc-window-inner { transition: transform 0.45s cubic-bezier(0.6, 0, 0.3, 1); }
 .oc-accent { color: #ff2a2a; text-shadow: 0 0 8px rgba(255, 30, 30, 0.55); }
 .oc-cursor {
   display: inline-block;
-  width: 22px;
-  height: 40px;
-  margin-left: 6px;
-  vertical-align: -6px;
+  width: 12px;
+  height: 22px;
+  margin-left: 4px;
+  vertical-align: -3px;
   background: #ff2a2a;
-  box-shadow: 0 0 10px #ff2a2a;
+  box-shadow: 0 0 8px #ff2a2a;
   animation: oc-blink 1s steps(1, end) infinite;
 }
 @keyframes oc-blink { 50% { opacity: 0; } }
 .opening-card.still .oc-cursor { animation: none; }
-.oc-skip {
+/* The glyphs in flight, over the text and under the scanlines. */
+.oc-fly { position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; }
+.oc-hint {
   position: absolute;
   right: 56px;
   bottom: 40px;
-  font-size: 24px;
-  letter-spacing: 6px;
+  z-index: 6;
+  font-size: 22px;
+  letter-spacing: 5px;
   color: #ff2a2a;
   opacity: 0.45;
 }
-/* Waiting for sound: only the prompt, blinking; the title and skip hint wait. */
-.opening-card.waiting .oc-text,
-.opening-card.waiting .oc-skip { visibility: hidden; }
+.oc-hint.ready { opacity: 0.9; text-shadow: 0 0 8px rgba(255, 30, 30, 0.6); animation: oc-pulse 1.4s ease-in-out infinite; }
+.opening-card.still .oc-hint.ready { animation: none; }
+@keyframes oc-pulse { 50% { opacity: 0.35; } }
+.oc-pager {
+  position: absolute;
+  left: 190px;
+  bottom: 40px;
+  z-index: 6;
+  font-size: 20px;
+  letter-spacing: 5px;
+  white-space: pre;
+  color: #ddd6d4;
+  opacity: 0.35;
+}
+.oc-pager b { font-weight: normal; color: #ff2a2a; }
+/* Waiting for sound: only the prompt, blinking; the page, hint and pager wait. */
+.opening-card.waiting .oc-hint,
+.opening-card.waiting .oc-pager { visibility: hidden; }
 .oc-sound {
   position: absolute;
   left: 0;

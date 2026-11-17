@@ -97,7 +97,7 @@ Names a hire can be drawn with, by the district they grew up in. A hire is from 
 - Eel Mahoney
 - Reed Okafor
 - Sal Duran · man
-- Wren Hatch
+- Tam Rushby
 - Cyrus Bell · man
 - Dory Pike
 - Hob Garnett · man

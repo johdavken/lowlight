@@ -1,5 +1,15 @@
 /* Holo-feed, HUD and input — the chat layer over the pixel scene. */
 
+/* The decode effect's Chinese glyphs (room/table/decode.ts GLYPHS), cut from Noto Sans CJK SC (OFL, fonts/
+   OFL-NotoSansCJK.txt) by tools/decode-font.sh, so a machine with no CJK font shows them too. Only these characters
+   use it: it stands second in --mono and every chat font, behind the font the line is in. */
+@font-face {
+  font-family: 'Lowlight Han';
+  src: url('./fonts/lowlight-han.woff2') format('woff2');
+  font-display: block;
+  unicode-range: U+7535, U+7F51, U+7801, U+6570, U+636E, U+5BC6, U+9501, U+95E8, U+9ED1, U+5F71, U+591C, U+57CE, U+5149, U+96E8, U+94B1, U+8840, U+9AA8, U+94C1, U+5200, U+706B, U+6C34, U+98CE, U+91D1, U+9F99, U+9B3C, U+6B7B, U+751F, U+547D, U+5FC3, U+773C, U+624B, U+53E3, U+4FE1, U+53F7, U+4EE4, U+673A, U+7B97, U+8BFB, U+5199, U+5B58, U+65AD, U+8FDE, U+7EBF, U+8DEF, U+7AEF, U+96F6, U+754C, U+57DF, U+63A7, U+94FE, U+8282, U+70B9, U+503A, U+6E2F;
+}
+
 :root {
   --nix: #ff4f8b;
   /* the room's agent accent, set from her portrait event; Nix's pink until then */
@@ -9,10 +19,13 @@
   --alert: #ff3b5c;
   --panel: rgba(9, 4, 18, 0.88);
   --panel-edge: rgba(9, 4, 18, 0.68);
-  --hud: rgba(127, 233, 255, 0.82);
-  --hud-dim: rgba(127, 233, 255, 0.45);
+  /* One colour for the UI's own lines (playtest pick 2026-11-15): the bar, the corners, keys, rails, hovers. People keep
+     their colours, cyan (--user) is the player's alone, amber is what needs you. TRACE_RED in trace-panel.ts is the same. */
+  --ui-red: #ff4d4d;
+  --hud: rgba(255, 77, 77, 0.9);
+  --hud-dim: rgba(255, 77, 77, 0.55);
   --pixel: 'VT323', ui-monospace, monospace;
-  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --mono: 'IBM Plex Mono', 'Lowlight Han', ui-monospace, monospace;
   --edge-x: 64px;
   --input-bottom: 18px;
   /* The box sits right on the input bar (52px), lifted by a draft's extra lines (set by the input). */
@@ -33,7 +46,7 @@
   position: absolute;
   width: 22px;
   height: 22px;
-  border: 0 solid rgba(127, 233, 255, 0.55);
+  border: 0 solid rgba(255, 77, 77, 0.55);
 }
 .corner.tl { top: 21.6px; left: 25.6px; border-width: 1px 0 0 1px; }
 .corner.tr { top: 21.6px; right: 25.6px; border-width: 1px 1px 0 0; }
@@ -53,37 +66,33 @@
   justify-content: space-between;
   align-items: baseline;
   gap: 1.5em;
-  font-size: 22px;
+  /* The chat bar's hints' size and spacing (the room HUD, playtest), so the bar and the prompt line read as one set. */
+  font-size: 15px;
   line-height: 1;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.18em;
   white-space: nowrap;
 }
-/* The band behind the bar, edge to edge, and its hairline (its own element: as the bar's pseudo
-   elements it would count toward the bar's width, and the bar would never fit). */
-.hud-band {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: calc(21.6px + 52px);
-  background: linear-gradient(rgba(5, 2, 12, 0.84), rgba(5, 2, 12, 0.5) 70%, transparent);
-}
-.hud-band::after {
-  content: '';
-  position: absolute;
-  left: calc(25.6px + 30px);
-  right: calc(25.6px + 30px);
-  bottom: 12px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(127, 233, 255, 0.45) 12%, rgba(127, 233, 255, 0.45) 88%, transparent);
-}
+/* The bar is linework only (the room HUD, docs/mockups/hud-frames.html): no band behind it, no fills. The words keep a
+   dark shadow under their glow to read over a bright room; the trace (hud.ts drawTrace) is the line they sit on. */
+.hud-band { display: none; }
 .hud {
   display: flex;
   align-items: baseline;
   min-width: 0; /* so the names inside can be cut short */
   color: var(--hud);
-  text-shadow: 0 0 10px rgba(127, 233, 255, 0.35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px rgba(255, 77, 77, 0.35);
 }
+.hud-trace { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; shape-rendering: crispEdges; }
+.hud-trace .kt { fill: none; stroke: color-mix(in srgb, var(--hud) 40%, #e6eef7); stroke-width: 1; stroke-opacity: 0.55; }
+.hud-trace .k2 { stroke-opacity: 0.3; }
+.hud-trace .kb { fill: var(--hud); opacity: 0.55; }
+.hud-trace .kring { fill: none; stroke: var(--hud); stroke-width: 1; opacity: 0.8; shape-rendering: auto; }
+.hud-trace .kon { --kc: var(--hud); stroke: var(--kc); stroke-width: 2; filter: drop-shadow(0 0 4px var(--kc)); }
+.hud-trace .ksys { fill: none; stroke: color-mix(in srgb, var(--hud) 40%, #e6eef7); stroke-width: 1; stroke-opacity: 0.9; }
+.hud-trace .ksys.on { stroke: var(--hud); stroke-opacity: 1; filter: drop-shadow(0 0 3px var(--hud)); }
+.hud-trace .nlead { fill: none; stroke: color-mix(in srgb, #ffc56b 45%, #e6eef7); stroke-width: 1; filter: drop-shadow(0 0 2px #ffc56b); }
+.hud-trace .nlead-ring { fill: none; stroke: #ffc56b; stroke-width: 1; shape-rendering: auto; }
+.hud-trace .nlead-dot { fill: #ffc56b; }
 .hud > * { flex: none; }
 /* The room name may be cut short, never below a few characters. */
 .hud > .scene {
@@ -92,10 +101,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.hud-bar[data-fit='snug'] { font-size: 20px; letter-spacing: 0.16em; }
-.hud-bar:is([data-fit='tight'], [data-fit='no-weather']) { font-size: 18px; letter-spacing: 0.1em; }
+.hud-bar[data-fit='snug'] { font-size: 15px; letter-spacing: 0.14em; }
+.hud-bar:is([data-fit='tight'], [data-fit='no-weather']) { font-size: 14px; letter-spacing: 0.1em; }
 /* The last steps, just above the phone layout: tighter still (then the screens shorten to their letters, in hud.ts). */
-.hud-bar:is([data-fit='no-clock'], [data-fit='short']) { font-size: 16px; letter-spacing: 0.06em; }
+.hud-bar:is([data-fit='no-clock'], [data-fit='short']) { font-size: 13px; letter-spacing: 0.06em; }
 .hud-bar[data-fit='no-weather'] :is(.weather, .sep-weather),
 .hud-bar:is([data-fit='no-clock'], [data-fit='short']) :is(.weather, .sep-weather, .clock, .sep-clock) { display: none; }
 /* The very last step, just above the phone layout: DICE goes (it comes back as soon as there's room). */
@@ -106,8 +115,47 @@
 .hud-back { pointer-events: auto; cursor: pointer; margin-right: 0.6em; color: var(--hud-dim); }
 .hud-back:hover, .hud-back:focus-visible { outline: none; color: #fff; }
 .hud .clock { font-variant-numeric: tabular-nums; }
-.hud .notice { margin-right: 1.4em; color: var(--tool); text-shadow: 0 0 10px rgba(255, 179, 71, 0.4); }
-.hud .notice[hidden] { display: none; }
+/* The notices under the bar at the right (hud.ts): glass, the left end cut both ways and the right cut at the bottom.
+   The warning (amber, a hazard stripe) is pinned; the texts notice (pink, slanted stripes, its Alt key) folds. */
+.hud-notices {
+  position: absolute;
+  top: 84px;
+  right: calc(25.6px + 30px);
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  font-size: 19px;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  white-space: nowrap;
+}
+.hud-notices > :is(.notice, .hud-texts) {
+  --tc: var(--tool);
+  --tl: color-mix(in srgb, var(--tc) 45%, #e6eef7);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  padding: 2px 16px 0 14px;
+  color: var(--tc);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--tc) 60%, transparent);
+  backdrop-filter: blur(calc(6px * var(--ui-blur, 1))) brightness(0.7);
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 1px), var(--tl) calc(50% - 1px) calc(50% + 0.5px), transparent calc(50% + 0.5px)) 0 0 / 12px 12px no-repeat,
+    linear-gradient(to top left, transparent calc(50% - 1px), var(--tl) calc(50% - 1px) calc(50% + 0.5px), transparent calc(50% + 0.5px)) 100% 100% / 10px 10px no-repeat,
+    linear-gradient(var(--tl), var(--tl)) 12px 0 / 100% 1px no-repeat,
+    linear-gradient(var(--tl), var(--tl)) 0 100% / calc(100% - 10px) 1px no-repeat,
+    linear-gradient(var(--tl), var(--tl)) 0 12px / 1px 100% no-repeat,
+    linear-gradient(var(--tl), var(--tl)) 100% 0 / 1px calc(100% - 10px) no-repeat,
+    linear-gradient(color-mix(in srgb, var(--tc) 14%, rgba(13, 22, 38, 0.82)), color-mix(in srgb, var(--tc) 14%, rgba(13, 22, 38, 0.82)));
+  clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 12px);
+}
+.hud-notices > :is(.notice, .hud-texts)[hidden] { display: none; }
+/* A screen open under the bar: the warning steps aside (it's the room's), so the panel's top strip reads. */
+.hud-root:has(.hud-right .open) .hud-notices > .notice { display: none; }
+/* The warning: a hazard stripe before its words. */
+.hud-notices > .notice::before { content: ''; flex: none; width: 26px; height: 14px; background: repeating-linear-gradient(-55deg, currentColor 0 3px, transparent 3px 7px); }
 
 .hud .link::before {
   content: '';
@@ -118,7 +166,8 @@
   background: currentColor;
   box-shadow: 0 0 8px currentColor;
 }
-.hud .link[data-status='ok'] { color: var(--hud); }
+/* Fine is green: in a red UI a red light would read as a fault. */
+.hud .link[data-status='ok'] { color: #3dff7a; }
 .hud .link[data-status='ok']::before { animation: hud-breathe 3.2s ease-in-out infinite; }
 .hud .link[data-status='down'] { color: var(--tool); text-shadow: 0 0 10px rgba(255, 179, 71, 0.4); }
 .hud .link[data-status='down']::before { animation: hud-blink 1s steps(2, jump-none) infinite; }
@@ -146,7 +195,7 @@
   opacity: 0;
   background:
     linear-gradient(90deg, rgba(4, 1, 10, 0.9) 0%, rgba(4, 1, 10, 0.7) 50%, rgba(4, 1, 10, 0.55) 100%);
-  backdrop-filter: blur(2px) saturate(0.6);
+  backdrop-filter: blur(calc(2px * var(--ui-blur, 1))) saturate(0.6);
   transition: opacity 260ms ease;
 }
 .feed-root.expanded .feed-dim {
@@ -374,6 +423,22 @@
 /* Typing: her reply is laid out in full; past the frontier it's hidden, and a block cursor sits there
    (it takes over from the end-of-text caret while it's present). */
 .unshown { visibility: hidden; }
+/* TEXT EFFECT DECODE (the box's settings): the text ahead of the cursor shows as glyph noise in the box's colour, dim,
+   and the letters lock in as she types (typing.ts noiseOf, feed.ts flicker). */
+.text .unshown.noise { visibility: visible; color: transparent !important; text-shadow: none !important; }
+.text .unshown.noise .nw { position: relative; }
+.text .unshown.noise .nw::after {
+  content: attr(data-n);
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--hf-c, var(--nix)) 60%, transparent);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--hf-c, var(--nix)) 40%, transparent);
+}
 .type-cursor { position: relative; }
 .type-cursor::after { content: ''; position: absolute; left: 1px; bottom: 0.15em; width: 0.55em; height: 1.05em; background: currentColor; animation: caret 1s steps(1) infinite; }
 .msg.s-streaming .text:has(.type-cursor)::after { display: none; }
@@ -505,11 +570,13 @@
   font-family: var(--pixel);
   font-size: 20px;
   letter-spacing: 0.24em;
-  color: var(--agent);
+  color: var(--ui-red);
   text-shadow: 0 0 4px #000, 0 0 10px #000;
   pointer-events: none;
 }
-.map-hint { font-size: 16px; color: rgba(255, 217, 230, 0.4); }
+/* The room's key line (hint-line.ts): keys in the UI's red, words dim. */
+.map-hint.hint-line { text-shadow: 0 0 3px #000, 0 0 8px #000; }
+.map-hint.hint-line b { color: var(--ui-red); }
 /* Missing or broken map data: the picture stays, with one line saying what's wrong. */
 .map-screen > .map-notice {
   inset: auto 0 0 0;
@@ -529,10 +596,10 @@
      it on the camera, so its lines stay 1px and line up with the map (spec 2026-10-28 §3). Major, then minor. */
   background-color: #000;
   background-image:
-    linear-gradient(90deg, rgba(127, 233, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(127, 233, 255, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(127, 233, 255, 0.04) 1px, transparent 1px),
-    linear-gradient(180deg, rgba(127, 233, 255, 0.04) 1px, transparent 1px);
+    linear-gradient(90deg, rgba(255, 77, 77, 0.09) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 77, 77, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 77, 77, 0.045) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255, 77, 77, 0.045) 1px, transparent 1px);
   cursor: grab;
   touch-action: none;
   animation: map-flicker 5s steps(1, end) infinite;
@@ -653,7 +720,7 @@
 
 /* ───────────────────────── Journal ───────────────────────── */
 
-.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-map, .hud-book {
+.hud-you, .hud-people, .hud-crew, .hud-map, .hud-book {
   pointer-events: auto;
   cursor: pointer;
   margin-left: 1.1em;
@@ -661,8 +728,8 @@
 }
 /* The Alt letter: underlined in her colour, only while Alt is held (plain words the rest of the time). */
 /* The letter never takes the click itself: the labels are rebuilt under the mouse, and a press on a letter that's gone clicks nothing (the X of TEXTS). */
-:is(.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-book) u { text-decoration: none; pointer-events: none; }
-.hud-bar.alt-held :is(.hud-you, .hud-people, .hud-tx, .hud-crew, .hud-book) u {
+:is(.hud-you, .hud-people, .hud-crew, .hud-book) u { text-decoration: none; pointer-events: none; }
+.hud-bar.alt-held :is(.hud-you, .hud-people, .hud-crew, .hud-book) u {
   text-decoration: underline;
   text-decoration-color: var(--agent);
   text-decoration-thickness: 2px;
@@ -671,30 +738,38 @@
 .hud-you:hover, .hud-you:focus-visible,
 .hud-map:hover, .hud-map:focus-visible,
 .hud-people:hover, .hud-people:focus-visible,
-.hud-tx:hover, .hud-tx:focus-visible,
 .hud-crew:hover, .hud-crew:focus-visible, .hud-book:hover, .hud-book:focus-visible { outline: none; color: #fff; }
-/* Texts you haven't seen on the deck (promised texts spec §6): NIX · 1 TEXT in her pink, opens TEXTS. */
+/* Texts you haven't seen on the deck (promised texts spec §6): the notice in amber (what needs you) under the bar,
+   slanted stripes before NIX · 1 TEXT and its Alt key after; it opens PEOPLE's TEXTS. Folded (hud.ts) it shrinks up
+   into the count on PEOPLE. */
 .hud-power { color: #ffb347; text-shadow: 0 0 8px rgba(255, 179, 71, 0.5); }
-.hud-texts { pointer-events: auto; cursor: pointer; color: #ff4f8b; text-shadow: 0 0 8px rgba(255, 79, 139, 0.6); }
-.hud-texts::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 6px; vertical-align: 0.15em; background: #ff4f8b; box-shadow: 0 0 6px #ff4f8b; }
-.hud-texts:hover, .hud-texts:focus-visible { outline: none; color: #fff; }
+.hud-notices > .hud-texts { --tc: #ffc56b; pointer-events: auto; cursor: pointer; transition: opacity 0.18s steps(3, end), transform 0.18s steps(3, end); }
+.hud-notices > .hud-texts::before { content: ''; flex: none; width: 31px; height: 14px; background: repeating-linear-gradient(-60deg, transparent 0 2px, currentColor 2px 9px, transparent 9px 10px); }
+.hud-notices > .hud-texts::after { content: 'ALT+X'; flex: none; margin-left: 6px; padding: 0 6px; font-size: 15px; box-shadow: inset 0 0 0 1px currentColor; }
+.hud-notices > .hud-texts:hover, .hud-notices > .hud-texts:focus-visible { outline: none; color: #fff; }
+.hud-notices > .hud-texts.folded { opacity: 0; transform: translate(-30px, -14px) scale(0.6); transform-origin: 30% 0; pointer-events: none; }
+.hud-notices > .hud-texts.drop:not(.folded) { animation: hud-drop 0.3s steps(4, end) both; }
+@keyframes hud-drop { from { opacity: 0; transform: translateY(-16px); } }
 /* A crew result not seen yet (crew spec §4): a dot after CREW. */
 .hud-crew.crew-new::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 5px; vertical-align: 0.35em; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 6px #ff4d4d; }
-/* Someone texted you unseen (in-game texts spec §4): a pink dot after TEXTS. */
-.hud-tx.texts-new::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 5px; vertical-align: 0.35em; border-radius: 50%; background: #ff4f8b; box-shadow: 0 0 6px #ff4f8b; }
-/* The open screen (YOU, PEOPLE, TEXTS, QUEST, CREW or MAP) lit like an open SYS: filled in its blue, dark type. A box-shadow, not
-   padding, so the bar's width (and its fit) doesn't change. */
-:is(.hud-you, .hud-people, .hud-tx, .hud-quest, .hud-crew, .hud-map).open,
-:is(.hud-you, .hud-people, .hud-tx, .hud-quest, .hud-crew, .hud-map).open:hover { color: #05020c; background: var(--hud); box-shadow: 0 0 0 4px var(--hud); text-shadow: none; }
-:is(.hud-you, .hud-people, .hud-tx, .hud-quest, .hud-crew).open u { text-decoration-color: #05020c; }
-/* CREW's word in its panel's red. */
-.hud-crew.open, .hud-crew.open:hover { background: #ff4d4d; box-shadow: 0 0 0 4px #ff4d4d; }
-/* BOOK (lore drawer): lit in the drawer's lilac, and the count a small raised number that never moves anything. */
-.hud-book.open, .hud-book.open:hover { color: #05020c; background: #c9a8ff; box-shadow: 0 0 0 4px #c9a8ff; text-shadow: none; }
-.hud-book.open u { text-decoration-color: #05020c; }
+/* Someone texted you unseen (in-game texts spec §4): the count on PEOPLE (TEXTS is its tab), small and raised in
+   amber, as BOOK's; it pings once as the notice folds into it. */
+.hud-people { position: relative; }
+.hud-people[data-count]::after { content: attr(data-count); position: absolute; right: -0.85em; top: -0.5em; font-size: 12px; letter-spacing: 0; color: #ffc56b; text-shadow: 0 0 6px rgba(255, 197, 107, 0.7); }
+.hud-people.ping[data-count]::after { animation: hud-ping 0.9s steps(6, end) 1; }
+@keyframes hud-ping { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.6); text-shadow: 0 0 12px #ffc56b, 0 0 20px #ffc56b; } }
+@media (prefers-reduced-motion: reduce) {
+  .hud-notices > .hud-texts { transition: none; }
+  .hud-notices > .hud-texts.drop:not(.folded), .hud-people.ping[data-count]::after { animation: none; }
+}
+/* The open screen (YOU, PEOPLE, QUEST, CREW or MAP): its word in its colour with a glow, no fill; the trace runs
+   bright under it (hud.ts). Nothing changes size, so the bar's fit holds. */
+:is(.hud-you, .hud-people, .hud-quest, .hud-crew, .hud-map, .hud-book).open { --kc: var(--hud); }
+:is(.hud-you, .hud-people, .hud-quest, .hud-crew, .hud-map, .hud-book).open,
+:is(.hud-you, .hud-people, .hud-quest, .hud-crew, .hud-map, .hud-book).open:hover { color: var(--kc); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px color-mix(in srgb, var(--kc) 60%, transparent); }
+/* BOOK (lore drawer): the count a small raised number that never moves anything. */
 .hud-book { position: relative; }
-.hud-book[data-count]::after { content: attr(data-count); position: absolute; right: -0.75em; top: -0.45em; font-size: 0.7em; letter-spacing: 0; color: #c9a8ff; }
-.hud-book.open[data-count]::after { color: #fff; text-shadow: 0 0 4px #05020c; }
+.hud-book[data-count]::after { content: attr(data-count); position: absolute; right: -0.85em; top: -0.5em; font-size: 12px; letter-spacing: 0; color: #ffc56b; }
 /* The SAVE row of SYS while her reply streams: WAIT FOR <HER>, dimmed, and it doesn't open. */
 .sys-row[data-row='save'].busy { cursor: default; }
 .sys-row[data-row='save'].busy .sys-value { color: var(--hud-dim); }
@@ -706,20 +781,18 @@
   align-items: center;
   gap: 0.45em;
   margin-left: 1.4em;
-  padding: 4px 10px;
+  padding: 5px 11px;
   color: var(--hud);
-  border: 1px solid rgba(127, 233, 255, 0.5);
-  background: rgba(9, 4, 18, 0.7);
 }
 .hud-sys .link::before { margin: 0 0 0.12em; }
 .hud-sys .sys-note { color: var(--agent); }
 .hud-sys .sys-note:empty { display: none; }
-.hud-sys:hover, .hud-sys:focus-visible { outline: none; border-color: var(--hud); color: #fff; }
-.hud-root:has(.sys-menu:not([hidden])) .hud-sys { color: #05020c; background: var(--hud); border-color: var(--hud); text-shadow: none; }
-.hud-root:has(.sys-menu:not([hidden])) .hud-sys .link { color: #05020c; text-shadow: none; }
-.hud-root:has(.sys-menu:not([hidden])) .hud-sys .link::before { box-shadow: none; }
-.hud-sys.down, .hud-sys.down .link { color: var(--alert); text-shadow: 0 0 8px rgba(255, 59, 92, 0.5); }
-.hud-sys.down { border-color: rgba(255, 59, 92, 0.7); }
+/* SYS: bracket corners in the trace (hud.ts), no box; open, they and its word brighten. */
+.hud-sys:hover, .hud-sys:focus-visible { outline: none; color: #fff; }
+.hud-root.sys-open .hud-sys { color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 10px var(--hud); }
+/* Down in amber, blinking: red is the bar's own colour now and wouldn't show. */
+.hud-sys.down, .hud-sys.down .link { color: var(--tool); text-shadow: 0 0 8px rgba(255, 179, 71, 0.5); animation: hud-blink 1s steps(2, jump-none) infinite; }
+.hud-root:has(.hud-sys.down) .hud-trace .ksys { stroke: var(--tool); }
 .hud-bar[data-fit='short'] .sys-caret { display: none; }
 /* The SYS dropdown (sys-menu.ts), under its button. */
 .sys-menu {
@@ -735,14 +808,20 @@
   letter-spacing: 0.1em;
   color: #e9def9;
   background: rgba(9, 4, 18, 0.92);
-  border: 1px solid rgba(127, 233, 255, 0.4);
+  border: 1px solid rgba(255, 77, 77, 0.4);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
 }
 .sys-menu[hidden] { display: none; }
 .sys-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 9px 16px; cursor: pointer; }
+/* The groups (SOUND · STAGE · GAME · MODEL): a head each, gone with its last row. The dropdown keeps them quiet. */
+.sys-group[hidden] { display: none; }
+.sys-head { padding: 8px 16px 2px; font-size: 14px; letter-spacing: 0.3em; color: var(--hud-dim); }
+.sys-group + .sys-group { border-top: 1px solid rgba(255, 77, 77, 0.12); }
+/* The label-to-value line: the pause's SETTINGS page draws it (pause-menu.css). */
+.sys-line { display: none; }
 .sys-row[hidden] { display: none; }
 .sys-row[data-row='link'] { cursor: default; }
-.sys-row.on { background: rgba(127, 233, 255, 0.1); box-shadow: inset 3px 0 0 var(--hud); }
+.sys-row.on { background: rgba(255, 77, 77, 0.1); box-shadow: inset 3px 0 0 var(--hud); }
 .sys-label { margin-right: auto; color: var(--hud-dim); }
 .sys-meter { display: inline-flex; gap: 3px; }
 .sys-meter[hidden] { display: none; }
@@ -756,7 +835,8 @@
 .sys-font-name { font-size: 15px; letter-spacing: 0.04em; white-space: pre; }
 .sys-speeds i.on, .sys-keys i.on { color: #05020c; background: var(--hud); }
 .sys-value.down { color: var(--alert); }
-.sys-foot { padding: 8px 16px; font-size: 16px; color: #8a7fa0; border-top: 1px solid rgba(127, 233, 255, 0.14); }
+.sys-foot { padding: 8px 16px; font-size: 16px; color: #8a7fa0; border-top: 1px solid rgba(255, 77, 77, 0.14); }
+.sys-foot.hint { color: var(--hud); line-height: 1.3; white-space: normal; }
 .model-menu {
   position: absolute;
   top: 44px;
@@ -769,7 +849,7 @@
   flex-direction: column;
   gap: 4px;
   background: rgba(6, 3, 14, 0.94);
-  border: 1px solid rgba(127, 233, 255, 0.35);
+  border: 1px solid rgba(255, 77, 77, 0.35);
   box-shadow: 0 0 24px -8px var(--hud);
   font-family: var(--pixel);
   font-size: 16px;
@@ -789,7 +869,7 @@
   padding: 2px 6px;
   cursor: pointer;
 }
-.mm-row.current { color: #fff; border-color: rgba(127, 233, 255, 0.35); }
+.mm-row.current { color: #fff; border-color: rgba(255, 77, 77, 0.35); }
 .mm-row:hover, .mm-row:focus-visible, .mm-other:hover, .mm-other:focus-visible { outline: none; color: #04121a; background: var(--hud); }
 .mm-price { opacity: 0.7; white-space: nowrap; }
 .mm-row:has(.mm-via) { flex-wrap: wrap; row-gap: 0; }
@@ -797,8 +877,8 @@
 .mm-input {
   font: inherit;
   color: #fff;
-  background: rgba(127, 233, 255, 0.06);
-  border: 1px solid rgba(127, 233, 255, 0.35);
+  background: rgba(255, 77, 77, 0.06);
+  border: 1px solid rgba(255, 77, 77, 0.35);
   padding: 2px 6px;
   outline: none;
 }
@@ -861,7 +941,7 @@
 /* The subtitle band: in stage mode the collapsed feed is one wide band above the prompt line, with no frame
    (spec 2026-10-16 subtitle chat box). --box-h is its height at rest; a reply that needs it grows it
    (--box-fit, set by the feed) up to --box-max. What stands on the band (notice, dice tray) keeps --plate-h of air. */
-:root { --box-h: 216px; --box-max: 270px; --fig-h: 360px; --plate-h: 26px; }
+:root { --box-h: 216px; --box-max: 270px; --fig-h: 360px; --plate-h: 52px; }
 /* The subtitle's and prompt line's side margins: room for the corner stacks (wider when they show words). */
 :root { --sub-x: 130px; }
 .keys-labels { --sub-x: 180px; }
@@ -872,14 +952,51 @@
   height: var(--box-fit, var(--box-h));
   max-height: var(--box-max);
   transition: height 150ms ease;
-  /* Subtitles (spec 2026-10-16): the line sits on the band's floor, just over the prompt line. */
-  justify-content: flex-end;
+  /* The line starts under its head line (main-trace.html B TRACE); with a pane it sat on the band's floor. */
+  justify-content: flex-start;
   padding: 0;
   -webkit-mask-image: none;
   mask-image: none;
 }
 .feed-root.feed-stage:not(.expanded) .feed > :first-child { margin-top: 0; }
-/* No box: a scrim rises from the floor under the line, its top ~140px over the band's (which grows with --box-fit). */
+/* The box has no pane (mockup main-trace.html B TRACE, playtest pick 2026-11-15): the speaker's colour (--hf-c) is the
+   head line along its top edge, the rail down its left and the leader to them; the text is held in from its edges. */
+.feed-root.feed-stage { --hf-c: var(--nix); }
+.feed-root.feed-stage.speaker-user { --hf-c: var(--user); }
+.feed-root.feed-stage.speaker-other { --hf-c: var(--other, var(--nix)); }
+.feed-root.feed-stage.speaker-stranger { --hf-c: #ffc56b; }
+/* COLOUR (the box's settings): a fixed swatch holds the line's colour to it whoever speaks; the name keeps theirs (--c). */
+.feed-root.feed-stage.fixed-accent { --hf-c: var(--fixed-hc); }
+.feed-root.feed-stage:not(.expanded) .feed {
+  padding: 0 34px 0 30px;
+  /* The name stands over the top edge (its row is 52px tall): clipped 16px out at the sides and the floor, 60px above. */
+  overflow: visible;
+  clip-path: inset(-60px -16px -16px -16px);
+}
+/* The head line and the rail, drawn on the box itself so they follow it wherever a column or a bust moves it: the line
+   fades to the right, the rail fades down, two ticks off the rail. (::before is the JOB column's new-line pulse.) */
+.feed-root.feed-stage:not(.expanded) .feed::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, var(--hf-c), color-mix(in srgb, var(--hf-c) 40%, transparent)) 0 0 / 100% 1px no-repeat,
+    linear-gradient(var(--hf-c), color-mix(in srgb, var(--hf-c) 8%, transparent)) 0 0 / 1px 100% no-repeat,
+    linear-gradient(var(--hf-c), var(--hf-c)) 0 36px / 9px 1px no-repeat,
+    linear-gradient(color-mix(in srgb, var(--hf-c) 60%, transparent), color-mix(in srgb, var(--hf-c) 60%, transparent)) 0 calc(100% - 54px) / 9px 1px no-repeat;
+  filter: drop-shadow(0 0 2px color-mix(in srgb, var(--hf-c) 60%, transparent));
+}
+.feed-root.box-empty .feed::after { display: none; }
+/* The leader to whoever speaks (subtitle-leader.ts): a fine pale line with a glow, a ring at them. */
+.sub-leader { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; shape-rendering: crispEdges; }
+.sub-leader .sl-line { fill: none; stroke: color-mix(in srgb, var(--hf-c) 45%, #e6eef7); stroke-width: 1; filter: drop-shadow(0 0 2px var(--hf-c)); }
+.sub-leader .sl-ring { fill: none; stroke: var(--hf-c); stroke-width: 1; opacity: 0.9; shape-rendering: auto; }
+.sub-leader .sl-dot { fill: var(--hf-c); }
+.feed-root.expanded > .sub-leader, .feed-root.box-empty > .sub-leader, .feed-root.no-leader > .sub-leader { display: none; }
+/* No pane: the floor of the picture goes dark under the line, its top ~140px over the band's (which grows with
+   --box-fit). SHADE (the box's settings, --box-glass 0–1) is how dark. */
 .sub-scrim { display: none; }
 .feed-root.feed-stage:not(.expanded) .sub-scrim {
   display: block;
@@ -889,7 +1006,7 @@
   bottom: 0;
   height: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-max)) + 140px);
   transition: height 150ms ease;
-  background: linear-gradient(180deg, transparent, rgba(6, 2, 12, 0.72) 40%, rgba(6, 2, 12, 0.94));
+  background: linear-gradient(180deg, transparent, rgba(5, 2, 10, calc(0.4 + var(--box-glass, 0.6) * 0.75)) 42%, rgba(5, 2, 10, calc(0.7 + var(--box-glass, 0.6) * 0.5)));
   pointer-events: none;
 }
 /* Someone else here (Hae, Silas): their lines in a reply are their own beats, names in their accent (--beat-c). In the box the nameplate takes
@@ -907,8 +1024,9 @@
   border-left: none;
   background: none;
   box-shadow: none;
-  /* The bottom padding is the pinned footer's room (24px row, 12px under it, 6px over it). */
-  padding: 0 0 42px;
+  /* The top padding clears the name row on the box's top edge; the bottom is the pinned footer's (24px row, 12px
+     under it, 6px over). */
+  padding: 16px 0 42px;
   min-height: 0;
   /* Static, so the nameplate and footer place themselves on the box (the list), not the line. */
   position: static;
@@ -918,19 +1036,72 @@
 .feed-root.feed-stage:not(.expanded) .msg .avatar { display: none; }
 /* The name row: over the text, always on the left; the speaker's name in their colour, then time, model, takes. */
 .feed-root.feed-stage:not(.expanded) .msg .meta {
-  position: static;
+  /* The name row stands on the head line (placed on the box, the list): the name in Teko, then the time, model and
+     takes on its baseline, over the room. Out of the flow, so the text keeps its lines. */
+  position: absolute;
+  z-index: 2;
+  top: -52px;
+  left: 30px;
+  right: 230px;
+  height: 48px;
+  /* A narrow box (BOOK open, a bust beside it): the row is cut at its end, the model's name first, never under the keys. */
+  overflow-x: clip;
+  align-items: flex-end;
   gap: 18px;
-  margin: 0 0 8px;
+  margin: 0;
   text-shadow: 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9);
 }
-.feed-root.feed-stage:not(.expanded) .msg .meta .name { font-size: 22px; letter-spacing: 0.4em; }
+/* The speaker's name, theirs alone in their colour (the mockup's head): Teko, no plate. ::after stays a tag (STRANGER,
+   COMMS, NEW) in pixel caps. */
+.feed-root.feed-stage:not(.expanded) .msg .meta .name {
+  --pc: var(--c);
+  position: relative;
+  flex: none;
+  margin-right: 4px;
+  font: 600 58px/0.74 'Teko', var(--pixel);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--pc);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--pc) 35%, transparent), 0 2px 3px #000;
+}
+/* The name slip (name-slip.ts): one letter goes transparent in place and a decode glyph is painted over it, squeezed to
+   the letter's narrow Teko width, so the name never changes size. */
+.feed-root.feed-stage:not(.expanded) .msg .meta .name .slip { position: relative; color: transparent; text-shadow: none; }
+/* The name jerks sideways while a letter slips (name-slip.ts sets --slip-x on its first frames). */
+.feed-root.feed-stage:not(.expanded) .msg .meta .name:has(.slip) { transform: translateX(var(--slip-x, 0px)); }
+.feed-root.feed-stage:not(.expanded) .msg .meta .name .slip::after {
+  content: attr(data-n);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  font: 700 58px/1 var(--pixel);
+  color: var(--pc);
+  text-shadow: 0 0 18px color-mix(in srgb, var(--pc) 35%, transparent), 0 2px 3px #000;
+  /* A square glyph narrowed to Teko's letters and brought to their cap height. */
+  transform: translate(-50%, -50%) scale(0.62, 0.92);
+  pointer-events: none;
+}
+/* !important: the tags' own rules (comms-inset.css, the stranger's) size them for the archive's small name. */
+.feed-root.feed-stage:not(.expanded) .msg .meta .name::after { font: 15px/1 var(--pixel) !important; vertical-align: 2px; }
 .feed-root.feed-stage:not(.expanded) .msg .meta .ts,
-.feed-root.feed-stage:not(.expanded) .msg .meta .model-tag { font-size: 15px; letter-spacing: 0.18em; color: var(--hud-dim); }
+.feed-root.feed-stage:not(.expanded) .msg .meta .model-tag {
+  font-size: 15px;
+  line-height: 1;
+  padding-bottom: 3px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.18em;
+  color: #8fa3ad;
+  text-shadow: 0 0 2px #000, 0 1px 3px #000, 0 0 8px rgba(0, 0, 0, 0.8);
+}
 /* One footer row pinned to the box's bottom: controls, then tool lines (// NOTED), then [CONTINUE] on the right. */
 .feed-root.feed-stage:not(.expanded) .foot {
   position: absolute;
-  left: 0;
-  right: 0;
+  left: 30px;
+  right: 34px;
   bottom: 12px;
   display: flex;
   align-items: center;
@@ -941,6 +1112,18 @@
 .feed-root.feed-stage:not(.expanded) .foot .controls { order: 1; margin-top: 0; flex-wrap: nowrap; }
 .feed-root.feed-stage:not(.expanded) .foot .tools { order: 2; flex-direction: row; gap: 14px; margin-top: 0; min-width: 0; overflow: hidden; white-space: nowrap; }
 .feed-root.feed-stage:not(.expanded) .foot .continue { order: 3; margin: 0 0 0 auto; }
+/* The page counter: a small cut key in the UI's red at the box's bottom right. */
+.feed-root.feed-stage:not(.expanded) .foot .continue {
+  --c: var(--ui-red);
+  color: color-mix(in srgb, var(--c) 75%, #fff);
+  background: rgba(5, 2, 10, 0.5);
+  border: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 70%, transparent);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.feed-root.feed-stage:not(.expanded) .foot .continue:hover,
+.feed-root.feed-stage:not(.expanded) .foot .continue:focus-visible { color: #0b0614; background: var(--c); text-shadow: none; }
 .feed-root.feed-stage:not(.expanded) .msg .text {
   font-size: calc(17px * var(--text-scale, 1));
   line-height: 1.6;
@@ -1053,9 +1236,10 @@
 
 /* ───────────────────────── Input ───────────────────────── */
 
-/* Roleplay is purple, out of character is green: the whole bar (border, glow, prompt, caret) follows --bar. */
-.input, .input.mode-rp { --bar: #9b5cff; --bar-rgb: 155, 92, 255; }
-.input.mode-ooc { --bar: #3dff9a; --bar-rgb: 61, 255, 154; }
+/* Roleplay is the UI's red with the player's cyan caret (B TRACE; it took the speaker's colour before), out of
+   character is green: the whole bar (border, glow, prompt, caret, switch, hints) follows --bar. */
+.input, .input.mode-rp { --bar: var(--ui-red); --caret: var(--user); }
+.input.mode-ooc { --bar: #3dff9a; --caret: #3dff9a; }
 .input {
   position: absolute;
   z-index: 25;
@@ -1068,12 +1252,16 @@
   align-items: flex-start;
   gap: 14px;
   padding: 0 0 6px;
-  border-bottom: 1px solid rgba(var(--bar-rgb), 0.7);
+  border-bottom: 1px solid color-mix(in srgb, var(--bar) 35%, transparent);
   cursor: text;
   transition: border-color 200ms, box-shadow 200ms;
 }
-.input:focus-within { box-shadow: 0 8px 12px -10px rgba(var(--bar-rgb), 0.7); }
+.input:focus-within { box-shadow: 0 8px 12px -10px color-mix(in srgb, var(--bar) 70%, transparent); }
 .field { position: relative; flex: 1; display: flex; }
+/* Who types: the player's name and a chevron in their cyan (theirs alone), before the line. */
+.input .me { flex: none; align-self: center; font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--user); text-transform: uppercase; white-space: nowrap; text-shadow: 0 0 2px #000, 0 1px 3px #000; user-select: none; }
+.input .me:empty, .input.walk-out .me { display: none; }
+.input .me::after { content: ' ›'; }
 .input textarea {
   flex: 1;
   display: block;
@@ -1088,8 +1276,8 @@
   font-size: calc(16px * var(--text-scale, 1));
   line-height: calc(24px * var(--text-scale, 1));
   height: calc(24px * var(--text-scale, 1));
-  color: #ffd9e6;
-  caret-color: var(--bar);
+  color: #f4f1f6;
+  caret-color: var(--caret);
   scrollbar-width: none;
 }
 .input textarea:placeholder-shown { caret-color: transparent; }
@@ -1101,53 +1289,70 @@
   font-family: var(--pixel);
   font-size: 26px;
   line-height: 22px;
-  color: var(--bar);
-  text-shadow: 0 0 8px rgba(var(--bar-rgb), 0.8);
+  color: var(--caret);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--caret) 80%, transparent);
   pointer-events: none;
   display: none;
   animation: caret 1.05s steps(2, jump-none) infinite;
 }
 .input textarea:placeholder-shown + .ghost { display: block; }
+/* The hints (the room HUD): the words in the name row's near-white, each shortcut's key and the // between them in the
+   bar's colour (the box's in RP, green in OOC), in the name row's size. */
 .hint {
   align-self: center;
   font-family: var(--pixel);
-  font-size: 17px;
-  letter-spacing: 0.2em;
-  color: rgba(255, 217, 230, 0.32);
+  font-size: 15px;
+  letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--bar) 25%, #e6eef7);
+  text-shadow: 0 0 2px #000, 0 1px 3px #000;
   white-space: nowrap;
   user-select: none;
 }
-/* A dot between the hint's parts still shown (hidden ones, short of room, don't count). */
-.hint-part:not([hidden]) ~ .hint-part:not([hidden])::before { content: '·'; margin: 0 0.55em; }
+.hint .hk { color: color-mix(in srgb, var(--bar) 85%, #fff); }
+/* A // between the hint's parts still shown (hidden ones, short of room, don't count). */
+.hint-part:not([hidden]) ~ .hint-part:not([hidden])::before { content: '//'; margin: 0 0.6em; letter-spacing: 0; color: var(--bar); opacity: 0.8; }
 
-.input.busy { border-color: rgba(var(--bar-rgb), 0.28); }
+.input.busy { border-color: color-mix(in srgb, var(--bar) 28%, transparent); }
 .input.busy .ghost { opacity: 0.4; }
-.input.busy .hint { color: rgba(var(--bar-rgb), 0.85); animation: hud-breathe 1.6s ease-in-out infinite; }
+.input.busy .hint { color: color-mix(in srgb, var(--bar) 85%, #fff); animation: hud-breathe 1.6s ease-in-out infinite; }
 
+/* The RP/OOC switch: both modes as plain words, the live one white and underlined in the bar's colour (red in RP, green
+   in OOC). The button's text is the live mode (its label and the tests read it); the other is drawn by ::before (RP,
+   before a live OOC) or ::after (OOC, after a live RP), behind a slanted tick. */
 .mode {
   flex: none;
   align-self: center;
-  padding: 0 8px;
+  height: 26px;
+  padding: 0 4px 0 0;
   border: 0;
-  background: var(--bar);
-  color: #0b0614;
+  color: #fff;
+  background: none;
   font-family: var(--pixel);
-  font-size: 17px;
-  line-height: 20px;
+  font-size: 18px;
+  line-height: 26px;
   letter-spacing: 0.2em;
+  text-shadow: 0 0 2px #000, 0 1px 3px #000;
+  text-decoration: underline 2px var(--bar);
+  text-underline-offset: 4px;
   cursor: pointer;
   user-select: none;
-  transition: background 150ms, color 200ms;
+  transition: color 200ms;
 }
-.mode:hover { box-shadow: 0 0 10px rgba(var(--bar-rgb), 0.8); }
+.mode::before,
+.mode::after {
+  display: inline-block; /* the live word's underline stays off them */
+  color: rgba(223, 233, 239, 0.45);
+  text-shadow: none;
+  background: linear-gradient(to top right, transparent calc(50% - 0.6px), color-mix(in srgb, var(--bar) 45%, transparent) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) no-repeat;
+  background-size: 8px 12px;
+}
+.input.mode-rp .mode::after { content: 'OOC'; padding-left: 22px; background-position: 4px 50%; }
+.input.mode-ooc .mode::before { content: 'RP'; padding-right: 18px; background-position: calc(100% - 8px) 50%; }
+.mode:hover { color: #fff; }
 .mode:focus-visible { outline: 1px solid var(--bar); outline-offset: 2px; }
-.input.mode-ooc .hint { color: rgba(61, 255, 154, 0.55); }
-
-/* ── The corner stacks (spec 2026-10-16 subtitle chat box §1, §7) ──
-   The line stack (bottom-left: the latest line's options) and the scene stack (bottom-right: DRAW,
-   END SCENE, LEAVE). Keys show glyphs (their word slides out on hover) or words (SYS → CHAT KEYS),
-   and each stack folds under the arrow at its corner end. */
-.line-keys,
+/* ── The scene stack (spec 2026-10-16 subtitle chat box §1, §7) ──
+   Bottom-right: DRAW, END SCENE, LEAVE. Keys show glyphs (their word slides out on hover) or words (SYS → CHAT KEYS),
+   and the stack folds under the arrow at its corner end. */
 .scene-keys {
   position: absolute;
   z-index: 25;
@@ -1157,15 +1362,42 @@
   gap: 4px;
   pointer-events: auto;
 }
-.line-keys { left: 48px; align-items: flex-start; }
 .scene-keys { right: 48px; align-items: flex-end; }
-.line-keys[hidden],
 .scene-keys[hidden],
-.feed-root.expanded .line-keys,
-.walking-out .line-keys,
 #game:has(.feed-root.expanded) .scene-keys { display: none; }
-.line-keys.folded > .key,
 .scene-keys.folded > .key { display: none; }
+/* ── The line's actions (playtest 2026-11-11) ──
+   Two by two at the bottom left, between the screen's corner and the RP/OOC switch (its ring starts at 106px): the
+   lower row on the switch's line, always there, in the room and at a table alike. REGENERATE and KEEP GOING above, EDIT
+   and DELETE below (three when her line can't keep going). Always as glyphs, whatever CHAT KEYS says (the words don't fit
+   here); each one's word is a tag above it on hover. */
+.line-keys {
+  position: absolute;
+  z-index: 25;
+  right: calc(var(--sub-x) + 36px);
+  bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-max)) + 8px);
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  pointer-events: auto;
+}
+.line-keys .key { flex: none; }
+.feed-root.job-col .line-keys { right: calc(var(--sub-x) + var(--job-w) + 24px + 36px); bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-h)) + 8px); }
+.feed-root.box-empty .line-keys { display: none; }
+/* At a table (not a phone's) the box is held empty and the line is the JOB column's: the keys keep their old corner, two
+   by two at the bottom left. */
+#game:has(> .tb.hud:not([hidden]):not(.phone):not(.pp-hud)) > .feed-root.feed-stage:not(.expanded) .line-keys:not([hidden]) {
+  display: grid;
+  grid-template-columns: repeat(2, 26px);
+  grid-auto-rows: 26px;
+  gap: 4px 2px;
+  left: 50px;
+  right: auto;
+  bottom: 33px;
+}
+.line-keys[hidden],
+.feed-root.expanded .line-keys,
+.walking-out .line-keys { display: none !important; }
 .key {
   position: relative;
   padding: 0;
@@ -1204,14 +1436,242 @@
   pointer-events: none;
   transition: opacity 120ms;
 }
-.keys-glyphs .line-keys .key .lb { left: 42px; }
 .keys-glyphs .scene-keys .key .lb { right: 42px; }
-.keys-glyphs .key:hover:not(:disabled) .lb,
-.keys-glyphs .key:focus-visible .lb { opacity: 1; }
+/* Its word shows in the hover tag (hover-tag.ts), with its shortcut: the slide-out stays shut. */
 /* Labels: the word alone, no box. */
 .keys-labels .key .glyph { display: none; }
 .keys-labels .key .lb { font-size: 15px; letter-spacing: 0.16em; text-shadow: 0 0 2px #000, 0 1px 3px rgba(0, 0, 0, 0.9); }
 .keys-labels .key:hover:not(:disabled) { color: #fff; }
+/* A line key: 26×26, cut top-left and bottom-right in the UI's red; its word a solid
+   tag above it on hover. The glass is ::before, so the cut doesn't clip the tag. */
+.line-keys .key { width: 26px; height: 26px; display: grid; place-items: center; padding: 0; color: color-mix(in srgb, var(--ui-red) 75%, #fff); }
+.line-keys .key::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: rgba(5, 2, 10, 0.55);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ui-red) 45%, rgba(230, 238, 247, 0.25));
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+.line-keys .key:hover:not(:disabled) { color: #05020a; }
+.line-keys .key:hover:not(:disabled)::before { background: var(--ui-red); }
+.line-keys .key .glyph { display: block; width: 14px; height: 14px; filter: none; }
+.line-keys .key .lb {
+  position: absolute;
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  transform: none;
+  padding: 1px 8px;
+  white-space: nowrap;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  color: #05020a;
+  text-shadow: none;
+  background: var(--ui-red);
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms;
+}
+/* The box's settings (box-settings.ts, docs/mockups/box-settings.html ABOVE). The key: on the box's top edge near its
+   right end, the scene keys' fine outline in the box's colour, faint until pointed at, lit while its panel is open. */
+.bs-key, .bs-panel { --bc: var(--ui-red); }
+.bs-key {
+  --kl: color-mix(in srgb, var(--bc) 55%, rgba(230, 238, 247, 0.3));
+  position: absolute;
+  z-index: 25;
+  right: var(--sub-x);
+  bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-max)) + 8px);
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: color-mix(in srgb, var(--bc) 75%, #fff);
+  opacity: 0.85;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.feed-root.job-col .bs-key { right: calc(var(--sub-x) + var(--job-w) + 24px); bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-h)) + 8px); }
+.bs-key::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 7px 7px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 7px 7px no-repeat,
+    rgba(5, 2, 10, 0.55);
+  box-shadow: inset 0 0 0 1px var(--kl);
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+.bs-key:hover, .bs-key:focus-visible, .bs-key.on { --kl: var(--bc); opacity: 1; color: #fff; filter: drop-shadow(0 0 4px var(--bc)); outline: none; }
+.bs-key svg { width: 16px; height: 16px; }
+/* The panel: the box's glass rising over its right end, cut top-left and bottom-right, its head the name plate. */
+.bs-panel {
+  --pl: color-mix(in srgb, var(--bc) 40%, #e6eef7);
+  position: absolute;
+  z-index: 26;
+  right: var(--sub-x);
+  bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-max)) + 46px);
+  width: 470px;
+  pointer-events: auto;
+}
+.feed-root.job-col .bs-panel { right: calc(var(--sub-x) + var(--job-w) + 24px); bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-h)) + 46px); }
+@supports (anchor-name: --a) {
+  /* The subtitle box is the anchor the key and its panel ride on (it went with the line keys' old anchoring once,
+     and the key fell to the stage's corner: playtest). */
+  .feed-root.feed-stage:not(.expanded) .feed { anchor-name: --sub-box; }
+  .bs-key, .bs-panel, .line-keys { position-anchor: --sub-box; }
+  .bs-key, .feed-root.job-col .bs-key { right: anchor(right); bottom: calc(anchor(top) + 8px); }
+  .line-keys, .feed-root.job-col .line-keys { right: calc(anchor(right) + 36px); bottom: calc(anchor(top) + 8px); }
+  .bs-panel, .feed-root.job-col .bs-panel { right: anchor(right); bottom: calc(anchor(top) + 46px); }
+}
+.bs-panel[hidden] { display: none; }
+.bs-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  backdrop-filter: blur(calc(6px * var(--ui-blur, 1))) brightness(0.55);
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--pl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 17px 17px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--pl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 17px 17px no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 16px 0 / 100% 1px no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 0 100% / calc(100% - 16px) 1px no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 0 16px / 1px 100% no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 100% 0 / 1px calc(100% - 16px) no-repeat,
+    rgba(5, 2, 10, 0.9);
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--bc) 45%, transparent));
+}
+/* Its head: a word in pixel caps on a fading hairline, as the trace panels' heads. */
+.bs-head { position: relative; display: flex; align-items: center; gap: 10px; padding: 14px 22px 0 34px; }
+.bs-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--bc) 60%, transparent), transparent); }
+.bs-panel .bs-plate { font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--bc); }
+.bs-rows { position: relative; padding: 6px 22px 4px 20px; }
+.bs-sec { margin: 6px 0 2px 14px; font: 13px var(--pixel); letter-spacing: 0.3em; color: var(--bc); opacity: 0.75; }
+.bs-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  height: 32px;
+  padding: 0 10px 0 14px;
+  font: 16px var(--pixel);
+  letter-spacing: 0.18em;
+  color: color-mix(in srgb, var(--bc) 25%, #e6eef7);
+  cursor: default;
+}
+.bs-row.on { background: linear-gradient(90deg, color-mix(in srgb, var(--bc) 22%, transparent), transparent 85%); }
+.bs-row.on::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background: var(--bc); box-shadow: 0 0 6px var(--bc); }
+.bs-label { white-space: nowrap; }
+.bs-value { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bs-words i, .bs-speaker { padding: 1px 7px; font-style: normal; color: rgba(223, 233, 239, 0.45); cursor: pointer; }
+.bs-words i:hover, .bs-speaker:hover { color: #fff; }
+.bs-words i.struck { text-decoration: line-through 1px; opacity: 0.55; }
+.bs-words i.on, .bs-speaker.on { color: color-mix(in srgb, var(--bc) 75%, #fff); box-shadow: inset 0 -2px 0 var(--bc); text-shadow: 0 0 6px color-mix(in srgb, var(--bc) 60%, transparent); }
+.bs-step { padding: 0 4px; font-style: normal; color: var(--bc); cursor: pointer; }
+.bs-step:hover { color: #fff; }
+.bs-num { min-width: 70px; text-align: center; color: #f2ecf7; }
+.bs-swatch { width: 18px; height: 18px; margin-left: 2px; background: var(--s); opacity: 0.75; cursor: pointer; clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px); }
+.bs-swatch:hover { opacity: 1; }
+.bs-swatch.on { opacity: 1; clip-path: none; outline: 1px solid #fff; outline-offset: 2px; }
+.bs-track { position: relative; width: 150px; height: 6px; cursor: pointer; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bc) 45%, rgba(230, 238, 247, 0.25)); }
+.bs-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bc); }
+.bs-pct { min-width: 44px; text-align: right; color: #f2ecf7; }
+.bs-foot { padding: 2px 20px 10px 34px; font: 13px var(--pixel); color: color-mix(in srgb, var(--bc) 25%, #e6eef7); }
+/* The tip keeps two lines whether or not there is one (playtest: swapping it with the keys made the panel jump). */
+.bs-tip { display: block; height: 32px; line-height: 16px; white-space: normal; letter-spacing: 0.08em; opacity: 0.95; }
+.bs-nav { display: block; letter-spacing: 0.18em; opacity: 0.7; }
+/* Gone with the box: the archive, no line in it, a walk-out, or off the stage. */
+.feed-root:not(.feed-stage) :is(.bs-key, .bs-panel),
+.feed-root.expanded :is(.bs-key, .bs-panel),
+.feed-root.box-empty :is(.bs-key, .bs-panel),
+.walking-out .feed-root :is(.bs-key, .bs-panel) { display: none; }
+/* At a table (not a phone's) the box is held empty and the talk is the JOB column's: the key stands on the column's top
+   edge near its right end, in its amber, and the panel opens down over the column (playtest 2026-11-11). The column is
+   lifted 16px above its region (job-column.css). */
+/* The feed's layer stands over the table and the column there (z 24): what it shows at a table is the key and its panel,
+   the line keys in their corner, and a failed line's RETRY; the held box itself takes no room. */
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) { z-index: 25; }
+/* There the subtitles' scrim would lie over the cards (the table's dim carries its shade instead, table.css), and the
+   held box, empty, keeps to her column (x 1284 on), clear of the costs, the debrief and the hand that reach to 1265: it
+   still takes the wheel there, up into the archive. */
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .sub-scrim { display: none; }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage.box-empty:not(.expanded) .feed { width: 280px; }
+/* The key and its panel in the column's colour (the job's amber, or a fixed BOX COLOUR); the panel opens to the column's
+   right, over the moment, so the column shows each change as it's made (playtest). */
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) :is(.bs-key, .bs-panel) { --bc: #ffc56b; right: auto; bottom: auto; }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage.fixed-accent:not(.expanded) :is(.bs-key, .bs-panel) { --bc: var(--fixed-hc); }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { display: grid; left: calc(var(--hud-log-x) + var(--hud-log-w) - 82px); top: calc(var(--hud-log-y) - 30px); }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-panel:not([hidden]) { display: block; left: calc(var(--hud-log-x) + var(--hud-log-w) + 20px); top: calc(var(--hud-log-y) - 2px); }
+
+/* The scene stack in the room HUD's vector look (playtest, after the line's keys): small keys as fine outlines with no
+   fill (playtest), cut top-left and bottom-right, each in its own colour (SUGGEST the box's, DRAW and DICE amber, END
+   SCENE and LEAVE red), down a fine rail on its right: a ring at the top, a tick to each key, a small square at the
+   foot. On hover the outline brightens and the key's word is a solid tag to its left. */
+.scene-keys {
+  --sk-line: color-mix(in srgb, var(--hud) 40%, #e6eef7);
+  gap: 6px;
+  padding: 12px 16px 6px 0;
+}
+.scene-keys::before {
+  content: '';
+  position: absolute;
+  right: 2px;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  pointer-events: none;
+  opacity: 0.6;
+  background:
+    radial-gradient(circle at 4.5px 4.5px, transparent 2.5px, var(--sk-line) 2.5px 3.5px, transparent 3.5px) 0 0 / 9px 9px no-repeat,
+    linear-gradient(var(--sk-line), var(--sk-line)) 4px 9px / 1px calc(100% - 12px) no-repeat,
+    linear-gradient(var(--hud), var(--hud)) 3px 100% / 3px 3px no-repeat;
+}
+.scene-keys .key { --kc: var(--ui-red); height: 28px; color: color-mix(in srgb, var(--kc) 75%, #fff); }
+.scene-keys .key:disabled { --kc: #6b6480; opacity: 0.6; }
+.scene-keys .key::before {
+  --kl: color-mix(in srgb, var(--kc) 55%, rgba(230, 238, 247, 0.3));
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 7px 7px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 7px 7px no-repeat;
+  box-shadow: inset 0 0 0 1px var(--kl);
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+}
+/* END SCENE is the filled key. */
+.scene-keys .key.end-scene:not(:disabled) { color: #05020a; }
+.scene-keys .key.end-scene:not(:disabled)::before { background: var(--kc); }
+.scene-keys .key.end-scene:hover:not(:disabled) { color: #05020a; }
+/* The tick from the key to the rail. */
+.scene-keys .key::after {
+  content: '';
+  position: absolute;
+  right: -11px;
+  top: 50%;
+  width: 7px;
+  height: 1px;
+  background: var(--sk-line);
+  opacity: 0.6;
+}
+.scene-keys .key:hover:not(:disabled) { color: #fff; filter: drop-shadow(0 0 4px var(--kc)); }
+.scene-keys .key:hover:not(:disabled)::before { --kl: var(--kc); }
+.keys-glyphs .scene-keys .key { width: 30px; }
+.keys-glyphs .scene-keys .key .glyph { width: 16px; height: 16px; filter: none; }
+.keys-glyphs .scene-keys .key .lb { right: 38px; padding: 1px 8px; font-size: 14px; color: #05020a; background: var(--kc); border: 0; }
+.keys-labels .scene-keys .key { padding: 2px 10px 0; }
+.keys-labels .scene-keys .key .lb { font-size: 14px; text-shadow: none; }
+.scene-keys .fold { width: 30px; height: 20px; margin-top: 0; font-size: 20px; color: var(--sk-line); }
 /* The fold arrow: a bare glyph that turns over when its stack is folded. */
 .fold {
   width: 34px;
@@ -1258,7 +1718,7 @@
   flex: none;
   border: 0;
   background: none;
-  color: rgba(var(--bar-rgb), 0.7);
+  color: color-mix(in srgb, var(--bar) 70%, transparent);
   font-family: var(--pixel);
   font-size: 18px;
   text-decoration: underline;
@@ -1339,7 +1799,7 @@
 .dp-title { color: var(--nix); text-shadow: 0 0 8px rgba(255, 60, 120, 0.7); }
 .dp-fps { margin-left: auto; font-variant-numeric: tabular-nums; color: rgba(127, 233, 255, 0.7); }
 .dp-link { flex-basis: 100%; font-size: 14px; color: rgba(255, 217, 230, 0.55); }
-.dp-link[data-status='ok'] { color: var(--hud); }
+.dp-link[data-status='ok'] { color: #3dff7a; }
 .dp-link[data-status='down'] { color: var(--tool); }
 .dp-link[data-status='lost'] { color: var(--nix); }
 .dp-model { flex-basis: 100%; font-size: 14px; color: rgba(255, 217, 230, 0.55); overflow-wrap: anywhere; }
@@ -1577,8 +2037,8 @@
   font-size: 15px;
   letter-spacing: 0.2em;
   color: var(--hud);
-  background: rgba(127, 233, 255, 0.06);
-  border: 1px solid rgba(127, 233, 255, 0.35);
+  background: rgba(255, 77, 77, 0.06);
+  border: 1px solid rgba(255, 77, 77, 0.35);
   padding: 0 8px;
   cursor: pointer;
   transition: background 120ms, color 120ms;
@@ -1603,16 +2063,17 @@
   padding: 6px 8px;
   resize: vertical;
 }
-.edit-box:focus { outline: none; box-shadow: 0 0 10px rgba(127, 233, 255, 0.35); }
+.edit-box:focus { outline: none; box-shadow: 0 0 10px rgba(255, 77, 77, 0.35); }
 .edit-error { color: var(--nix); font-size: 0.85em; min-height: 1em; }
 .feed-notice {
   position: absolute;
   right: calc(25.6px + 30px);
+  /* Over the name row and the keys on the head line (--plate-h). */
   bottom: calc(var(--feed-bottom) + var(--box-fit, var(--box-h, 216px)) + var(--plate-h, 0px) + 8px);
   font-family: var(--pixel);
   font-size: 15px;
   letter-spacing: 0.2em;
-  color: var(--hud);
+  color: #e6eef2;
   background: rgba(4, 3, 12, 0.85);
   padding: 2px 10px;
   pointer-events: auto;
@@ -1620,29 +2081,43 @@
 
 
 
-/* The opening scene (scenario cards mockup 4): an amber card under the HUD while the scene opens (a
+/* The opening scene (scenario cards mockup 4; on the HUD trace 2026-11-15): no box, a head line in cyan (the opening's
+   colour) with a rail down from its ring, the text on a dark that fades right, under the HUD while the scene opens (a
    click folds it to its title); it fades once her greeting is in. The archive shows it in its place. */
-.scene-banner {
+.scene-banner,
+.encounter-banner {
+  --c: #7fe9ff;
   position: absolute;
   left: 50%;
   top: 84px;
+  box-sizing: border-box;
   width: min(760px, calc(100% - 32px));
   transform: translateX(-50%);
-  padding: 14px 20px;
+  padding: 4px 22px 12px 34px;
   font: 15px/1.65 var(--mono);
-  color: #e1d6f2;
+  color: #d9e4ea;
+  text-shadow: 0 1px 2px #000;
   cursor: pointer;
   pointer-events: auto;
-  background: rgba(8, 4, 16, 0.86);
-  border: 1px solid rgba(255, 197, 107, 0.5);
+  background:
+    linear-gradient(color-mix(in srgb, var(--c) 60%, transparent), color-mix(in srgb, var(--c) 6%, transparent)) 8px 22px / 1px calc(100% - 22px) no-repeat,
+    linear-gradient(90deg, rgba(5, 2, 10, 0.82), rgba(5, 2, 10, 0.66) 70%, rgba(5, 2, 10, 0.3));
 }
 .feed-root.expanded .scene-banner { display: none; }
-.scene-banner .sb-head { display: flex; align-items: baseline; gap: 12px; }
-.scene-banner .sb-title,
+.scene-banner .sb-head,
+.encounter-banner .eb-head { position: relative; display: flex; align-items: baseline; gap: 12px; padding: 6px 0 7px; margin-bottom: 6px; }
+.scene-banner .sb-head::after,
+.encounter-banner .eb-head::after { content: ''; position: absolute; left: -26px; right: -22px; bottom: 0; height: 1px; background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 12%, transparent)); box-shadow: 0 0 4px color-mix(in srgb, var(--c) 40%, transparent); }
+.scene-banner .sb-head::before,
+.encounter-banner .eb-head::before { content: ''; position: absolute; left: -30px; bottom: -4px; z-index: 1; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: #05020a; }
+.scene-banner .sb-title { flex: 1; font: 20px var(--pixel); letter-spacing: 0.3em; color: var(--c); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 45%, transparent), 0 1px 2px #000; }
 .scene-entry .sb-title { flex: 1; font: 20px var(--pixel); letter-spacing: 0.3em; color: #ffc56b; }
-.scene-banner .sb-fold { font: 16px var(--pixel); letter-spacing: 0.2em; color: #8a7fa0; }
-.scene-banner .sb-text { margin-top: 4px; white-space: pre-wrap; }
-.scene-banner.folded { padding: 6px 20px; }
+.scene-banner .sb-fold { font: 15px var(--pixel); letter-spacing: 0.2em; color: #8fa3ad; }
+.scene-banner .sb-text { white-space: pre-wrap; }
+.scene-banner.folded,
+.encounter-banner.folded { padding-bottom: 2px; background-size: 0 0, auto; }
+.scene-banner.folded .sb-head,
+.encounter-banner.folded .eb-head { margin-bottom: 0; }
 .scene-banner.folded .sb-text { display: none; }
 /* Done (her reply is in): it fades out, then the feed removes it (BANNER_FADE_MS). */
 .scene-banner.fading,
@@ -1660,34 +2135,19 @@
 /* Encounter cards (mockups 1–4): amber is everything the narrator writes. ◆ DRAW beside END SCENE. */
 /* ◆ DRAW is a key in the scene stack (see the corner stacks); disabled, it greys rather than dims. */
 .key.draw:disabled, .key.dice:disabled { color: #5a5070; opacity: 1; }
+.scene-keys .key.draw:disabled, .scene-keys .key.dice:disabled { --kc: #6b6480; color: #8a829c; opacity: 0.6; }
 
-/* The event in play: an amber card under the HUD; fades once her reaction is in. It takes the opening scene's place. */
-.encounter-banner {
-  position: absolute;
-  left: 50%;
-  top: 84px;
-  width: min(760px, calc(100% - 32px));
-  transform: translateX(-50%);
-  padding: 14px 20px;
-  font: 15px/1.65 var(--mono);
-  color: #efe0c4;
-  cursor: pointer;
-  pointer-events: auto;
-  background: rgba(30, 16, 2, 0.88);
-  border: 1px solid rgba(255, 197, 107, 0.6);
-  border-left: 4px solid #ffc56b;
-  box-shadow: 0 0 24px rgba(255, 197, 107, 0.25);
-}
+/* The event in play (on the HUD trace 2026-11-15): the opening scene's banner in DRAW's red, under the HUD; it fades
+   once her reaction is in. It takes the opening scene's place. */
+.encounter-banner { --c: var(--ui-red, #ff4d4d); }
 .feed-root:has(.encounter-banner) .scene-banner,
 .feed-root.expanded .encounter-banner { display: none; }
-.encounter-banner .eb-head { display: flex; align-items: baseline; gap: 12px; }
-.encounter-banner .eb-title,
+.encounter-banner .eb-title { font: 20px var(--pixel); letter-spacing: 0.3em; color: var(--c); text-shadow: 0 0 10px color-mix(in srgb, var(--c) 45%, transparent), 0 1px 2px #000; }
 .encounter-entry .eb-title { font: 20px var(--pixel); letter-spacing: 0.3em; color: #ffc56b; }
-.encounter-banner .eb-arrives,
+.encounter-banner .eb-arrives { flex: none; padding: 1px 6px 0; font: 13px/1.2 var(--pixel); letter-spacing: 0.14em; color: #05020a; background: #ffc56b; text-shadow: none; }
 .encounter-entry .eb-arrives { flex: 1; font: 16px var(--pixel); letter-spacing: 0.2em; color: #b89a6a; }
-.encounter-banner .eb-fold { margin-left: auto; font: 16px var(--pixel); letter-spacing: 0.2em; color: #8a7fa0; }
-.encounter-banner .eb-text { margin-top: 4px; white-space: pre-wrap; }
-.encounter-banner.folded { padding: 6px 16px; }
+.encounter-banner .eb-fold { margin-left: auto; font: 15px var(--pixel); letter-spacing: 0.2em; color: #8fa3ad; }
+.encounter-banner .eb-text { white-space: pre-wrap; }
 .encounter-banner.folded .eb-text,
 .encounter-banner.folded .eb-arrives { display: none; }
 .encounter-banner .status { margin-top: 6px; }
@@ -1731,62 +2191,13 @@
 .feed-root:not(.feed-stage) .beat[data-who='stranger'],
 .feed-root.expanded .beat[data-who='stranger'] { padding-left: 1.2em; }
 .feed-root.feed-stage:not(.expanded) .msg.agent.stranger-page .meta { --c: #ffc56b; }
-.feed-root.feed-stage:not(.expanded) .msg.agent.stranger-page .meta .name { color: #ffc56b; }
+.feed-root.feed-stage:not(.expanded) .msg.agent.stranger-page .meta .name { --pc: #ffc56b; }
 .feed-root.feed-stage:not(.expanded) .msg.agent.stranger-page .meta .name::after {
   content: 'STRANGER';
   margin-left: 10px;
-  font-size: 0.7em;
   letter-spacing: 0.2em;
   color: #b89a6a;
 }
-
-/* The ENCOUNTER panel over the dimmed room (scene.css gives the cards). */
-.encounter-host {
-  /* scene.css reads the landing page's colours. */
-  --amber: #ffc56b;
-  --ink: #e9defa;
-  --p2: #ff2bd6;
-  position: absolute;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 60px 16px 18px;
-  background: rgba(4, 2, 10, 0.62);
-}
-.encounter-host .ep-title { margin-bottom: 18px; font: 52px var(--pixel); letter-spacing: 0.3em; color: var(--amber); text-shadow: 0 0 18px var(--amber); }
-/* SUGGEST's lines on the same panel (suggest-panel.ts): cyan, the player's colour, where DRAW is amber. */
-.encounter-host.suggest-host { --amber: #7fe9ff; }
-/* A new game's openings (opening-panel.ts) over the arrival screen: the pair's head, both faces and the tie. */
-.encounter-host.opening-host { padding-top: 40px; background: rgba(4, 2, 10, 0.72); }
-.encounter-host.opening-host .scene-panel { width: 980px; }
-.op-pair { display: flex; align-items: center; gap: 18px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px dashed #3a2f50; }
-.op-face { flex: none; width: 64px; height: 80px; background: #120a20 center top / cover no-repeat; border: 1px solid rgba(127, 233, 255, 0.5); }
-.op-face.op-her { border-color: rgba(255, 79, 139, 0.6); }
-.op-mid { flex: 1; text-align: center; }
-.op-names { font: 30px var(--pixel); letter-spacing: 0.24em; }
-.op-you { color: #7fe9ff; }
-.op-x { margin: 0 10px; color: #6b5f85; }
-.op-hername { color: #ff4f8b; }
-.op-where { font: 17px var(--pixel); letter-spacing: 0.22em; color: #b8acd0; }
-.op-tie { margin-top: 4px; font: italic 12.5px var(--mono); color: #8a7fa0; }
-.encounter-host.suggest-host .scene-panel { border-color: rgba(127, 233, 255, 0.45); }
-.encounter-host.suggest-host .sp-card.on { background: rgba(127, 233, 255, 0.08); border-color: rgba(127, 233, 255, 0.6); border-left-color: var(--amber); }
-.encounter-host .sp-sub-what { margin-left: 12px; font: 12px var(--mono); letter-spacing: 0; text-transform: none; color: #8a7fa0; }
-.encounter-host .sp-card-text em { color: #a99cc4; }
-/* A card's picture (SUGGEST's angles): a 3:4 tile down its left edge, the number on its corner; dim until chosen. */
-.encounter-host .sp-card.has-art { min-height: 120px; padding-left: 118px; }
-.encounter-host .sp-art { position: absolute; left: 10px; top: 10px; bottom: 10px; width: 92px; background-size: cover; background-position: center; border: 1px solid rgba(255, 255, 255, 0.12); filter: saturate(0.85) brightness(0.8); transition: filter 150ms; }
-.encounter-host .sp-card.on .sp-art { filter: none; border-color: color-mix(in srgb, var(--amber) 70%, transparent); box-shadow: 0 0 12px color-mix(in srgb, var(--amber) 30%, transparent); }
-.encounter-host .sp-card.has-art .sp-n { z-index: 1; left: 14px; top: 12px; padding: 0 5px; font-size: 24px; line-height: 24px; background: rgba(8, 4, 16, 0.85); }
-/* DRAW's stranger: a face, so its top (the head) stays in the tile. */
-.encounter-host:not(.suggest-host) .sp-art { background-position: center 15%; }
-.encounter-host .scene-panel { width: min(900px, 100%); max-height: calc(900px - 220px); }
-.encounter-host .ep-who { display: inline-block; margin-top: 6px; padding: 0 8px; font: 16px var(--pixel); letter-spacing: 0.2em; color: #ffc56b; border: 1px solid rgba(255, 197, 107, 0.5); }
-.encounter-host .ep-voice { margin-left: 6px; font: 12px var(--mono); font-style: normal; letter-spacing: 0.05em; color: #b89a6a; }
-.encounter-host .ep-foot { margin-top: 12px; padding-top: 8px; font-size: 12.5px; color: #8a7fa0; border-top: 1px dashed #3a2f50; }
-.encounter-host .ep-hints { margin-top: 16px; font: 20px var(--pixel); letter-spacing: 0.3em; color: #b8acd0; opacity: 0.7; }
 
 /* A gig run's row (gig runs spec §6.3): an amber CRT card over its action line. */
 .msg.dice-row { background: none; border: 1px solid rgba(255, 190, 140, 0.35); border-left: 3px solid #ffcf9a; box-shadow: none; }
@@ -1918,7 +2329,9 @@ body.ui-hidden > #devpanel {
 .qc-ask { margin-top: 6px; font: 13px var(--mono); color: #ffd36b; }
 .qc-wait { margin-top: 8px; font: 15px var(--pixel); letter-spacing: 0.15em; padding: 2px 12px; cursor: pointer; color: #0b0612; background: #7fe9ff; border: 0; }
 .qc-host.qc-folded .qc-wait { display: none; }
-.hud-quest.quest-new { color: #ffd36b; animation: hud-breathe 1.6s ease-in-out infinite; }
+/* A job here not looked at yet: a small gold square raised after JOBS (the list opening puts it out). */
+.hud-quest { position: relative; }
+.hud-quest.quest-new::after { content: ''; position: absolute; right: -0.55em; top: -0.2em; width: 5px; height: 5px; background: #ffd36b; box-shadow: 0 0 6px #ffd36b; }
 /* Small jobs (spec 2026-10-19 §6): the job's strip, each card's odds bar and why line, ONE SHOT, a crack's size, passive labels, the FIXER. */
 .qc-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; margin: -2px 0 8px; font: 14px var(--pixel); letter-spacing: 0.16em; color: #8fb3bd; }
 .qc-alarm { display: inline-flex; align-items: center; gap: 3px; }
@@ -2027,11 +2440,38 @@ body.ui-hidden > #devpanel {
 @keyframes db-stamp { 0% { opacity: 0; transform: scale(1.6); } 100% { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .db-tier { animation: none; } }
 /* Lore words (feedback 2026-10-19): a faint dotted underline; the card above the word. */
-.lore-word { text-decoration: underline dotted rgba(127, 233, 255, 0.55); text-underline-offset: 3px; cursor: help; outline: none; }
-.lore-word:hover, .lore-word:focus-visible { text-decoration-color: #7fe9ff; color: #b8eaf5; }
-.lore-card { position: absolute; z-index: 60; max-width: 340px; padding: 8px 12px; pointer-events: none; background: rgba(4, 16, 22, 0.94); border: 1px solid rgba(127, 233, 255, 0.45); box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6); }
-.lore-card-title { font: 14px var(--pixel); letter-spacing: 0.2em; color: #7fe9ff; text-transform: uppercase; margin-bottom: 3px; }
-.lore-card-text { font: 13px/1.45 var(--mono); color: #d9eef3; font-style: normal; }
+.lore-word { text-decoration: underline dotted rgba(255, 77, 77, 0.55); text-underline-offset: 3px; cursor: help; outline: none; }
+.lore-word:hover, .lore-word:focus-visible { text-decoration-color: var(--ui-red); color: #ffd9d9; }
+/* Hovers in the HUD trace (mockup overlay-hud.html B TRACE, picked 2026-11-13): the card panel, Graft tips, the lore card
+   and the small tags. The named suspect's frame, cut top-left and bottom-right, its outline and the cuts' hairlines in
+   --hv-c; a pixel head on a fading hairline; rows keyed in pixel caps; a leader from what it's about (trace-lead.ts).
+   One colour for every kind (BY KIND would set --hv-c per kind). */
+:root { --hv-c: var(--ui-red); }
+.hv-frame { position: absolute; box-sizing: border-box; padding: 12px 16px; background: rgba(6, 3, 12, 0.97); color: #d9e4ea; clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+.hv-frame::before { content: ''; position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hv-c) 55%, transparent);
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--hv-c) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 11px 11px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--hv-c) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 11px 11px no-repeat; }
+.hv-head { display: flex; align-items: center; gap: 10px; font: 20px/1 var(--pixel); letter-spacing: 0.2em; color: var(--hv-c); }
+.hv-head::after { content: ''; flex: 1; min-width: 16px; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--hv-c) 60%, transparent), transparent); }
+.hv-gist { margin: 6px 0 0; font: 600 13.5px/1.35 var(--mono); color: #fff; }
+.hv-rows { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; margin-top: 8px; font: 12.5px/1.4 var(--mono); color: #d9e4ea; }
+.hv-k { padding-top: 1px; font: 14px/1.3 var(--pixel); letter-spacing: 0.14em; color: var(--hv-c); opacity: 0.85; white-space: nowrap; }
+.hv-t { margin: 0; }
+.hv-t.full { grid-column: 1 / -1; }
+svg.hv-lead { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; shape-rendering: crispEdges; z-index: 59; }
+svg.hv-lead path { fill: none; stroke: var(--hv-c); stroke-width: 1; stroke-opacity: 0.8; }
+svg.hv-lead .ring { fill: #05020a; stroke: var(--hv-c); stroke-width: 1; }
+svg.hv-lead .dot { fill: var(--hv-c); }
+svg.hv-lead[data-lead='tag'] { z-index: 61; }
+/* A small tag (hover-tag.ts): a control's name or why it's shut, its shortcut dim beside it. */
+.hv-tag { position: absolute; z-index: 61; max-width: 320px; padding: 3px 9px 1px; font: 15px/1.15 var(--pixel); letter-spacing: 0.12em; color: var(--hv-c); background: rgba(6, 3, 12, 0.94); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--hv-c) 45%, transparent); pointer-events: none; }
+.hv-tag[hidden] { display: none; }
+.hv-tag .hv-cap { margin-left: 8px; color: #8fa3ad; white-space: nowrap; }
+.lore-card { z-index: 60; width: max-content; max-width: 340px; pointer-events: none; }
+.lore-card[hidden] { display: none; }
+.lore-card-title { font-size: 15px; letter-spacing: 0.22em; text-transform: uppercase; }
+.lore-card-text { margin-top: 5px; font: 13px/1.45 var(--mono); color: #d9e4ea; font-style: normal; }
 /* The HUD table's pieces (table.css) stay out of the plain card: its crew lines, sums and rolls read as they always did. */
 .db-art, .db-face, .db-face.cr-mono, .db-keep, .db-pay-word { display: none; }
 .db-sums, .db-mate, .db-row { display: contents; }

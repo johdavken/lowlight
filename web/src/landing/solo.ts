@@ -23,7 +23,7 @@ export interface SoloDeps {
   agents(): Promise<ReadonlyMap<string, LandingAgent>>;
   art: SplashArt;
   nav(path: string): void;
-  sound?(cue: 'move' | 'confirm' | 'save'): void;
+  sound?(cue: 'move' | 'confirm' | 'save' | 'rejoin'): void;
 }
 
 const SAVE_NAME = 'On your own';
@@ -152,7 +152,7 @@ export function mountSolo(root: HTMLElement, deps: SoloDeps): { destroy(): void 
     if (busy || destroyed) return;
     busy = true;
     error.textContent = '';
-    deps.sound?.('confirm');
+    deps.sound?.('rejoin');
     try {
       await deps.api.setLocation(id);
     } catch (err) {

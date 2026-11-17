@@ -4,6 +4,8 @@
  * and comms. It reaches the chat turn only through `JobHost`: `questTurn` writes a job row and asks
  * her to answer it, and that is the one way a job goes back to chat.
  */
+import { applyBoardMove, boardView, cleanBoard, freshBoard, type BoardMove, type BoardView } from '../../shared/deduction';
+import { accountsView, applyAccountsMove, cleanAccounts, freshAccounts, TELL_LINE, type AccountsFile, type AccountsMove, type AccountsView, type StoryRun } from '../../shared/accounts';
 import { UNPAID_REASON } from './standing';
 import { commsKey, parseComms, type CommsState } from '../../shared/comms';
 import { arrangementActive, arrangementKey, chairTwoChecks, cutOf, parseArrangement, retainerToCut, type Arrangement, type ChairCheck } from '../../shared/arrangement';
@@ -17,13 +19,13 @@ import { crewKey, parseCrewEvents } from './crew-view';
 import { EMPTY_QUEST_STATE } from '../../shared/types';
 import { OK, type Result } from './room-state';
 import { NO_LINK_NOTICE } from './turn';
-import { MISSION_OPEN, MISSION_CLOSE } from './instructions';
+import { MISSION_BEAT, MISSION_OPEN, MISSION_CLOSE } from './instructions';
 import { hhmmOf, START, TURN_COST } from '../../shared/clock';
 import type { Player } from './players';
-import { beatAt, flagsOf, beatAway, beatText, beatViews, fillHire, heardAt, isJob, ownedBy, postsOpen, mentionsFlag, chooseVariant, fillTimes, holds, openQuests, pickLine, stepMinutes, type CrackPick, questWaitBlock, startWait, waitDue, waitLine, type Outcome, type RunWait, questBlock, questGuest, questKey, shownChoices, type Beat, type CondCtx, type QuestEntry, type QuestRun, type QuestStatus } from '../../shared/quests';
+import { beatAt, beatTitle, diceAhead, flagsOf, outcomeFor, posted, storyFlagsOf, toldKey, outfitKey, beatAway, beatText, beatViews, fillHire, heardAt, unheardIds, isJob, ownedBy, postsOpen, mentionsFlag, chooseVariant, fillTimes, holds, openQuests, pickLine, stepMinutes, type CrackPick, questWaitBlock, startWait, waitDue, waitLine, type Outcome, type RunWait, questBlock, questGuest, questKey, shownChoices, type Beat, type CondCtx, type QuestEntry, type QuestRun, type QuestStatus, settledFor, isLegacyRoll } from '../../shared/quests';
 import { oneLine } from './persona';
 import { boardBlock, bookId, buildDebrief, clientsBlock, contractBlock, BURNER, coverCards, coveredLoss, crackLine, crackSetup, drawsFor, effectEvent, FALL_GUY, fallGuyFee, jobRunId, missionOpenBlock, missionSummary, payFor, playerKitLine, legacyRollLine, REROLL, rollLine, seedFor, STEADY, TAKE, AFTER, COST, RESIST, ARMOUR } from './mission-run';
-import { COSTS, dealCosts, firstCost, picksFor, resistPrice, RESIST_CHROME_DIE, type CostId } from '../../shared/costs';
+import { COSTS, dealCosts, firstCost, picksFor, resistPrice, RESIST_CHROME_DIE, takePreview, type CostId } from '../../shared/costs';
 import { writtenLine } from '../../shared/gm-lines';
 import { askGm, GM_HOLD_MS, gmMessages, type GmComplete } from './gm';
 import { HEAT_MAX, heatIn, repDelta, repTier, TIER_NAMES, type Check, type CoverId, type KitEvent, type Tier } from '../../shared/mission';
@@ -40,13 +42,21 @@ import { kitLine } from '../../shared/kit-line';
 import { afterEffect, CARRY_ON, rerunRoll, swappedCheck, ALARM_SHIFT, gambleDie, gambleFaces, gambleResult, stepRefusal, crackTake, statDice, ALARM_MAX, effectPushRefusal, fragileDies, kindResult, poolOf, POOL_MAX, PRESS_NERVE, PUSH_NERVE, resultOf, jobTakeSize, tierLine, tradeRefusal, type DiceResult, type Pool, type Effect, type Position, type PushMode, type Trade } from '../../shared/dice';
 import { abilityCard, abilityCardId, abilityNerve, AGAIN_RISK, pressed, CONTACT_BURN, CONTACT_BURN_REASON, contactId, FAVOUR_BURN, FAVOUR_ON_HOLD, hardStartTake, type Setup, MAX_PEOPLE, SPEC_STAT, type Approach, type Call, type CallEffect } from '../../shared/hand';
 import { ceilingOf, settleTake, takeOf } from './take-run';
-import { blowsOnMiss } from '../../shared/job-template';
+import { blowsOnMiss, paths } from '../../shared/job-template';
 import { effectTagOf, isLegacyPending, isOldRun, parseRun as parseRunOf, withGetaway, withSpring, type Choice, type JobHire, type DealtCost, type DicePending, type DiceRoll, type Roll, type SettledCost } from '../../shared/quests';
 import { canOffer, dropTake, heatLeft, lossEvents, nextPushBeat, PRESS, PUSH_BEAT, WALK, walkValue } from './push-run';
 import { actedOn, afterRefusal, alarmPlus, barredOn, bestRep, carriedOn, COVERED, filed, HELD_ALARM, jobOver, nightOpen, nothingToPay, PASS_AFTER, rollFills, scoring, settledAll, stepless, tagsOf, TALKED_DOWN, withTake, type Play } from './job-rules';
 import type { ChatRelayDeps } from './chat-relay';
-import { tierOf, endAbilities, endTake, endCool, endDeal, heldAlarm, fenceOn, summaryCrew, crewHeatOf, debriefCrew, debriefPeople, trustDelta, outfitLine } from './job-end';
+import { tierOf, endAbilities, endTake, endCool, endDeal, heldAlarm, fenceOn, summaryCrew, crewHeatOf, debriefCrew, debriefPeople, trustDelta, outfitLine, clueLine } from './job-end';
 import { crewOn, districtOf, callsOf, cardEffect, callLoss, fallFor, abilityLabels, shownTraits, pocketsView, callTexts } from './job-views';
+
+/** Why FIREWALL is off on a wire roll (2026-11-08): on the wire nothing shields you. */
+const WIRE_NO_FIREWALL = 'ON THE WIRE';
+/** A rolled beat's verdict in SO FAR's row (the parked roll's words). */
+const SO_FAR_WORDS = { crit: 'CRIT', clean: 'CLEAN', cost: 'THROUGH, AT A COST', miss: 'MISS' } as const;
+
+/** What a landed roll fills TAKE by, at the effect it was rolled with; a saved miss fills as the 4–5 it became (crew abilities spec §2). */
+const rollGain = (roll: DiceRoll): number => (roll.saved ? kindResult('cost', roll.position, roll.effect).take : resultOf(roll.faces, roll.keep, roll.position, roll.effect).take);
 
 /** What the job game needs from the relay: who the call is for, whether a turn runs, and a row's way into chat. */
 export interface JobHost {
@@ -75,6 +85,9 @@ export interface JobHost {
   /** Re-sends her plan's card, which rides with the job state. */
   emitPlanCard(player: string): void;
 }
+
+/** The accusation's pick line (deduction board spec §3): `You name K.`, with one period however the name ends. */
+export const nameLine = (suspect: string | null): string => (suspect ? `You name ${suspect}${suspect.endsWith('.') ? '' : '.'}` : 'You name nobody.');
 
 export class JobRunner {
   constructor(
@@ -131,7 +144,8 @@ export class JobRunner {
     // Quests at a beat or waiting in someone else's room: listed here so they're never lost (quest waits spec §4).
     const elsewhere = qs
       .status(player)
-      .filter((s) => s.contact !== qs.contact && !s.run.done && (s.run.beat !== null || s.run.wait !== null || nightOpen(s.run)))
+      // A run of a job no longer in the book (Paper Trail, retired 2026-11-08) is passed over, as it is in its own room.
+      .filter((s) => s.contact !== qs.contact && !s.run.done && book.some((e) => e.id === bookId(s.id)) && (s.run.beat !== null || s.run.wait !== null || nightOpen(s.run)))
       .map((s) => ({ id: bookId(s.id), title: titleOf(bookId(s.id), s.run), ...((art) => (art ? { art: `/api/quests/art/${art}` } : {}))(qs.book().find((e) => e.id === bookId(s.id))?.art), contact: s.contact, contactName: qs.contactName(s.contact), next: s.run.wait ? waitLine(s.run.wait, qs.placeName) : nightOpen(s.run) ? "It's tonight" : null }));
     const fixer = this.fixerFor(player);
     // NERVE gone (the table spec §3): every job is locked until the next 06:00.
@@ -181,6 +195,37 @@ export class JobRunner {
       const rctx = this.runCtx(q, run, ctx, player);
       const kit = qs.kit?.(player);
       const cracks: Record<string, TerminalSetup> = {};
+      // A fork (routes and posts spec §1): the beat's cards lead to different beats, so each says where it leads.
+      const nextOf = (c: Choice): string | null => {
+        const to = outcomeFor(q, c.to, rctx)?.to;
+        return to && q.beats.has(to) ? to : null;
+      };
+      const forks = isJob(q) && new Set(shownChoices(beat, rctx).map(nextOf).filter((x) => x !== null)).size > 1;
+      // This beat's post (§2), and who holds it once someone does.
+      const postBy = beat.post ? run.posts?.[beat.post.id] : undefined;
+      const post = isJob(q) && beat.post && !run.getaway && run.push?.state !== 'playing' ? { post: { ...beat.post, ...(postBy ? { by: postBy } : {}) } } : {};
+      // What a card's outcomes do beyond the roll (the table in the trace): judged with the card's own flags, as `blows` is.
+      const onOf = (c: Choice) => {
+        if (!isJob(q) || !(c.check || c.crack)) return {};
+        const cctx = { ...rctx, flags: { ...rctx.flags, ...tagsOf(c, run.flags).flags } };
+        const pass = outcomeFor(q, c.to, cctx)?.effects;
+        const miss = c.fail ? outcomeFor(q, c.fail, cctx)?.effects : undefined;
+        const by = miss?.postHarm ? run.posts?.[miss.postHarm.post] : undefined;
+        const on = { ...(pass?.take === 'part' || pass?.take === 'none' ? { pass: pass.take } : {}), ...(miss?.take === 'part' || miss?.take === 'none' ? { miss: miss.take } : {}), ...(miss?.blown ? { blown: true as const } : {}), ...(miss?.postHarm && by ? { harm: { who: by, harm: miss.postHarm.harm } } : {}) };
+        return Object.keys(on).length ? { on } : {};
+      };
+      // A card that rolls nothing: what it does for certain (docs/graft-rules.md: a no-roll pick fills 1 TAKE, none on a template job).
+      const sureOf = (c: Choice) => {
+        if (!isJob(q) || c.check || c.crack) return {};
+        const t = tagsOf(c, run.flags);
+        const cctx = { ...rctx, flags: { ...rctx.flags, ...t.flags } };
+        const out = outcomeFor(q, c.to, cctx);
+        if (!out) return {};
+        const fills = scoring(q, run) && run.push?.state !== 'playing' && !run.getaway;
+        const then = out.to === 'end' ? 'THE END' : out.to === 'back' ? null : beatTitle(chooseVariant(q, out.to, cctx)?.beat ?? { id: out.to });
+        const fx = out.effects;
+        return { sure: { take: fills && !q.template ? 1 : 0, ...(t.minutes ? { minutes: t.minutes } : {}), ...(then ? { then } : {}), ...(fx.take === 'part' || fx.take === 'none' ? { left: fx.take } : {}), ...(fx.payKind ? { pay: fx.payKind } : {}), ...(fx.blown ? { blown: true as const } : {}) } };
+      };
       let cards: NonNullable<QuestState['active']>['choices'];
       // A blown job waiting on cover (spec §5–§6): the pick that blew it and the debrief as it stands come with the cards.
       const pc = run.pendingCover;
@@ -192,6 +237,7 @@ export class JobRunner {
       else if (run.pending) cards = !isLegacyPending(run.pending) && run.pending.dealt ? [] : [{ id: TAKE, line: nothingToPay(beat, run, run.pending) ? CARRY_ON : 'TAKE IT' }];
       else
         cards = shownChoices(beat, rctx).filter((c) => !barredOn(run, beat.id, c.id)).map((c) => {
+          const leads = forks ? nextOf(c) : null;
           const setup = c.crack && isJob(q) ? this.crackSetupFor(status.id, beat.id, c, rctx) : null;
           if (setup) cracks[c.id] = setup;
           const plays = c.check && run.setup && !c.crack ? this.playsFor(c, rctx, beat, { q, run, player }) : null;
@@ -201,14 +247,14 @@ export class JobRunner {
           const programs = pool && run.setup?.deck && !c.crack ? this.programPreviews(c, rctx, beat, { q, run, player }, pool) : null;
           // The route's own ALARM (a choice's [alarm +n]): it lands on the pick, whatever the dice, so the card says so.
           const routeAlarm = c.tags.reduce((n, t) => n + (t.kind === 'alarm' ? t.delta : 0), 0);
-          return { id: c.id, line: c.line, ...(pool ? { pool } : {}), ...(routeAlarm ? { alarm: routeAlarm } : {}), ...trades, ...(c.check?.red ? { red: true as const } : {}), ...(blowsOnMiss(q, c) ? { blows: true as const } : {}), ...(setup ? { crack: { length: setup.length, tries: setup.tries, take: crackTake(q, rctx.deck ?? null) } } : {}), ...(plays ? { plays } : {}), ...(programs ? { programs } : {}) };
+          return { id: c.id, line: c.line, ...onOf(c), ...sureOf(c), ...(leads ? { leads: beatTitle(chooseVariant(q, leads, rctx)?.beat ?? { id: leads }) } : {}), ...(pool ? { pool } : {}), ...(routeAlarm ? { alarm: routeAlarm } : {}), ...trades, ...(c.check?.red ? { red: true as const } : {}), ...(blowsOnMiss(q, c, { ...rctx, flags: { ...rctx.flags, ...tagsOf(c, run.flags).flags } }) ? { blows: true as const } : {}), ...(setup ? { crack: { length: setup.length, tries: setup.tries, take: crackTake(q, rctx.deck ?? null) } } : {}), ...(plays ? { plays } : {}), ...(programs ? { programs } : {}) };
         });
       const hand = isJob(q) ? this.handView(q, run) : null;
       const costs = isJob(q) && run.pending && !isLegacyPending(run.pending) && run.pending.dealt ? this.costsView(q, beat, run, run.pending, rctx, player) : null;
-      const job = isJob(q) ? { tier: q.tier, ...(run.push?.state === 'playing' ? { pressing: true as const } : {}), ...(hand ? { hand } : {}), ...(costs ? { costs } : {}), ...(scoring(q, run) ? { take: { filled: takeOf(run, q), size: jobTakeSize(q) } } : {}), ...(run.getaway ? { getaway: true as const } : {}), alarm: run.alarm ?? 0, nerve: { left: kit?.nerveLeft ?? 0, max: kit?.nerveMax ?? 0 }, heat: rctx.heat ?? 0, pay: q.payRange ?? ([0, 0] as [number, number]), ...(run.pending ? { rolled: isLegacyPending(run.pending) ? { choice: run.pending.choice, chance: run.pending.chance, rolls: run.pending.rolls } : { choice: run.pending.choice, faces: run.pending.roll.faces, keep: run.pending.roll.keep, kind: run.pending.roll.kind, cost: run.pending.cost, ...(run.pending.roll.saved ? { saved: true as const } : {}), ...(run.pending.roll.gamble ? { gamble: run.pending.roll.gamble } : {}), ...(run.pending.roll.rerun ? { rerun: true as const } : {}), ...(run.pending.roll.lessTake ? { lessTake: run.pending.roll.lessTake } : {}), ...(run.pending.roll.missTake ? { missTake: true as const } : {}), ...(run.pending.roll.effect ? { effect: run.pending.roll.effect } : {}) } } : {}) } : {};
+      const job = isJob(q) ? { tier: q.tier, ...this.routeOf(q, run), ...this.soFarOf(q, run), ...(run.push?.state === 'playing' ? { pressing: true as const } : {}), ...(hand ? { hand } : {}), ...(costs ? { costs } : {}), ...(scoring(q, run) ? { take: { filled: takeOf(run, q), size: jobTakeSize(q) } } : {}), ...(run.getaway ? { getaway: true as const } : {}), alarm: run.alarm ?? 0, nerve: { left: kit?.nerveLeft ?? 0, max: kit?.nerveMax ?? 0 }, heat: rctx.heat ?? 0, pay: q.payRange ?? ([0, 0] as [number, number]), ...(run.pending ? { rolled: isLegacyPending(run.pending) ? { choice: run.pending.choice, chance: run.pending.chance, rolls: run.pending.rolls } : { choice: run.pending.choice, faces: run.pending.roll.faces, keep: run.pending.roll.keep, kind: run.pending.roll.kind, cost: run.pending.cost, ...this.earnedOf(q, run), ...(run.pending.roll.saved ? { saved: true as const } : {}), ...(run.pending.roll.gamble ? { gamble: run.pending.roll.gamble } : {}), ...(run.pending.roll.rerun ? { rerun: true as const } : {}), ...(run.pending.roll.lessTake ? { lessTake: run.pending.roll.lessTake } : {}), ...(run.pending.roll.missTake ? { missTake: true as const } : {}), ...(run.pending.roll.effect ? { effect: run.pending.roll.effect } : {}) } } : {}) } : {};
       return {
         ...none,
-        active: { id: q.id, title: q.title, ...(q.postedBy ? { postedBy: q.postedBy } : {}), beat: beat.id, ...(beat.song && holds(beat.songWhen ?? null, rctx) ? { song: beat.song } : {}), ...(beat.room ? { room: beat.room, ...(run.setup?.guest && run.setup.guest.kind !== 'guest' ? { roomGuest: run.setup.guest.id } : {}) } : {}), ...(beat.onComms ? { comms: true as const } : {}), ...(beat.onLine ? { onLine: beat.onLine } : {}), choices: cards, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...job, ...(Object.keys(cracks).length ? { crack: cracks } : {}), ...(blown ? { blown } : {}) },
+        active: { id: q.id, title: q.title, ...(q.postedBy ? { postedBy: q.postedBy } : {}), beat: beat.id, ...(beat.song && holds(beat.songWhen ?? null, rctx) ? { song: beat.song } : {}), ...(beat.room ? { room: beat.room, ...(run.setup?.guest && run.setup.guest.kind !== 'guest' ? { roomGuest: run.setup.guest.id } : {}) } : {}), ...(beat.onComms ? { comms: true as const } : {}), ...(beat.here ? { here: true as const } : {}), ...(beat.onLine ? { onLine: beat.onLine } : {}), choices: cards, ...post, ...this.boardOn(beat, run, player), ...this.accountsOn(q, beat, run, player), ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...job, ...(Object.keys(cracks).length ? { crack: cracks } : {}), ...(blown ? { blown } : {}) },
       };
     }
     const quests = openQuests(
@@ -246,7 +292,7 @@ export class JobRunner {
     const arcView = arc?.q?.contract && arcRun?.run.contract
       ? { id: arc.q.id, title: arc.q.title, ...(arc.q.art ? { art: `/api/quests/art/${arc.q.art}` } : {}), next: arcRun.run.contract.stage === 'fallout' ? "It isn't over yet." : nightLeft > 0 ? `The night is in ${Math.ceil(nightLeft / 60)}h.` : "It's tonight.", stage: arcRun.run.contract.stage, walk: arcRun.run.contract.stage === 'waiting', pieces: arc.q.contract.pieces.map((p) => ({ id: p.id, spec: p.spec, state: (crewNow?.reports?.[`${arcRun.id}:${p.id}`] ? 'back' : crewNow?.groundwork?.[arcRun.id]?.some((g) => g.piece === p.id) ? 'out' : 'open') as 'open' | 'out' | 'back' })) }
       : null;
-    return { ...none, ...(arcView ? { arc: arcView } : {}), ...(rumors.length ? { rumors } : {}), open: [...open.map((q) => ({ id: q.id, title: q.title, pitch: q.pitch, ...filed(q), timed: q.timed, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...(gone && isJob(q) ? { locked: 'NERVE GONE — BACK AT 06:00' } : {}), ...(q.kind === 'mission' || q.kind === 'contract' ? { mission: { pay: q.pay, tier: q.tier, ...(q.payRange ? { range: q.payRange } : {}), ...crewRow(q), ...(ownedBy(q) ? { own: qs.contactName(ownedBy(q)!) } : {}), ...(q.trust ? { trust: true as const } : {}), ...(this.capped(q, player) ? { capped: qs.contactName(qs.contact) } : {}), ...(q.commsAt ? { comms: qs.placeName(q.commsAt) } : {}) } } : {}), ...(isJob(q) && (!q.contract || qs.status(player).some((s) => bookId(s.id) === q.id && nightOpen(s.run))) ? { setup: this.setupOffer(q, player) } : {}), ...(isJob(q) && q.once ? { once: true as const } : {}) })), ...tier2Rows] };
+    return { ...none, ...(arcView ? { arc: arcView } : {}), ...(rumors.length ? { rumors } : {}), open: [...open.map((q) => ({ id: q.id, title: q.title, pitch: q.pitch, ...filed(q), timed: q.timed, ...(q.art ? { art: `/api/quests/art/${q.art}` } : {}), ...(gone && isJob(q) ? { locked: 'NERVE GONE — BACK AT 06:00' } : {}), ...(q.kind === 'mission' || q.kind === 'contract' ? { mission: { pay: q.pay, tier: q.tier, ...(q.payRange ? { range: q.payRange } : {}), ...crewRow(q), ...(q.for ? { yours: true as const } : ownedBy(q) ? { own: qs.contactName(ownedBy(q)!) } : {}), ...(q.trust ? { trust: true as const } : {}), ...(this.capped(q, player) ? { capped: qs.contactName(qs.contact) } : {}), ...(q.commsAt ? { comms: qs.placeName(q.commsAt) } : {}) } } : {}), ...(isJob(q) && (!q.contract || qs.status(player).some((s) => bookId(s.id) === q.id && nightOpen(s.run))) ? { setup: this.setupOffer(q, player) } : {}), ...(isJob(q) && q.once ? { once: true as const } : {}), ...this.outfitOn(q, player) })), ...tier2Rows] };
   }
 
   /** A job's SETUP card (the hand spec §1): its district, your tier and heat there, the favour, and the crew ready to bring. */
@@ -569,9 +615,155 @@ export class JobRunner {
             ...(q.posts && !postsOpen(q.posts, clock) ? { opens: hhmmOf(q.posts[0]) } : {}),
             ...(q.commsAt ? { comms: qs.placeName(q.commsAt) } : {}),
             ...(q.once ? { once: true as const } : {}),
+            ...this.outfitOn(q, player),
           })),
       }))
       .filter((b) => b.jobs.length > 0);
+  }
+
+  /** The deduction board on a board beat (spec §3): the view, from the run's board and the clues the kit holds. */
+  private boardOn(beat: Beat, run: QuestRun, player: string): { board?: BoardView } {
+    const c = beat.board ? this.deps.quests?.cases?.().find((x) => x.id === beat.board) : undefined;
+    // A verdict parked on a roll or the cover cards (final review C1): those cards show, not the board.
+    if (!c || run.pending || run.pendingCover) return {};
+    const s = cleanBoard(c, run.board ?? freshBoard(c));
+    return { board: boardView(c, s, this.heldClues(c.id, player), (card) => this.deps.quests?.caseArt?.(c.id, card), this.deps.quests?.caseBarks?.(c.id)) };
+  }
+
+  /** The clue cards `player` holds for case `id`, by card id. */
+  private heldClues(id: string, player: string): string[] {
+    return (this.deps.quests?.kit?.(player).clues ?? []).filter((k) => k.startsWith(`${id}/`)).map((k) => k.slice(id.length + 1));
+  }
+
+  /**
+   * A move on the deduction board (spec §3). Pairs, filing and naming change the run's board and say a line as a
+   * notice, with no row and no model call; an open ACCUSE lands on the verdict's outcome as a pick does.
+   */
+  /** The accounts board on an accounts beat (Two Stories spec §3): the view, from the run's board, kit and flags. */
+  private accountsOn(q: QuestEntry, beat: Beat, run: QuestRun, player: string): { accounts?: AccountsView } {
+    const f = beat.accounts ? this.deps.quests?.accounts?.().find((x) => x.id === beat.accounts) : undefined;
+    const ctx = this.deps.quests?.ctx(player) ?? null;
+    if (!f || !ctx || run.pending || run.pendingCover) return {};
+    const story = this.storyRun(f, q, run, ctx, player);
+    return { accounts: accountsView(f, cleanAccounts(f, run.accounts ?? freshAccounts(f), story), story, (id) => this.deps.quests?.listener?.(id) ?? null) };
+  }
+
+  /** What a run brings to the accounts board: the cards its kit was given for this file, and the run's flags. */
+  private storyRun(f: AccountsFile, q: QuestEntry, run: QuestRun, ctx: CondCtx, player: string): StoryRun {
+    return { held: this.heldClues(f.id, player), ctx: this.runCtx(q, run, ctx, player) };
+  }
+
+  /**
+   * A move on the accounts board (Two Stories spec §3). Placing and taking change the run's board and say a press as a
+   * notice, with no row and no model call; an open TELL sets the story flags and lands on `## told` as a pick does,
+   * through the fallout when the board is a contract's fallout.
+   */
+  async accountsMove(player: string, o: { id: string; move: AccountsMove }): Promise<Result | string> {
+    if (this.host.busy) return 'wait for her to finish';
+    this.host.enter(player);
+    const passed = 'that choice has passed';
+    const here = this.questHere(this.host.pid);
+    const ctx0 = this.deps.quests?.ctx(this.host.pid) ?? null;
+    if (!here?.q || !here.beat?.accounts || !ctx0 || here.q.id !== o.id || here.status.run.done || here.status.run.pending || here.status.run.pendingCover) return passed;
+    const { q, beat, status } = here;
+    const f = this.deps.quests?.accounts?.().find((x) => x.id === beat.accounts);
+    if (!f) return passed;
+    const story = this.storyRun(f, q, status.run, ctx0, this.host.pid);
+    const state0 = cleanAccounts(f, status.run.accounts ?? freshAccounts(f), story);
+    const r = applyAccountsMove(f, state0, story, o.move);
+    if (r.refused) return r.refused;
+    if (r.told) {
+      if (!this.host.ready) return NO_LINK_NOTICE;
+      const outcome = q.outcomes.get('told');
+      if (!outcome) return passed;
+      const ctx = this.runCtx(q, status.run, ctx0, this.host.pid);
+      const flags = { ...status.run.flags, ...r.told };
+      const pick = { choice: 'tell', line: TELL_LINE };
+      const at = { ...status, run: { ...status.run, accounts: r.state } };
+      if (status.run.contract?.stage === 'fallout') return this.falloutStep(q, beat, at, ctx, pick, outcome, flags, 0);
+      return this.jobStep({ q, status: at, ctx, outcome, texts: [TELL_LINE], pick, record: { beat: beat.id, choice: 'tell' }, minutes: 0, kitBefore: status.run.kit ?? [], alarm: status.run.alarm ?? 0, flags, take: 0 });
+    }
+    this.deps.db.setMeta(questKey(this.host.pair(), status.id), JSON.stringify({ ...status.run, accounts: r.state, at: Date.now() }));
+    if (r.said) this.deps.emit({ type: 'notice', text: r.said, for: 'quest', ...(r.by ? { by: r.by } : {}) }, this.host.pair());
+    this.emitQuestState();
+    return OK;
+  }
+
+  async boardMove(player: string, o: { id: string; move: BoardMove }): Promise<Result | string> {
+    if (this.host.busy) return 'wait for her to finish';
+    this.host.enter(player);
+    const passed = 'that choice has passed';
+    const here = this.questHere(this.host.pid);
+    const ctx0 = this.deps.quests?.ctx(this.host.pid) ?? null;
+    if (!here?.q || !here.beat?.board || !ctx0 || here.q.id !== o.id || here.status.run.done || here.status.run.pending || here.status.run.pendingCover) return passed;
+    const { q, beat, status } = here;
+    const c = this.deps.quests?.cases?.().find((x) => x.id === beat.board);
+    if (!c) return passed;
+    const state0 = cleanBoard(c, status.run.board ?? freshBoard(c));
+    const r = applyBoardMove(c, state0, this.heldClues(c.id, this.host.pid), o.move);
+    if (r.refused) return r.refused;
+    if (r.verdict !== undefined) {
+      if (!this.host.ready) return NO_LINK_NOTICE;
+      const outcome = q.outcomes.get(r.verdict);
+      if (!outcome) return passed;
+      const line = nameLine(r.state.suspect);
+      const ctx = this.runCtx(q, status.run, ctx0, this.host.pid);
+      const flags = { ...status.run.flags, [`case.${c.id}`]: r.verdict };
+      // A case that holds fills what's left of TAKE, so its `take: full` stands (final review I2); any other verdict fills none.
+      const take = r.verdict === 'holds' ? Math.max(0, jobTakeSize(q) - takeOf(status.run, q)) : 0;
+      return this.jobStep({ q, status: { ...status, run: { ...status.run, board: r.state } }, ctx, outcome, texts: [line], pick: { choice: 'accuse', line }, record: { beat: beat.id, choice: 'accuse' }, minutes: 0, kitBefore: status.run.kit ?? [], alarm: status.run.alarm ?? 0, flags, take });
+    }
+    this.deps.db.setMeta(questKey(this.host.pair(), status.id), JSON.stringify({ ...status.run, board: r.state, at: Date.now() }));
+    if (r.said) this.deps.emit({ type: 'notice', text: r.said, for: 'quest' }, this.host.pair());
+    this.emitQuestState();
+    return OK;
+  }
+
+  /** The CLUE lines for the cards in these kit events, once each, in order (deduction board spec §2). */
+  private clueLines(kit: readonly { clue?: string[] }[]): string[] {
+    const cases = this.deps.quests?.cases?.() ?? [];
+    const keys = [...new Set(kit.flatMap((e) => e.clue ?? []))];
+    return keys.flatMap((k) => {
+      const [caseId, card] = k.split('/');
+      const c = cases.find((x) => x.id === caseId)?.cards.get(card);
+      return c ? [clueLine(c)] : [];
+    });
+  }
+
+  /** The outfit an ending of `q` can give (outfits as rewards), as its file's chip: `{ outfit: 'NIX · COAT' }` until earned. */
+  private outfitOn(q: QuestEntry, player: string): { outfit?: string } {
+    const qs = this.deps.quests;
+    const o = [...q.outcomes.values()].find((x) => x.effects.outfit)?.effects.outfit;
+    if (!qs || !o || (qs.kit?.(player).outfits ?? []).includes(outfitKey(o))) return {};
+    return { outfit: `${qs.contactName(o.who).toUpperCase()} · ${o.name.toUpperCase()}` };
+  }
+
+  /**
+   * Her own `text:` jobs whose gate has opened and that she hasn't told `player` about yet (job texts spec §3–§4), in
+   * book order: what the checker texts while you're apart, and what she raises in the room while you're with her.
+   */
+  jobTextsDue(player: string): { id: string; title: string; text: string }[] {
+    const qs = this.deps.quests;
+    const ctx = qs?.ctx(player) ?? null;
+    if (!qs || !ctx) return [];
+    const started = qs.status(player);
+    return qs
+      .book()
+      .filter((q) => q.text && ownedBy(q) === qs.contact && (!q.for || q.for === player) && holds(q.after, ctx) && !started.some((s) => bookId(s.id) === q.id) && qs.heard?.(toldKey(player, q.id)) !== true)
+      .map((q) => ({ id: q.id, title: q.title, text: q.text! }));
+  }
+
+  /**
+   * The STORY opening a new game for `player` with her can open on: her `for: player` job with an `opening:`, its gate
+   * held and not started (null: none). The first in book order.
+   */
+  storyOpening(player: string): { id: string; title: string; text: string; view: string } | null {
+    const qs = this.deps.quests;
+    const ctx = qs?.ctx(player) ?? null;
+    if (!qs || !ctx) return null;
+    const started = qs.status(player);
+    const q = qs.book().find((e) => e.opening && e.for === player && e.with?.length === 1 && e.with[0] === qs.contact && holds(e.after, ctx) && !started.some((s) => bookId(s.id) === e.id));
+    return q?.opening ? { id: q.id, title: q.title, ...q.opening } : null;
   }
 
   private openJobs(player: string, book: QuestEntry[], ctx: CondCtx, at?: { place: string; anyContact: true; anyHour: true }): QuestEntry[] {
@@ -593,6 +785,8 @@ export class JobRunner {
         return q.starts === place && withHer(q) && holds(q.after, ctx) && this.leadHeld(q, player) && bestRep(kit) >= (q.contract?.postsAt ?? 0) && !started.some((s) => bookId(s.id) === q.id);
       }
       if (q.kind !== 'mission' || q.starts !== place || !withHer(q) || !holds(q.after, ctx)) return false;
+      // A contact's text: job (job texts spec §2) lists only once she has told you, by text or in the room.
+      if (q.text && qs.heard?.(toldKey(player, q.id)) !== true) return false;
       // A job's posts: window (Intake board spec §1) gates listing only; a started run carries on.
       if (!at?.anyHour && !postsOpen(q.posts, this.deps.clockNow?.() ?? 0)) return false;
       // A desk job is played on comms (spec 2026-10-20 §3): it lists only while her deal is in force (final review I5).
@@ -647,10 +841,19 @@ export class JobRunner {
     const qs = this.deps.quests!;
     const district = districtOf(this.deps.quests, q);
     const kit = district ? qs.kit?.(player) : undefined;
-    // Quests' flags, then this run's own: another job's (or last night's) prep never carries in.
+    // Quests' flags and other jobs' story flags (what their cards set, and a board's verdict), then this run's own:
+    // another job's (or last night's) draws and prep never carry in, but an arc's earlier acts do (playtest 2026-11-10).
     const book = qs.book();
-    const quests = qs.status(player).filter((s) => !isJob(book.find((e) => e.id === bookId(s.id)) ?? { kind: 'quest' }));
-    return { ...ctx, deck: carriedOn(q, ctx.deck ?? null), flags: { ...flagsOf(quests), ...(run?.flags ?? {}) }, alarm: run?.alarm ?? 0, ...(kit ? { heat: heatIn(kit, district) } : {}) };
+    const prior = qs.status(player).flatMap((s) => {
+      const e = book.find((x) => x.id === bookId(s.id));
+      if (!e || !isJob(e)) return [s];
+      if (e.id === q.id) return [];
+      // The flags an accounts beat's cards cost (Two Stories): kade=told carries like a card's [set].
+      const ids = new Set([...e.beats.values()].flat().flatMap((b) => (b.accounts ? [b.accounts] : [])));
+      const costs = (qs.accounts?.() ?? []).filter((f) => ids.has(f.id)).flatMap((f) => f.listeners.flatMap((l) => [...l.costs.values()].map((c) => c.flag)));
+      return [{ ...s, run: { ...s.run, flags: storyFlagsOf(e, s.run, costs) } }];
+    });
+    return { ...ctx, deck: carriedOn(q, ctx.deck ?? null), flags: { ...flagsOf(prior), ...(run?.flags ?? {}) }, alarm: run?.alarm ?? 0, ...(kit ? { heat: heatIn(kit, district) } : {}) };
   }
 
   /** WALK AWAY: before its night, a contract ends for −5 rep in its district, no heat, no debrief. A string is why not. */
@@ -809,10 +1012,13 @@ export class JobRunner {
   }
 
   /** Her `[quest]` block for `player`'s quest at a beat here; null without one. */
-  questBlockFor(player: string, shown: boolean): string | null {
+  questBlockFor(player: string, shown: boolean, o: { beatReply?: boolean } = {}): string | null {
     const here = this.questHere(player);
     const ctx = this.deps.quests?.ctx(player) ?? null;
     if (here?.wait && here.q && this.waitIntact(here.q, here.wait)) return questWaitBlock(here.q.title, waitLine(here.wait, this.deps.quests!.placeName));
+    // A ride-along reply answers the move just played (House Glass live check): the next beat's cards and whoever it
+    // brings in wait for her next turn, or she plays them out (GLM acted Lark's floor card for him).
+    if (o.beatReply) return null;
     const now = this.deps.clockNow?.() ?? 0;
     return here?.q && here.beat && ctx ? fillTimes(questBlock(here.q, { ...here.beat, choices: here.beat.choices.filter((c) => !barredOn(here.status.run, here.beat!.id, c.id)) }, this.runCtx(here.q, here.status.run, ctx, player), oneLine, shown, this.deps.players.resolve(player).name), now) : null;
   }
@@ -843,13 +1049,42 @@ export class JobRunner {
       const came = run ? (summaryCrew(this.deps.quests, run, questKey(this.host.pair(), qd.run ?? q.id))?.came ?? []) : [];
       return `${MISSION_OPEN}\n\n${missionOpenBlock(q, playerKitLine(name, ctx?.stats ?? DEFAULT_STATS, carriedOn(q, ctx?.deck ?? null), ctx?.heat ?? 0), came)}`;
     }
+    // A pick on a ride-along beat (2026-11-08): one short reaction, with the view of the beat just played (its stamp).
+    if (run && qd.ride) return [MISSION_BEAT, this.viewAt(q, run, qd.ride.beat, qd.ride.variant)].filter(Boolean).join('\n\n');
     return null;
+  }
+
+  /** Whether `row` is a ride-along beat's reply, for her [job] block (chat-relay): it leaves the next beat's view out. */
+  isBeatReply(row: ChatMessage): boolean {
+    return Boolean(row.quest?.ride && !row.quest.silent);
+  }
+
+  /**
+   * A ride-along beat (2026-11-08): this room's contact has their own `view` line on it, so they're on the job with the
+   * player and answer a pick on it. `view any`, the getaway and push beats don't count, nor a contract's beats outside its
+   * night (its offer, reports and fallout: review I2).
+   */
+  private rideAlong(q: QuestEntry, run: QuestRun, beatId: string | null, variant: number): boolean {
+    const contact = this.deps.quests?.contact;
+    if (!isJob(q) || !contact || beatId === null || beatId === 'getaway' || /^push-\d+$/.test(beatId)) return false;
+    if (q.contract && run.contract?.stage !== 'night') return false;
+    return beatAt(q, beatId, variant)?.views.some((v) => v.contact === contact) ?? false;
   }
 
   /** The view of the beat a job ended on: the run has no beat by its closing turn, so her [job] block is gone (Run Sheet, playtest). */
   private lastView(q: QuestEntry, run: QuestRun): string | null {
     const last = run.picks.filter((p) => !p.beat.startsWith('!')).at(-1);
-    const beat = last ? beatAt(q, last.beat, run.variant) : undefined;
+    if (!last) return null;
+    // A run that has ended keeps no variant (it's 0 by then), so the version of its last beat is chosen again from the
+    // run's own flags, as it was when it played (playtest 2026-11-10: Quiet's plain ending read the dug one's view).
+    const ctx = this.deps.quests?.ctx(this.host.pid) ?? null;
+    const variant = run.beat === null && ctx ? (chooseVariant(q, last.beat, this.runCtx(q, run, ctx, this.host.pid))?.variant ?? run.variant) : run.variant;
+    return this.viewAt(q, run, last.beat, variant);
+  }
+
+  /** Her view of one beat, as a `[what you think: …]` line; null when she has none there. */
+  private viewAt(q: QuestEntry, run: QuestRun, beatId: string, variant: number): string | null {
+    const beat = beatAt(q, beatId, variant);
     const ctx = this.deps.quests?.ctx(this.host.pid) ?? null;
     const views = beat && ctx ? beatViews(beat, this.runCtx(q, run, ctx, this.host.pid)) : '';
     return views ? `[what you think: ${fillTimes(views, this.deps.clockNow?.() ?? 0)}]` : null;
@@ -1073,7 +1308,7 @@ export class JobRunner {
    * A card, or CONFIRM on a held line (spec §3): one row of the pick line, the outcome and the next
    * beat. `said` is the player's own line when CONFIRM sent it; `moves` a crack card's terminal moves. A string is why not.
    */
-  async chooseQuest(player: string, o: { id: string; beat: string; choice: string; push?: boolean | PushMode; trade?: Trade; card?: string; press?: string; programs?: { load: string[]; run: string[] }; said?: string; moves?: CrackPick['moves'] }): Promise<Result | string> {
+  async chooseQuest(player: string, o: { id: string; beat: string; choice: string; push?: boolean | PushMode; trade?: Trade; card?: string; press?: string; /** A recruit sent to this beat's post with the pick (routes and posts spec §2). */ post?: string; programs?: { load: string[]; run: string[] }; said?: string; moves?: CrackPick['moves'] }): Promise<Result | string> {
     if (this.host.busy) return 'wait for her to finish';
     if (!this.host.ready) return NO_LINK_NOTICE;
     this.host.enter(player);
@@ -1083,8 +1318,9 @@ export class JobRunner {
     // The WALK / PRESS ON card (pressing on spec §1).
     if (here?.q && ctx0 && here.q.id === o.id && o.beat === PUSH_BEAT && here.status.run.beat === PUSH_BEAT) return this.pushPick(here.q, here.status, ctx0, o.choice);
     if (!here || !here.q || !here.beat || !ctx0 || here.q.id !== o.id || here.beat.id !== o.beat) return passed;
-    const { q, beat, status } = here;
-    const ctx = this.runCtx(q, status.run, ctx0, this.host.pid);
+    const { q, beat } = here;
+    let status = here.status;
+    let ctx = this.runCtx(q, status.run, ctx0, this.host.pid);
     if (status.run.pendingCover) return o.choice === BURNER || o.choice === FALL_GUY || o.choice === TAKE ? this.coverPick(q, status, o.choice) : passed;
     const pending = status.run.pending ?? null;
     // While a roll waits (roll lifecycle spec §1): its costs to pick and settle, AFTER A ROLL abilities; one parked before
@@ -1101,20 +1337,29 @@ export class JobRunner {
     const choice = pending ? beat.choices.find((c) => c.id === pending.choice) : shownChoices(beat, ctx).find((c) => c.id === o.choice && !barredOn(status.run, beat.id, c.id));
     // The hand (spec 2026-10-29-the-hand §2): a card goes on a choice that rolls, with the roll; never on a crack, a gig or a parked roll.
     if ((o.card !== undefined || o.press !== undefined) && (!choice || !isJob(q) || !choice.check || choice.crack || pending)) return 'cards only go on a roll';
+    // A send (routes and posts spec §2) rides in with the pick: they stand at the post from here, whatever the dice.
+    if (o.post !== undefined) {
+      if (!choice || pending || dealt) return passed;
+      const sent = this.sendTo(q, beat, status.run, o.post);
+      if (typeof sent === 'string') return sent;
+      status = { ...status, run: sent };
+      ctx = this.runCtx(q, status.run, ctx0, this.host.pid);
+    }
     if (choice && isJob(q)) {
       const fell = status.run.contract?.stage === 'fallout' ? q.outcomes.get(choice.to) : undefined;
       if (fell) return this.falloutPick(q, beat, status, ctx, choice, fell, o.said);
       if (choice.crack && !pending) return this.crackPick(q, beat, status, ctx, choice, o);
       if (choice.check) return this.checkedPick(q, beat, status, ctx, choice, o);
-      const outcome = q.outcomes.get(choice.to);
-      if (!outcome) return passed;
       const t = tagsOf(choice, status.run.flags);
+      const outcome = outcomeFor(q, choice.to, { ...ctx, flags: { ...ctx.flags, ...t.flags } });
+      if (!outcome) return passed;
       const line = o.said?.trim() || pickLine(choice.line);
       return this.jobStep({ q, status, ctx, outcome, texts: [line], pick: { choice: choice.id, line }, record: { beat: beat.id, choice: choice.id }, minutes: t.minutes, kitBefore: status.run.kit ?? [], alarm: alarmPlus(status.run.alarm, t.alarm), flags: t.flags, take: q.template ? 0 : 1 });
     }
-    const outcome = choice ? q.outcomes.get(choice.to) : undefined;
-    if (!choice || !outcome) return passed;
+    if (!choice) return passed;
     const { flags, minutes } = tagsOf(choice, status.run.flags);
+    const outcome = outcomeFor(q, choice.to, { ...ctx, flags: { ...ctx.flags, ...flags } });
+    if (!outcome) return passed;
     const line = o.said?.trim() || pickLine(choice.line);
     const step = this.followOutcome(q, outcome, { ...ctx, flags: { ...ctx.flags, ...flags } }, this.rowClock(minutes));
     const drawn = this.drawFace(step.beat?.stranger ?? null, status.run.faces ?? {});
@@ -1150,7 +1395,7 @@ export class JobRunner {
       const outcome = q.outcomes.get(choice.fail!);
       if (!outcome) return 'that choice has passed';
       const roll: Roll = { stat: pending.stat, chance: pending.chance, rolls: pending.rolls, pass: false };
-      return this.jobStep({ q, status, ctx, outcome, texts: [line, legacyRollLine(pending, false)], pick: { choice: choice.id, line, roll }, record: { beat: beat.id, choice: choice.id, roll }, minutes: t.minutes, kitBefore: [...(run0.kit ?? []), heat(1)], alarm: alarmPlus(run0.alarm, t.alarm + 1), flags: t.flags });
+      return this.jobStep({ q, status, ctx, outcome, texts: [line, legacyRollLine(pending, false)], pick: { choice: choice.id, line, roll }, record: { beat: beat.id, choice: choice.id, roll }, minutes: t.minutes, kitBefore: [...(run0.kit ?? []), heat(1)], alarm: alarmPlus(run0.alarm, t.alarm + 1), flags: t.flags, rolled: true });
     }
     // A waiting roll lands (its own events are already on the run): a dealt one once every picked cost is settled
     // (costPick), with what each became; one parked before the deal with its fixed cost.
@@ -1254,14 +1499,14 @@ export class JobRunner {
 
   /**
    * The costs a result deals (roll lifecycle spec §1.2). TAKE −1 needs TAKE after this roll's own fill, at its effect and
-   * under the cap (review I3); NEXT ROLL needs a next pick after the outcome that plays: the fail's on a miss, the pass's
-   * on a 4–5 (review I4). `alarm`: what this roll adds to the run's before its costs.
+   * under the cap (review I3); NEXT ROLL needs a dice check still reachable after the outcome that plays: the fail's on a
+   * miss, the pass's on a 4–5 (2026-11-08; a crack or a no-roll pick isn't one). `alarm`: what this roll adds to the run's
+   * before its costs.
    */
   private dealFor(q: QuestEntry, run: QuestRun, choice: Choice, seed: string, r: { kind: DiceResult['kind']; position: Position; effect: Effect | undefined; fills: boolean; alarm: number; less?: number; atLeast?: number }): { dealt: DealtCost[]; pick: number; filled: number } {
     const filled = Math.min(jobTakeSize(q), takeOf(run, q) + (r.fills ? kindResult(r.kind, r.position, r.effect).take : 0)) - (r.less ?? 0);
     const plays = r.kind === 'miss' ? choice.fail : choice.to;
-    const ends = !plays || (q.outcomes.get(plays)?.to ?? 'end') === 'end';
-    const can = { take: r.fills && filled > 0, next: !ends, alarm: (run.alarm ?? 0) + r.alarm < ALARM_MAX };
+    const can = { take: r.fills && filled > 0, next: diceAhead(q, plays ?? undefined), alarm: (run.alarm ?? 0) + r.alarm < ALARM_MAX };
     const ids = r.kind === 'cost' || r.kind === 'miss' ? dealCosts(seed, can, run.setup?.approach) : [];
     const pick = Math.max(picksFor(r.kind, r.position, ids.length), Math.min(r.atLeast ?? 0, ids.length));
     const written = this.deps.quests?.gmWritten?.() ?? {};
@@ -1299,6 +1544,23 @@ export class JobRunner {
     return { load: load.filter((id) => ran.some((p) => p.id === id)), ran };
   }
 
+  /** The run with `rid` at this beat's post, its flag set (`fit` when the post suits their trade), or why they can't go. */
+  private sendTo(q: QuestEntry, beat: Beat, run: QuestRun, rid: string): QuestRun | string {
+    const post = isJob(q) && !run.getaway && run.push?.state !== 'playing' ? beat.post : undefined;
+    const setup = run.setup;
+    if (!post || !setup) return 'NO POST HERE';
+    if (run.posts?.[post.id]) return 'THE POST IS TAKEN';
+    // Roster recruits only: never the favour, a contact card, an ability or a guest.
+    if (rid === 'favour' || contactId(rid) !== null || abilityCard(rid) !== null || rid.startsWith('guest-') || (setup.guest && rid === guestId(setup.guest.id))) return 'ONLY YOUR OWN CREW TAKE A POST';
+    const member = setup.people.includes(rid) ? crewOn(this.deps.quests, setup).find((m) => m.recruit.id === rid) : undefined;
+    if (!member) return 'NOBODY TO SEND';
+    const first = member.recruit.name.split(' ')[0].toUpperCase();
+    if (callsOf(run).some((c) => c.card === rid && c.loss)) return `${first} IS DOWN`;
+    const at = posted(run, rid);
+    if (at !== null) return `THEY'RE ALREADY AT THE ${at.toUpperCase()}`;
+    return { ...run, posts: { ...run.posts, [post.id]: rid }, flags: { ...run.flags, [`post.${post.id}`]: post.suits === member.recruit.spec ? 'fit' : 'yes' } };
+  }
+
   /**
    * A card in the run's hand (the hand spec §2): the recruit (null for the favour) and whether it's an again-call,
    * or why it can't play: not brought, spent, down from a loss, or a FENCE (who plays at the end).
@@ -1316,6 +1578,8 @@ export class JobRunner {
       if (!member || !ability || !(setup.abilities?.[ac.rid] ?? []).includes(ac.ability)) return missing;
       const first = member.recruit.name.split(' ')[0].toUpperCase();
       if (calls.some((c) => c.card === ac.rid && c.loss)) return `${first} IS DOWN`;
+      const stands = posted(run, ac.rid);
+      if (stands !== null) return `${first} IS AT THE ${stands.toUpperCase()}`;
       const timing = TIMING[ability.job.kind];
       if (timing === 'end') return `${first} PLAYS IT AT THE END`;
       if (timing === 'auto') return `${first} PLAYS IT WHEN IT COMES`;
@@ -1342,6 +1606,8 @@ export class JobRunner {
     if (!member) return missing;
     const first = member.recruit.name.split(' ')[0].toUpperCase();
     if (calls.some((c) => c.card === card && c.loss)) return `${first} IS DOWN`;
+    const stands = posted(run, card);
+    if (stands !== null) return `${first} IS AT THE ${stands.toUpperCase()}`;
     // A guest isn't yours to spend (guest crew spec §2): one call, no second at a risk.
     if (setup.guest && card === guestId(setup.guest.id) && pressed(calls, card)) return `${first} IS SPENT`;
     if (!SPEC_STAT[member.recruit.spec]) return member.recruit.spec === 'fence' ? `${first} PLAYS AT THE END` : `${first} CAN'T BE CALLED`;
@@ -1376,7 +1642,7 @@ export class JobRunner {
     };
     const acts = (a: Ability) => affords(a) && (PASS_AFTER.has(a.job.kind) ? passes(a) : a.job.kind === 'save' || a.job.kind === 'alarm' ? afterEffect(a.job, roll, cost) !== null : a.job.kind === 'nerve' && nerveWants);
     const fresh = (rid: string) => !played.some((c) => c.card === rid);
-    return setup.people.some((rid) => fresh(rid) && !calls.some((c) => c.card === rid && c.loss) && (setup.abilities?.[rid] ?? []).some((aid) => !pressed(calls, rid, aid) && book.some((a) => a.id === aid && acts(a))));
+    return setup.people.some((rid) => fresh(rid) && !calls.some((c) => c.card === rid && c.loss) && posted(run, rid) === null && (setup.abilities?.[rid] ?? []).some((aid) => !pressed(calls, rid, aid) && book.some((a) => a.id === aid && acts(a))));
   }
 
   /**
@@ -1493,7 +1759,7 @@ export class JobRunner {
     } else if (kind === 'undo') {
       // The roll never happened: nothing it dealt lands, what was spent on it stays spent, and a NEXT ROLL it used is used up.
       // A loss drawn on it, or a deck it killed, never happened either.
-      const { next: _used, pending: _gone, deckDead: _dead, ...rest } = run0;
+      const { next: _used, owed: _owed, pending: _gone, deckDead: _dead, ...rest } = run0;
       const spentOn = [...(next.call ? [next.call] : []), ...(next.after ?? [])].map(({ loss: _loss, ...c }) => c);
       const kit = (run0.kit ?? []).filter((e) => !(pending.died && e.at === at && e.lose));
       const run: QuestRun = { ...rest, ...(run0.deckDead && !pending.died ? { deckDead: true as const } : {}), calls: [...(run0.calls ?? []), ...spentOn], kit: [...kit, ...(price ? [{ at, nerve: -price }] : [])], barred: { beat: beat.id, choice: pending.choice }, at: Date.now() };
@@ -1536,16 +1802,25 @@ export class JobRunner {
     const holds = Boolean(choice?.check?.grid && pool?.deck?.match === 'holds');
     // The approach's own cost is the only first pick (approach shapes spec §1).
     const first = settled.length === 0 ? firstCost(run.setup?.approach, p.dealt!.map((d) => d.cost)) : null;
+    // TAKE −1's sums (2026-11-08, playtest): what the roll earns and what the cost leaves, as the roll will land them.
+    const fills = scoring(q, run) && run.getaway !== true && run.push?.state !== 'playing';
+    const take = fills ? takePreview({ banked: takeOf(run, q), gain: rollGain(p.roll), size: jobTakeSize(q), other: (p.roll.lessTake ?? 0) + (p.roll.missTake && p.roll.kind === 'miss' ? 1 : 0) }) : null;
     return {
       pick: p.pick ?? 0,
       ...(this.gmWriting.has(`${player}|${p.at}`) ? { writing: true as const } : {}),
       dealt: p.dealt!.map((d) => {
         const x = settled.find((y) => y.cost === d.cost);
-        return { cost: d.cost, tag: COSTS[d.cost].tag, line: d.line, by: d.by, picked: Boolean(x), ...(d.cost === first ? { first: true as const } : {}), ...(x?.how ? { settled: x.how } : {}), ...(x?.faces ? { faces: x.faces } : {}), ...(x?.nerve !== undefined ? { nerve: x.nerve } : {}) };
+        return { cost: d.cost, tag: COSTS[d.cost].tag, line: d.line, by: d.by, picked: Boolean(x), ...(d.cost === 'take' && take ? { take } : {}), ...(d.cost === first ? { first: true as const } : {}), ...(x?.how ? { settled: x.how } : {}), ...(x?.faces ? { faces: x.faces } : {}), ...(x?.nerve !== undefined ? { nerve: x.nerve } : {}) };
       }),
       resist: { dice: statDice((ctx.stats ?? DEFAULT_STATS).edge) + (choice?.check?.grid && pool?.deck?.chrome ? RESIST_CHROME_DIE : 0), ok: why === undefined, ...(why ? { why } : {}) },
-      armour: run.setup?.deck && !isOldRun(run) ? (choice?.check?.red ? { ok: false, left: 0 } : this.firewallView(run, run.setup.deck)) : { ok: holds && !run.armourUsed, left: holds && !run.armourUsed ? 1 : 0 },
+      armour: run.setup?.deck && !isOldRun(run) ? (choice?.check?.red ? { ok: false, left: 0 } : this.firewallOn(run, run.setup.deck, p.roll.position)) : { ok: holds && !run.armourUsed, left: holds && !run.armourUsed ? 1 : 0 },
     };
+  }
+
+  /** FIREWALL on this roll: as `firewallView`, but off on a wire roll, where nothing shields you (2026-11-08), saying why. */
+  private firewallOn(run: QuestRun, deck: NonNullable<Setup['deck']>, position: Position): { ok: boolean; left: number; load?: true; why?: string } {
+    const view = this.firewallView(run, deck);
+    return position === 'wire' && view.ok ? { ok: false, left: view.left, why: WIRE_NO_FIREWALL } : view;
   }
 
   /** FIREWALL as a program (programs spec §2.3): loaded and not burned, or a free slot that would load it. */
@@ -1607,6 +1882,7 @@ export class JobRunner {
       // adds ALARM +1, landed with the roll (it deals nothing new).
       // A red card stays hard: no PUSH, no programs, no RESIST, no FIREWALL.
       if (choice.check.red) return 'ONE SHOT';
+      if (p.roll.position === 'wire') return WIRE_NO_FIREWALL;
       const view = this.firewallView(run0, run0.setup.deck);
       if (!view.ok) return run0.deckDead ? 'THE DECK IS DEAD' : (run0.programs ?? []).length < run0.setup.deck.slots ? 'not enough nerve' : 'NO FREE SLOT';
       const fw = (this.deps.quests?.programs?.() ?? []).find((x) => x.id === FIREWALL);
@@ -1688,6 +1964,43 @@ export class JobRunner {
   }
 
   /** The hand as the table shows it (§2): each recruit brought, their free call and again risk, who's down, the favour. */
+  /** The job's ways through for the table (the table in the trace): rolled beats per way, each beat's post and holder, the beats played. */
+  private routeOf(q: QuestEntry, run: QuestRun): Pick<NonNullable<QuestState['active']>, 'route'> {
+    if (run.push?.state === 'playing') return {};
+    let ways = this.routes.get(q);
+    if (!ways) {
+      ways = paths(q).map((p) => ({ via: p.via, beats: p.beats.map((b) => ({ id: b.id, title: beatTitle(b.beat), post: b.versions.find((v) => v.post)?.post })) }));
+      this.routes.set(q, ways);
+    }
+    if (!ways.length) return {};
+    const played = [...new Set(run.picks.map((p) => p.beat))].filter((id) => ways!.some((w) => w.beats.some((b) => b.id === id)));
+    return { route: { ways: ways.map((w) => ({ via: w.via, beats: w.beats.map((b) => ({ id: b.id, title: b.title, ...(b.post ? { post: { id: b.post.id, ...(b.post.suits ? { suits: b.post.suits } : {}), ...(run.posts?.[b.post.id] ? { by: run.posts[b.post.id] } : {}) } } : {}) })) })), played } };
+  }
+  private readonly routes = new WeakMap<QuestEntry, { via: string | null; beats: { id: string; title: string; post?: Beat['post'] }[] }[]>();
+
+  /** The TAKE a waiting roll will fill when it lands, for the clock's blinking pips: what it earned, less what a trade or a taken TAKE −1 gave up, within the room left. */
+  private earnedOf(q: QuestEntry, run: QuestRun): { take?: number } {
+    const p = run.pending;
+    if (!p || isLegacyPending(p) || !rollFills(q, run)) return {};
+    const lost = (p.settled ?? []).filter((x) => x.cost === 'take' && x.how === 'taken').length;
+    const take = Math.max(0, Math.min(jobTakeSize(q) - takeOf(run, q), rollGain(p.roll) - (p.roll.lessTake ?? 0) - lost));
+    return take > 0 ? { take } : {};
+  }
+
+  /** SO FAR for the table: the job's own rolled beats already played (not a push's), with what each changed. */
+  private soFarOf(q: QuestEntry, run: QuestRun): Pick<NonNullable<QuestState['active']>, 'soFar'> {
+    const rows = run.picks.flatMap((p) => {
+      if (!p.roll || isLegacyRoll(p.roll) || p.beat.startsWith('!')) return [];
+      const r = p.roll;
+      const top = r.kind === 'crit' ? '6 6' : String(r.keep === 'high' ? Math.max(...r.faces) : Math.min(...r.faces));
+      const title = beatTitle((q.beats.get(p.beat) ?? [])[0] ?? { id: p.beat });
+      // The costs it took that aren't a clock's (those show as the clock's change).
+      const costs = (r.costs ?? []).filter((c) => c.how === 'taken' && c.cost !== 'alarm' && c.cost !== 'take').map((c) => COSTS[c.cost].tag);
+      return [{ beat: p.beat, title, line: `${r.stat} ${top} · ${SO_FAR_WORDS[r.kind]}`, ...(p.take ? { take: p.take } : {}), ...(p.alarm ? { alarm: p.alarm } : {}), ...(costs.length ? { costs } : {}) }];
+    });
+    return rows.length ? { soFar: rows } : {};
+  }
+
   private handView(q: QuestEntry, run: QuestRun): HandView | null {
     const setup = run.setup;
     if (!setup) return null;
@@ -1703,6 +2016,8 @@ export class JobRunner {
       const callable = SPEC_STAT[r.spec] !== undefined;
       const called = pressed(calls, id);
       const down = calls.some((c) => c.card === id && c.loss !== undefined);
+      // At a post (routes and posts spec §2): away for the job, no call and no ability.
+      const at = posted(run, id);
       // Each ability in the loadout taken at GO IN (crew abilities spec §2): its NERVE a press (effect and NERVE spec §2).
       const abilities = (setup.abilities?.[id] ?? []).flatMap((aid) =>
         book.filter((a) => a.id === aid).map((a) => {
@@ -1715,14 +2030,14 @@ export class JobRunner {
           const acts = passes ? afterRefusal(a.job.kind, q, run, parked) === null : parked?.dealt && a.job.kind === 'alarm' ? (parked.settled ?? []).some((x) => x.cost === 'alarm' && !x.how) : parked !== null && afterEffect(a.job, parked.roll, parked.cost) !== null;
           const acted = parked !== null && actedOn(parked, id);
           const tradeFull = a.job.kind === 'trade-nerve' && (kit?.nerveLeft ?? 0) >= (kit?.nerveMax ?? 0);
-          const playable = timing === 'after' && parked !== null && !down && !used && !nerveFull && !tradeFull && !acted && afford && acts;
+          const playable = timing === 'after' && parked !== null && !down && at === null && !used && !nerveFull && !tradeFull && !acted && afford && acts;
           return { id: aid, label: a.label, kind: a.job.kind, timing, words: jobWords(a.job), nerve, afford, used, playable };
         }),
       );
       const g = setup.guest && id === guestId(setup.guest.id) ? setup.guest : null;
       const art = g ? guestArt(g) : undefined;
       const guest = g ? { guest: true as const, ...(art ? { art } : {}) } : {};
-      return [{ id, name: r.name, spec: r.spec, grade: r.grade, toNext: m.toNext, face: r.face, traits: g ? guestTraits(g) : shownTraits(this.deps.quests, m), free: callable && !called ? 1 : 0, risk: callable && called && !g ? AGAIN_RISK[r.grade] : null, down, abilities, ...guest }];
+      return [{ id, name: r.name, spec: r.spec, grade: r.grade, toNext: m.toNext, face: r.face, traits: g ? guestTraits(g) : shownTraits(this.deps.quests, m), free: callable && !called && at === null ? 1 : 0, risk: callable && called && !g && at === null ? AGAIN_RISK[r.grade] : null, down, ...(at !== null ? { at: at.toUpperCase() } : {}), abilities, ...guest }];
     });
     const contacts = (setup.contacts ?? []).map((c) => ({ ...c, used: calls.some((x) => x.card === `contact:${c.id}`) || setup.fencedBy === `contact:${c.id}` }));
     return { approach: setup.approach, people, favour: setup.favour ? (calls.some((c) => c.card === 'favour') ? 'used' : 'ready') : null, contacts, ...(setup.deck ? { pockets: pocketsView(this.deps.quests, run, setup.deck, this.programsHeld(this.host.pid, run)) } : {}) };
@@ -1804,7 +2119,7 @@ export class JobRunner {
     }
     // Each settled cost that was taken lands (roll lifecycle spec §1.1); resisted, armoured or cancelled ones don't.
     const taken = (c: CostId): number => (o.settled ?? []).filter((x) => x.cost === c && x.how === 'taken').length;
-    const played = q.outcomes.get(roll.pass ? choice.to : choice.fail!);
+    const played = outcomeFor(q, roll.pass ? choice.to : choice.fail!, { ...o.ctx, flags: { ...o.ctx.flags, ...o.t.flags } });
     if (!played) return Promise.resolve({ ok: false, error: 'that choice has passed' });
     // Talk Them Down (tier 3 beat play spec §2): the blow-up doesn't land, and the face stays behind for it. Blown
     // outcomes pay nothing, so it pays the job's pay here and TAKE scales it; a pressed job's pay is already settled.
@@ -1828,12 +2143,15 @@ export class JobRunner {
       flags: o.t.flags,
       // A saved miss fills as the 4–5 it became (crew abilities spec §2).
       // At the effect it was rolled with (effect and NERVE spec §1), whatever heat or ALARM did since.
-      take: roll.saved ? kindResult('cost', roll.position, roll.effect).take : resultOf(roll.faces, roll.keep, roll.position, roll.effect).take,
+      take: rollGain(roll),
       // TAKE −1 comes off after the roll's own fill is capped (review I2), and a greed press's on a miss (ability pass spec §2).
       ...(lost ? { takeLoss: lost } : {}),
       calls: o.calls,
       // NEXT ROLL costs and a setup's bonus wait for the next checked pick (§1.1).
       ...(taken('worse') || taken('small') || roll.setup ? { next: { ...(taken('worse') ? { worse: true as const } : {}), ...(taken('small') ? { small: true as const } : {}), ...roll.setup } } : {}),
+      // Which of those are costs, kept past a crack or a no-roll pick until a dice check (2026-11-08).
+      ...(taken('worse') || taken('small') ? { owed: { ...(taken('worse') ? { worse: true as const } : {}), ...(taken('small') ? { small: true as const } : {}) } } : {}),
+      rolled: true,
     });
   }
 
@@ -1849,9 +2167,9 @@ export class JobRunner {
     const moves = o.moves;
     const played = playTerminal(makeTerminal(setup), moves);
     const granted = played.state === 'granted';
-    const outcome = q.outcomes.get(granted ? choice.to : choice.fail!);
-    if (!outcome) return 'that choice has passed';
     const t = tagsOf(choice, status.run.flags);
+    const outcome = outcomeFor(q, granted ? choice.to : choice.fail!, { ...ctx, flags: { ...ctx.flags, ...t.flags } });
+    if (!outcome) return 'that choice has passed';
     const line = o.said?.trim() || pickLine(choice.line);
     const crack: CrackPick = { moves, state: granted ? 'granted' : 'locked', tries: played.log.filter((l) => l.likeness !== undefined).length };
     return this.jobStep({
@@ -1891,8 +2209,12 @@ export class JobRunner {
     take?: number;
     /** The cards played on this pick's roll (the hand spec §2), and AFTER A ROLL abilities on it. */
     calls?: Call[];
-    /** NEXT ROLL costs this pick leaves for the next one (roll lifecycle spec §1.1); every pick uses up the last ones. */
+    /** What this pick's roll leaves for the next checked card (roll lifecycle spec §1.1): its NEXT ROLL costs and a setup's bonus. */
     next?: QuestRun['next'];
+    /** Which of `next` are NEXT ROLL costs (2026-11-08). */
+    owed?: QuestRun['owed'];
+    /** A dice check: it uses up the last pick's NEXT ROLL costs. A crack or a no-roll pick leaves them, and spends only a setup's bonus. */
+    rolled?: true;
     /** TAKE −1 costs taken on this pick: off the fill after it's capped (§1.1). */
     takeLoss?: number;
   }): Promise<Result> {
@@ -1907,38 +2229,58 @@ export class JobRunner {
     const paid = fx.payKind === 'full' ? (run0.pay ?? 0) : fx.payKind === 'half' ? Math.floor((run0.pay ?? 0) / 2) : (fx.pay ?? 0);
     const drawn = this.drawFace(step.beat?.stranger ?? null, run0.faces ?? {});
     const faces = drawn.faces ?? run0.faces;
+    // What this pick changed on the job's clocks, kept on the pick for SO FAR (the table in the trace).
+    const fillAfter = isJob(o.q) && scoring(o.q, run0) && run0.push?.state !== 'playing' && !run0.getaway ? Math.max(0, Math.min(jobTakeSize(o.q), takeOf(run0, o.q) + (o.take ?? 0)) - (o.takeLoss ?? 0)) : null;
+    const moved = isJob(o.q) ? { take: fillAfter === null ? 0 : fillAfter - takeOf(run0, o.q), alarm: o.alarm - (run0.alarm ?? 0) } : { take: 0, alarm: 0 };
+    const record = { ...o.record, ...(moved.take ? { take: moved.take } : {}), ...(moved.alarm ? { alarm: moved.alarm } : {}) };
     let run: QuestRun = {
       ...run0,
       ...step.run,
-      picks: [...run0.picks, o.record],
+      picks: [...run0.picks, record],
       flags: o.flags,
       alarm: o.alarm,
       ...withTake(run0, o.outcome),
       // TAKE (the table spec §2): the job's own picks fill it; push beats pay their pot instead.
       // Every job pick writes it, so only runs from before the table lack it (takeOf counts their picks).
-      ...(isJob(o.q) && scoring(o.q, run0) && run0.push?.state !== 'playing' && !run0.getaway ? { takeFill: Math.max(0, Math.min(jobTakeSize(o.q), takeOf(run0, o.q) + (o.take ?? 0)) - (o.takeLoss ?? 0)) } : {}),
+      ...(fillAfter !== null ? { takeFill: fillAfter } : {}),
       ...(paid ? { payCeiling: ceilingOf(run0) + paid } : {}),
       ...(o.calls?.length ? { calls: [...(run0.calls ?? []), ...o.calls] } : {}),
       kit: [...o.kitBefore, ...(effect ? [effect] : [])],
-      next: o.next,
+      // NEXT ROLL costs wait for a dice check (2026-11-08): past a crack or a no-roll pick they stay, until the job ends.
+      next: o.rolled ? o.next : step.beat && run0.owed ? { ...run0.owed } : undefined,
+      owed: o.rolled ? o.owed : step.beat ? run0.owed : undefined,
       barred: undefined,
       pending: null,
       at: Date.now(),
       ...(faces ? { faces } : {}),
     };
-    const texts = [...o.texts, ...step.texts];
+    // A post's harm (routes and posts spec §2): this outcome lands on whoever holds it, as a lost again-call does.
+    const harm = o.outcome.effects.postHarm;
+    const holder = harm ? run0.posts?.[harm.post] : undefined;
+    const stood = holder ? crewOn(this.deps.quests, run0.setup).find((m) => m.recruit.id === holder) : undefined;
+    const lost: string[] = [];
+    if (harm && stood && !(run.calls ?? []).some((c) => c.card === stood.recruit.id && c.loss)) {
+      const loss = harm.harm === 'held' ? fallFor(this.deps.quests, stood, 'held') : 'hurt';
+      run = { ...run, calls: [...(run.calls ?? []), { beat: o.record.beat, choice: o.record.choice, card: stood.recruit.id, again: false, at, loss, post: harm.post }] };
+      lost.push(`⟦LOST⟧ ${stood.recruit.name.split(' ')[0]} got ${loss}.`);
+    }
+    const texts = [...o.texts, ...step.texts, ...lost];
     const cost = stepMinutes(q) + o.minutes;
     const stayed = heldAlarm(this.deps.quests, q, run0, run);
     if (stayed) {
       run = stayed;
       texts.push(HELD_ALARM);
+      // The clocks moved again (ALARM held, a TAKE paid for it): the pick keeps what it came to in the end.
+      const { take: _take, alarm: _alarm, ...bare } = record;
+      const end = { take: takeOf(run, q) - takeOf(run0, q), alarm: (run.alarm ?? 0) - (run0.alarm ?? 0) };
+      run = { ...run, picks: [...run0.picks, { ...bare, ...(end.take ? { take: end.take } : {}), ...(end.alarm ? { alarm: end.alarm } : {}) }] };
     }
     // ALARM full (the table spec §2): after this outcome's text, GET OUT: the file's # getaway, else the stock card.
     if ((run.alarm ?? 0) >= ALARM_MAX && (run0.alarm ?? 0) < ALARM_MAX && !run0.getaway) {
       const qg = withGetaway(q);
       const gctx = { ...o.ctx, flags: { ...o.ctx.flags, ...o.flags }, alarm: run.alarm };
       const chosen = chooseVariant(qg, 'getaway', gctx)!;
-      const row = this.questRow(qg, [...o.texts, o.outcome.text, beatText(chosen.beat, gctx)], { beat: chosen.beat }, o.pick, drawn.face, { run: status.id });
+      const row = this.questRow(qg, [...o.texts, o.outcome.text, ...lost, beatText(chosen.beat, gctx)], { beat: chosen.beat }, o.pick, drawn.face, { run: status.id });
       // A push beat's own outcome is kept as it stands (final review I3): a lost push stays lost whatever the getaway does.
       const pushed = run0.push?.state === 'playing' ? { push: { ...run0.push, pot: run0.push.pot + (o.outcome.effects.lost ? 0 : (o.outcome.effects.bonus ?? 0)), log: [...run0.push.log, { beat: o.record.beat, choice: o.record.choice, result: o.outcome.effects.lost ? ('lost' as const) : ('won' as const), sol: o.outcome.effects.lost ? 0 : (o.outcome.effects.bonus ?? 0) }] } } : {};
       return this.questTurn(row, status.id, { ...run, ...pushed, beat: 'getaway', variant: chosen.variant, wait: null, done: false, getaway: true }, cost, false, 0);
@@ -1946,7 +2288,19 @@ export class JobRunner {
     if (!step.run.done) {
       // A contract's pick back to its wait closes the table with nothing after it, so she answers it (playtest).
       const backToWait = Boolean(run.contract && run.wait);
-      const played = await this.questTurn(this.questRow(q, texts, step, o.pick, drawn.face, { run: status.id }), status.id, run, cost, backToWait, 0);
+      // A ride-along beat (2026-11-08): the contact has a view line on the beat just played, so they answer the pick.
+      const rides = this.rideAlong(q, run0, run0.beat, run0.variant);
+      // The next beat waits on the page until the contact has answered the move (2026-11-08): it's the last of the
+      // step's texts (followOutcome), after the move and its outcome.
+      const heldAt = rides && run0.beat !== null && step.beat ? o.texts.length + step.texts.length - 1 : undefined;
+      const row = this.questRow(q, texts, step, o.pick, drawn.face, { run: status.id }, heldAt);
+      // Stamped with the beat played and its variant (review I3): her note reads this, not the run's next beat.
+      if (rides && row.quest && run0.beat !== null) {
+        // On the line (she's away from the beat she answers): her reply reads in the JOB column, not the box (2026-11-11).
+        const at = beatAt(q, run0.beat, run0.variant);
+        row.quest.ride = { beat: run0.beat, variant: run0.variant, ...(at && beatAway(at) ? { line: true as const } : {}) };
+      }
+      const played = await this.questTurn(row, status.id, run, cost, backToWait || rides, 0);
       // Her turn's end doesn't play what's due from here: the next report, or the night.
       if (backToWait) await this.playDueQuest(this.host.pid);
       return played;
@@ -1997,7 +2351,8 @@ export class JobRunner {
       done = { ...fenced, kit: [...(run.kit ?? []), ...settled.events], take };
       if (!run0.getaway && canOffer(q, done, 0, this.nerveAfter(run0, done))) return this.pushOffer(q, status.id, { ...done, push: { stage: 0, pot: 0, from: (done.kit ?? []).length, outcome: o.outcome.id, state: 'offer', log: [] } }, texts, o.pick, cost);
     }
-    const end = { outcome: o.outcome.id, text: texts.filter((t) => t !== '').join('\n\n'), pick: o.pick, minutes: cost };
+    const parts = texts.filter((t) => t !== '');
+    const end = { outcome: o.outcome.id, text: parts.join('\n\n'), texts: parts, pick: o.pick, minutes: cost };
     const held = this.deps.quests?.kit?.(this.host.pid).cover;
     // A trust job's loss can't be covered (Intake board spec §2): no cover cards, nothing spent.
     if (tierOf(done) === 'blown' && !q.trust && held && (held.burner > 0 || held['fall-guy'] > 0)) {
@@ -2116,6 +2471,9 @@ export class JobRunner {
     // Outfits as rewards: what the ending opens, under the recruit's line.
     const outfit = q.outcomes.get(end.outcome)?.effects.outfit;
     if (outfit) debrief.outfit = outfitLine(this.deps.quests, outfit);
+    // Clue cards (deduction board spec §2): every card this run gave, a line each.
+    const clues = this.clueLines([...(run.kit ?? []), ...(q.outcomes.get(end.outcome)?.effects.clues ?? []).map((c) => ({ at: 0, clue: [`${c.case}/${c.card}`] }))]);
+    if (clues.length) debrief.clues = clues;
     return { done, debrief };
   }
 
@@ -2147,7 +2505,8 @@ export class JobRunner {
    */
   private async finishJob(q: QuestEntry, runId: string, run: QuestRun, end: NonNullable<QuestRun['pendingCover']>, cover: CoverId | null): Promise<Result> {
     const { done, debrief } = this.jobEnd(q, run, end, cover, this.host.pid, runId);
-    const row = this.questRow(q, [end.text], { beat: null }, end.pick, undefined, { run: runId, debrief });
+    // The parts apart, so an ending's recorded clip finds its section (an old save's parked end has only the text).
+    const row = this.questRow(q, end.texts?.length ? end.texts : [end.text], { beat: null }, end.pick, undefined, { run: runId, debrief });
     const trust = trustDelta(q, tierOf(run));
     const player = this.host.pid;
     const unpaid = debrief.retainer?.paid === false;
@@ -2168,11 +2527,15 @@ export class JobRunner {
   /** A pick on a contract's fallout: it plays out with no second debrief, and its `gives:` is the mark you keep (tier 3 contracts spec §4). */
   private falloutPick(q: QuestEntry, beat: Beat, status: QuestStatus, ctx: CondCtx, choice: Choice, outcome: Outcome, said: string | undefined): Promise<Result> {
     const { flags, minutes } = tagsOf(choice, status.run.flags);
-    const line = said?.trim() || pickLine(choice.line);
+    return this.falloutStep(q, beat, status, ctx, { choice: choice.id, line: said?.trim() || pickLine(choice.line) }, outcome, flags, minutes);
+  }
+
+  /** A fallout's step (tier 3 contracts spec §4): a pick, or TELL on an accounts board, into its outcome. No debrief. */
+  private falloutStep(q: QuestEntry, beat: Beat, status: QuestStatus, ctx: CondCtx, pick: { choice: string; line: string }, outcome: Outcome, flags: Record<string, string>, minutes: number): Promise<Result> {
+    const line = pick.line;
     const clock = this.rowClock(minutes);
     const step = this.followOutcome(q, outcome, { ...ctx, flags: { ...ctx.flags, ...flags } }, clock, status.run);
     const effect = effectEvent({ ...outcome.effects, heat: undefined }, clock, { pay: null, district: districtOf(this.deps.quests, q) });
-    const pick = { choice: choice.id, line };
     // Outfits as rewards: no debrief here, so the end card shows what the ending opened.
     const outfit = outcome.effects.outfit && step.run.done ? outcome.effects.outfit : null;
     const row = this.questRow(q, [line, ...step.texts], step, pick, undefined, { run: status.id, ...(outfit ? { rewards: [outfitLine(this.deps.quests, outfit)] } : {}) });
@@ -2183,7 +2546,7 @@ export class JobRunner {
     if (recruit && step.run.done) this.deps.emit({ type: 'notice', text: `// SOMEONE WANTS WORK — at ${this.deps.quests?.placeName(q.starts) ?? q.starts} until 06:00 (CREW → HIRE)`, for: 'quest' }, this.host.pair());
     // The kit event below opens it; the notice says where to wear it (yours on YOU, a contact's on PEOPLE).
     if (outfit) this.deps.emit({ type: 'notice', text: `// NEW ${outfitLine(this.deps.quests, outfit)} (${outfit.who === this.host.pair() ? 'YOU' : 'PEOPLE'} → WARDROBE)`, for: 'quest' }, this.host.pair());
-    const run: QuestRun = { ...status.run, ...step.run, ...closed, ...(recruit ? { recruit } : {}), flags, picks: [...status.run.picks, { beat: beat.id, choice: choice.id }], ...(effect ? { kit: [...(status.run.kit ?? []), effect] } : {}), at: Date.now() };
+    const run: QuestRun = { ...status.run, ...step.run, ...closed, ...(recruit ? { recruit } : {}), flags, picks: [...status.run.picks, { beat: beat.id, choice: pick.choice }], ...(effect ? { kit: [...(status.run.kit ?? []), effect] } : {}), at: Date.now() };
     return this.questTurn(row, status.id, run, minutes, !step.run.done);
   }
 
@@ -2224,7 +2587,7 @@ export class JobRunner {
    * or a wait that parks the run, or the end. The run fields it settles; picks, flags and `at` are the caller's.
    */
   private followOutcome(q: QuestEntry, outcome: Outcome, ctx: CondCtx, clock: number, from?: QuestRun): { texts: string[]; beat: Beat | null; run: Pick<QuestRun, 'beat' | 'variant' | 'wait' | 'done'> & Partial<Pick<QuestRun, 'contract' | 'guestNote' | 'settles'>> } {
-    if (outcome.to === 'end') return { texts: [outcome.text], beat: null, run: { beat: null, variant: 0, wait: null, done: true, ...(outcome.effects.guestNote ? { guestNote: outcome.effects.guestNote } : {}), ...(outcome.effects.settles ? { settles: outcome.effects.settles } : {}) } };
+    if (outcome.to === 'end') return { texts: [outcome.text], beat: null, run: { beat: null, variant: 0, wait: null, done: true, ...(outcome.effects.guestNote ? { guestNote: outcome.effects.guestNote } : {}), ...(outcome.effects.settles ? { settles: settledFor(outcome.effects.settles, ctx) } : {}) } };
     // A contract's offer or report hands back to the wait for its night (tier 3 contracts spec §2).
     if (outcome.to === 'back' && q.contract) {
       const wait = from?.contract?.wait ?? { to: 'night', from: clock + q.contract.night, at: null, ready: false, by: null, else: null, next: 'The night is set.' };
@@ -2236,11 +2599,15 @@ export class JobRunner {
   }
 
   /** A quest row: the shown texts, and the snapshot of where it left the quest. */
-  private questRow(q: QuestEntry, texts: string[], step: { beat: Beat | null; run?: Pick<QuestRun, 'wait'> }, pick?: { choice: string; line: string; roll?: Roll }, face?: string, job: Pick<NonNullable<ChatMessage['quest']>, 'run' | 'debrief' | 'rewards'> = {}): ChatMessage {
+  /** `held`: the index in `texts` where the next beat starts, on a ride-along pick (the page holds it back while the contact answers). */
+  private questRow(q: QuestEntry, texts: string[], step: { beat: Beat | null; run?: Pick<QuestRun, 'wait'> }, pick?: { choice: string; line: string; roll?: Roll }, face?: string, job: Pick<NonNullable<ChatMessage['quest']>, 'run' | 'debrief' | 'rewards'> = {}, held?: number): ChatMessage {
+    // Voiced job beats: the texts are still apart here (before {hire} goes in), so each matches its section as recorded.
+    const clips = this.deps.quests?.clips?.(q.id, texts) ?? [];
+    const { text, at } = this.rowText(q, texts, job.run, held);
     return {
       id: crypto.randomUUID(),
       role: 'user',
-      text: this.hireNamed(q, texts.filter((t) => t !== '').join('\n\n'), job.run),
+      text,
       toolLines: [],
       ts: Date.now(),
       status: 'ok',
@@ -2251,11 +2618,27 @@ export class JobRunner {
         beat: step.beat?.id ?? null,
         ...(pick ? { pick } : {}),
         ...(step.run?.wait ? { waiting: true as const } : {}),
-        ...(step.beat && beatAway(step.beat) ? { heard: heardAt(step.beat, pick?.line) } : {}),
+        // An [unheard] card's pick (The Fourteenth's dug read) isn't something she heard.
+        ...(step.beat && beatAway(step.beat) ? { heard: heardAt(step.beat, pick && !unheardIds(q).has(pick.choice) ? pick.line : undefined) } : {}),
         ...(step.beat?.stranger ? { stranger: { name: step.beat.stranger.name, voice: step.beat.stranger.voice, ...(face ? { face } : {}) } } : {}),
+        ...(clips.length ? { clips } : {}),
+        ...(at !== null ? { held: { at, clips: (this.deps.quests?.clips?.(q.id, texts.slice(0, held)) ?? []).length } } : {}),
         ...job,
       },
     };
+  }
+
+  /**
+   * A row's text, with `{hire}` filled in. Split at `held` (a ride-along pick): `at` is where the next beat starts in
+   * the text, found after the fill (a recruit's name changes the length); null when either side is empty.
+   */
+  private rowText(q: QuestEntry, texts: string[], runId: string | undefined, held: number | undefined): { text: string; at: number | null } {
+    const join = (ts: string[]) => ts.filter((t) => t !== '').join('\n\n');
+    if (held === undefined) return { text: this.hireNamed(q, join(texts), runId), at: null };
+    const CUT = '\u0000';
+    const [now, next] = this.hireNamed(q, `${join(texts.slice(0, held))}${CUT}${join(texts.slice(held))}`, runId).split(CUT);
+    if (!now || !next) return { text: now || next, at: null };
+    return { text: `${now}\n\n${next}`, at: now.length + 2 };
   }
 
   /**
@@ -2308,7 +2691,7 @@ export class JobRunner {
     }
     const target = due === 'due' ? wait.to : wait.else!;
     const clock = this.rowClock(0);
-    const outcome = q.outcomes.get(target);
+    const outcome = outcomeFor(q, target, ctx);
     let step: ReturnType<JobRunner['followOutcome']>;
     if (outcome) step = this.followOutcome(q, outcome, ctx, clock);
     else {
@@ -2324,7 +2707,10 @@ export class JobRunner {
     const kit = [...(status.run.kit ?? []), ...(effect ? [effect] : [])];
     const run: QuestRun = { ...status.run, ...step.run, ...(mission && outcome ? withTake(status.run, outcome) : {}), at: Date.now(), ...(drawn.faces ? { faces: drawn.faces } : {}), ...(kit.length ? { kit } : {}) };
     // A job ended by its wait settles its tier and debrief like a pick's ending; no cover is offered there.
-    if (mission && step.run.done && outcome) return this.finishJob(q, status.id, run, { outcome: outcome.id, text: step.texts.filter((t) => t !== '').join('\n\n'), minutes: TURN_COST.quest }, null);
+    if (mission && step.run.done && outcome) {
+      const parts = step.texts.filter((t) => t !== '');
+      return this.finishJob(q, status.id, run, { outcome: outcome.id, text: parts.join('\n\n'), texts: parts, minutes: TURN_COST.quest }, null);
+    }
     return this.questTurn(row, status.id, run, 0, !mission || step.run.done);
   }
 

@@ -1,5 +1,6 @@
 /**
- * HIRE (crew spec §4): a tab per hiring place, tonight's cards on each. HIRE works only where you stand; elsewhere
+ * HIRE (crew spec §4): the hiring places as a list on the panel's rail (a free hire, from a job or a vouch, in its own
+ * colour), tonight's faces at the picked place as files side by side. HIRE works only where you stand; elsewhere
  * GO THERE. A card shows the traits you can see and a "?" for the one you learn on hiring; the teaser shows the
  * rep tier its grade needs.
  */
@@ -20,11 +21,14 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
   const job = v.hires.findIndex((h) => h.cards.some((c) => c.from && 'job' in c.from));
   let sel = Math.max(0, job >= 0 ? job : at >= 0 ? at : v.hires.findIndex((h) => h.place === v.here));
   const head = el('div', 'cr-hire-head');
-  const tabs = el('div', 'cr-places');
+  const tabs = el('div', 'cr-places tp-list');
   const places = v.hires.map((h, i) => {
-    const b = el('button', `cr-place${h.vouched ? ' vouched' : ''}`, h.vouched ? `${h.name.toUpperCase()} · ${h.vouched.name.toUpperCase()}` : h.name.toUpperCase());
+    const b = el('button', `cr-place tp-row${h.vouched ? ' vouched' : ''}${h.cards.some((c) => c.from && 'job' in c.from) ? ' job' : ''}`, h.vouched ? `${h.name.toUpperCase()} · ${h.vouched.name.toUpperCase()}` : h.name.toUpperCase());
     b.type = 'button';
     if (h.vouched?.accent) b.style.setProperty('--cr-vouch', h.vouched.accent);
+    // Under the name, in CSS: where it is, whether you stand there, how many faces tonight.
+    const n = h.cards.filter((c) => c.recruit).length;
+    b.dataset.sub = [h.vouched ? 'VOUCHED · FREE' : h.cards.some((c) => c.from && 'job' in c.from) ? 'FROM A JOB · FREE' : null, up(h.district), v.here === h.place ? 'YOU ARE HERE' : null, n === 0 ? 'NOBODY TONIGHT' : `${n} TONIGHT`].filter(Boolean).join(' · ');
     b.addEventListener('click', () => {
       sel = i;
       draw();
@@ -32,12 +36,16 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
     return b;
   });
   tabs.append(...places);
-  const title = el('h2', '');
-  const where = el('span', 'cr-where');
-  head.append(title, where, tabs);
+  const title = el('h2', 'tp-name');
+  const where = el('div', 'cr-where tp-role');
+  head.append(title, where, el('div', 'cr-dh tp-head', 'TONIGHT'));
   const cards = el('div', 'cr-cards');
   cards.dataset.keep = 'cards';
-  root.append(head, cards, el('div', 'cr-foot', `Hiring takes a free slot (${v.used}/${v.slots}). Wages come out at 06:00; skip a night and loyalty drops. New faces at 06:00.`));
+  const left = el('div', 'cr-hire-left');
+  left.append(el('div', 'cr-dh tp-head', 'PLACES'), tabs, el('div', 'cr-dh tp-head quiet', 'HOW IT WORKS'), el('div', 'cr-foot', `Hiring takes a free slot (${v.used}/${v.slots}). Wages come out at 06:00; skip a night and loyalty drops. New faces at 06:00.`));
+  const main = el('div', 'cr-hire-main tp-file');
+  main.append(head, cards);
+  root.append(left, main);
 
   function draw(): void {
     const h = v.hires[sel];
@@ -48,18 +56,22 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
       ...h.cards.map((c) => {
         if (c.locked) {
           const card = el('div', 'cr-card locked');
-          const pic = el('div', 'cr-pic');
-          pic.append(el('span', 'cr-spec', up(c.locked.spec)), el('span', 'cr-grade', GRADES[c.locked.grade]), el('span', 'cr-shadow', ''));
+          const pic = el('div', 'cr-pic tp-face');
+          pic.append(el('span', 'cr-shadow', '?'));
+          const side = el('div', 'cr-side');
+          side.append(el('span', 'cr-grade', GRADES[c.locked.grade]), el('span', 'cr-spec', up(c.locked.spec)));
           const body = el('div', 'cr-body');
           body.append(el('div', 'cr-cname', '???'), el('div', 'cr-pitch', "Someone at the back is watching you. Not interested yet."), el('div', 'cr-lock', `🔒 ${up(h.district)} REP · ${TIER_NAMES[c.locked.tier - 1]}`));
-          card.append(pic, body);
+          card.append(pic, side, body);
           return card;
         }
         const r = c.recruit;
         const card = el('div', `cr-card${c.from ? ' free' : ''}`);
         if (h.vouched?.accent) card.style.setProperty('--cr-vouch', h.vouched.accent);
-        const pic = el('div', 'cr-pic');
-        pic.append(el('span', 'cr-spec', up(r.spec)), el('span', 'cr-grade', GRADES[r.grade]), face(r, 'cr-card-face'));
+        const pic = el('div', 'cr-pic tp-face');
+        pic.append(face(r, 'cr-card-face'));
+        const side = el('div', 'cr-side');
+        side.append(el('span', 'cr-grade', GRADES[r.grade]), el('span', 'cr-spec', up(r.spec)));
         const body = el('div', 'cr-body');
         // A free card (crew spec §5): who vouched, or the job it came from.
         if (c.from) body.append(el('div', 'cr-vouch', 'vouched' in c.from ? `VOUCHED BY ${c.from.name.toUpperCase()}` : `FROM THE JOB · ${c.from.title.toUpperCase()}`));
@@ -84,12 +96,13 @@ export function hireTab(v: CrewView, o: { act(a: CrewAction): void }): HTMLEleme
         const here = v.here === h.place;
         const full = v.used >= v.slots;
         const short = v.sol < c.cost;
-        const btn = el('button', 'cr-btn', !here ? 'GO THERE' : full ? 'NO FREE SLOT' : short ? `COSTS ${c.cost} SOL` : 'HIRE');
+        const btn = el('button', 'cr-btn tp-key', !here ? 'GO THERE' : full ? 'NO FREE SLOT' : short ? `COSTS ${c.cost} SOL` : 'HIRE');
         btn.type = 'button';
         btn.disabled = !here || full || short;
         btn.addEventListener('click', () => o.act({ do: 'hire', recruit: r.id }));
-        body.append(money, btn);
-        card.append(pic, body);
+        side.append(money);
+        body.append(btn);
+        card.append(pic, side, body);
         return card;
       }),
     );

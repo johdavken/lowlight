@@ -1,12 +1,14 @@
 /**
- * The YOU screen (panel 2026-11-04, docs/mockups/you-panel.html): who you're playing, on QUEST's holo pane in your
- * accent, the shared screen's `scr-holo` frame. The figure and wardrobe stand on the left where QUEST has its list; the
- * room you're in, your name and tagline head the right, over four pages: FILE (the select screen's bio and facts, or a
- * persona's background), STATS, STREET (NERVE, then REP and HEAT by district) and KIT (sol, decks, cover). What isn't
- * built yet is drawn dim and marked NOT YET, so the sheet doubles as the roadmap.
- * Esc or a click on the backdrop closes it. ‹ › (or ← →) change what you wear, here and in the room; a click on a tab,
- * or Tab on the screen cycle (FILE → STATS → STREET → KIT → PEOPLE), turns the page.
+ * The YOU screen (trace panel 2026-11-15, docs/mockups/you-trace.html): who you're playing, in the HUD trace
+ * (ui/trace-panel.ts): no pane, the room dimmed behind. Your figure stands unframed at the left, where the other panels
+ * have their list, the wardrobe a line under its feet; a leader runs from it to your name, which heads four pages:
+ * FILE (the select screen's bio and facts, or a persona's background), STATS, STREET (NERVE, then REP and HEAT by
+ * district) and KIT (sol, decks, cover). The panel's own lines are the UI's red; what is yours (the name, its rail, the
+ * leader, the stat cells) is cyan. What isn't built yet is drawn dim and marked NOT YET, so the sheet doubles as the roadmap.
+ * Esc or a click on the backdrop closes it. ← → turn the page (and wrap), as on PEOPLE and CREW; ‹ › (or ↑ ↓) change
+ * what you wear, here and in the room; Tab on the screen cycle walks FILE → STATS → STREET → KIT → PEOPLE.
  */
+import { panelCue } from '../ui/panel-sound';
 import type { Fact, KitView, SpriteRef } from '../../../shared/types';
 import type { Deck } from '../../../shared/gear';
 import { EFFECT_HEAT } from '../../../shared/dice';
@@ -15,7 +17,9 @@ import { repTier, TIER_NAMES } from '../../../shared/mission';
 import { SLOTS } from '../../../shared/programs';
 import type { StatKey } from '../../../shared/stats';
 import './character-sheet.css';
-import { openScreen, SCREEN_GLITCH_OUT_MS } from '../ui/screen';
+import { bugReportOpen } from '../ui/bug-report';
+import { openScreen, TRACE_OUT_MS } from '../ui/screen';
+import { mountTracePanel, TRACE_RED } from '../ui/trace-panel';
 import { sol } from './crew-ui';
 
 /** Who the sheet is for: the room's persona (name, figure, accent, tagline, outfits and the one worn). */
@@ -37,8 +41,6 @@ export interface SheetPlayer {
   bio?: string[];
   /** FILE's facts (none under a persona). */
   facts?: Fact[];
-  /** The picture of the room you're in, for the banner; absent: a hatch. */
-  room?: string;
 }
 
 interface Row {
@@ -124,8 +126,9 @@ const deckText = (d: Deck) => [`Q${d.quality}`, `${SLOTS[d.quality]} ${SLOTS[d.q
 function sec(id: string, title: string, note: string, ...body: HTMLElement[]): HTMLElement {
   const n = el('section', 'cs-sec');
   n.dataset.section = id;
-  const dh = el('div', 'cs-dh');
-  dh.append(el('span', '', title), el('span', 'cs-scale', note));
+  const dh = el('div', 'cs-dh tp-head');
+  dh.append(el('span', '', title));
+  if (note) dh.append(el('small', 'cs-scale', note));
   n.append(dh, ...body);
   return n;
 }
@@ -134,6 +137,7 @@ function sec(id: string, title: string, note: string, ...body: HTMLElement[]): H
 function planned(id: string, title: string, ...body: HTMLElement[]): HTMLElement {
   const n = sec(id, title, 'NOT YET', ...body);
   n.classList.add('planned');
+  n.querySelector('.cs-dh')!.classList.add('quiet');
   return n;
 }
 
@@ -221,11 +225,14 @@ function kitPage(kit: KitView, onCarry?: (id: string) => void): HTMLElement {
     const text = el('div', '');
     text.append(el('div', 'cs-deck-name', d.name), el('div', 'cs-deck-terms', deckText(d)));
     n.append(text);
-    if (on) n.append(el('span', 'cs-carried', 'CARRIED'));
+    if (on) n.append(el('span', 'cs-carried tp-tag', 'CARRIED'));
     else {
-      const b = el('button', 'cs-carry', 'CARRY');
+      const b = el('button', 'cs-carry tp-key sm', 'CARRY');
       b.type = 'button';
-      b.addEventListener('click', () => onCarry?.(d.id));
+      b.addEventListener('click', () => {
+        panelCue('carry');
+        onCarry?.(d.id);
+      });
       n.append(b);
     }
     return n;
@@ -268,18 +275,19 @@ function filePage(p: Pick<SheetPlayer, 'bio' | 'facts'>): HTMLElement {
     return n;
   }
   const head = (text: string) => {
-    const h = el('div', 'cs-dh');
+    const h = el('div', 'cs-dh tp-head');
     h.append(el('span', '', text));
     return h;
   };
   if (bio.length > 0) {
     const b = el('section', 'cs-bio');
+    b.classList.add('tp-prose');
     b.append(head('BIO'), ...bio.map((para) => el('p', '', para)));
     n.append(b);
   }
   if (facts.length > 0) {
     const f = el('section', 'cs-facts');
-    const dl = el('dl', '');
+    const dl = el('dl', 'tp-rows');
     for (const fact of facts) dl.append(el('dt', '', fact.label), el('dd', '', fact.value));
     f.append(head('FACTS'), dl);
     n.append(f);
@@ -291,8 +299,8 @@ function filePage(p: Pick<SheetPlayer, 'bio' | 'facts'>): HTMLElement {
 export const SHEET_PAGES = ['file', 'stats', 'street', 'kit'] as const;
 export type SheetPage = (typeof SHEET_PAGES)[number];
 
-/** How long the glitch-out runs before the sheet is gone (the shared screen's). */
-export const SHEET_GLITCH_OUT_MS = SCREEN_GLITCH_OUT_MS;
+/** How long the step-off runs before the sheet is gone (the trace panel's). */
+export const SHEET_OUT_MS = TRACE_OUT_MS;
 
 export function openCharacterSheet(
   host: HTMLElement,
@@ -306,12 +314,12 @@ export function openCharacterSheet(
     onCarry?(deck: string): void;
     /** The page it opens on: FILE, unless the screen cycle comes back into YOU (Shift+Tab), which lands on KIT. */
     page?: SheetPage;
-    /** No glitch in or out: it shows and goes at once. */
+    /** No draw-on or draw-off: it shows and goes at once. */
     reducedMotion?: boolean;
   },
 ): {
   close(instant?: boolean): void;
-  /** The screen cycle's Tab: a page on (1) or back (-1); false past either end, so the cycle moves on. */
+  /** The screen cycle's Tab: a page on (1) or back (-1); false past either end, so the cycle moves on (← → wrap instead). */
   turnPage(dir: 1 | -1): boolean;
   /** A fresh kit: every page it feeds redrawn (a deck carried, bought or lost while it's up). */
   setKit(kit: KitView): void;
@@ -337,12 +345,13 @@ export function openCharacterSheet(
     });
     figure.append(img);
   }
-  // The wardrobe: ‹ › (or ← →) step through her outfits; the choice is saved in the playthrough.
+  // The wardrobe: ‹ › (or ↑ ↓) step through her outfits; the choice is saved in the playthrough.
   const wardrobe = el('div', 'cs-wardrobe');
   const label = el('span', 'cs-outfit', wardrobeLabel(options, worn));
   const count = el('span', 'cs-scale');
   const arrow = (text: string, dir: -1 | 1) => {
     const b = el('button', 'cs-arrow', text);
+    b.tabIndex = -1;
     b.type = 'button';
     b.setAttribute('aria-label', dir < 0 ? 'Previous outfit' : 'Next outfit');
     b.disabled = options.length < 2;
@@ -361,6 +370,7 @@ export function openCharacterSheet(
     worn = stepOutfit(options, worn, dir);
     show();
     const now = worn;
+    if (now !== was) panelCue('wear');
     void Promise.resolve(o.onOutfit?.(now)).catch(() => {
       // Not saved: back to what she had on, unless she's stepped on since.
       if (worn !== now) return;
@@ -370,17 +380,18 @@ export function openCharacterSheet(
   };
   wardrobe.append(arrow('‹', -1), label, arrow('›', 1), count);
   show();
-  figure.append(wardrobe);
+  // Where the leader to your name leaves the figure: its shoulder, on the name's side.
+  const anchor = el('i', 'cs-anchor');
+  figure.append(anchor, wardrobe);
 
-  const art = el('div', p.room ? 'cs-art' : 'cs-art cs-noart');
-  if (p.room) art.style.backgroundImage = `url("${p.room}")`;
+  const name = el('h2', 'cs-name tp-name', p.name.toUpperCase());
   const main = el('div', 'cs-in');
-  main.append(el('div', 'cs-name', p.name.toUpperCase()));
+  main.append(name);
   if (p.tagline) main.append(el('div', 'cs-tagline', p.tagline));
   const page = el('div', 'cs-page');
   main.append(page);
-  const file = el('div', 'cs-file');
-  file.append(art, main);
+  const file = el('div', 'cs-file tp-file');
+  file.append(main);
 
   let kit = p.kit;
   // A refused CARRY: kept off the page, so it's still there if KIT is turned away from; a fresh kit clears it.
@@ -397,16 +408,50 @@ export function openCharacterSheet(
     n.querySelector('.cs-deck-why')!.textContent = refused;
     return n;
   };
-  const pages = el('nav', 'cs-pages');
+
+  let instantClose = false;
+  const wrap = el('div', 'cs-wrap');
+  wrap.append(figure, file);
+  const screen = openScreen(host, {
+    title: 'YOU',
+    className: 'scr-trace character-sheet',
+    hotkey: 'Y',
+    label: `Character sheet: ${p.name}`,
+    accent: TRACE_RED,
+    reducedMotion: o.reducedMotion,
+    onClose: () => {
+      window.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', lead);
+      panel.destroy();
+      // Still on screen while it steps off: Esc mustn't reach the room (back to the dial-in) until it's gone.
+      if (!instantClose && !o.reducedMotion) {
+        window.addEventListener('keydown', swallowEsc, true);
+        setTimeout(() => window.removeEventListener('keydown', swallowEsc, true), TRACE_OUT_MS);
+      }
+      o.onClose?.();
+    },
+  });
+  const swallowEsc = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape' || bugReportOpen()) return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  const panel = mountTracePanel(screen, { title: 'YOU' });
   const pageTab = (id: SheetPage) => {
-    const b = el('button', 'cs-page-tab', id.toUpperCase());
+    const b = el('button', 'cs-page-tab tp-tab', id.toUpperCase());
     b.type = 'button';
     b.dataset.page = id;
-    b.addEventListener('click', () => showPage(id));
+    b.addEventListener('click', () => {
+      if (id !== at) panelCue('tab');
+      showPage(id);
+    });
     return b;
   };
   const pageTabs = SHEET_PAGES.map(pageTab);
-  pages.append(...pageTabs, el('span', 'cs-next', '[TAB] NEXT'));
+  panel.tabs.classList.add('cs-pages');
+  panel.tabs.append(...pageTabs);
+  panel.nums.classList.add('cs-strip');
+  panel.hints('[←→] PAGE · [↑↓] OUTFIT · [TAB] PEOPLE · [ESC] CLOSE');
   let at: SheetPage = 'file';
   const showPage = (to: SheetPage) => {
     at = to;
@@ -414,35 +459,39 @@ export function openCharacterSheet(
     page.replaceChildren(draw(to));
     page.scrollTop = 0;
   };
-
-  const wrap = el('div', 'cs-wrap');
-  wrap.append(figure, file);
-  const screen = openScreen(host, {
-    title: 'YOU',
-    className: 'scr-holo character-sheet',
-    label: `Character sheet: ${p.name}`,
-    reducedMotion: o.reducedMotion,
-    onClose: () => {
-      window.removeEventListener('keydown', onKey, true);
-      o.onClose?.();
-    },
-  });
-  if (p.accent) screen.root.style.setProperty('--cs-side', p.accent);
-  const strip = el('div', 'cs-strip');
+  /** Tonight's numbers at the head line's right end: `SOL 1,240 · NERVE 3 / 4 · HEAT 3 IN KARASU`. */
   const showStrip = () => {
-    strip.textContent = kit ? `SOL ${sol(kit.sol)} · NERVE ${kit.nerveLeft}/${kit.nerveMax}` : '';
+    if (!kit) return void panel.nums.replaceChildren();
+    const sep = () => el('i', '', ' · ');
+    const parts: (Node | string)[] = ['SOL ', el('b', '', sol(kit.sol)), sep(), 'NERVE ', el('b', '', `${kit.nerveLeft} / ${kit.nerveMax}`)];
+    if (kit.here) parts.push(sep(), el('span', kit.heatHere > 0 ? 'cs-hot' : '', `HEAT ${kit.heatHere}`), ' IN ', el('b', '', districtName(kit.here)));
+    panel.nums.replaceChildren(...parts);
   };
-  screen.head.replaceChildren(el('span', '', '◆ YOU'), strip, el('span', 'cs-esc', 'ESC'));
-  screen.body.append(pages, wrap);
+  /** The leader: from the figure's shoulder to your name, in your colour. */
+  function lead(): void {
+    if (!screen.isOpen) return;
+    panel.lead('you', anchor, name, { fromGap: 0, toGap: 28, color: 'var(--tp-cyan)' });
+  }
+  screen.body.append(wrap);
   showStrip();
   showPage(o.page ?? 'file');
+  lead();
+  requestAnimationFrame(lead);
+  img?.addEventListener('load', lead);
+  window.addEventListener('resize', lead);
 
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      // Capture phase too: the arrows dress her, they don't move the prompt's caret behind the sheet.
+    // The bug report is over everything: its keys are its own.
+    if (bugReportOpen()) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      // Capture phase too: the arrows are the sheet's, they don't move the prompt's caret behind it.
       e.preventDefault();
       e.stopPropagation();
-      step(e.key === 'ArrowLeft' ? -1 : 1);
+      // ← → turn the page and wrap (as PEOPLE and CREW); ↑ ↓ dress her.
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') return step(e.key === 'ArrowUp' ? -1 : 1);
+      const n = SHEET_PAGES.length;
+      panelCue('tab');
+      showPage(SHEET_PAGES[(SHEET_PAGES.indexOf(at) + (e.key === 'ArrowLeft' ? n - 1 : 1)) % n]);
       return;
     }
     if (e.key !== 'Escape') return;
@@ -454,6 +503,7 @@ export function openCharacterSheet(
   window.addEventListener('keydown', onKey, true);
 
   function close(instant = false): void {
+    instantClose = instant;
     screen.close(instant);
   }
 

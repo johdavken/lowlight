@@ -637,6 +637,63 @@ describe('arrival screen: SUGGEST', () => {
   });
 });
 
+describe("arrival screen: the opening's STORY (2026-11-11)", () => {
+  const STORY = { job: 'run-sheet', text: 'Her message came at six: "Come up tonight."' };
+  const label = () => $('.ar-label span')!.textContent;
+  it("with a story, it's the default: read, not typed; ENTER sends its text and its job", async () => {
+    const { arrival } = make();
+    const sent = vi.fn();
+    arrival.onSend(sent);
+    await toReady(arrival, 'opening');
+    arrival.setStory(STORY);
+    expect(label()).toBe('STORY');
+    expect($('.ar-story-text')!.textContent).toBe(STORY.text);
+    expect(box()!.hidden).toBe(true);
+    expect(document.activeElement).not.toBe(box());
+    expect([...host.querySelectorAll('.ar-keys button')].map((b) => b.firstChild?.textContent)).toEqual(['CUSTOM', 'ENTER']);
+    key('Enter');
+    expect(sent).toHaveBeenCalledExactlyOnceWith(STORY.text);
+    expect(arrival.story()).toBe('run-sheet');
+    expect(arrival.open).toBe(false);
+  });
+  it('C (or CUSTOM) writes your own: the box, no job; Esc goes back to the STORY', async () => {
+    const { arrival } = make();
+    const sent = vi.fn();
+    arrival.onSend(sent);
+    await toReady(arrival, 'opening');
+    arrival.setStory(STORY);
+    key('c');
+    expect(label()).toBe('HOW IT OPENS');
+    expect(box()!.hidden).toBe(false);
+    expect(document.activeElement).toBe(box());
+    key('Escape', {}, box()!);
+    expect(label()).toBe('STORY');
+    $('.ar-flip')!.click();
+    box()!.value = 'Rain.';
+    key('Enter', {}, box()!);
+    expect(sent).toHaveBeenCalledExactlyOnceWith('Rain.');
+    expect(arrival.story()).toBeNull();
+  });
+  it('a story that comes after something was typed waits behind it; no story leaves the box as it was', async () => {
+    const { arrival } = make();
+    await toReady(arrival, 'opening');
+    box()!.value = 'mine';
+    arrival.setStory(STORY);
+    expect(label()).toBe('HOW IT OPENS');
+    expect($('.ar-flip')!.firstChild?.textContent).toBe('STORY');
+    const { arrival: plain } = make();
+    await toReady(plain, 'opening');
+    plain.setStory(null);
+    expect(host.querySelectorAll('.ar-flip')).toHaveLength(1);
+  });
+  it('a story set before the history says opening shows once it does', async () => {
+    const { arrival } = make();
+    arrival.setStory(STORY);
+    await toReady(arrival, 'opening');
+    expect(label()).toBe('STORY');
+  });
+});
+
 describe("arrival screen: the opening's three openings", () => {
   /** A stand-in for the cards panel: what the screen hands it, and the keys it hears. */
   function fakeOpenings() {

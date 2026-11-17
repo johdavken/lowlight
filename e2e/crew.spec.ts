@@ -103,7 +103,7 @@ test('rewind before a send takes it back: the recruit is ready, with no runs', a
   const hiredAt = await newRow(page);
   const name = await hireOne(page);
   await page.keyboard.press('Escape');
-  // Gone after its glitch-out, before it opens again.
+  // Gone after its draw-off, before it opens again.
   await expect(page.locator('.crew-screen')).toHaveCount(0);
   await newRow(page);
   await page.keyboard.press('Alt+KeyK');
@@ -123,11 +123,13 @@ test('rewind before a send takes it back: the recruit is ready, with no runs', a
 /** Plays the table's up cards (STEADY/TAKE IT and the cover cards included) until the debrief deals; returns it. */
 async function playToDebrief(page: Page, first?: string) {
   const debrief = page.locator('.tb-debrief .db');
-  // A card that can be played: the deal's own (a parked roll's card sits in its row), not the one still rolling (locked).
-  const playable = page.locator('.tb-deal > .tb-card[data-state="up"]:not(.is-locked)');
+  // A card that can be played: the deal's own (a parked roll's card sits in its row, STEADY/TAKE IT beside it), and none
+  // while a card in the row is still locked rolling: the others stand faded and take no clicks, and a roll that parks on
+  // costs keeps them so. Never the debrief's card.
+  const playable = page.locator('.tb-deal:not(:has(> .tb-card.is-locked)) > .tb-card[data-state="up"]:not(.tb-debrief)');
   let settles = 0;
   for (let i = 0; i < 10 && !(await debrief.isVisible()); i++) {
-    if (i > 0) await expect(playable.first().or(debrief).or(page.locator('.tb-costs'))).toBeVisible({ timeout: 15_000 });
+    if (i > 0) await expect(playable.first().or(debrief).or(page.locator('.tb-costs')).first()).toBeVisible({ timeout: 15_000 });
     if (await debrief.isVisible()) break;
     // A costly roll's costs (roll lifecycle spec §1.5): pick and TAKE IT until the roll lands.
     // Capped (final review M10): a refused click would otherwise loop until the test times out.
@@ -154,11 +156,11 @@ async function goInWith(page: Page, job: string, rid: string) {
   await page.screenshot({ path: 'test-results/hand-board.png' });
   await startQuest(page, job);
   await expect(page.locator('.tb-setup')).toBeVisible();
-  // The pitch and its district line read in the JOB column beside the subtitles; the table keeps the title.
+  // SETUP is the job's table: the pitch reads in the JOB column in the log, its line heads the top bar.
   await expect(page.locator('.jc')).toBeVisible();
   await expect(page.locator('.jc-head')).toHaveText(`◆ JOB · ${job.toUpperCase()}`);
-  await expect(page.locator('.jc-sub')).toContainText('HEAT');
   await expect(page.locator('.ts-pitch .tb-sub')).toBeHidden();
+  await expect(page.locator('.tb-setup .tb-top .ts-strip')).toContainText('HEAT');
   // The archive opens over SETUP, not behind its cards, and Esc closes it without backing out.
   await page.locator('.feed-root.feed-stage .feed').hover();
   await page.mouse.wheel(0, -200);
@@ -195,8 +197,9 @@ async function goInWith(page: Page, job: string, rid: string) {
   await page.mouse.wheel(0, -200);
   await expect(page.locator('.feed-root.expanded')).toHaveCount(1);
   {
-    const [feed, col, middle, levers] = await Promise.all(['.feed-root .feed', '.jc', '.tb-job .tb-middle', '.tb-job .tb-levers'].map((s) => page.locator(s).boundingBox()));
-    expect(feed!.x).toBeGreaterThanOrEqual(levers!.x + levers!.width);
+    // The levers stand at the end of the hand's rail now (the table in the trace): the archive keeps clear of the hand.
+    const [feed, col, middle, hand] = await Promise.all(['.feed-root .feed', '.jc', '.tb-job .tb-middle', '.tb-job .tb-hand'].map((s) => page.locator(s).boundingBox()));
+    expect(feed!.x).toBeGreaterThanOrEqual(hand!.x + hand!.width);
     await expect(page.locator('.jc')).toBeVisible();
     expect(col!.x + col!.width).toBeLessThanOrEqual(middle!.x);
     // Nothing of the table sits on top of it.
@@ -207,13 +210,29 @@ async function goInWith(page: Page, job: string, rid: string) {
   await page.keyboard.press('Escape');
   await expect(page.locator('.feed-root.expanded')).toHaveCount(0);
   await expect(page.locator('.tb-job')).toBeVisible();
-  // A beat with no hand: the log region runs down the corner, and the column still ends over the line keys.
+  // A click anywhere off the archive closes it, on the cards or the JOB column too, and plays nothing (playtest
+  // 2026-11-08: only a sliver of her column did, so a click on the cards went to the table).
+  const choices = () => page.locator('.tb-job .tb-deal > .tb-card').evaluateAll((ns) => ns.map((n) => (n as HTMLElement).dataset.choice).join(','));
+  const dealt = await choices();
+  for (const target of ['.tb-job .tb-deal > .tb-card', '.jc']) {
+    await page.locator('.feed-root.feed-stage .feed').hover();
+    await page.mouse.wheel(0, -200);
+    await expect(page.locator('.feed-root.expanded')).toHaveCount(1);
+    const at = (await page.locator(target).first().boundingBox())!;
+    await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+    await expect(page.locator('.feed-root.expanded')).toHaveCount(0);
+  }
+  await page.waitForTimeout(500);
+  await expect(page.locator('.tb-job .tb-deal > .tb-card.is-locked')).toHaveCount(0);
+  expect(await choices()).toBe(dealt);
+  // A beat with no hand: the log region runs down the corner, and the column still keeps off the line's keys.
   await page.locator('.tb-job .tb-bottom').evaluate((n: HTMLElement) => (n.style.display = 'none'));
   const log = page.locator('.tb-job .tb-log');
-  await expect.poll(() => log.evaluate((n: HTMLElement) => getComputedStyle(n.closest('#game')!).getPropertyValue('--hud-log-h') === `${n.offsetHeight}px`)).toBe(true);
+  await expect.poll(() => log.evaluate((n: HTMLElement) => getComputedStyle(n.closest('#game')!).getPropertyValue('--hud-log-h') === `${(n.querySelector<HTMLElement>(':scope > .tb-log-at') ?? n).offsetHeight}px`)).toBe(true);
   const [region, col, keys] = await Promise.all([log.boundingBox(), page.locator('.jc').boundingBox(), page.locator('.line-keys').boundingBox()]);
-  expect(region!.y + region!.height).toBeGreaterThan(keys!.y);
-  expect(col!.y + col!.height).toBeLessThanOrEqual(keys!.y);
+  // The keys are on her box at the right, or (no box) a row over the prompt line: either way the column never covers them.
+  const apart = col!.x + col!.width <= keys!.x || keys!.x + keys!.width <= col!.x || col!.y + col!.height <= keys!.y;
+  expect(apart).toBe(true);
   await page.screenshot({ path: 'test-results/job-column-no-hand.png' });
   await page.locator('.tb-job .tb-bottom').evaluate((n: HTMLElement) => (n.style.display = ''));
 }
@@ -303,18 +322,22 @@ test("abilities: the hire's ability on the file, UNSLOT and SLOT, bring them, pr
   await page.screenshot({ path: 'test-results/abilities-file.png' });
   await page.keyboard.press('Escape');
   await goInWith(page, 'Night Shift', rid);
-  // The recruit's card with a tab for the ability under it; the tab turns the card over to the ability, which, lifted,
-  // previews on a check and goes with the pick.
-  const tab = page.locator(`.tb-crew-stack[data-stack="${rid}"] .tb-tab[data-id="${rid}/e2e-steady"]`);
-  await expect(tab).toHaveCount(1);
+  // The recruit's card with the ability as a small card beside it, an outline under it for the slot it hasn't got
+  // (playtest 2026-11-11: no tabs or turning at the HUD); lifted, it previews on a check and goes with the pick.
+  const mini = page.locator(`.tb-crew-stack[data-stack="${rid}"] .tb-abil .tb-slot.tb-mini[data-id="${rid}/e2e-steady"]`);
+  await expect(mini).toHaveCount(1);
+  await expect(page.locator(`.tb-crew-stack[data-stack="${rid}"] .tb-abil .tb-mini-empty`)).toHaveCount(1);
+  await expect(page.locator('.tb-tab')).toHaveCount(0);
   // Let the deal turn the hand face up before the screenshot.
   await page.waitForTimeout(1500);
   await page.screenshot({ path: 'test-results/abilities-stack-rest.png' });
-  await tab.click();
-  await expect(tab).toHaveClass(/\bon\b/);
-  // Both half turns done: the ability is the side up.
-  await page.waitForTimeout(900);
-  await page.locator(`.tb-hand .tb-slot[data-id="${rid}/e2e-steady"]`).click();
+  // The ability is a chip under the recruit's row (the table in the trace), inside their rail's width and clear of their name and status.
+  const [cardBox, miniBox, stackBox] = await Promise.all([page.locator(`.tb-crew-stack[data-stack="${rid}"] > .tb-slot .tbc-body`).boundingBox(), mini.boundingBox(), page.locator(`.tb-crew-stack[data-stack="${rid}"]`).boundingBox()]);
+  expect(miniBox!.height).toBeGreaterThan(8);
+  expect(miniBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height - 1);
+  expect(miniBox!.x).toBeGreaterThanOrEqual(stackBox!.x - 1);
+  expect(miniBox!.x + miniBox!.width).toBeLessThanOrEqual(stackBox!.x + stackBox!.width + 1);
+  await mini.click();
   await expect(page.locator('.tb-deal .tb-card[data-choice="roof"] .tb-odds.preview')).toBeVisible();
   await page.screenshot({ path: 'test-results/abilities-stack.png' });
   const debrief = await playToDebrief(page, 'roof');
@@ -341,10 +364,7 @@ test('effect and NERVE: BOLD on a card, an ability pressed for 1 NERVE, the reco
   await expect(roof.locator('.tb-eff')).toHaveText('BIG');
   await expect(roof.locator('.tb-odds')).toContainText('FAIR → BIG');
   // The ability costs 1 NERVE a press: its card says so.
-  const tab = page.locator(`.tb-crew-stack[data-stack="${rid}"] .tb-tab[data-id="${rid}/e2e-steady"]`);
   await page.waitForTimeout(1500);
-  await tab.click();
-  await page.waitForTimeout(900);
   const ability = page.locator(`.tb-hand .tb-slot[data-id="${rid}/e2e-steady"]`);
   await expect(ability).toContainText('1 NERVE');
   await ability.click();
@@ -407,8 +427,6 @@ test('a press beside a call: both cards lift, one roll, both on the record', asy
   await page.keyboard.press('Enter');
   await expect(page.locator('.tb-setup')).toBeHidden();
   await page.waitForTimeout(1500);
-  await page.locator(`.tb-crew-stack[data-stack="${second}"] .tb-tab[data-id="${second}/e2e-steady"]`).click();
-  await page.waitForTimeout(900);
   const call = page.locator(`.tb-hand .tb-slot[data-id="${first}"]`);
   const press = page.locator(`.tb-hand .tb-slot[data-id="${second}/e2e-steady"]`);
   await call.click();
@@ -513,7 +531,11 @@ test('Graft tips on a first job: SETUP, the first beat, the next deal; none agai
   // SYS → TIPS → SHOW AGAIN brings them back.
   await page.locator('.hud-sys').click();
   await page.locator('.sys-tips-again').click();
+  // SYS is PAUSED's SETTINGS page: Esc goes back to its rows, or straight out over a table (no rows there).
   await page.keyboard.press('Escape');
+  await page.waitForTimeout(50);
+  if (await page.locator('.pause-menu:not(.pause-closing)').count()) await page.keyboard.press('Escape');
+  await expect(page.locator('.pause-menu')).toHaveCount(0);
   await openSetup();
   await expect(title).toHaveText('HOW YOU GO IN');
   await page.locator('.ts-back').click();
@@ -626,7 +648,7 @@ test('a first lot: sold in the wanted district, the price on the card', async ({
   await expect(page.locator('.cr-where button.on')).toBeVisible();
   const price = Number(((await page.locator('.cr-pick-price').first().textContent()) ?? '').split(' ')[0]);
   expect(price).toBeGreaterThan(0);
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(450); // past the panel's step-on
   await page.screenshot({ path: 'test-results/crew-goods.png' });
   const solBefore = (await crew(page)).sol;
   await page.locator('.cr-send').click();
@@ -637,47 +659,63 @@ test('a first lot: sold in the wanted district, the price on the card', async ({
   expect(errors).toEqual([]);
 });
 
-test('the panel: QUEST’s box, four recruits fit, more scroll sideways, all three tabs at 1600×900', async ({ page }) => {
+test('the panel: no pane, hung off the bar; list, file and key line fit at 1600×900 on all three tabs', async ({ page }) => {
   await room(page);
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.route('**/api/extras/face', (r) => r.fulfill({ path: `world/extras/${fs.readdirSync('world/extras').find((f) => f.endsWith('.png'))}` }));
   await page.route('**/api/quests/art/the-subtraction.webp', (r) => r.fulfill({ path: 'world/quests/art/the-subtraction.webp' }));
   let panel = fullPanel();
   await page.route('**/api/crew', (r) => r.fulfill({ json: { crew: panel } }));
-  // The same box as QUEST's, on a desktop and on a phone.
-  const box = (sel: string) => page.locator(sel).boundingBox();
-  // The stage rescales a moment after the viewport changes: read the box once it's stopped moving.
-  const steady = async (sel: string) => {
-    let last = '';
-    await expect.poll(async () => { const now = JSON.stringify(await box(sel)); const held = now === last; last = now; return held; }, { intervals: [150] }).toBe(true);
-    return JSON.parse(last);
-  };
-  const same = async () => {
-    await page.keyboard.press('Alt+KeyQ');
-    await expect(page.locator('.ql-pane')).toBeVisible();
-    const quest = await steady('.ql-pane');
-    await page.keyboard.press('Escape');
-    await page.keyboard.press('Alt+KeyK');
-    await expect(page.locator('.crew-screen .cr-tile').first()).toBeVisible();
-    expect(await box('.crew-screen .scr-frame')).toEqual(quest);
-  };
+  const box = async (sel: string) => (await page.locator(sel).first().boundingBox())!;
+  const settled = () => page.waitForTimeout(450); // past the panel's step-on
+  // A phone-sized window: it opens and closes.
   await page.setViewportSize({ width: 915, height: 412 });
-  await same();
-  await page.waitForTimeout(400);
+  await page.keyboard.press('Alt+KeyK');
+  await expect(page.locator('.crew-screen .cr-tile').first()).toBeVisible();
+  await settled();
   await page.screenshot({ path: 'test-results/crew-phone.png' });
   await page.keyboard.press('Alt+KeyK');
   await expect(page.locator('.crew-screen')).toHaveCount(0);
   await page.setViewportSize({ width: 1600, height: 900 });
-  await same();
-  await page.waitForTimeout(400);
+  await page.keyboard.press('Alt+KeyK');
+  await expect(page.locator('.crew-screen .cr-tile').first()).toBeVisible();
+  await settled();
+  // No pane or frame; the head line starts at the ring and ends on the bar's run under CREW.
+  await expect(page.locator('.crew-screen .hf')).toHaveCount(0);
+  const ends = await page.evaluate(() => {
+    const d = document.querySelector('.crew-screen > svg.hv-lead[data-lead="head"] path')!.getAttribute('d')!;
+    const pts = [...d.matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+    const root = document.querySelector('.crew-screen')!.getBoundingClientRect();
+    const z = root.width / (document.querySelector<HTMLElement>('.crew-screen')!.offsetWidth || 1);
+    const kon = document.querySelector('.hud-trace .kon')!.getBoundingClientRect();
+    return { n: pts.length, last: pts[pts.length - 1], run: [(kon.left - root.left) / z, (kon.top + kon.height / 2 - root.top) / z] };
+  });
+  expect(ends.n).toBe(3);
+  expect(Math.abs(ends.last[0] - ends.run[0])).toBeLessThan(2);
+  expect(Math.abs(ends.last[1] - ends.run[1])).toBeLessThan(2);
+  // The list, the file and the key line don't overlap; a leader runs from the picked recruit to the file.
+  const apart = async (list: string, file: string) => {
+    const [l, f, k] = [await box(list), await box(file), await box('.tp-keys')];
+    expect(l.x + l.width).toBeLessThanOrEqual(f.x + 1);
+    expect(f.y + f.height).toBeLessThanOrEqual(k.y + 1);
+    expect(l.y + l.height).toBeLessThanOrEqual(k.y + 1);
+    expect(f.x + f.width).toBeLessThanOrEqual(1600);
+  };
+  await apart('.cr-tiles', '.cr-file');
+  await expect(page.locator('.crew-screen > svg.hv-lead[data-lead="pick"] path')).toHaveCount(1);
   await page.screenshot({ path: 'test-results/crew-roster.png' });
-  // The file scrolls inside the pane; its actions stay in view.
+  // The file scrolls inside the panel; its actions stay in view.
   await page.locator('.cr-file').evaluate((n) => n.scrollTo(0, n.scrollHeight));
   await expect(page.locator('.cr-acts .cr-btn').first()).toBeInViewport();
   await page.screenshot({ path: 'test-results/crew-roster-foot.png' });
+  // ↓ picks the next recruit; the leader follows.
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.cr-tile.on .cr-tile-name')).toHaveText('DEZ');
   await page.locator('.cr-tab[data-tab="assign"]').click();
   await expect(page.locator('.cr-brief h2')).toHaveText('THE BOAT');
   await expect(page.locator('.cr-pick')).toHaveCount(4);
+  await apart('.cr-assign-left', '.cr-brief');
+  await expect(page.locator('.crew-screen > svg.hv-lead[data-lead="who"] path')).toHaveCount(1);
   await page.screenshot({ path: 'test-results/crew-errands.png' });
   expect(await fits(page, '.cr-in')).toEqual([0, 0]);
   // The longest blurb, a job's, and a piece that can't go, fit as well.
@@ -688,7 +726,11 @@ test('the panel: QUEST’s box, four recruits fit, more scroll sideways, all thr
   expect(await fits(page, '.cr-in')).toEqual([0, 0]);
   await page.locator('.cr-tab[data-tab="hire"]').click();
   await expect(page.locator('.cr-card')).toHaveCount(4);
+  await apart('.cr-hire-left', '.cr-hire-main');
   await page.screenshot({ path: 'test-results/crew-hire.png' });
+  // ↓ walks the places.
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('.cr-place.on')).toHaveText('THE LONG HAUL');
   panel = fullPanel(4);
   await page.keyboard.press('Alt+KeyK');
   await expect(page.locator('.crew-screen')).toHaveCount(0);
@@ -697,6 +739,8 @@ test('the panel: QUEST’s box, four recruits fit, more scroll sideways, all thr
   await expect(page.locator('.cr-pick')).toHaveCount(8);
   expect((await fits(page, '.cr-picks'))[1]).toBeGreaterThan(0);
   expect(await fits(page, '.cr-in')).toEqual([0, 0]);
-  await page.waitForTimeout(400);
+  await settled();
   await page.screenshot({ path: 'test-results/crew-errands-eight.png' });
+  await page.locator('.cr-tab[data-tab="roster"]').click();
+  await page.screenshot({ path: 'test-results/crew-roster-eight.png' });
 });

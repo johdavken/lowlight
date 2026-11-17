@@ -1,11 +1,22 @@
-/* The arrival screen (spec 2026-10-27; mockup layout A): a 1600×900 stage scaled to fit, art left, place right. Classes prefixed ar- (global class names collide across screens). */
+/*
+ * The arrival screen (spec 2026-10-27; mockup layout A): a 1600×900 stage scaled to fit, art left, place right. On the
+ * HUD trace in the one red (2026-11-15): a rail down the file, ringed heads, the route as a trace line, the box a plain
+ * outline with your words in cyan, the bar a thin trace, the keys cut. The place's name keeps its neon: the sign.
+ * Classes prefixed ar- (global class names collide across screens).
+ */
 .ar-root {
+  --c: var(--ui-red, #ff4d4d);
+  --ar-text: #d9e4ea;
+  --ar-dim: #8fa3ad;
+  --ar-ink: #05020a;
+  --ar-amber: #ffc56b;
+  --ar-cyan: #7fe9ff;
   position: absolute;
   inset: 0;
   z-index: 200;
   overflow: hidden;
   background: #05020c;
-  color: #eef4ff;
+  color: var(--ar-text);
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   cursor: default;
   transition: opacity 0.3s ease;
@@ -16,94 +27,126 @@
 .ar-art { position: absolute; left: 0; top: 0; height: 900px; width: 680px; object-fit: cover; object-position: center 30%; }
 .ar-fade { position: absolute; left: 440px; top: 0; bottom: 0; width: 260px; background: linear-gradient(90deg, transparent, #05020c); }
 .ar-file { position: absolute; left: 740px; right: 90px; top: 96px; bottom: 60px; display: flex; flex-direction: column; }
+/* The rail down the file, from the rule's ring to the keys. */
+.ar-file::before { content: ''; position: absolute; left: -26px; top: 8px; bottom: 14px; width: 1px; background: linear-gradient(var(--c), color-mix(in srgb, var(--c) 35%, transparent) 45%, transparent 85%); filter: drop-shadow(0 0 2px var(--c)); pointer-events: none; }
 .ar-no-art .ar-file { left: 300px; right: 300px; }
-.ar-rule { font-size: 13px; letter-spacing: 0.42em; color: #7fe9ff; }
+/* A head on the rail: a ring on it, pixel caps in the red, a hairline running off. */
+.ar-rule, .ar-label { position: relative; display: flex; align-items: center; gap: 12px; font: 17px/1 var(--pixel); letter-spacing: 0.3em; color: var(--c); text-shadow: 0 1px 2px #000; }
+.ar-rule::before, .ar-label::before { content: ''; position: absolute; left: -30px; top: 50%; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: var(--ar-ink); }
+.ar-rule::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 60%, transparent), transparent); }
 .ar-name {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   font: 400 72px/1 'Tilt Neon', system-ui, sans-serif;
   letter-spacing: 0.16em;
   color: #fff;
   text-shadow: 0 0 6px #fff, 0 0 18px #ff4fb8, 0 0 42px #ff4fb8;
 }
-.ar-sub { margin-top: 12px; font-size: 15px; letter-spacing: 0.5em; text-transform: uppercase; }
+.ar-sub { margin-top: 14px; font: 17px/1 var(--pixel); letter-spacing: 0.32em; text-transform: uppercase; color: var(--ar-text); }
 .ar-sub:empty { display: none; }
-.ar-lore-line { margin-top: 12px; font-size: 15px; font-style: italic; color: #a99cc4; }
+.ar-lore-line { margin-top: 10px; font: italic 14px/1.5 var(--mono); color: var(--ar-dim); }
 .ar-lore-line:empty { display: none; }
-.ar-route { display: flex; gap: 14px; align-items: center; margin-top: 24px; font: 22px 'VT323', ui-monospace, monospace; letter-spacing: 0.2em; color: rgba(127, 233, 255, 0.45); }
+/* Travel's route: where you are, a trace (ring to dot) in the red, where you're going. */
+.ar-route { display: flex; gap: 14px; align-items: center; margin-top: 24px; font: 22px var(--pixel); letter-spacing: 0.2em; color: var(--ar-dim); }
 .ar-route[hidden] { display: none; }
-.ar-route b { font-weight: 400; color: #7fe9ff; }
-.ar-route .ar-to { color: #fff; }
-.ar-arrow { position: relative; flex: 0 0 90px; height: 1px; background: linear-gradient(90deg, rgba(127, 233, 255, 0.45), #ff4f8b); }
-.ar-arrow::after { content: '▸'; position: absolute; right: -8px; top: -13px; font-size: 20px; color: #ff4f8b; }
-.ar-meta { margin-top: 8px; font: 20px 'VT323', ui-monospace, monospace; letter-spacing: 0.2em; color: #8d7fb0; }
+.ar-route b { font-weight: 400; color: var(--ar-dim); }
+.ar-route .ar-to { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 50%, transparent); }
+.ar-arrow { position: relative; flex: 0 0 96px; height: 1px; background: var(--c); box-shadow: 0 0 4px var(--c); }
+.ar-arrow::before { content: ''; position: absolute; left: -4px; top: -4px; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: var(--ar-ink); }
+.ar-arrow::after { content: ''; position: absolute; right: -1px; top: -1px; width: 3px; height: 3px; background: var(--c); }
+.ar-meta { margin-top: 10px; font: 17px var(--pixel); letter-spacing: 0.24em; color: var(--ar-dim); }
 .ar-meta:empty { display: none; }
-.ar-with { display: flex; gap: 10px; align-items: center; margin-top: 18px; font: 20px 'VT323', ui-monospace, monospace; letter-spacing: 0.25em; color: #ff4f8b; }
-.ar-with::before { content: ''; width: 8px; height: 8px; background: #ff4f8b; box-shadow: 0 0 8px #ff4f8b; }
+/* Who comes with you: her colour (contacts keep theirs), a ring rather than a lamp. */
+.ar-with { display: flex; gap: 10px; align-items: center; margin-top: 18px; font: 18px var(--pixel); letter-spacing: 0.24em; color: #ff4f8b; }
+.ar-with::before { content: ''; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid currentColor; border-radius: 50%; box-shadow: 0 0 6px currentColor; }
 .ar-with[hidden] { display: none; }
 /* A long entry is cut with a fade rather than pushing the keys off the stage. */
 .ar-lore {
   flex: 0 1 auto;
   min-height: 0;
   overflow: hidden;
-  margin-top: 28px;
+  margin-top: 26px;
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
   mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
 .ar-lore:empty { display: none; }
-.ar-lore p { margin: 0 0 12px; font-size: 17px; line-height: 1.6; }
-.ar-move { margin-top: 24px; font-size: 16px; font-style: italic; color: #bdb2d6; }
+.ar-lore p { margin: 0 0 12px; font: 15px/1.65 var(--mono); color: var(--ar-text); }
+.ar-move { margin-top: 22px; font: italic 14px/1.5 var(--mono); color: var(--ar-dim); }
 .ar-move:empty, .ar-move[hidden] { display: none; }
-.ar-box { margin-top: 22px; }
-.ar-label { display: flex; justify-content: space-between; font-size: 12px; letter-spacing: 0.4em; color: #7fe9ff; }
+.ar-box { margin-top: 24px; }
+.ar-label { justify-content: space-between; font-size: 15px; }
 .ar-label .ar-drafting { color: #ff4f8b; }
-.ar-optional { letter-spacing: 0.2em; color: #6e5a90; }
+.ar-optional { letter-spacing: 0.2em; color: var(--ar-dim); }
+/* The box: a plain outline on the dark, your words in cyan; the outline turns cyan while you type. */
 .ar-area {
   box-sizing: border-box;
   display: block;
   width: 100%;
   min-height: 96px;
-  margin-top: 10px;
+  margin-top: 12px;
   padding: 14px 16px;
   resize: none;
-  font: 17px/1.6 'IBM Plex Mono', ui-monospace, monospace;
-  color: #7fe9ff;
-  caret-color: #7fe9ff;
-  background: rgba(127, 233, 255, 0.05);
-  border: 1px solid rgba(127, 233, 255, 0.35);
+  font: 15px/1.6 var(--mono);
+  color: var(--ar-cyan);
+  caret-color: var(--ar-cyan);
+  background: rgba(5, 2, 10, 0.5);
+  border: 0;
   border-radius: 0;
   outline: none;
-  box-shadow: inset 0 0 24px rgba(127, 233, 255, 0.06);
+  box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.2);
 }
-.ar-area:focus { border-color: rgba(127, 233, 255, 0.7); }
-.ar-hint { margin-top: 8px; font-size: 12px; letter-spacing: 0.08em; color: #6e5a90; }
-.ar-fail, .ar-notice { margin-top: 8px; font-size: 13px; letter-spacing: 0.08em; color: #ff3b5c; }
+.ar-area:focus { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ar-cyan) 70%, transparent); }
+.ar-area::placeholder { color: rgba(143, 163, 173, 0.6); }
+.ar-hint { margin-top: 8px; font: 12px/1.4 var(--mono); color: var(--ar-dim); }
+.ar-fail, .ar-notice { margin-top: 8px; font: 15px/1.2 var(--pixel); letter-spacing: 0.14em; color: var(--ar-amber); }
 .ar-fail:empty, .ar-notice:empty { display: none; }
-.ar-bar { flex: none; height: 6px; margin-top: 26px; background: rgba(127, 233, 255, 0.15); }
-.ar-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7fe9ff, #ff4fb8); box-shadow: 0 0 12px #ff4fb8; }
+/* The bar: a thin trace in the red, filling. */
+.ar-bar { flex: none; height: 1px; margin-top: 28px; background: color-mix(in srgb, var(--c) 22%, transparent); }
+.ar-bar i { display: block; height: 3px; margin-top: -1px; background: var(--c); box-shadow: 0 0 8px var(--c); }
 /* On travel the bar only shows once GO is pressed and the room is still on its way. */
 .ar-travel .ar-bar { visibility: hidden; }
 .ar-root.ar-moving .ar-bar { visibility: visible; }
-.ar-keys { display: flex; gap: 14px; align-items: center; margin-top: 18px; }
+/* The keys: cut outlines in the red; the one Enter does is filled; BACK is soft. */
+.ar-keys { display: flex; gap: 14px; align-items: center; margin-top: 20px; }
 .ar-keys button {
-  padding: 2px 18px;
-  font: 22px 'VT323', ui-monospace, monospace;
-  letter-spacing: 0.3em;
-  color: #000;
+  --kc: var(--c);
+  padding: 8px 20px 5px;
+  font: 20px/1 var(--pixel);
+  letter-spacing: 0.24em;
+  white-space: nowrap;
+  color: var(--kc);
   border: 0;
   border-radius: 0;
-  transform: skewX(-12deg);
   cursor: pointer;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  box-shadow: inset 0 0 0 1px var(--kc);
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 8px 8px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 8px 8px no-repeat,
+    rgba(5, 2, 10, 0.4);
 }
-.ar-keys button small { margin-left: 8px; font-size: 15px; letter-spacing: 0.1em; opacity: 0.6; }
-.ar-keys button:disabled { opacity: 0.5; cursor: default; }
-.ar-suggest { color: #ff4f8b !important; background: transparent; outline: 1px solid #ff4f8b; box-shadow: 0 0 12px rgba(255, 79, 139, 0.35); }
-.ar-back { margin-left: auto; color: #b9a8dd !important; background: #2a2140; }
-.ar-go.ar-go-key { background: #7fe9ff; box-shadow: 0 0 16px rgba(127, 233, 255, 0.5); }
+.ar-keys button small { margin-left: 10px; font-size: 15px; letter-spacing: 0.12em; opacity: 0.65; }
+.ar-keys button:hover:not(:disabled), .ar-keys button:focus-visible { outline: none; color: var(--ar-ink); background: var(--kc); }
+.ar-keys button:disabled { --kc: rgba(230, 238, 247, 0.22); color: rgba(230, 238, 247, 0.38); cursor: default; }
+.ar-keys .ar-back { --kc: rgba(230, 238, 247, 0.45); margin-left: auto; color: var(--ar-dim); }
+.ar-keys .ar-back:hover, .ar-keys .ar-back:focus-visible { --kc: var(--ar-text); color: var(--ar-ink); }
+.ar-go.ar-go-key { color: var(--ar-ink); background: var(--c); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 40%, transparent); }
+.ar-go.ar-go-key:hover, .ar-go.ar-go-key:focus-visible { background: #fff; }
 .ar-suggest + .ar-go.ar-go-key, .ar-keys > .ar-go.ar-go-key:first-child { margin-left: auto; }
-/* Resume: the old ENTER TO CONTINUE line. */
-.ar-keys .ar-go:not(.ar-go-key) { padding: 0; font-size: 26px; color: #3dff7a; background: none; transform: none; text-shadow: 0 0 10px currentColor; }
+/* Resume: the old ENTER TO CONTINUE line, a prompt in the room's green rather than a key. */
+.ar-keys .ar-go:not(.ar-go-key) { padding: 0; font-size: 26px; color: #3dff7a; background: none; box-shadow: none; clip-path: none; text-shadow: 0 0 10px currentColor; }
 .ar-go[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .ar-root { transition: none; }
-  .ar-bar i, .ar-go.ar-go-key, .ar-suggest { box-shadow: none; }
+  .ar-bar i, .ar-go.ar-go-key { box-shadow: none; }
 }
+/* The opening's STORY: her job's own scene, read, not typed (2026-11-11). */
+.ar-story-text {
+  margin-top: 12px;
+  padding: 14px 16px;
+  font: italic 15px/1.6 var(--mono);
+  color: var(--ar-text);
+  background: rgba(5, 2, 10, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.2);
+}
+.ar-story-text[hidden] { display: none; }
+.ar-area[hidden] { display: none; }

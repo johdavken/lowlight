@@ -5,6 +5,8 @@ import { Feed } from '../src/ui/feed';
 import type { ChatMessage, QuestState } from '../../shared/types';
 
 afterEach(() => {
+  // A panel a test left open still listens on the window: Esc closes any, so no test's keys reach another's.
+  window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
   document.body.innerHTML = '';
 });
 const host = () => {
@@ -142,36 +144,60 @@ describe('the QUEST list', () => {
     expect(h.querySelector('.ql-cased')!.textContent).toBe('CASED');
   });
 
-  it('the FIXER shelf: a card per item with its picture, numbers and price; BUY only for ok; why for the rest', () => {
+  const FIXER_ITEMS: NonNullable<QuestState['fixer']>['items'] = [
+    { id: 'burner', name: 'Burner', kind: 'cover', price: 600, tier: 1, state: 'ok' },
+    { id: 'stall-build', name: 'Stall build', kind: 'deck', price: 600, tier: 1, quality: 2, heat: 0, traits: ['fragile'], state: 'short' },
+    { id: 'fall-guy', name: 'Fall guy', kind: 'cover', price: 1000, tier: 3, state: 'locked' },
+    { id: 'pocket-deck', name: 'Pocket deck', kind: 'deck', price: 600, tier: 1, quality: 1, heat: 0, traits: ['hidden'], state: 'owned' },
+  ];
+
+  it("FIXER: a row per item with its numbers and price; the picked item's file has its picture; BUY only for ok; why for the rest", () => {
     const h = host();
     const onBuy = vi.fn();
     const list = mountQuestList(h, { onStart: vi.fn(), onBuy });
-    list.show(
-      listState({
-        fixer: {
-          place: 'under-the-cat',
-          items: [
-            { id: 'burner', name: 'Burner', kind: 'cover', price: 600, tier: 1, state: 'ok' },
-            { id: 'stall-build', name: 'Stall build', kind: 'deck', price: 600, tier: 1, quality: 2, heat: 0, traits: ['fragile'], state: 'short' },
-            { id: 'fall-guy', name: 'Fall guy', kind: 'cover', price: 1000, tier: 3, state: 'locked' },
-            { id: 'pocket-deck', name: 'Pocket deck', kind: 'deck', price: 600, tier: 1, quality: 1, heat: 0, traits: ['hidden'], state: 'owned' },
-          ],
-        },
-      }),
-    );
+    list.show(listState({ fixer: { place: 'under-the-cat', items: FIXER_ITEMS } }));
     expect(list.has()).toBe(true);
-    const cards = [...h.querySelectorAll<HTMLElement>('.ql-fixer .ql-item')];
-    expect(cards.map((c) => c.querySelector('img')!.getAttribute('src'))).toEqual(['/gear/burner.webp', '/gear/stall-build.webp', '/gear/fall-guy.webp', '/gear/pocket-deck.webp']);
-    expect(cards.map((c) => c.querySelector('.ql-item-name')!.textContent)).toEqual(['BURNER', 'STALL BUILD', 'FALL GUY', 'POCKET DECK']);
-    expect(cards.map((c) => c.querySelector('.ql-item-stat')!.textContent)).toEqual(['COVER · USED UP', 'Q2 · 2 SLOTS · HEAT 0 · FRAGILE', 'COVER · USED UP', 'Q1 · 1 SLOT · HEAT 0 · HIDDEN']);
-    expect(cards.map((c) => c.querySelector('.ql-item-price')!.textContent)).toEqual(['600 SOL', '600 SOL', '1000 SOL', '600 SOL']);
-    expect(cards.map((c) => c.querySelector('.ql-buy') !== null)).toEqual([true, false, false, false]);
-    expect(cards.slice(1).map((c) => c.querySelector('.ql-item-why')!.textContent)).toEqual(['NOT ENOUGH SOL', 'TIER 3', 'YOU HAVE ONE']);
-    cards[0].querySelector<HTMLButtonElement>('.ql-buy')!.click();
-    expect(onBuy).toHaveBeenCalledWith('burner');
+    // A list and a file, as the jobs are: no shelf of cards.
+    expect(h.querySelector('.ql-shelf, button.ql-gear, .ql-gear-foot')).toBeNull();
+    expect([...h.querySelectorAll('.ql-body.ql-fixer > .ql-list > .ql-group')].map((g) => g.textContent)).toEqual(['FOR SALE HERE']);
+    const rows = () => [...h.querySelectorAll<HTMLButtonElement>('.ql-body.ql-fixer > .ql-list > button.ql-row.ql-item')];
+    expect(rows().map((r) => r.dataset.item)).toEqual(['burner', 'stall-build', 'fall-guy', 'pocket-deck']);
+    expect(rows().map((r) => ['ok', 'short', 'locked', 'owned'].filter((c) => r.classList.contains(c)))).toEqual([['ok'], ['short'], ['locked'], ['owned']]);
+    expect(rows().map((r) => r.querySelector('.ql-item-name')!.textContent)).toEqual(['BURNER', 'STALL BUILD', 'FALL GUY', 'POCKET DECK']);
+    // Why it can't be bought leads the stat line.
+    expect(rows().map((r) => r.querySelector('.ql-item-stat')!.textContent)).toEqual(['COVER · USED UP', 'NOT ENOUGH SOL · Q2 · 2 SLOTS · HEAT 0 · FRAGILE', 'TIER 3 · COVER · USED UP', 'YOU HAVE ONE · Q1 · 1 SLOT · HEAT 0 · HIDDEN']);
+    expect(rows().map((r) => r.querySelector('.ql-item-stat .ql-row-why')?.textContent ?? null)).toEqual([null, 'NOT ENOUGH SOL', 'TIER 3', 'YOU HAVE ONE']);
+    expect(rows().map((r) => r.querySelector('.ql-item-price')!.textContent)).toEqual(['600 SOL', '600 SOL', '1000 SOL', '600 SOL']);
+    // No picture on a row: the picked item's stands in its file.
+    expect(h.querySelector('.ql-list img')).toBeNull();
+    // Each item's file, picked by a click on its row.
+    const files = FIXER_ITEMS.map((item) => {
+      h.querySelector<HTMLButtonElement>(`.ql-row[data-item="${item.id}"]`)!.click();
+      const file = h.querySelector<HTMLElement>('.ql-file')!;
+      const why = file.querySelector('.ql-meta .ql-item-why');
+      return {
+        img: file.querySelector('div.ql-art.ql-gear > img')!.getAttribute('src'),
+        title: file.querySelector('.ql-file-title')!.textContent,
+        tag: file.querySelector('.ql-meta .ql-file-tag')!.textContent,
+        why: why?.textContent ?? null,
+        has: why?.classList.contains('has') ?? null,
+        hint: file.querySelector(':scope > .ql-go .ql-hint')!.textContent,
+        keys: [...file.querySelectorAll(':scope > .ql-go button')].map((b) => [b.className, b.textContent]),
+      };
+    });
+    expect(files).toEqual([
+      { img: '/gear/burner.webp', title: 'BURNER', tag: 'COVER · USED UP · 600 SOL', why: null, has: null, hint: 'YOURS TO KEEP', keys: [['ql-buy tp-key go', 'BUY · 600']] },
+      { img: '/gear/stall-build.webp', title: 'STALL BUILD', tag: 'Q2 · 2 SLOTS · HEAT 0 · FRAGILE · 600 SOL', why: 'NOT ENOUGH SOL', has: false, hint: 'NOT ENOUGH SOL', keys: [] },
+      { img: '/gear/fall-guy.webp', title: 'FALL GUY', tag: 'COVER · USED UP · 1000 SOL', why: 'TIER 3', has: false, hint: 'TIER 3', keys: [] },
+      // Yours already: a white tag, not a grey one.
+      { img: '/gear/pocket-deck.webp', title: 'POCKET DECK', tag: 'Q1 · 1 SLOT · HEAT 0 · HIDDEN · 600 SOL', why: 'YOU HAVE ONE', has: true, hint: 'YOU HAVE ONE', keys: [] },
+    ]);
+    rows()[0].click();
+    h.querySelector<HTMLButtonElement>('.ql-go .ql-buy')!.click();
+    expect(onBuy).toHaveBeenCalledExactlyOnceWith('burner');
   });
 
-  it('the FIXER shelf: the first card is picked and its rule shows under the row; a click picks another', () => {
+  it('FIXER: the first row is picked and its rule shows in the file; a click picks another', () => {
     const h = host();
     const list = mountQuestList(h, { onStart: vi.fn() });
     list.show(
@@ -185,34 +211,86 @@ describe('the QUEST list', () => {
         },
       }),
     );
-    const rule = () => h.querySelector('.ql-gear-rule')!.textContent;
-    expect(h.querySelector('.ql-picked')!.getAttribute('data-item')).toBe('burner');
+    const rule = () => h.querySelector('.ql-file .ql-in .ql-gear-rule')!.textContent;
+    const pickedRows = () => [...h.querySelectorAll<HTMLElement>('.ql-row.ql-picked')].map((r) => [r.dataset.item, r.classList.contains('on'), r.getAttribute('aria-selected')]);
+    expect(pickedRows()).toEqual([['burner', true, 'true']]);
+    expect(h.querySelectorAll('.ql-row.on')).toHaveLength(1);
+    expect(h.querySelector('.ql-gear-rule .ql-gear-rule-name')!.textContent).toBe('BURNER');
+    expect(h.querySelector('.ql-gear-rule p.ql-brief')!.textContent).toBe("A blown job's rep loss is halved. Used up.");
     expect(rule()).toBe("BURNERA blown job's rep loss is halved. Used up.");
-    h.querySelector<HTMLButtonElement>('[data-item="field-deck"] .ql-gear')!.click();
-    expect(h.querySelector('.ql-picked')!.getAttribute('data-item')).toBe('field-deck');
+    h.querySelector<HTMLButtonElement>('button.ql-row[data-item="field-deck"]')!.click();
+    expect(pickedRows()).toEqual([['field-deck', true, 'true']]);
+    expect(h.querySelector('.ql-row[data-item="burner"]')!.getAttribute('aria-selected')).toBe('false');
+    expect(h.querySelector('.ql-file-title')!.textContent).toBe('SENTINEL FIELD DECK');
     expect(rule()).toBe("SENTINEL FIELD DECK2 program slots. Heat 3 at a job's end if you rolled a grid check. Breaker: the wire becomes open on a grid check.");
   });
 
-  it('the FIXER shelf: a program shows its card art, PROGRAM · stat · kind, and its line as the rule', () => {
+  it('FIXER: a program shows its card art, PROGRAM · stat · kind, and its line as the rule', () => {
     const h = host();
     const onBuy = vi.fn();
     const list = mountQuestList(h, { onStart: vi.fn(), onBuy });
     list.show(listState({ fixer: { place: 'deck-market', items: [{ id: 'leech', name: 'LEECH', kind: 'program', price: 200, tier: 1, stat: 'tech', programKind: 'effect', line: 'Drinks what the lacquer guards.', state: 'ok' }] } }));
-    const card = h.querySelector<HTMLElement>('.ql-fixer .ql-item')!;
-    expect(card.querySelector('img')!.getAttribute('src')).toBe('/programs/leech.webp');
-    expect(card.querySelector('.ql-item-name')!.textContent).toBe('LEECH');
-    expect(card.querySelector('.ql-item-stat')!.textContent).toBe('PROGRAM · TECH · EFFECT');
+    const row = h.querySelector<HTMLElement>('.ql-fixer .ql-row.ql-item')!;
+    expect(row.querySelector('.ql-item-name')!.textContent).toBe('LEECH');
+    expect(row.querySelector('.ql-item-stat')!.textContent).toBe('PROGRAM · TECH · EFFECT');
+    expect(h.querySelector('.ql-file .ql-art.ql-gear > img')!.getAttribute('src')).toBe('/programs/leech.webp');
+    expect(h.querySelector('.ql-file .ql-file-tag')!.textContent).toBe('PROGRAM · TECH · EFFECT · 200 SOL');
     expect(h.querySelector('.ql-gear-rule')!.textContent).toBe('LEECHDrinks what the lacquer guards. Yours for good: load it free at SETUP.');
-    card.querySelector<HTMLButtonElement>('.ql-buy')!.click();
+    h.querySelector<HTMLButtonElement>('.ql-file .ql-go .ql-buy')!.click();
     expect(onBuy).toHaveBeenCalledWith('leech');
   });
 
-  it('the FIXER shelf: a picture that fails to load becomes the hatch', () => {
+  it('FIXER: a picture that fails to load leaves nothing standing there', () => {
     const h = host();
     const list = mountQuestList(h, { onStart: vi.fn() });
     list.show(listState({ fixer: { place: 'x', items: [{ id: 'new-deck', name: 'New deck', kind: 'deck', price: 1, tier: 1, quality: 1, heat: 0, traits: [], state: 'ok' }] } }));
-    h.querySelector('.ql-gear img')!.dispatchEvent(new Event('error'));
-    expect(h.querySelector('.ql-gear img')).toBeNull();
-    expect(h.querySelector('.ql-gear .ql-noart')).not.toBeNull();
+    const pic = h.querySelector<HTMLElement>('.ql-file > .ql-art.ql-gear')!;
+    expect(pic.classList.contains('ql-noart')).toBe(false);
+    pic.querySelector('img')!.dispatchEvent(new Event('error'));
+    expect(pic.classList.contains('ql-noart')).toBe(true);
+    // The file keeps its title and its key.
+    expect(h.querySelector('.ql-file-title')!.textContent).toBe('NEW DECK');
+    expect(h.querySelector('.ql-go .ql-buy')).not.toBeNull();
+  });
+
+  it('FIXER: ↑ / ↓ walk the items without wrapping, and Enter buys the picked one when it can be bought', () => {
+    const h = host();
+    const onBuy = vi.fn();
+    const list = mountQuestList(h, { onStart: vi.fn(), onBuy });
+    list.show(listState({ fixer: { place: 'under-the-cat', items: FIXER_ITEMS } }));
+    list.toggle();
+    expect(h.querySelector<HTMLElement>('.ql-pane')!.dataset.tab).toBe('fixer');
+    const at = () => [h.querySelector<HTMLElement>('.ql-row.on')!.dataset.item, h.querySelector('.ql-file-title')!.textContent];
+    const press = (key: string) => {
+      const e = new KeyboardEvent('keydown', { key, cancelable: true });
+      window.dispatchEvent(e);
+      return e;
+    };
+    expect(at()).toEqual(['burner', 'BURNER']);
+    // The arrows never reach the room, even at the list's end.
+    expect(press('ArrowUp').defaultPrevented).toBe(true);
+    expect(at()).toEqual(['burner', 'BURNER']);
+    press('ArrowDown');
+    expect(at()).toEqual(['stall-build', 'STALL BUILD']);
+    // Not enough sol: no filled key, so Enter does nothing.
+    expect(press('Enter').defaultPrevented).toBe(false);
+    expect(onBuy).not.toHaveBeenCalled();
+    press('ArrowDown');
+    press('ArrowDown');
+    expect(at()).toEqual(['pocket-deck', 'POCKET DECK']);
+    press('ArrowDown');
+    expect(at()).toEqual(['pocket-deck', 'POCKET DECK']);
+    for (let i = 0; i < 3; i++) press('ArrowUp');
+    expect(at()).toEqual(['burner', 'BURNER']);
+    expect(press('Enter').defaultPrevented).toBe(true);
+    expect(onBuy).toHaveBeenCalledExactlyOnceWith('burner');
+    // A held Enter buys once: the repeats are taken (the room never hears them) but do nothing.
+    const held = new KeyboardEvent('keydown', { key: 'Enter', repeat: true, cancelable: true });
+    window.dispatchEvent(held);
+    expect(held.defaultPrevented).toBe(true);
+    expect(onBuy).toHaveBeenCalledTimes(1);
+    // BUY keeps the panel up.
+    expect(list.isOpen).toBe(true);
+    list.close(true);
   });
 });

@@ -8,6 +8,8 @@
   --p2: #ff2bd6;
   --ink: #e9defa;
   --cyan: #7fe9ff;
+  /* The front end keeps its cyan hovers and leaders; the room's are the UI red (style.css --ui-red). */
+  --hv-c: #7fe9ff;
   --teko: 'Teko', 'VT323', sans-serif;
   position: absolute;
   inset: 0;
@@ -39,10 +41,7 @@
   z-index: 20;
   text-align: center;
   pointer-events: none;
-  font: 56px var(--pixel);
-  letter-spacing: 0.3em;
   color: var(--p2);
-  text-shadow: 0 0 18px currentColor;
 }
 [data-phase='p1'] .select-title { color: var(--p1); }
 .select-hints {
@@ -52,9 +51,6 @@
   right: 0;
   z-index: 20;
   text-align: center;
-  font: 20px var(--pixel);
-  letter-spacing: 0.3em;
-  opacity: 0.65;
 }
 .jack-in {
   position: absolute;
@@ -68,8 +64,8 @@
   white-space: nowrap;
   color: var(--p1);
   text-shadow: 0 0 14px currentColor;
-  background: rgba(5, 2, 12, 0.8);
-  border-left: 4px solid currentColor;
+  background: rgba(5, 2, 10, 0.88);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent);
   opacity: 0;
   transform: translate(-50%, -50%);
   clip-path: inset(0 100% 0 0);
@@ -94,8 +90,8 @@
   font-size: 15px;
   letter-spacing: 0.06em;
   color: #ff6b8a;
-  background: rgba(5, 2, 12, 0.85);
-  border-left: 3px solid #ff6b8a;
+  background: rgba(5, 2, 10, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(255, 107, 138, 0.45);
 }
 .dial-error:empty { display: none; }
 .select-message {
@@ -180,18 +176,21 @@
   80% { transform: translateX(5px); }
 }
 .fighter .tag {
+  --c: var(--side);
   position: absolute;
-  top: 70px;
+  top: 80px;
   z-index: 6;
-  padding: 2px 12px;
-  font: 28px var(--pixel);
-  letter-spacing: 0.3em;
-  color: #000;
-  background: var(--side);
+  box-sizing: border-box;
+  width: 360px;
 }
-.p1 .tag { left: 22px; }
-.p2 .tag { right: 22px; }
+/* The rail's head (trace.css .rail-head): ring on the rail at x 30 (2P: 1570), the words, a hairline running off. */
+.p1 .tag { left: 52px; }
+.p2 .tag { right: 52px; flex-direction: row-reverse; }
+.p2 .tag::before { left: auto; right: -26px; }
+.p2 .tag::after { background: linear-gradient(-90deg, color-mix(in srgb, var(--c) 60%, transparent), transparent); }
 
+/* No panel (B TRACE): a wash from the screen's edge, a rail in the side's colour at x 30 (2P: 1570) with ticks. The text
+   column keeps its 330 px where it was, so the select still holds ~800 chars of bio. */
 .file-strip {
   position: absolute;
   top: 0;
@@ -200,20 +199,22 @@
   width: 420px;
   display: flex;
   flex-direction: column;
-  padding: 112px 68px 40px 22px;
+  padding: 112px 38px 40px 52px;
   box-sizing: border-box;
-  background: linear-gradient(90deg, rgba(5, 2, 12, 0.92), rgba(5, 2, 12, 0.7));
-  border-left: 4px solid var(--p1);
-  clip-path: polygon(0 0, 100% 0, 84% 100%, 0 100%);
+  background: linear-gradient(90deg, rgba(5, 2, 10, 0.88), rgba(5, 2, 10, 0.72) 70%, transparent);
 }
 .p2 .file-strip {
   right: 0;
-  padding: 112px 22px 40px 68px;
-  background: linear-gradient(270deg, rgba(5, 2, 12, 0.92), rgba(5, 2, 12, 0.7));
-  border-left: 0;
-  border-right: 4px solid var(--p2);
-  clip-path: polygon(16% 0, 100% 0, 100% 100%, 0 100%);
+  padding: 112px 52px 40px 38px;
+  background: linear-gradient(270deg, rgba(5, 2, 10, 0.88), rgba(5, 2, 10, 0.72) 70%, transparent);
 }
+.file-strip::before,
+.file-strip::after { content: ''; position: absolute; pointer-events: none; }
+.file-strip::before { left: 30px; top: 98px; bottom: 40px; width: 1px; background: linear-gradient(var(--side), color-mix(in srgb, var(--side) 10%, transparent)); }
+.file-strip::after { left: 27px; top: 160px; bottom: 100px; width: 7px; opacity: 0.7; background: repeating-linear-gradient(to bottom, var(--side) 0 1px, transparent 1px 40px); }
+.p2 .file-strip::before { left: auto; right: 30px; }
+.p2 .file-strip::after { left: auto; right: 27px; }
+.file-strip.wide::after { display: none; }
 .fighter.waiting .file-strip { opacity: 0.4; }
 /* Name and tagline at the top, the file takes what's left (cut with a fade), the extras pinned at the bottom. */
 .file-strip .name { flex: none; font: 700 84px/0.8 var(--teko); letter-spacing: 0.02em; color: var(--side); overflow-wrap: anywhere; }
@@ -239,21 +240,25 @@
   mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
 .fighter-file.has-facts dl { flex: none; }
-.fighter-file .dh { margin-bottom: 4px; font: 18px var(--pixel); letter-spacing: 0.3em; color: var(--side); opacity: 0.7; }
+.fighter-file .dh { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font: 15px var(--pixel); letter-spacing: 0.24em; color: var(--side); opacity: 0.75; }
+.fighter-file .dh::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--side) 60%, transparent), transparent); }
 .fighter-file p { margin: 0 0 6px; }
 .fighter-file dl { display: grid; grid-template-columns: 96px 1fr; gap: 3px 10px; margin: 8px 0 0; align-items: baseline; }
-.fighter-file dt { font: 14px/1.1 var(--pixel); letter-spacing: 0.12em; opacity: 0.55; }
+.fighter-file dt { position: relative; font: 14px/1.1 var(--pixel); letter-spacing: 0.12em; color: var(--side); opacity: 0.85; }
+/* A tick from the rail to each fact (1P: the rail is 22 px to the left). */
+.p1 .fighter-file dt::before { content: ''; position: absolute; left: -22px; top: 7px; width: 8px; height: 1px; background: var(--side); opacity: 0.6; }
 .fighter-file dd { margin: 0; font-size: 11px; line-height: 1.35; text-transform: uppercase; letter-spacing: 0.04em; }
 /* A screen's own file (title, LOAD; FighterStrip.setFile): a long name, a quoted line, pickable rows. */
 .file-strip .name.long { font-size: 46px; line-height: 0.9; }
 .fighter-file q { display: block; margin: 4px 0 10px; font-size: 14px; line-height: 1.5; color: #fff; quotes: '“' '”'; }
-.fighter-file .pt { display: flex; gap: 8px; align-items: baseline; padding: 5px 8px; margin: 0 0 3px; border-left: 3px solid transparent; opacity: 0.55; cursor: pointer; }
+.fighter-file .pt { display: flex; gap: 8px; align-items: baseline; padding: 5px 8px; margin: 0 0 3px; opacity: 0.55; cursor: pointer; }
 .fighter-file .pt b { font: 400 20px/1 var(--pixel); letter-spacing: 0.12em; color: var(--ink); }
 .fighter-file .pt b { flex: 1; min-width: 0; }
 .fighter-file .pt small { margin-left: auto; white-space: nowrap; font: 14px var(--pixel); letter-spacing: 0.1em; }
 .fighter-file .pt .act { padding: 0 5px; font: 13px var(--pixel); letter-spacing: 0.15em; color: #000; background: var(--p1); }
 .fighter-file .pt:hover { opacity: 0.85; }
-.fighter-file .pt.on { opacity: 1; border-color: var(--p1); background: rgba(61, 255, 122, 0.12); }
+.fighter-file .pt.on { opacity: 1; color: var(--p1); }
+.fighter-file .pt.on b { color: var(--p1); }
 .fighter-file.print { animation: print 0.4s steps(10) backwards; }
 @keyframes print {
   from { clip-path: inset(0 0 100% 0); }
@@ -263,34 +268,31 @@
 .extra { flex: none; margin-top: 14px; font: 20px var(--pixel); letter-spacing: 0.2em; }
 .extra:empty { display: none; }
 .models .mh { margin-bottom: 6px; font: 18px var(--pixel); letter-spacing: 0.3em; color: var(--p2); }
-.models .m { padding: 3px 10px; font: 14px var(--mono); letter-spacing: normal; border-left: 3px solid transparent; opacity: 0.55; }
-.models .m.on { opacity: 1; border-color: var(--p2); background: rgba(255, 43, 214, 0.12); }
+.models .m { padding: 3px 10px; font: 14px var(--mono); letter-spacing: normal; opacity: 0.55; }
+.models .m.on { opacity: 1; color: var(--p2); }
 .models .offline { margin-top: 6px; font: 15px var(--pixel); letter-spacing: 0.2em; opacity: 0.5; }
 .extra .error { font: 13px/1.5 var(--mono); letter-spacing: normal; color: #ff6b8a; }
 
 /* ---------- the tile band ---------- */
 .grid-band { position: absolute; left: 50%; bottom: 110px; z-index: 15; transform: translateX(-50%); }
-/* The grid clips rows (its own scroll window) but lets the skewed edge tiles and cursor glow show. */
-.grid { overflow: visible !important; clip-path: inset(-6px -32px); }
+/* The grid clips rows (its own scroll window) but lets the cursor ring show. */
+.grid { overflow: visible !important; clip-path: inset(-6px -12px); }
 .track { transition: transform 0.18s steps(3); }
 .tile {
-  --g-base: skewX(-12deg);
   box-sizing: border-box;
   overflow: hidden;
   cursor: pointer;
-  transform: skewX(-12deg);
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  background: #120a22;
+  border: 1px solid rgba(230, 238, 247, 0.2);
+  background: #0b0614;
 }
 .tile > .tile-art,
 .tile > .tile-mask,
 .tile > .tile-mono,
 .tile > .tile-random {
   position: absolute;
-  inset: 0 -14px;
-  width: calc(100% + 28px);
+  inset: 0;
+  width: 100%;
   height: 100%;
-  transform: skewX(12deg);
 }
 .tile > img { object-fit: cover; image-rendering: pixelated; }
 .tile-mask { background: var(--a); mask: var(--img) center / contain no-repeat; -webkit-mask: var(--img) center / contain no-repeat; }
@@ -300,13 +302,11 @@
 .tile-random { font: 64px var(--pixel); }
 .tile-name {
   position: absolute;
-  left: -14px;
-  right: -14px;
+  left: 0;
+  right: 0;
   bottom: 0;
-  /* The sides sit under the tile's slant: text stays inside the visible face (and wraps there). */
-  padding: 10px 16px 2px;
-  transform: skewX(12deg);
-  font: 18px var(--pixel);
+  padding: 12px 4px 3px;
+  font: 15px var(--pixel);
   letter-spacing: 0.2em;
   text-align: center;
   /* A long name (MOTHER ROT) wraps to two lines rather than running off the tile. */
@@ -320,12 +320,13 @@
 .tile-group {
   box-sizing: border-box;
   height: 22px;
-  padding: 0 4px 1px;
-  transform: skewX(-12deg);
-  font: 17px/20px var(--pixel);
-  letter-spacing: 0.25em;
-  color: rgba(233, 222, 250, 0.75);
-  border-bottom: 1px solid rgba(233, 222, 250, 0.3);
+  padding: 0 4px 1px 0;
+  font: 14px/20px var(--pixel);
+  letter-spacing: 0.28em;
+  color: #c4d2da;
+  text-shadow: 0 1px 2px #000, 0 0 6px #000;
+  border-bottom: 1px solid;
+  border-image: linear-gradient(90deg, rgba(230, 238, 247, 0.4), transparent) 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -335,20 +336,20 @@
 .tile-group[data-span='1'] { letter-spacing: 0.04em; padding: 0 2px 1px; }
 .tile.offline > :not(.tile-name) { opacity: 0.35; }
 .tile.offline .tile-name { color: rgba(233, 222, 250, 0.5); }
-.tile.hot { border-color: rgba(255, 255, 255, 0.5); }
+.tile.hot { border-color: rgba(230, 238, 247, 0.45); }
 .tile.locked-p1 { border-color: var(--p1); }
 .tile.locked-p2 { border-color: var(--p2); }
 .grid.more-above::before,
-.grid.more-below::after { content: ''; position: absolute; left: -32px; right: -32px; height: 28px; z-index: 6; pointer-events: none; }
+.grid.more-below::after { content: ''; position: absolute; left: -12px; right: -12px; height: 28px; z-index: 6; pointer-events: none; }
 .grid.more-above::before { top: 0; background: linear-gradient(rgba(5, 2, 12, 0.85), transparent); }
 .grid.more-below::after { bottom: 0; background: linear-gradient(transparent, rgba(5, 2, 12, 0.85)); }
 .cursor {
   box-sizing: border-box;
   z-index: 5;
   pointer-events: none;
-  transform: skewX(-12deg);
-  border: 4px solid var(--c);
-  box-shadow: 0 0 22px var(--c);
+  border: 1px solid var(--c);
+  /* B TRACE: the side's colour on the tile, a dark gap, a faint ring. */
+  box-shadow: 0 0 0 3px rgba(5, 2, 10, 0.8), 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent), 0 0 14px color-mix(in srgb, var(--c) 30%, transparent);
   /* No slide between tiles: Firefox could leave the frame painted at a step of it (between two tiles). */
 }
 .cursor.c1 { --c: var(--p1); }
@@ -358,9 +359,14 @@
 @keyframes pulse {
   50% { opacity: 0.55; }
 }
-.cursor .lbl { position: absolute; top: -4px; padding: 0 6px; transform: skewX(12deg); font: 18px var(--pixel); letter-spacing: 0.1em; color: #000; background: var(--c); }
-.cursor.c1 .lbl { left: -4px; }
-.cursor.c2 .lbl { right: -4px; }
+.cursor .lbl { position: absolute; top: 3px; padding: 1px 4px 0; font: 13px/1 var(--pixel); letter-spacing: 0.14em; color: var(--c); background: rgba(5, 2, 10, 0.8); }
+.cursor.c1 .lbl { left: 3px; }
+.cursor.c2 .lbl { right: 3px; }
+/* The pick leaders (select-leads.ts) run behind the tiles. */
+.select-stage > svg.hv-lead[data-lead^='pick'] { z-index: 14; }
+.select-stage > svg.hv-lead[data-lead^='pick'] path { stroke-opacity: 0.85; filter: drop-shadow(0 0 2px var(--hv-c)); }
+.select-stage > svg.hv-lead[data-lead^='pick'] .dot,
+.select-stage > svg.hv-lead[data-lead^='pick'] .ring { stroke: var(--hv-c); }
 /* VS: the grid steps back. */
 [data-phase='ready'] .grid-band { opacity: 0.25; filter: grayscale(1); }
 /* The model step's band stands where the grid stood. */
@@ -377,7 +383,7 @@
   bottom: 30px;
   z-index: 3;
   padding: 0 6px;
-  transform: translateX(-50%) skewX(12deg);
+  transform: translateX(-50%);
   font: 14px var(--pixel);
   letter-spacing: 0.15em;
   white-space: nowrap;

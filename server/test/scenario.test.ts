@@ -329,14 +329,22 @@ describe('POST /api/scenario/draft', () => {
       busy: () => null,
       target: (ai) => (ai === 'nix-direct' ? { kind: 'direct', ready: () => true, narrate } : null),
       promptFor: async () => ({ messages: [{ role: 'system', content: NARRATOR_SYSTEM }], pair: PAIR }),
+      story: async () => null,
       ...over,
     };
     const a = Fastify();
     registerScenarioRoutes(a, deps);
     await a.ready();
     const post = (body: unknown) => a.inject({ method: 'POST', url: '/api/scenario/draft', payload: body as object });
-    return { post, narrate };
+    return { post, narrate, a };
   }
+
+  it('GET /api/scenario/story/:ai answers her story for the pair, or null', async () => {
+    const story = vi.fn(async (ai: string) => (ai === 'rue' ? { job: 'run-sheet', text: 'Come up tonight.' } : null));
+    const { a } = await app({ story });
+    expect((await a.inject({ method: 'GET', url: '/api/scenario/story/rue' })).json()).toEqual({ story: { job: 'run-sheet', text: 'Come up tonight.' } });
+    expect((await a.inject({ method: 'GET', url: '/api/scenario/story/nix' })).json()).toEqual({ story: null });
+  });
 
   it('returns the three openings and the pair, passing the steer on', async () => {
     const promptFor = vi.fn(async () => ({ messages: [{ role: 'system' as const, content: NARRATOR_SYSTEM }], pair: PAIR }));

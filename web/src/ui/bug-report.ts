@@ -15,7 +15,7 @@ const COPY = {
   shot: 'Screenshot of the game window',
   turnsScene: 'The last 10 turns of this scene — your story text',
   turnsOf: (name: string) => `The last 10 turns of ${name} — your story text`,
-  fine: "Always included: build version, OS, room, who's here, model, and the last 200 lines of the game's log. Your OpenRouter key is never sent.",
+  fine: "Always included: build version, OS, room, who's here, model, and the last 200 lines of the game's log. Your keys are never sent.",
   tip: 'Tip: press F8 in a scene to report from there, with a screenshot.',
   sending: 'Sending…',
   sent: 'Sent — thanks. Bug reports go straight to the developer.',

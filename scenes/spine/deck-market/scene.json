@@ -373,6 +373,10 @@
       "songs": [
         "Time by the Freight.ogg"
       ]
+    },
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
     }
   },
   "effects": [

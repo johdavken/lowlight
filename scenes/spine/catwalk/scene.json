@@ -392,7 +392,11 @@
     }
   },
   "sound": {
-    "indoor": false
+    "indoor": false,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
+    }
   },
   "effects": [
     {

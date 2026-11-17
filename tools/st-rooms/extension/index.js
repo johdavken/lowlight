@@ -229,7 +229,14 @@ if (!IS_PACKAGE) try {
 
 eventSource.on(eventTypes.CHAT_CHANGED, showYou);
 eventSource.on(eventTypes.PERSONA_CHANGED, showYou);
-eventSource.on(eventTypes.MESSAGE_RECEIVED, () => travelNote(''));
+// The note is kept on the reply it was for, so a new take of that reply gets it again (room-tools.js).
+eventSource.on(eventTypes.MESSAGE_RECEIVED, (i) => {
+  const c = SillyTavern.getContext();
+  const note = c.extensionPrompts?.[TRAVEL_KEY]?.value;
+  const msg = c.chat?.[typeof i === 'number' ? i : c.chat.length - 1];
+  if (note && msg && !msg.is_user) msg.extra = { ...msg.extra, lowlight_note: note };
+  travelNote('');
+});
 eventSource.on(eventTypes.CHAT_CHANGED, () => travelNote(''));
 showYou();
 

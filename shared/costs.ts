@@ -15,7 +15,7 @@ export const COSTS: Record<CostId, { tag: string; meaning: string }> = {
   heat: { tag: 'HEAT +1', meaning: 'The district will remember this after the job: a face seen, a name passed on. Nothing changes inside the job itself.' },
   worse: { tag: 'NEXT ROLL WORSE', meaning: 'The very next obstacle is now more dangerous: a specific threat waiting there. Nobody suspects the job as a whole any more than before.' },
   small: { tag: 'NEXT ROLL SMALL', meaning: 'The next obstacle will pay less if you get through: the prize or the window shrinks. It is not more dangerous and nobody is more suspicious.' },
-  take: { tag: 'TAKE −1', meaning: 'You lose part of what you have taken so far (only from the loot listed).' },
+  take: { tag: 'TAKE −1', meaning: 'You lose part of the haul: first what this move just got you, then what you already held (only from the loot listed).' },
 };
 /** What a roll can deal. `heat` stays a CostId for a waiting roll dealt before ALARM became HEAT (tier template spec §2). */
 const ORDER: readonly CostId[] = ['alarm', 'worse', 'small', 'take'];
@@ -68,6 +68,17 @@ const PICKS: Record<Position, { cost: number; miss: number }> = { dark: { cost: 
 export function picksFor(kind: DiceResult['kind'], position: Position, dealt: number): number {
   if (kind !== 'cost' && kind !== 'miss') return 0;
   return Math.min(dealt, PICKS[position][kind]);
+}
+
+/**
+ * What TAKE −1 would leave (2026-11-08, playtest): the roll's own gain is capped at the clock first, then the cost and any
+ * other loss on the roll come off, as the roll lands (`jobStep`'s `takeFill`). At TAKE 0 it shows the cost taking back what
+ * the roll just earned, which an unmoving meter hid. `gain`: what the result fills at its effect; `other`: a trade's TAKE
+ * and a greed press's on a miss.
+ */
+export function takePreview(o: { banked: number; gain: number; size: number; other: number }): { banked: number; earned: number; other: number; after: number; size: number } {
+  const earned = Math.max(0, Math.min(o.size, o.banked + o.gain) - o.banked);
+  return { banked: o.banked, earned, other: o.other, after: Math.max(0, o.banked + earned - o.other - 1), size: o.size };
 }
 
 /** RESIST's NERVE (§1.3) by the kept die: 6 → 0, 4–5 → 1, 1–3 → 2; two 6s give one back (−1). */

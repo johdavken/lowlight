@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { listenScreenCycle, nextScreen, type CycleScreen } from '../src/room/screen-cycle';
+import { CYCLE, listenScreenCycle, nextScreen, type CycleScreen } from '../src/room/screen-cycle';
 
 const tab = (init: KeyboardEventInit = {}, target: EventTarget = document.body) => {
   const e = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, ...init });
@@ -15,10 +15,10 @@ afterEach(() => {
 });
 
 describe('nextScreen', () => {
-  it('YOU → PEOPLE → TEXTS → QUEST → CREW → MAP → BOOK → YOU, and back the other way', () => {
+  it("YOU → PEOPLE → QUEST → CREW → MAP → BOOK → YOU, and back the other way (TEXTS is PEOPLE's tab, not a stop)", () => {
+    expect(CYCLE).not.toContain('texts');
     expect(nextScreen('you', 1)).toBe('people');
-    expect(nextScreen('people', 1)).toBe('texts');
-    expect(nextScreen('texts', 1)).toBe('quest');
+    expect(nextScreen('people', 1)).toBe('quest');
     expect(nextScreen('quest', 1)).toBe('crew');
     expect(nextScreen('crew', 1)).toBe('map');
     expect(nextScreen('map', 1)).toBe('book');
@@ -26,8 +26,7 @@ describe('nextScreen', () => {
     expect(nextScreen('you', -1)).toBe('book');
     expect(nextScreen('book', -1)).toBe('map');
     expect(nextScreen('crew', -1)).toBe('quest');
-    expect(nextScreen('quest', -1)).toBe('texts');
-    expect(nextScreen('texts', -1)).toBe('people');
+    expect(nextScreen('quest', -1)).toBe('people');
     expect(nextScreen('people', -1)).toBe('you');
   });
   it('starts at YOU with nothing open, and at BOOK going back', () => {
@@ -36,8 +35,8 @@ describe('nextScreen', () => {
   });
   it('skips a screen that is not on the bar (QUEST with nothing to list)', () => {
     const noQuest = (s: CycleScreen) => s !== 'quest';
-    expect(nextScreen('texts', 1, noQuest)).toBe('crew');
-    expect(nextScreen('crew', -1, noQuest)).toBe('texts');
+    expect(nextScreen('people', 1, noQuest)).toBe('crew');
+    expect(nextScreen('crew', -1, noQuest)).toBe('people');
   });
 });
 
@@ -61,7 +60,7 @@ describe('listenScreenCycle', () => {
     const { go, room, done } = listen({ current: 'people' });
     expect(tab().defaultPrevented).toBe(true);
     tab({ shiftKey: true });
-    expect(go.mock.calls).toEqual([['texts', 1], ['you', -1]]);
+    expect(go.mock.calls).toEqual([['quest', 1], ['you', -1]]);
     expect(room).not.toHaveBeenCalled();
     done();
   });

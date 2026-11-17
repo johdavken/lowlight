@@ -399,6 +399,21 @@ describe('cipher (cipher spec §2.3)', () => {
     expect(r.applied).toContain('clue T1');
   });
 
+  it('a clue cut to fit ends in … and is still checked against the page (2026-11-08)', () => {
+    const long = `a thick envelope ${'and more words '.repeat(15)}`.trim();
+    applyResidual({ ...deps(), cipher: cipherDeps() }, { ...empty, cipher: { clues: [{ id: 'T1', text: long }], learned: [] } }, { messageId: 'a1', take: 0, kind: 'turn' });
+    const text = (evs[0] as { text: string }).text;
+    expect(text.endsWith('…')).toBe(true);
+    expect(text.length).toBeLessThanOrEqual(160);
+    expect(text).not.toMatch(/ …$/);
+    expect(evs[0]).toMatchObject({ onPage: true });
+  });
+
+  it('a clue that fits is never given …', () => {
+    applyResidual({ ...deps(), cipher: cipherDeps() }, { ...empty, cipher: { clues: [{ id: 'T1', text: 'a thick envelope' }], learned: [] } }, { messageId: 'a1', take: 0, kind: 'turn' });
+    expect((evs[0] as { text: string }).text).toBe('a thick envelope');
+  });
+
   it('a clue the page never showed is kept, off the page', () => {
     applyResidual({ ...deps(), cipher: cipherDeps() }, { ...empty, cipher: { clues: [{ id: 'T1', text: 'a burned receipt' }], learned: [] } }, { messageId: 'a1', take: 0, kind: 'turn' });
     expect(evs[0]).toMatchObject({ t: 'clue', onPage: false });

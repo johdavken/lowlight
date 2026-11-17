@@ -32,7 +32,7 @@
   "sprite": {
     "src": "nix-direct-outfit-outdoors.png",
     "pixel": true,
-    "waist": 0.365
+    "waist": 0.382
   },
   "expressions": {
     "happy": "nix-direct-happy.png",
@@ -40,6 +40,7 @@
     "concerned": "nix-direct-concerned.png",
     "tired": "nix-direct-tired.png"
   },
+  "commsFigure": "nix-direct-comms.png",
   "outfits": {
     "outdoors": "nix-direct-outfit-outdoors.png",
     "indoors": "nix-direct-outfit-indoors.png",
@@ -50,14 +51,14 @@
   "outfitByScene": {
     "karasu/lowlight-intake": "indoors",
     "karasu/nix-apartment": "home",
-    "drownworks/pump-house-nine": "coat",
+    "drownworks/pump-house-nine": "jacket",
     "karasu/cass-apartment": "jacket",
     "karasu/hicks-room": "jacket",
     "karasu/the-tilt": "jacket",
     "karasu/zhou-flat": "jacket",
     "velvet/glass-orchid": "jacket",
     "velvet/under-the-cat": "jacket",
-    "marsh/counting-house": "coat"
+    "marsh/counting-house": "jacket"
   },
   "outfitWears": {
     "outdoors": "black leather moto jacket over a grey tee, ID badge on a lanyard, black cargo trousers, laced black combat boots",
@@ -83,6 +84,12 @@
     },
     {
       "from": "05:00",
+      "to": "13:00",
+      "room": "karasu/nix-apartment",
+      "sleeps": true
+    },
+    {
+      "from": "13:00",
       "to": "18:00",
       "room": "karasu/nix-apartment"
     },

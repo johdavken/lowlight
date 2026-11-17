@@ -109,10 +109,23 @@ function residentRooms(repo: string): Map<string, string> {
 
 const folder = (room: string) => room.split('/').pop()!;
 
+/** The characters the package carries: all but nix and the made person's stand-in (character creator spec 2026-11-14). */
+export function castIds(repo: string): string[] {
+  return fs.readdirSync(path.join(repo, 'characters')).filter((id) => {
+    const file = path.join(repo, 'characters', id, 'character.json');
+    if (id === 'nix' || !fs.existsSync(file)) return false;
+    try {
+      return (JSON.parse(fs.readFileSync(file, 'utf8')) as { standIn?: unknown }).standIn !== true;
+    } catch {
+      return true;
+    }
+  });
+}
+
 export async function exportCast(o: ExportOptions): Promise<{ cast: CastJson; report: string[] }> {
   const { repo } = o;
   const version = o.version ?? '0.0.0';
-  const ids = o.ids ?? fs.readdirSync(path.join(repo, 'characters')).filter((id) => id !== 'nix' && fs.existsSync(path.join(repo, 'characters', id, 'character.json')));
+  const ids = o.ids ?? castIds(repo);
   const src = fs.readFileSync(path.join(repo, 'server', 'src', 'instructions.ts'), 'utf8');
   const guide = /export const ROLEPLAY_GUIDE = `([\s\S]*?)`;/.exec(src)![1]
     // Lowlight-only: the renderer note and the clock tool.

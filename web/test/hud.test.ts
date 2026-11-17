@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Atmosphere } from '../../shared/types';
-import { Hud } from '../src/ui/hud';
+import { Hud, TEXTS_HOLD_MS, TEXTS_LEAVE_MS } from '../src/ui/hud';
 
 const atmo = (over: Partial<Atmosphere>): Atmosphere => ({
   ambient: '#101020',
@@ -195,7 +195,7 @@ describe('Hud fit (one bar: tighten, cut long names, then drop weather, then the
   it('the room name keeps its full text as a tooltip', () => {
     const { root, hud } = fitHud(1200);
     hud.setScene('Lowlight Intake');
-    expect(root.querySelector<HTMLElement>('.scene')!.title).toBe('LOWLIGHT INTAKE');
+    expect(root.querySelector<HTMLElement>('.scene')!.dataset.tip).toBe('LOWLIGHT INTAKE');
   });
 
   it('short of room, the screens drop to their letters, no underline', () => {
@@ -243,7 +243,7 @@ describe('Hud fit order: the type tightens before a name is cut', () => {
     expect(labels).toEqual(['hud-you', 'hud-people', 'hud-map']);
     expect(root.querySelector('.hud-save, .hud-dice')).toBeNull();
     const people = root.querySelector<HTMLElement>('.hud-people')!;
-    expect(people.title).toBe('People (Alt+P)');
+    expect(people.dataset.tip).toBe('People (Alt+P)');
     people.click();
     expect(onPeople).toHaveBeenCalledTimes(1);
   });
@@ -259,9 +259,8 @@ describe('Hud fit order: the type tightens before a name is cut', () => {
     expect(lit()).toEqual(['hud-people']);
     hud.setOpen('map');
     expect(lit()).toEqual(['hud-map']);
-    hud.setTextsScreen(() => {});
-    hud.setOpen('texts');
-    expect(lit()).toEqual(['hud-tx']);
+    // TEXTS is PEOPLE's tab (2026-11-15): no word of its own on the bar.
+    expect(root.querySelector('.hud-tx')).toBeNull();
     hud.setOpen(null);
     expect(lit()).toEqual([]);
   });
@@ -285,7 +284,6 @@ describe('Hud Keys bar and SYS', () => {
     hud.setBackLink(() => {});
     hud.setYou(() => {});
     hud.setPeople(() => {});
-    hud.setTextsScreen(() => {});
     hud.setSave(() => {});
     hud.setMapLink(() => {});
     return { root, hud, sys: q(root, '.hud-sys') };
@@ -313,11 +311,46 @@ describe('Hud Keys bar and SYS', () => {
     expect(hud.where()).toContain('THE NOODLE STALL');
   });
 
-  it('the right side, in order: texts (promised texts spec §6), notice, YOU, PEOPLE, TEXTS, QUEST, CREW, MAP, BOOK, SYS', () => {
+  it('with a pause menu, the SYS word opens it (click or Enter) instead of the dropdown', () => {
+    const { root, hud, sys } = setup2();
+    const pause = vi.fn();
+    hud.setPause(pause);
+    sys.click();
+    sys.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+    expect(pause).toHaveBeenCalledTimes(2);
+    expect(q(root, '.sys-menu').hidden).toBe(true);
+  });
+
+  it('settings: SYS opens inside a host as a page, lights the SYS word, tells its watchers, and comes home when it shuts', () => {
+    const { root, hud } = setup2();
+    const host = document.createElement('div');
+    document.body.append(host);
+    const seen: boolean[] = [];
+    const off = hud.settings.watch((o) => seen.push(o));
+    hud.settings.open(host);
+    const menu = host.querySelector<HTMLElement>('.sys-menu')!;
+    expect(menu.hidden).toBe(false);
+    expect(menu.classList.contains('sys-paged')).toBe(true);
+    expect(root.classList.contains('sys-open')).toBe(true);
+    expect(hud.sysOpen).toBe(true);
+    hud.settings.close();
+    expect(menu.parentElement).toBe(root);
+    expect(menu.classList.contains('sys-paged')).toBe(false);
+    expect(root.classList.contains('sys-open')).toBe(false);
+    expect(seen).toEqual([true, false]);
+    off();
+    hud.openSys();
+    hud.settings.close();
+    expect(seen).toEqual([true, false]);
+  });
+
+  it('the right side, in order: YOU, PEOPLE, QUEST, CREW, MAP, BOOK, SYS; the warning and texts notices under the bar', () => {
     const { root } = full();
     expect([...q(root, '.hud-right').children].map((c) => c.className.split(' ')[0])).toEqual([
-      'hud-texts', 'notice', 'hud-you', 'hud-people', 'hud-tx', 'hud-quest', 'hud-crew', 'hud-map', 'hud-book', 'hud-sys',
+      'hud-you', 'hud-people', 'hud-quest', 'hud-crew', 'hud-map', 'hud-book', 'hud-sys',
     ]);
+    expect([...q(root, '.hud-notices').children].map((c) => c.className.split(' ')[0])).toEqual(['hud-texts', 'notice']);
+    expect(root.querySelector('.hud-bar .hud-notices, .hud-bar .hud-texts')).toBeNull();
     expect(root.querySelector('.hud-sound, .hud-speed, .hud-bar .hud-model')).toBeNull();
   });
 
@@ -325,12 +358,12 @@ describe('Hud Keys bar and SYS', () => {
     const { root } = full();
     for (const [cls, k, t] of [['hud-people', 'P', 'People (Alt+P)'], ['hud-you', 'Y', 'You (Alt+Y)']]) {
       expect(q(root, `.${cls}`).dataset.key).toBe(k);
-      expect(q(root, `.${cls}`).title).toBe(t);
+      expect(q(root, `.${cls}`).dataset.tip).toBe(t);
       expect(q(root, `.${cls} u`).textContent).toBe(k);
     }
     expect(q(root, '.hud-back').textContent).toBe('‹');
     expect(q(root, '.hud-back').dataset.key).toBe('T');
-    expect(q(root, '.hud-back').title).toBe('Title (Alt+T)');
+    expect(q(root, '.hud-back').dataset.tip).toBe('Title (Alt+T)');
     expect(q(root, '.hud-map').dataset.key).toBeUndefined();
   });
 
@@ -340,17 +373,7 @@ describe('Hud Keys bar and SYS', () => {
     const crew = q(root, '.hud-crew');
     expect(crew.textContent).toBe('CREW');
     expect(crew.querySelector('u')).toBeNull();
-    expect(crew.title).toBe('Crew (Alt+K)');
-  });
-
-  it('TEXTS underlines its X, not its first letter (in-game texts spec §2)', () => {
-    const { root } = full();
-    const tx = q(root, '.hud-tx');
-    expect(tx.dataset.key).toBe('X');
-    expect(tx.title).toBe('Texts (Alt+X)');
-    expect(tx.textContent).toBe('TEXTS');
-    expect(tx.querySelector('u')!.textContent).toBe('X');
-    expect(tx.firstChild!.textContent).toBe('TE');
+    expect(crew.dataset.tip).toBe('Crew (Alt+K)');
   });
 
   it('holding Alt lights the keycaps; letting go or leaving the window puts them out', () => {
@@ -389,11 +412,11 @@ describe('Hud Keys bar and SYS', () => {
     const { root, hud, sys } = full();
     const onToggle = vi.fn();
     const onWheel = vi.fn();
-    hud.setSoundControl({ onToggle, onWheel, onMusic: vi.fn(), onAmbient: vi.fn() });
+    hud.setSoundControl({ onToggle, onWheel, onMusic: vi.fn(), onVoice: vi.fn(), onUi: vi.fn(), onBackground: vi.fn(), onAmbient: vi.fn() });
     hud.showSound({ kind: 'locked' });
     expect(q(root, '.sys-note').textContent).toBe('♪');
-    expect(sys.title).toContain('Click anywhere for sound');
-    hud.showSound({ kind: 'on', volume: 0.6, muted: false, music: 1, ambient: 1 });
+    expect(sys.dataset.tip).toContain('Click anywhere for sound');
+    hud.showSound({ kind: 'on', volume: 0.6, muted: false, music: 1, voice: 0.75, ui: 1, ambient: 1, muteInBackground: false });
     expect(q(root, '.sys-note').textContent).toBe('');
     expect(q(root, '.sys-row[data-row="sound"] .sys-value').textContent).toBe('60%');
     const up = new WheelEvent('wheel', { deltaY: -100, cancelable: true });
@@ -498,45 +521,9 @@ describe('Hud Keys bar and SYS', () => {
     expect(row().hidden).toBe(true);
   });
 
-  it('setTextSpeedControl: a speed word calls onPick, ← → on TEXT call onStep', () => {
-    const { root, hud, sys } = full();
-    const onPick = vi.fn();
-    const onStep = vi.fn();
-    hud.setTextSpeedControl({ onPick, onStep });
-    hud.showTextSpeed('fast');
-    expect(q(root, 'i[data-speed].on').textContent).toBe('FAST');
-    q(root, 'i[data-speed="slow"]').click();
-    expect(onPick).toHaveBeenCalledWith('slow');
-    sys.click();
-    // SOUND, then TEXT.
-    for (let i = 0; i < 1; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
-    expect(onStep).toHaveBeenCalledWith(1);
-  });
-
-  it('CHAT KEYS sits under FONT, FONT under TEXT SIZE: a word picks it, ← → switch to the other (subtitle chat box §7)', () => {
-    const { root, hud, sys } = full();
-    const onPick = vi.fn();
-    hud.setChatKeysControl(onPick);
-    hud.showChatKeys('glyphs');
-    const row = q(root, '.sys-row[data-row="keys"]');
-    expect(row.previousElementSibling).toBe(q(root, '.sys-row[data-row="font"]'));
-    expect(q(root, '.sys-row[data-row="font"]').previousElementSibling).toBe(q(root, '.sys-row[data-row="size"]'));
-    expect(row.querySelector('.sys-label')!.textContent).toBe('CHAT KEYS');
-    expect(q(root, 'i[data-keys].on').textContent).toBe('GLYPHS');
-    q(root, 'i[data-keys="labels"]').click();
-    expect(onPick).toHaveBeenLastCalledWith('labels');
-    sys.click();
-    // SOUND, TEXT, TEXT SIZE, FONT, CHAT KEYS.
-    for (let i = 0; i < 4; i++) window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', cancelable: true }));
-    expect(row.classList.contains('on')).toBe(true);
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }));
-    expect(onPick).toHaveBeenLastCalledWith('labels');
-    hud.showChatKeys('labels');
-    expect(q(root, 'i[data-keys].on').textContent).toBe('LABELS');
-    expect(q(root, 'i[data-keys="glyphs"]').classList.contains('on')).toBe(false);
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true }));
-    expect(onPick).toHaveBeenLastCalledWith('glyphs');
+  it("SYS no longer holds the box's settings: TEXT, TEXT SIZE, FONT and CHAT KEYS are on the box's key (box-settings.ts)", () => {
+    const { root } = full();
+    for (const r of ['text', 'size', 'font', 'keys']) expect(root.querySelector(`.sys-row[data-row="${r}"]`)).toBeNull();
   });
 });
 
@@ -544,6 +531,7 @@ describe('the texts signal (promised texts spec §6)', () => {
   afterEach(() => {
     while (huds.length > 0) huds.pop()!.dispose();
     vi.restoreAllMocks();
+    vi.useRealTimers();
   });
   it('NIX · 1 TEXT, 2 TEXTS · NIX, HICKS, and nothing when there are none', () => {
     const { root, hud } = setup();
@@ -568,14 +556,80 @@ describe('the texts signal (promised texts spec §6)', () => {
     expect(onOpen.mock.calls).toEqual([['nix'], ['nix']]);
     expect(open).not.toHaveBeenCalled();
   });
-  it('the TEXTS word carries a dot while anyone has texted unseen', () => {
+  it("PEOPLE's word carries the count while anyone has texted unseen (TEXTS is its tab)", () => {
     const { root, hud } = setup();
-    hud.setTextsScreen(() => {});
-    const tx = root.querySelector<HTMLElement>('.hud-tx')!;
+    hud.setPeople(() => {});
+    const tx = root.querySelector<HTMLElement>('.hud-people')!;
     hud.setTexts([{ id: 'nix', name: 'Nix' }]);
     expect(tx.classList.contains('texts-new')).toBe(true);
+    expect(tx.dataset.count).toBe('1');
+    hud.setTexts([{ id: 'nix', name: 'Nix' }, { id: 'hicks', name: 'Hicks' }]);
+    expect(tx.dataset.count).toBe('2');
     hud.setTexts([]);
     expect(tx.classList.contains('texts-new')).toBe(false);
+    expect(tx.dataset.count).toBeUndefined();
+  });
+  it('the notice drops in when a text lands, folds into PEOPLE after a few seconds (a ping), and is back while pointed at', () => {
+    vi.useFakeTimers();
+    const { root, hud } = setup();
+    hud.setPeople(() => {});
+    const el = root.querySelector<HTMLElement>('.hud-texts')!;
+    const tx = root.querySelector<HTMLElement>('.hud-people')!;
+    hud.setTexts([{ id: 'nix', name: 'Nix' }]);
+    expect(el.classList.contains('folded')).toBe(false);
+    expect(el.classList.contains('drop')).toBe(true);
+    vi.advanceTimersByTime(TEXTS_HOLD_MS);
+    expect(el.classList.contains('folded')).toBe(true);
+    expect(tx.classList.contains('ping')).toBe(true);
+    // The same list again doesn't bring it back; a new sender does.
+    hud.setTexts([{ id: 'nix', name: 'Nix' }]);
+    expect(el.classList.contains('folded')).toBe(true);
+    // The drop ends: its class goes, so pointing doesn't replay it.
+    el.dispatchEvent(new Event('animationend'));
+    expect(el.classList.contains('drop')).toBe(false);
+    hud.setTexts([{ id: 'nix', name: 'Nix' }, { id: 'cass', name: 'Cass' }]);
+    expect(el.classList.contains('folded')).toBe(false);
+    vi.advanceTimersByTime(TEXTS_HOLD_MS);
+    expect(el.classList.contains('folded')).toBe(true);
+    // Pointing at TEXTS shows it; leaving folds it after a beat, unless the pointer reaches the notice.
+    tx.dispatchEvent(new Event('pointerenter'));
+    expect(el.classList.contains('folded')).toBe(false);
+    tx.dispatchEvent(new Event('pointerleave'));
+    vi.advanceTimersByTime(TEXTS_LEAVE_MS / 2);
+    el.dispatchEvent(new Event('pointerenter'));
+    vi.advanceTimersByTime(TEXTS_LEAVE_MS);
+    expect(el.classList.contains('folded')).toBe(false);
+    el.dispatchEvent(new Event('pointerleave'));
+    vi.advanceTimersByTime(TEXTS_LEAVE_MS);
+    expect(el.classList.contains('folded')).toBe(true);
+    // Keyboard focus counts as pointing, and the pointer leaving doesn't fold it while focus stays.
+    el.dispatchEvent(new Event('focusin'));
+    expect(el.classList.contains('folded')).toBe(false);
+    el.dispatchEvent(new Event('pointerenter'));
+    el.dispatchEvent(new Event('pointerleave'));
+    vi.advanceTimersByTime(TEXTS_LEAVE_MS);
+    expect(el.classList.contains('folded')).toBe(false);
+    el.dispatchEvent(new Event('focusout'));
+    expect(el.classList.contains('folded')).toBe(true);
+  });
+  it('the same senders sent again keep the notice on its first clock', () => {
+    vi.useFakeTimers();
+    const { root, hud } = setup();
+    const el = root.querySelector<HTMLElement>('.hud-texts')!;
+    hud.setTexts([{ id: 'nix', name: 'Nix' }]);
+    vi.advanceTimersByTime(TEXTS_HOLD_MS - 1000);
+    hud.setTexts([{ id: 'nix', name: 'Nix' }]);
+    vi.advanceTimersByTime(1000);
+    expect(el.classList.contains('folded')).toBe(true);
+  });
+  it('the warning is pinned: it never folds', () => {
+    vi.useFakeTimers();
+    const { root, hud } = setup();
+    hud.setNotice('// RENDERER OFFLINE');
+    vi.advanceTimersByTime(TEXTS_HOLD_MS * 3);
+    const n = root.querySelector<HTMLElement>('.hud-notices > .notice')!;
+    expect(n.hidden).toBe(false);
+    expect(n.classList.contains('folded')).toBe(false);
   });
   it('the bar refits when it appears (final review M2)', () => {
     const { hud } = setup();

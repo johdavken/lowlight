@@ -61,8 +61,8 @@ const agents = new Map<string, LandingAgent>([
 ]);
 
 const key = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, cancelable: true }));
-const tiles = () => [...document.querySelectorAll<HTMLElement>('.title-menu .tile')].map((t) => t.dataset.id);
-const focused = () => document.querySelector<HTMLElement>('.title-menu .tile.on')?.dataset.id;
+const rows = () => [...document.querySelectorAll<HTMLElement>('.title-menu .tm-item')].map((t) => t.dataset.id);
+const focused = () => document.querySelector<HTMLElement>('.title-menu .tm-item.on')?.dataset.id;
 const text = (sel: string) => document.querySelector(`.title-menu ${sel}`)?.textContent ?? null;
 const p1 = (sel: string) => text(`.fighter.p1 ${sel}`);
 const p2 = (sel: string) => text(`.fighter.p2 ${sel}`);
@@ -90,9 +90,9 @@ afterEach(() => {
 });
 
 describe('title menu', () => {
-  it('REPORT A BUG is the last tile; Enter on it calls onReport', async () => {
+  it('REPORT A BUG is the last row; Enter on it calls onReport', async () => {
     const deps = await mount(fakeApi());
-    key('ArrowRight');
+    key('ArrowDown');
     expect(focused()).toBe('report');
     expect(text('.title-logo')).toBe('REPORT A BUG');
     expect(under()).toBe('SOMETHING BROKE? TELL THE DEVELOPER');
@@ -102,9 +102,9 @@ describe('title menu', () => {
     expect(deps.onNewGame).not.toHaveBeenCalled();
   });
 
-  it('no playthrough: only the NEW GAME tile, focused; both fighters waiting with ???', async () => {
+  it('no playthrough: only NEW GAME and REPORT A BUG, NEW GAME focused; both fighters waiting with ???', async () => {
     const deps = await mount(fakeApi());
-    expect(tiles()).toEqual(['new', 'report']);
+    expect(rows()).toEqual(['new', 'report']);
     expect(focused()).toBe('new');
     expect(document.querySelector('.title-menu .fighter.p1')!.classList.contains('waiting')).toBe(true);
     expect(p1('.name')).toBe('???');
@@ -119,8 +119,8 @@ describe('title menu', () => {
 
   it('playthroughs but none active: NEW GAME and LOAD; → Enter calls onLoad', async () => {
     const deps = await mount(fakeApi({ others: [playthrough(), playthrough({ id: 'pt-2', name: 'Imported – cass' })] }));
-    expect(tiles()).toEqual(['new', 'load', 'report']);
-    key('ArrowRight');
+    expect(rows()).toEqual(['new', 'load', 'report']);
+    key('ArrowDown');
     expect(focused()).toBe('load');
     expect(deps.sound).toHaveBeenCalledWith('move');
     expect(under()).toBe('2 GAMES');
@@ -138,7 +138,7 @@ describe('title menu', () => {
       playthrough({ id: 'pt-6', name: 'Test three' }),
     ];
     await mount(fakeApi({ others }));
-    key('ArrowRight');
+    key('ArrowDown');
     expect(under()).toBe('5 GAMES');
     expect(p1('.dh')).toBe('// KEPT');
     expect([...document.querySelectorAll('.title-menu .fighter.p1 .pt b')].map((b) => b.textContent)).toEqual(['Main Rue Game', 'Soren run']);
@@ -148,21 +148,22 @@ describe('title menu', () => {
 
   it('with none starred, the LOAD card says how to star', async () => {
     await mount(fakeApi({ others: [playthrough(), playthrough({ id: 'pt-2', name: 'Imported – cass' })] }));
-    key('ArrowRight');
+    key('ArrowDown');
     expect(document.querySelectorAll('.title-menu .fighter.p1 .pt')).toHaveLength(0);
     expect(text('.fighter.p1')).toContain('S on LOAD stars a game you want to keep');
   });
 
-  it('all four tiles fit the band at once: REPORT A BUG is never cut off', async () => {
+  it('the list holds all four rows, REPORT A BUG last, the amber line on the focused one only', async () => {
     await mount(fakeApi({ active: playthrough(), contacts: [known[0]!] }));
-    expect(tiles()).toEqual(['continue', 'new', 'load', 'report']);
-    expect(document.querySelector('.title-menu .band')!.classList.contains('more-right')).toBe(false);
+    expect(rows()).toEqual(['continue', 'new', 'load', 'report']);
+    expect(document.querySelectorAll('.title-menu .title-under')).toHaveLength(1);
+    expect(document.querySelector('.title-menu .tm-item.on .title-under')).not.toBeNull();
   });
 
   it('active: CONTINUE first; 1P is the player with // LAST SCENE; CPU is Nix with // LAST LINE; the under line names the place', async () => {
     const api = fakeApi({ active: playthrough(), contacts: [{ ...known[0]!, lastLine: { speaker: 'Nix', text: 'Fee clears first.' } }, known[1]!] });
     const deps = await mount(api);
-    expect(tiles()).toEqual(['continue', 'new', 'load', 'report']);
+    expect(rows()).toEqual(['continue', 'new', 'load', 'report']);
     expect(focused()).toBe('continue');
     expect(p1('.name')).toBe('HICKS');
     expect(p1('.tag')).toBe('1P · YOU');
@@ -183,62 +184,63 @@ describe('title menu', () => {
     expect(p1('.name')).toBe('HICKS');
   });
 
-  it('↓ cycles the contact: CPU becomes CASS and, her room unknown, the backdrop goes to the skyline', async () => {
+  it('→ cycles the contact: CPU becomes CASS and, her room unknown, the backdrop goes to the skyline', async () => {
     const deps = await mount(fakeApi({ active: playthrough() }));
-    key('ArrowDown');
+    key('ArrowRight');
     expect(p2('.name')).toBe('CASS');
     expect(under()).toBe('RIBBON ROOFTOP · 2H AGO  ◀ 2/2 ▶');
     expect(deps.backdrop).toHaveBeenLastCalledWith(null);
-    key('ArrowDown'); // wraps
+    key('ArrowRight'); // wraps
     expect(p2('.name')).toBe('NIX');
-    key('ArrowUp');
+    key('ArrowLeft');
     expect(p2('.name')).toBe('CASS');
   });
 
-  it('one contact: ↑↓ do nothing and the under line has no ◀ ▶', async () => {
+  it('one contact: ←→ do nothing and the under line has no ◀ ▶', async () => {
     await mount(fakeApi({ active: playthrough(), contacts: [known[0]!] }));
-    key('ArrowDown');
+    key('ArrowRight');
     expect(p2('.name')).toBe('NIX');
     expect(under()).toBe("NIX'S APARTMENT · NIGHT · 2H AGO");
   });
 
-  it('↑↓ off CONTINUE do nothing', async () => {
+  it('←→ off CONTINUE do nothing', async () => {
     await mount(fakeApi({ active: playthrough() }));
-    key('ArrowRight');
     key('ArrowDown');
+    key('ArrowRight');
     expect(focused()).toBe('new');
-    key('ArrowLeft');
+    key('ArrowUp');
     expect(p2('.name')).toBe('NIX');
   });
 
-  it('→ to NEW GAME: the skyline, both fighters waiting', async () => {
+  it('↓ to NEW GAME: the skyline, both fighters waiting', async () => {
     const deps = await mount(fakeApi({ active: playthrough() }));
-    key('ArrowRight');
+    key('ArrowDown');
     expect(focused()).toBe('new');
     expect(deps.backdrop).toHaveBeenLastCalledWith(null);
     expect(p1('.name')).toBe('???');
     expect(under()).toBe('PICK WHO YOU ARE · THEN WHO ANSWERS');
   });
 
-  it("the heading is the focused tile's action, not LOWLIGHT", async () => {
+  it("the heading is the focused row's action, not LOWLIGHT", async () => {
     await mount(fakeApi({ active: playthrough() }));
     expect(text('.title-logo')).toBe('CONTINUE');
-    key('ArrowRight');
+    key('ArrowDown');
     expect(text('.title-logo')).toBe('NEW GAME');
-    key('ArrowRight');
+    key('ArrowDown');
     expect(text('.title-logo')).toBe('LOAD');
   });
 
   it('the hints bracket each key, so a key never reads as part of its action', async () => {
     await mount(fakeApi({ active: playthrough() }));
-    expect(text('.title-hints')).toBe('[←→] CHOOSE · [↑↓] CONTACT · [ENTER] JACK IN · [ESC] SPLASH');
-    key('ArrowRight');
-    expect(text('.title-hints')).toBe('[←→] CHOOSE · [ENTER] JACK IN · [ESC] SPLASH');
+    expect(text('.title-hints')).toBe('[↑↓] CHOOSE · [←→] CONTACT · [ENTER] JACK IN · [ESC] SPLASH');
+    expect(document.querySelector('.title-menu .title-hints b')!.textContent).toBe('[↑↓]');
+    key('ArrowDown');
+    expect(text('.title-hints')).toBe('[↑↓] CHOOSE · [ENTER] JACK IN · [ESC] SPLASH');
   });
 
-  it('← at the first tile stays; sound(move) only when the focus moves', async () => {
+  it('↑ at the first row stays; sound(move) only when the focus moves', async () => {
     const deps = await mount(fakeApi({ active: playthrough() }));
-    key('ArrowLeft');
+    key('ArrowUp');
     expect(focused()).toBe('continue');
     expect(deps.sound).not.toHaveBeenCalled();
   });
@@ -246,12 +248,12 @@ describe('title menu', () => {
   it('Enter on CONTINUE: lock flash on both fighters, JACK IN, then setLocation and nav after JACK_MS', async () => {
     const api = fakeApi({ active: playthrough() });
     const deps = await mount(api);
-    key('ArrowDown');
+    key('ArrowRight');
     key('Enter');
     expect(document.querySelector('.title-menu .fighter.p1')!.classList.contains('is-locked')).toBe(true);
     expect(document.querySelector('.title-menu .fighter.p2')!.classList.contains('is-locked')).toBe(true);
     expect(document.querySelector('.title-menu .jack-in')!.classList.contains('on')).toBe(true);
-    expect(document.querySelector('.title-menu .cursor')!.classList.contains('live')).toBe(false);
+    expect(document.querySelector('.title-menu .title-list')!.classList.contains('locked')).toBe(true);
     expect(deps.nav).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(JACK_MS);
     expect(api.setLocation).toHaveBeenCalledWith('cass');
@@ -281,7 +283,7 @@ describe('title menu', () => {
   it('CONTINUE on a solo playthrough after ↓: to that contact as usual', async () => {
     const api = fakeApi({ active: playthrough({ solo: true }) });
     const deps = await mount(api);
-    key('ArrowDown');
+    key('ArrowRight');
     expect(under()).not.toMatch(/ON YOUR OWN/);
     key('Enter');
     await vi.advanceTimersByTimeAsync(JACK_MS);
@@ -316,7 +318,7 @@ describe('title menu', () => {
   it('Enter twice on CONTINUE calls setLocation and nav once', async () => {
     const api = fakeApi({ active: playthrough() });
     const deps = await mount(api);
-    key('ArrowDown');
+    key('ArrowRight');
     key('Enter');
     key('Enter');
     await vi.advanceTimersByTimeAsync(JACK_MS * 2);
@@ -324,44 +326,25 @@ describe('title menu', () => {
     expect(deps.nav).toHaveBeenCalledTimes(1);
   });
 
-  it("a failed setLocation shows // COULDN'T REACH … and stays, the cursor live again", async () => {
+  it("a failed setLocation shows // COULDN'T REACH … and stays, the list live again", async () => {
     const api = fakeApi({ active: playthrough() });
     api.setLocation.mockRejectedValueOnce(new ApiError(403, 'unknown-contact'));
     const deps = await mount(api);
-    key('ArrowDown');
+    key('ArrowRight');
     key('Enter');
     await vi.advanceTimersByTimeAsync(JACK_MS);
     expect(deps.nav).not.toHaveBeenCalled();
     expect(text('.title-error')).toContain('unknown-contact');
-    expect(document.querySelector('.title-menu .cursor')!.classList.contains('live')).toBe(true);
-    key('ArrowRight');
+    expect(document.querySelector('.title-menu .title-list')!.classList.contains('locked')).toBe(false);
+    key('ArrowDown');
     expect(focused()).toBe('new');
   });
 
   it('no sprite: Cass shows the badge, not a broken img', async () => {
     await mount(fakeApi({ active: playthrough() }));
-    key('ArrowDown');
+    key('ArrowRight');
     expect(document.querySelector('.title-menu .fighter.p2 .fighter-badge')).not.toBeNull();
     expect(document.querySelector('.title-menu .fighter.p2 img.fighter-art')).toBeNull();
-  });
-
-  it('NEW GAME, LOAD and REPORT A BUG wear their pixel glyphs: a prompt, stacked shards, a transmitter', async () => {
-    await mount(fakeApi({ active: playthrough() }));
-    const glyph = (id: string) => document.querySelector<HTMLElement>(`.title-menu .tile[data-id="${id}"] .tile-glyph`)?.dataset.glyph;
-    expect(['new', 'load', 'report'].map(glyph)).toEqual(['new', 'load', 'report']);
-    expect(document.querySelector('.title-menu .tile-mosaic')).toBeNull();
-  });
-
-  it('a contact with no portrait gets her initial on the CONTINUE tile', async () => {
-    await mount(fakeApi({ active: playthrough(), contacts: [contact({ id: 'nix', name: 'Nix', portrait: null })] }));
-    expect(document.querySelector('.title-menu .tile[data-id="continue"] .tile-mark')!.textContent).toBe('N');
-  });
-
-  it("the CONTINUE tile uses her select thumbnail when the roster has one", async () => {
-    agents.set('nix', agent('nix', 'Nix', { thumb: '/api/agents/nix/thumb' }));
-    await mount(fakeApi({ active: playthrough() }));
-    expect(document.querySelector('.title-menu .tile[data-id="continue"] img.tile-art')!.getAttribute('src')).toBe('/api/agents/nix/thumb');
-    agents.set('nix', agent('nix', 'Nix'));
   });
 
   it('her last line drops the roleplay markup, and a line cut at 120 characters ends with …', async () => {
@@ -376,8 +359,8 @@ describe('title menu', () => {
 
   it('on LOAD the playthrough list is lit, not waiting', async () => {
     await mount(fakeApi({ active: playthrough() }));
-    key('ArrowRight');
-    key('ArrowRight');
+    key('ArrowDown');
+    key('ArrowDown');
     expect(document.querySelector('.title-menu .fighter.p1')!.classList.contains('waiting')).toBe(false);
     expect(document.querySelector('.title-menu .fighter.p2')!.classList.contains('waiting')).toBe(true);
   });
@@ -413,20 +396,20 @@ describe('title menu', () => {
     expect(deps.backdrop).toHaveBeenLastCalledWith('nix');
   });
 
-  it('the mouse over a tile focuses it, with the move sound', async () => {
+  it('the mouse over a row focuses it, with the move sound', async () => {
     const deps = await mount(fakeApi({ active: playthrough() }));
-    document.querySelector<HTMLElement>('.title-menu .tile[data-id="load"]')!.dispatchEvent(new MouseEvent('mouseenter'));
+    document.querySelector<HTMLElement>('.title-menu .tm-item[data-id="load"]')!.dispatchEvent(new MouseEvent('mouseenter'));
     expect(focused()).toBe('load');
     expect(deps.sound).toHaveBeenCalledWith('move');
     expect(deps.onLoad).not.toHaveBeenCalled();
   });
 
-  it('clicking a tile focuses it; clicking the focused tile is Enter', async () => {
+  it('clicking a row focuses it; clicking the focused row is Enter', async () => {
     const deps = await mount(fakeApi({ active: playthrough() }));
-    document.querySelector<HTMLElement>('.title-menu .tile[data-id="load"]')!.click();
+    document.querySelector<HTMLElement>('.title-menu .tm-item[data-id="load"]')!.click();
     expect(focused()).toBe('load');
     expect(deps.onLoad).not.toHaveBeenCalled();
-    document.querySelector<HTMLElement>('.title-menu .tile[data-id="load"]')!.click();
+    document.querySelector<HTMLElement>('.title-menu .tm-item[data-id="load"]')!.click();
     expect(deps.onLoad).toHaveBeenCalledTimes(1);
   });
 
@@ -434,7 +417,7 @@ describe('title menu', () => {
     const api = fakeApi();
     api.listPlaythroughs.mockRejectedValueOnce(new Error('down'));
     await mount(api);
-    expect(tiles()).toEqual(['new', 'report']);
+    expect(rows()).toEqual(['new', 'report']);
   });
 
   it('destroy removes the screen and its keys; no nav after destroy', async () => {

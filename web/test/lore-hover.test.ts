@@ -86,8 +86,10 @@ describe('the lore card', () => {
     expect(card.hidden).toBe(false);
     expect(card.querySelector('.lore-card-title')!.textContent).toBe('Aegis Solutions');
     expect(card.querySelector('.lore-card-text')!.textContent).toBe('Cheaper than SDG.');
+    expect(document.querySelector('svg[data-lead="lore"] path')).not.toBeNull();
     word.dispatchEvent(new MouseEvent('mouseout', { bubbles: true }));
     expect(card.hidden).toBe(true);
+    expect(document.querySelector('svg[data-lead="lore"]')!.childElementCount).toBe(0);
     word.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
     expect(card.hidden).toBe(false);
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));

@@ -7,7 +7,7 @@ import type { ChatMessage } from '../../../shared/types';
 import type { KeyId } from './key-glyphs';
 
 export type ControlAction =
-  | { kind: 'regenerate' | 'continue' | 'delete' | 'rewind' | 'branch'; id: string }
+  | { kind: 'regenerate' | 'continue' | 'delete' | 'rewind'; id: string }
   | { kind: 'swipe'; id: string; index: number }
   | { kind: 'edit'; id: string; text: string };
 
@@ -39,17 +39,13 @@ function editable(m: ChatMessage): boolean {
   return !(m.role === 'user' && (m.mode === 'travel' || m.mode === 'gig' || m.mode === 'dice'));
 }
 
-/** No confirm: the room asks for the branch's name, and Esc there cancels. */
-const branch = (m: ChatMessage, act: (a: ControlAction) => void) => () => act({ kind: 'branch', id: m.id });
-
 /** What the latest line offers (her latest, or the player's when the story ends on it): the box row and the line stack both build from this. */
 export function latestActions(m: ChatMessage, act: (a: ControlAction) => void, startEdit: () => void): LineAction[] {
   const list: LineAction[] = [{ id: 'regenerate', label: 'REGENERATE', run: () => act({ kind: 'regenerate', id: m.id }) }];
   if (m.role === 'agent') list.push({ id: 'continue', label: 'KEEP GOING', run: () => act({ kind: 'continue', id: m.id }) });
   if (editable(m)) list.push({ id: 'edit', label: 'EDIT', run: startEdit });
   list.push({ id: 'delete', label: 'DELETE', run: () => act({ kind: 'delete', id: m.id }) });
-  // Any line, the latest too: the story from here on, as a new playthrough.
-  list.push({ id: 'branch', label: 'BRANCH HERE', run: branch(m, act) });
+  // No BRANCH HERE (playtest 2026-11-11): a rewind saves a checkpoint first, and B on a save in LOAD forks a game.
   return list;
 }
 
@@ -67,7 +63,6 @@ export function controlRow(m: ChatMessage, place: Place, busy: boolean, act: (a:
   add('REWIND HERE', () => {
     if (window.confirm(REWIND_CONFIRM)) act({ kind: 'rewind', id: m.id });
   });
-  add('BRANCH HERE', branch(m, act));
   return row;
 }
 

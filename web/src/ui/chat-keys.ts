@@ -2,6 +2,7 @@
  * The chat box's corner stacks (spec 2026-10-16 subtitle chat box §7): glyphs or labels
  * (SYS → CHAT KEYS) and which stacks are folded, kept per browser like TEXT SIZE.
  */
+import { setTip } from './hover-tag';
 export type ChatKeys = 'glyphs' | 'labels';
 export type FoldSide = 'line' | 'scene';
 
@@ -68,8 +69,9 @@ export function foldArrow(stack: HTMLElement, side: FoldSide): HTMLButtonElement
   const apply = (folded: boolean) => {
     stack.classList.toggle('folded', folded);
     b.setAttribute('aria-expanded', String(!folded));
-    b.title = `${folded ? 'Show' : 'Hide'} ${WHAT[side]}`;
-    b.setAttribute('aria-label', b.title);
+    const words = `${folded ? 'Show' : 'Hide'} ${WHAT[side]}`;
+    setTip(b, words);
+    b.setAttribute('aria-label', words);
   };
   apply(loadFold()[side]);
   b.addEventListener('click', (e) => {

@@ -5,7 +5,7 @@ import path from 'node:path';
 import { modelLabel } from '../../shared/model-label';
 import type { AgentInfo, Crop, SpriteRef } from '../../shared/types';
 import type { OutfitUnlock } from '../../shared/standing';
-import { AGENT_ID_RE, characterFile, deckOf, diceSettings, loadCharacter, statsOf, resolveExpressions, resolveOutfitByScene, resolveOutfitUnlocks, resolveOutfitWears, resolveOutfits, resolveSprite, type Character } from './character';
+import { AGENT_ID_RE, characterFile, deckOf, diceSettings, loadCharacter, statsOf, resolveExpressions, resolveOutfitByScene, resolveOutfitUnlocks, resolveOutfitWears, resolveOutfits, resolveSprite, resolveCommsFigure, type Character } from './character';
 import { DEFAULT_FACE, resolveProfile, type CharacterProfile, type ProfileSource } from './character-profile';
 import { OPENROUTER_BASE_URL } from './config';
 import { oldProfileIdentity } from '../../shared/identity';
@@ -192,6 +192,8 @@ export type SpriteRecord = {
   outfitWears: Record<string, string>;
   /** Outfits by standing: outfit name → what her standing must have reached (and for whom) before it's worn. */
   outfitUnlocks?: Record<string, OutfitUnlock>;
+  /** Her figure while she's on the line (`commsFigure`, 2026-11-08); absent: none. */
+  comms?: string;
 };
 
 /** Outfits and the scene → outfit map from one character file, resolved in its folder. */
@@ -226,6 +228,7 @@ function spriteRef(id: string, sprite: Omit<SpriteRecord, 'file'>, select: strin
     ...(names.length > 0 ? { expressions: Object.fromEntries(names.map((n) => [n, `/api/agents/${id}/sprite/${n}`])) } : {}),
     ...(outfits.length > 0 ? { outfits: Object.fromEntries(outfits.map((n) => [n, `/api/agents/${id}/outfit/${n}`])) } : {}),
     ...(Object.keys(sprite.outfitByScene).length > 0 ? { outfitByScene: sprite.outfitByScene } : {}),
+    ...(sprite.comms ? { comms: `/api/agents/${id}/comms` } : {}),
     // Without faces there's nothing to choose (an explicit `neutral` with faces is sent as null).
     ...(names.length > 0 || select !== undefined ? { selectFace: selectFace(id, sprite.expressions, select, warn) } : {}),
   };
@@ -276,7 +279,11 @@ function resolveLook(id: string, own: Character, charDir: string, base: Characte
   } else if (!spriteBase && hasWardrobe(wardrobeFrom)) {
     warn('outfits need a sprite; ignoring them');
   }
-  const sprite = spriteBase ? { ...spriteBase, expressions, ...wardrobe } : null;
+  // Her comms figure follows the sprite too (2026-11-08): it stands in for that figure.
+  const commsRaw = (ownSprite ? own : base)?.commsFigure;
+  const comms = spriteBase ? resolveCommsFigure(spriteFrom![0], commsRaw, warn) : null;
+  if (!spriteBase && commsRaw !== undefined) warn('commsFigure needs a sprite; ignoring it');
+  const sprite = spriteBase ? { ...spriteBase, expressions, ...wardrobe, ...(comms ? { comms } : {}) } : null;
   const rooms = resolveRooms(own, base, opts, warn);
   const description = own.description ?? base?.description ?? '';
   const accent = own.accent ?? base?.accent ?? DEFAULT_ACCENT;
@@ -349,12 +356,12 @@ function loadMindless(id: string, opts: LoadAgentsOptions): AgentRecord {
 }
 
 /** Who select offers her as (select leads spec §1): only `true` counts, and neither comes from the character she extends. */
-function selectFlags(c: Pick<Character, 'playable' | 'discover'> | null): { playable: boolean; discover: boolean } {
-  return { playable: c?.playable === true, discover: c?.discover === true };
+function selectFlags(c: Pick<Character, 'playable' | 'discover' | 'standIn'> | null): { playable: boolean; discover: boolean; standIn: boolean } {
+  return { playable: c?.playable === true, discover: c?.discover === true, standIn: c?.standIn === true };
 }
 
 /** Her select flags from her file alone, for a character that can't connect. */
-function selectFlagsOnFile(charDir: string): { playable: boolean; discover: boolean } {
+function selectFlagsOnFile(charDir: string): { playable: boolean; discover: boolean; standIn: boolean } {
   try {
     return selectFlags(loadCharacter(charDir));
   } catch {

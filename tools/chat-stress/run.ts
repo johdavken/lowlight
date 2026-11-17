@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import WebSocket from 'ws';
-import { earlierOf, flagsOf, summary, type Expect, type TurnRecord } from './analyze';
+import { earlierOf, flagsOf, stickySection, summary, type Expect, type TurnRecord } from './analyze';
 import { cleanup, cleanupDetached, inGroup, killGroup, portFree, stopGroup, whoListens, defaultModelsOnly } from './scratch';
 import { traceLines, waitForResidual } from './trace';
 
@@ -226,7 +226,7 @@ async function main(): Promise<void> {
 
   const cost = before !== null && after !== null ? `$${(before - after).toFixed(2)} (credit $${after.toFixed(2)} left)` : 'unknown';
   const flagged = records.flatMap((r) => flagsOf(r, earlierOf(records, r)).map((f) => `- ${r.contact} T${r.turn} **${f.kind}** ${f.detail}`));
-  const report = [`# Chat stress · ${o.ref} · ${new Date().toISOString().slice(0, 16)}`, '', `Cost: ${cost}`, '', summary(records), '', '## Flagged', '', ...(flagged.length ? flagged : ['none'])].join('\n');
+  const report = [`# Chat stress · ${o.ref} · ${new Date().toISOString().slice(0, 16)}`, '', `Cost: ${cost}`, '', summary(records), '', '## Flagged', '', ...(flagged.length ? flagged : ['none']), '', stickySection(records)].join('\n');
   fs.writeFileSync(path.join(o.out, 'report.md'), `${report}\n`);
   fs.writeFileSync(path.join(o.out, 'transcript.md'), `${transcript.join('\n\n')}\n`);
   fs.writeFileSync(path.join(o.out, 'turns.jsonl'), records.map((r) => JSON.stringify(r)).join('\n') + '\n');

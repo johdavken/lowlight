@@ -1,5 +1,32 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { openPauseMenu } from '../src/room/pause-menu';
+import { openPauseMenu, type SettingsPage } from '../src/room/pause-menu';
+
+/** A stand-in for the HUD's SYS page: a `.sys-menu` it moves into the host, and its watchers. */
+function fakeSettings() {
+  const el = document.createElement('div');
+  el.className = 'sys-menu';
+  el.hidden = true;
+  const watchers = new Set<(open: boolean) => void>();
+  const set = (open: boolean) => {
+    if (el.hidden === !open) return;
+    el.hidden = !open;
+    if (!open) el.remove();
+    for (const w of [...watchers]) w(open);
+  };
+  const page: SettingsPage & { el: HTMLElement } = {
+    el,
+    open: vi.fn((host: HTMLElement) => {
+      host.append(el);
+      set(true);
+    }),
+    close: vi.fn(() => set(false)),
+    watch: (cb) => {
+      watchers.add(cb);
+      return () => watchers.delete(cb);
+    },
+  };
+  return page;
+}
 
 const key = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, cancelable: true }));
 const rows = () => [...document.querySelectorAll<HTMLElement>('.pause-row')];
@@ -10,7 +37,7 @@ function open(o: Partial<Parameters<typeof openPauseMenu>[1]> = {}) {
     where: 'THE NOODLE STALL · SAT 05:30 · WITH CASS',
     onSave: vi.fn(),
     onLoad: vi.fn(),
-    onSettings: vi.fn(),
+    settings: fakeSettings(),
     onTitle: vi.fn(),
     onClose: vi.fn(),
     reducedMotion: true,
@@ -33,6 +60,13 @@ describe('the pause menu', () => {
     expect(rows().map((r) => r.dataset.row)).toEqual(['resume', 'save', 'load', 'settings', 'title']);
     expect(on()).toBe('resume');
     expect(document.querySelector('.pause-where')!.textContent).toBe('THE NOODLE STALL · SAT 05:30 · WITH CASS');
+  });
+
+  it('stands on the trace: no holo frame, the key line at its foot', () => {
+    open();
+    expect(document.querySelector('.pause-menu .hf')).toBeNull();
+    expect(document.querySelector('.pause-keys')!.textContent).toBe('[↑↓] MOVE · [ENTER] PICK · [ESC] RESUME');
+    expect(document.querySelector('.pause-keys b')!.textContent).toBe('[↑↓]');
   });
 
   it('↑↓ move (wrapping), Enter picks; each row closes the menu and calls its handler', () => {
@@ -59,14 +93,16 @@ describe('the pause menu', () => {
     let o = open();
     key('Enter');
     expect(o.menu.isOpen).toBe(false);
-    for (const f of [o.h.onSave, o.h.onLoad, o.h.onSettings, o.h.onTitle]) expect(f).not.toHaveBeenCalled();
+    for (const f of [o.h.onSave, o.h.onLoad, o.h.settings.open, o.h.onTitle]) expect(f).not.toHaveBeenCalled();
     expect(o.h.onClose).toHaveBeenCalledExactlyOnceWith(true);
     o = open();
     key('Escape');
     expect(o.menu.isOpen).toBe(false);
     expect(o.h.onClose).toHaveBeenCalledExactlyOnceWith(true);
     o = open();
-    document.querySelector<HTMLElement>('.pause-menu')!.click();
+    const backdrop = document.querySelector<HTMLElement>('.pause-menu')!;
+    backdrop.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    backdrop.click();
     expect(o.menu.isOpen).toBe(false);
     expect(o.h.onClose).toHaveBeenCalledExactlyOnceWith(true);
   });
@@ -119,5 +155,73 @@ describe('the pause menu', () => {
     window.dispatchEvent(f5);
     expect(f5.defaultPrevented).toBe(false);
     expect(document.querySelector('.pause-menu')).not.toBeNull();
+  });
+
+  it('a click that lands outside after a press inside (the panel grew under it) does not resume', () => {
+    const { menu } = open();
+    document.querySelector('.pause-row')!.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    document.querySelector<HTMLElement>('.pause-menu')!.click();
+    expect(menu.isOpen).toBe(true);
+  });
+
+  it('SETTINGS is a page in the panel: SYS opens inside it, Esc (SYS shutting) goes back to the rows on SETTINGS', () => {
+    const { h, menu } = open();
+    const sys = h.settings as ReturnType<typeof fakeSettings>;
+    rows()[3].click();
+    expect(menu.isOpen).toBe(true);
+    expect(sys.open).toHaveBeenCalledExactlyOnceWith(document.querySelector('.pause-settings'));
+    expect(document.querySelector('.pause-settings .sys-menu')).toBe(sys.el);
+    expect(document.querySelector('.pause-title')!.textContent).toBe('SETTINGS');
+    expect(document.querySelector<HTMLElement>('.pause-rows')!.hidden).toBe(true);
+    expect(document.querySelector('.pause-keys')!.textContent).toBe('[↑↓] MOVE · [←→] CHANGE · [ENTER] PICK · [ESC] BACK');
+    // SYS takes its own keys first; the pause lets the rest stop with it and does nothing with them.
+    key('ArrowDown');
+    key('Enter');
+    expect(h.onSave).not.toHaveBeenCalled();
+    sys.close();
+    expect(menu.isOpen).toBe(true);
+    expect(document.querySelector('.pause-title')!.textContent).toBe('PAUSED');
+    expect(on()).toBe('settings');
+    expect(document.querySelector('.pause-keys')!.textContent).toBe('[↑↓] MOVE · [ENTER] PICK · [ESC] RESUME');
+    key('Escape');
+    expect(menu.isOpen).toBe(false);
+  });
+
+  it("on: 'settings' opens straight on SETTINGS; closing PAUSED shuts SYS too", () => {
+    const { h, menu } = open({ on: 'settings' });
+    expect(h.settings.open).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.pause-title')!.textContent).toBe('SETTINGS');
+    menu.close();
+    expect(h.settings.close).toHaveBeenCalledTimes(1);
+    expect(h.onClose).toHaveBeenCalledExactlyOnceWith(false);
+  });
+
+  it('settingsOnly (SYS over a table or a screen): no rows, and SYS shutting closes it as a resume', () => {
+    const { h, menu } = open({ settingsOnly: true });
+    expect(document.querySelector<HTMLElement>('.pause-rows')!.hidden).toBe(true);
+    expect(document.querySelector('.pause-keys')!.textContent).toBe('[↑↓] MOVE · [←→] CHANGE · [ENTER] PICK · [ESC] CLOSE');
+    h.settings.close();
+    expect(menu.isOpen).toBe(false);
+    expect(h.onClose).toHaveBeenCalledExactlyOnceWith(true);
+  });
+});
+
+describe('the pause menu sounds', () => {
+  it('a row step on each arrow, a pick on SAVE, TITLE its own, and nothing for RESUME (the close has its sound)', () => {
+    const cues: string[] = [];
+    const send = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    open({ onCue: (n) => cues.push(n) });
+    send('ArrowDown');
+    send('ArrowUp');
+    send('Enter');
+    expect(cues).toEqual(['row', 'row']);
+    open({ onCue: (n) => cues.push(n) });
+    send('ArrowDown');
+    send('Enter');
+    expect(cues).toEqual(['row', 'row', 'row', 'pick']);
+    open({ onCue: (n) => cues.push(n) });
+    send('ArrowUp');
+    send('Enter');
+    expect(cues.slice(4)).toEqual(['row', 'title']);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { LightDef } from './types';
-import { AMBIENT_FLOOR, dimmedAmbientLevel, lightShare, withBase } from './light-share';
+import { AMBIENT_FLOOR, asGroup, dimmedAmbientLevel, groupShare, lightShare, ownShare, setGroup, withBase } from './light-share';
 
 const light = (id: string, intensity: number, extra: Partial<LightDef> = {}): LightDef => ({
   id,
@@ -60,5 +60,37 @@ describe('dimmedAmbientLevel', () => {
 describe('withBase', () => {
   it("records each light's intensity as its base", () => {
     expect(withBase([light('lamp', 0.6), light('tv', 0, { base: 0.4 })]).map((l) => l.base)).toEqual([0.6, 0]);
+  });
+});
+
+describe('light groups', () => {
+  const room = [light('lamp', 0.6, { base: 0.6 }), light('heater', 0.4, { base: 0.4 }), light('window', 0.8, { base: 0.8, outside: true })];
+
+  it('asGroup reads inside and outside in any case or quotes, nothing else', () => {
+    expect(asGroup(' Inside ')).toBe('inside');
+    expect(asGroup('"OUTSIDE"')).toBe('outside');
+    expect(asGroup('lamp')).toBeNull();
+  });
+
+  it('setGroup moves every member to a share of its base, keeps the balance, leaves the other group, clamps at 1', () => {
+    const half = setGroup(room, 'inside', 0.5);
+    expect(half.map((l) => l.intensity)).toEqual([0.3, 0.2, 0.8]);
+    expect(setGroup(room, 'inside', 0).map((l) => l.intensity)).toEqual([0, 0, 0.8]);
+    expect(setGroup(room, 'inside', 2).map((l) => l.intensity)).toEqual([1, 0.8, 0.8]);
+    expect(setGroup(room, 'outside', 0.5, { flicker: 0.2 })[2]).toMatchObject({ intensity: 0.4, flicker: 0.2 });
+  });
+
+  it('a base of 0 (a dark mood) falls back to the painted level', () => {
+    const dark = [light('lamp', 0, { base: 0 })];
+    expect(setGroup(dark, 'inside', 1).map((l) => l.intensity)).toEqual([0]);
+    expect(setGroup(dark, 'inside', 1, { painted: new Map([['lamp', 0.6]]) }).map((l) => l.intensity)).toEqual([0.6]);
+  });
+
+  it("groupShare is the brightest member's share of its base; null for an empty group", () => {
+    expect(groupShare(room, 'inside')).toBe(1);
+    expect(groupShare(setGroup(room, 'inside', 0.5), 'inside')).toBeCloseTo(0.5);
+    expect(groupShare([room[0]!, { ...room[1]!, intensity: 0 }], 'inside')).toBe(1);
+    expect(groupShare([room[0]!], 'outside')).toBeNull();
+    expect(ownShare({ ...room[1]!, intensity: 0.2 })).toBeCloseTo(0.5);
   });
 });

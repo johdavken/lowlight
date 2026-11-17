@@ -51,6 +51,13 @@ describe('for: a job for one player', () => {
     const t = intakeRelay({ book: [entry('for: hicks'), ...fillers], clock: at(22, 0) });
     expect(t.relay.questState('hicks').open.map((q) => q.id)).toContain('the-favour');
   });
+  it("is the player's job on the row, not the contact's client", () => {
+    const t = intakeRelay({ book: [entry('for: hicks\nwith: [nix-direct]')], clock: at(22, 0) });
+    expect(intakeRelay({ book: [entry('with: [nix-direct]')], clock: at(22, 0) }).relay.questState('hicks').open.find((q) => q.id === 'the-favour')?.mission?.own).toBe('Nix');
+    const m = t.relay.questState('hicks').open.find((q) => q.id === 'the-favour')!.mission!;
+    expect(m.yours).toBe(true);
+    expect(m.own).toBeUndefined();
+  });
   it('never lists for anyone else', () => {
     const t = intakeRelay({ book: [entry('for: soren')], clock: at(22, 0) });
     expect(t.relay.questState('hicks').open.map((q) => q.id)).not.toContain('the-favour');

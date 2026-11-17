@@ -1,4 +1,4 @@
-// The subtitle chat box (spec 2026-10-16): the corner stacks, their folds, SYS → CHAT KEYS, and
+// The subtitle chat box (spec 2026-10-16; the room HUD): the line's keys on the box, the scene stack's fold, SYS → CHAT KEYS, and
 // paging under both. The unit tests cover what each key does; here only the real layout and storage.
 import { expect, test, type Page } from '@playwright/test';
 import { DIRECT, awaitGreeting, send, skipIntro } from './fixtures';
@@ -27,24 +27,49 @@ async function reply(page: Page, n: number) {
 }
 
 async function pickChatKeys(page: Page, word: 'GLYPHS' | 'LABELS'): Promise<void> {
-  await page.locator('.hud-sys').click();
-  await page.locator('.sys-row[data-row="keys"] i', { hasText: word }).click();
+  // CHAT KEYS is on the box's settings key (box-settings.ts).
+  await page.locator('.bs-key').click();
+  await page.locator('.bs-row[data-row="keys"] i', { hasText: word }).click();
   await page.keyboard.press('Escape');
 }
 
-test('both stacks fold, stay folded across a reload, and the shortcuts still work', async ({ page }) => {
+test("the line's keys sit in a row on the head line beside the settings key, always there; the scene stack folds and stays folded across a reload", async ({ page }) => {
   await room(page);
   const line = page.locator('.line-keys');
   const scene = page.locator('.scene-keys');
-  await expect(line.locator('button.key')).toHaveCount(5);
-  await line.locator('.fold').click();
+  // REGENERATE, KEEP GOING, EDIT, DELETE: no BRANCH HERE (playtest 2026-11-11).
+  await expect(line.locator('button.key')).toHaveCount(4);
+  await expect(line.locator('.fold')).toHaveCount(0);
+  const [box, keys] = await Promise.all([page.locator('#feed .feed').boundingBox(), line.boundingBox()]);
+  // No pane (B TRACE, 2026-11-15): no glass frame layer; the head line and the rail are drawn on the box itself.
+  await expect(page.locator('#feed > .hf')).toHaveCount(0);
+  expect(await page.locator('#feed .feed').evaluate((n) => getComputedStyle(n, '::after').backgroundImage)).toContain('linear-gradient');
+  // One row, standing on the head line (8px over the box's top edge), in the box's right half.
+  const tops = new Set(await line.locator('button.key').evaluateAll((ks) => ks.map((k) => Math.round(k.getBoundingClientRect().top))));
+  expect(tops.size).toBe(1);
+  expect(Math.abs(keys!.y + keys!.height + 8 - box!.y)).toBeLessThanOrEqual(3);
+  expect(keys!.x).toBeGreaterThan(box!.x + box!.width / 2);
+  // The name stands on the same line at the left, clear of the keys, and nothing clips it.
+  const name = (await page.locator('#feed .msg').last().locator('.meta .name').boundingBox())!;
+  expect(name.y + name.height).toBeLessThanOrEqual(box!.y + 2);
+  expect(name.x + name.width).toBeLessThan(keys!.x);
+  expect(await page.locator('#feed .msg').last().locator('.meta .name').evaluate((n) => { const r = n.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) !== null; })).toBe(true);
+  // Always there, the pointer anywhere.
+  await page.mouse.move(800, 300);
+  expect(await line.evaluate((n) => getComputedStyle(n).opacity)).toBe('1');
+  // The box's settings key ends the same row at the box's right end (anchored to it: playtest, it once fell to the corner).
+  const bk = (await page.locator('.bs-key').boundingBox())!;
+  expect(Math.abs(bk.y - keys!.y)).toBeLessThanOrEqual(2);
+  expect(bk.x).toBeGreaterThanOrEqual(keys!.x + keys!.width);
+  expect(Math.abs(bk.x + bk.width - (box!.x + box!.width))).toBeLessThanOrEqual(2);
+  // The leader from the speaker lands on the head line left of the keys.
+  const lead = await page.locator('#feed .sub-leader .sl-line').evaluate((n) => n.getAttribute('points')!.split(' ')[0].split(',').map(Number));
+  const k = box!.width / (await page.locator('#feed .feed').evaluate((n) => (n as HTMLElement).offsetWidth));
+  expect(lead[0] * k).toBeLessThan(keys!.x);
   await scene.locator('.fold').click();
-  await expect(line).toHaveClass(/\bfolded\b/);
   await expect(scene).toHaveClass(/\bfolded\b/);
-  await expect(line.locator('button.key').first()).toBeHidden();
   await page.reload();
   await page.waitForFunction(() => window.__nixRoom !== undefined);
-  await expect(page.locator('.line-keys')).toHaveClass(/\bfolded\b/);
   await expect(page.locator('.scene-keys')).toHaveClass(/\bfolded\b/);
   // Alt+E ends the scene with its stack folded: her goodbye-to-the-scene turn goes out.
   await expect(page.locator('.link')).toHaveAttribute('data-status', 'ok');
@@ -54,15 +79,16 @@ test('both stacks fold, stay folded across a reload, and the shortcuts still wor
   await expect(users).toHaveCount(before + 1, { timeout: 10_000 });
 });
 
-test('LABELS shows words and widens the subtitle; GLYPHS narrows it again', async ({ page }) => {
+test('LABELS widens the subtitle (the line keys keep their glyphs); GLYPHS narrows it again', async ({ page }) => {
   await room(page);
   const left = () => page.locator('#feed .feed').evaluate((n) => getComputedStyle(n).left);
   await expect.poll(left).toBe('130px');
   await expect(page.locator('.line-keys .key .glyph').first()).toBeVisible();
   await pickChatKeys(page, 'LABELS');
   await expect.poll(left).toBe('180px');
-  await expect(page.locator('.line-keys .key .glyph').first()).toBeHidden();
-  await expect(page.locator('.line-keys .key .lb').first()).toBeVisible();
+  // The line's keys keep their glyphs in their corner (words don't fit there); the word is their hover tag.
+  await expect(page.locator('.line-keys .key .glyph').first()).toBeVisible();
+  expect(await page.locator('.line-keys .key .lb').first().evaluate((n) => getComputedStyle(n).opacity)).toBe('0');
   await pickChatKeys(page, 'GLYPHS');
   await expect.poll(left).toBe('130px');
 });
@@ -102,4 +128,39 @@ test('a very long reply never grows the band past its cap', async ({ page }) => 
   await reply(page, 6000);
   const heights = await page.locator('#feed .feed').evaluate((n) => ({ h: n.getBoundingClientRect().height, max: parseFloat(getComputedStyle(n).maxHeight) }));
   expect(heights.h).toBeLessThanOrEqual(heights.max + 0.5);
+});
+
+test("the box's settings key: a swatch holds the box's colour (not the name's), the speaker line goes, AUTO PAGE turns a page, kept on reload", async ({ page }) => {
+  await room(page);
+  const hue = () => page.locator('#feed').evaluate((n) => getComputedStyle(n).getPropertyValue('--hf-c').trim());
+  const speaker = await hue();
+  await page.locator('.bs-key').click();
+  const panel = page.locator('.bs-panel');
+  await expect(panel).toBeVisible();
+  // It rises over the box's right end.
+  const [box, p] = await Promise.all([page.locator('#feed .feed').boundingBox(), panel.boundingBox()]);
+  expect(p!.y + p!.height).toBeLessThan(box!.y);
+  expect(p!.x + p!.width).toBeLessThanOrEqual(box!.x + box!.width);
+  await page.locator('.bs-row[data-row="colour"] i[data-colour="cyan"]').click();
+  await expect.poll(hue).not.toBe(speaker);
+  expect((await hue()).toLowerCase()).toBe('#46e3fc');
+  // The name keeps the speaker's colour.
+  const name = await page.locator('#feed .msg:not(.hidden-collapsed) .meta .name').evaluate((n) => getComputedStyle(n).getPropertyValue('--pc').trim());
+  expect(name.toLowerCase()).not.toBe('#46e3fc');
+  await page.locator('.bs-row[data-row="line"] i[data-line="off"]').click();
+  await expect(page.locator('#feed > .sub-leader')).toBeHidden();
+  await page.locator('.bs-row[data-row="auto"] i[data-auto="fast"]').click();
+  // INSTANT, so a page is all there at once and the wait is AUTO PAGE's alone.
+  await page.locator('.bs-row[data-row="text"] i[data-speed="instant"]').click();
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+  // A long reply turns its own page once a page has typed out.
+  await reply(page, 4200);
+  const cont = page.locator('button.continue');
+  await expect(cont).toHaveText(/\[CONTINUE ▸ 1\//);
+  await expect(cont).toHaveText(/\[CONTINUE ▸ 2\//, { timeout: 8_000 });
+  await page.reload();
+  await page.waitForFunction(() => window.__nixRoom !== undefined);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('lowlight.box') ?? '{}'))).toMatchObject({ colour: 'cyan', line: false, autoPage: 'fast' });
+  await expect.poll(hue).toBe('#46e3fc');
 });

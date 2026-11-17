@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { KitView } from '../../shared/types';
-import { openCharacterSheet, SHEET_GLITCH_OUT_MS, stepOutfit, wardrobeLabel, wardrobeOptions, wornOutfit } from '../src/room/character-sheet';
+import { openCharacterSheet, SHEET_OUT_MS, stepOutfit, wardrobeLabel, wardrobeOptions, wornOutfit } from '../src/room/character-sheet';
 
 const hicks = {
   name: 'Hicks',
@@ -65,11 +65,12 @@ describe('the wardrobe', () => {
 });
 
 describe('openCharacterSheet', () => {
-  it('shows the name, tagline, accent and figure (pixel art stays pixelated)', () => {
+  it('shows the name, tagline and figure (pixel art stays pixelated); the panel is red, not the accent', () => {
     openCharacterSheet(document.body, { player: hicks });
     const sheet = document.querySelector<HTMLElement>('.character-sheet')!;
     expect(sheet.getAttribute('role')).toBe('dialog');
-    expect(sheet.style.getPropertyValue('--cs-side')).toBe('#3dff7a');
+    expect(sheet.style.getPropertyValue('--cs-side')).toBe('');
+    expect(sheet.style.getPropertyValue('--screen-accent')).toBe('#ff4d4d');
     expect(sheet.querySelector('.cs-name')!.textContent).toBe('HICKS');
     expect(sheet.querySelector('.cs-tagline')!.textContent).toBe('Netrunner. Old Town born.');
     const img = sheet.querySelector<HTMLImageElement>('.cs-img')!;
@@ -107,16 +108,18 @@ describe('openCharacterSheet', () => {
     expect([...document.querySelectorAll('.cs-wallet')].map((w) => w.classList.contains('live'))).toEqual([true, false, false]);
   });
 
-  it('the pane: ◆ YOU, the strip with sol and NERVE, and the room as the banner', () => {
-    openCharacterSheet(document.body, { player: { ...hicks, kit, room: '/scenes/karasu/the-tilt/room.png' } });
-    expect(document.querySelector('.character-sheet')!.classList.contains('scr-holo')).toBe(true);
-    expect(document.querySelector('.scr-head')!.textContent).toBe('◆ YOUSOL 1,240 · NERVE 3/4ESC');
-    expect(document.querySelector<HTMLElement>('.cs-art')!.style.backgroundImage).toContain('/scenes/karasu/the-tilt/room.png');
-  });
-
-  it('with no room the banner is a hatch', () => {
-    openCharacterSheet(document.body, { player: hicks });
-    expect(document.querySelector('.cs-art')!.classList.contains('cs-noart')).toBe(true);
+  it('the trace panel: YOU, the pages as its tabs, tonight\'s numbers on the head line, the key line, no banner', () => {
+    openCharacterSheet(document.body, { player: { ...hicks, kit } });
+    const root = document.querySelector('.character-sheet')!;
+    expect(root.classList.contains('scr-trace')).toBe(true);
+    expect(root.classList.contains('scr-holo')).toBe(false);
+    expect(document.querySelector('.scr-head .tp-title')!.textContent).toBe('YOU');
+    expect([...document.querySelectorAll('.scr-head .tp-tabs .cs-page-tab')].map((b) => b.textContent)).toEqual(['FILE', 'STATS', 'STREET', 'KIT']);
+    expect(document.querySelector('.scr-head .cs-strip')!.textContent).toBe(`SOL 1,240 · NERVE 3 / 4 · HEAT ${kit.heatHere} IN ${String(kit.here).replace(/-/g, ' ').toUpperCase()}`);
+    expect(document.querySelector('.tp-keys')!.textContent).toContain('PAGE');
+    expect(document.querySelector('.tp-keys')!.textContent).toContain('OUTFIT');
+    expect(document.querySelector('.cs-art')).toBeNull();
+    expect(document.querySelector('.cs-name')!.classList.contains('tp-name')).toBe(true);
   });
 
   it('STATS: each number and its bar', () => {
@@ -183,7 +186,7 @@ describe('openCharacterSheet', () => {
     const sheet = openCharacterSheet(document.body, { player: { ...hicks, kit }, page: 'kit' });
     sheet.setKit({ ...kit, deck: slate, sol: 900 });
     expect(document.querySelector('.cs-deck.on .cs-deck-name')!.textContent).toBe('Dock slate');
-    expect(document.querySelector('.cs-strip')!.textContent).toBe('SOL 900 · NERVE 3/4');
+    expect(document.querySelector('.cs-strip')!.textContent).toContain('SOL 900 · NERVE 3 / 4');
     sheet.refusal('Not mid-job.');
     expect(document.querySelector('.cs-deck-why')!.textContent).toBe('Not mid-job.');
   });
@@ -198,7 +201,7 @@ describe('openCharacterSheet', () => {
     expect(document.querySelector('.cs-img')!.getAttribute('src')).toBe('/api/agents/hicks/outfit/home');
   });
 
-  it('‹ › and ← → change the outfit, tell onOutfit, and dress the figure; the plain sprite is null', () => {
+  it('‹ › and ↑ ↓ change the outfit, tell onOutfit, and dress the figure; the plain sprite is null', () => {
     const onOutfit = vi.fn();
     openCharacterSheet(document.body, { player: { ...hicks, outfits: ['work', 'home'] }, onOutfit });
     const label = () => document.querySelector('.cs-outfit')!.textContent;
@@ -208,12 +211,12 @@ describe('openCharacterSheet', () => {
     document.querySelectorAll<HTMLButtonElement>('.cs-arrow')[1].click();
     expect(label()).toBe('WORK');
     expect(src()).toBe('/api/agents/hicks/outfit/work');
-    const ev = new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true });
+    const ev = new KeyboardEvent('keydown', { key: 'ArrowUp', cancelable: true });
     window.dispatchEvent(ev);
     expect(ev.defaultPrevented).toBe(true);
     expect(label()).toBe('BASE');
     expect(src()).toBe('/api/persona/sprite?as=hicks');
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
     expect(label()).toBe('HOME');
     expect(onOutfit.mock.calls).toEqual([['work'], [null], ['home']]);
   });
@@ -235,14 +238,23 @@ describe('openCharacterSheet', () => {
     expect(onOutfit).not.toHaveBeenCalled();
   });
 
-  it('comes up with the shared screen: glitch-in, and the screen holds the page', () => {
+  it('comes up with the shared screen, with no frame: the screen holds the figure and the page', () => {
     openCharacterSheet(document.body, { player: hicks });
     const screen = document.querySelector<HTMLElement>('.scr-screen')!;
-    expect(screen.classList.contains('scr-glitch-in')).toBe(true);
-    expect(screen.querySelector('.cs-pages')).not.toBeNull();
+    expect(document.querySelector('.character-sheet .hf')).toBeNull();
+    expect(screen.querySelector('.cs-figure')).not.toBeNull();
+    expect(screen.querySelector('.cs-page')).not.toBeNull();
   });
 
-  it('Esc closes it (and goes no further): onClose at once, gone once the glitch-out has run', () => {
+  it("the head line's NERVE follows the kit", () => {
+    const sheet = openCharacterSheet(document.body, { player: { ...hicks, kit } });
+    const strip = document.querySelector<HTMLElement>('.cs-strip')!;
+    expect(strip.textContent).toContain('NERVE 3 / 4');
+    sheet.setKit({ ...kit, nerveLeft: 1 });
+    expect(strip.textContent).toContain('NERVE 1 / 4');
+  });
+
+  it('Esc closes it (and goes no further): onClose at once, gone once the step-off has run', () => {
     vi.useFakeTimers();
     try {
       const onClose = vi.fn();
@@ -253,9 +265,8 @@ describe('openCharacterSheet', () => {
       window.removeEventListener('keydown', later);
       expect(later).not.toHaveBeenCalled();
       expect(onClose).toHaveBeenCalledTimes(1);
-      expect(document.querySelector('.scr-screen')!.classList.contains('scr-glitch-out')).toBe(true);
       expect(document.querySelector('.character-sheet')!.classList.contains('scr-closing')).toBe(true);
-      vi.advanceTimersByTime(SHEET_GLITCH_OUT_MS);
+      vi.advanceTimersByTime(SHEET_OUT_MS);
       expect(document.querySelector('.character-sheet')).toBeNull();
       sheet.close();
       expect(onClose).toHaveBeenCalledTimes(1);
@@ -273,9 +284,9 @@ describe('openCharacterSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('reduced motion: no glitch, and it goes at once', () => {
+  it('reduced motion: no step-on, and it goes at once', () => {
     const sheet = openCharacterSheet(document.body, { player: hicks, reducedMotion: true });
-    expect(document.querySelector('.scr-screen')!.classList.contains('scr-glitch-in')).toBe(false);
+    expect(document.querySelector('.character-sheet')!.classList.contains('scr-still')).toBe(true);
     sheet.close();
     expect(document.querySelector('.character-sheet')).toBeNull();
   });
@@ -344,11 +355,20 @@ describe('the pages', () => {
     expect(document.querySelector('.cs-facts')).toBeNull();
   });
 
-  it('← → still dress you on FILE', () => {
+  it('← → turn the page and wrap, and never dress you; ↑ ↓ dress you on any page', () => {
     const onOutfit = vi.fn();
     openCharacterSheet(document.body, { player: { ...filed, outfits: ['work', 'home'] }, onOutfit });
     expect(page()).toBe('file');
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft' }));
+    const ev = new KeyboardEvent('keydown', { key: 'ArrowLeft', cancelable: true });
+    window.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(true);
+    expect(page()).toBe('kit');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(page()).toBe('file');
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }));
+    expect(page()).toBe('stats');
+    expect(onOutfit).not.toHaveBeenCalled();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp' }));
     expect(onOutfit).toHaveBeenCalledWith('home');
   });
 });

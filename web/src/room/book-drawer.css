@@ -1,7 +1,13 @@
-/* The lore drawer (book-drawer.ts, spec 2026-11-06): the holo pane's look in lilac, at the room's right, the scene still up. lb- only. */
-:root { --book-w: 580px; --book-a: #c9a8ff; }
+/* The lore drawer (book-drawer.ts; dense, on the HUD trace 2026-11-15, mockup book-dense.html): at the room's right with the
+   scene still up. No pane: a head line off the bar's BOOK word, a rail down its left edge, in the UI's red; only its side
+   of the picture darkens. A row is one line. The parts are the trace panel's (ui/trace-panel.css `tp-*`). lb- only. */
+:root { --book-w: 580px; }
 /* Its own layer on the game stage, over the JOB column's. Its right edge is the band's, as the column's is: the scene keys stand outside it. */
-.lb-layer { position: absolute; inset: 0; z-index: 26; pointer-events: none; }
+.lb-layer { position: absolute; inset: 0; z-index: 26; pointer-events: none; --c: var(--ui-red, #ff4d4d); --hv-c: var(--c); --tp-text: #d9e4ea; --tp-dim: #8fa3ad; --tp-ink: #05020a; --tp-amber: #ffc56b; }
+.lb-layer > svg.hv-lead { z-index: 1; }
+.lb-layer > svg.hv-lead path { stroke-opacity: 0.9; filter: drop-shadow(0 0 2px var(--hv-c)); animation: lb-line 0.24s linear backwards; }
+.lb-layer > svg.hv-lead .dot { display: none; }
+@keyframes lb-line { from { stroke-dasharray: 1200; stroke-dashoffset: -1200; } to { stroke-dasharray: 1200; stroke-dashoffset: 0; } }
 .lb-root {
   --lb-teko: var(--cs-teko, 'Teko', var(--pixel));
   position: absolute;
@@ -11,66 +17,91 @@
   width: var(--book-w);
   display: flex;
   flex-direction: column;
-  color: #e7e0f5;
-  background: linear-gradient(135deg, rgba(201, 168, 255, 0.15), rgba(255, 79, 139, 0.05) 60%, rgba(9, 4, 18, 0.86)), rgba(10, 6, 20, 0.78);
-  border: 1px solid rgba(201, 168, 255, 0.55);
-  box-shadow: 0 0 34px rgba(201, 168, 255, 0.13) inset;
-  clip-path: polygon(0 0, 96% 0, 100% 4%, 100% 100%, 4% 100%, 0 96%);
-  backdrop-filter: blur(3px);
+  padding-left: 24px;
+  box-sizing: border-box;
+  color: var(--tp-text);
+  font-family: var(--mono);
   pointer-events: auto;
+  animation: lb-on 0.3s steps(4, end) backwards;
 }
 .lb-root[hidden] { display: none; }
-.lb-root.lb-flicker { animation: ql-flicker-in 0.32s steps(1, end); }
+@keyframes lb-on { 0%, 35% { opacity: 0; } 60% { opacity: 0.5; } 100% { opacity: 1; } }
+/* Only the drawer's side of the picture darkens: the scene stays up beside it, and the scene keys and the prompt's hints stay clear. */
+.lb-root::after { content: ''; position: absolute; z-index: -1; inset: -24px 0 0 -200px; background: linear-gradient(90deg, transparent, rgba(5, 2, 10, 0.86) 200px, rgba(5, 2, 10, 0.92) calc(100% - 24px), rgba(5, 2, 10, 0.5)); -webkit-mask-image: linear-gradient(transparent, #000 24px); mask-image: linear-gradient(transparent, #000 24px); pointer-events: none; }
+/* The rail: down from the head line's ring to the key line. */
+.lb-root::before { content: ''; position: absolute; left: 0; top: 46px; bottom: 32px; width: 1px; background: linear-gradient(var(--c), color-mix(in srgb, var(--c) 12%, transparent)); filter: drop-shadow(0 0 2px var(--c)); pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
-  .lb-root.lb-flicker { animation: none; }
+  .lb-root, .lb-layer > svg.hv-lead path { animation: none; }
 }
 
-.lb-head { flex: none; display: flex; align-items: baseline; padding: 14px 25px 6px; font: 27px var(--pixel); letter-spacing: 0.3em; color: var(--book-a); }
-.lb-esc { margin-left: auto; font-size: 18px; letter-spacing: 0.2em; color: #a99cbd; }
-.lb-tabs { flex: none; display: flex; gap: 4px; padding: 6px 25px 0; border-bottom: 1px solid rgba(201, 168, 255, 0.35); }
-.lb-tab { font: 19px var(--pixel); letter-spacing: 0.2em; padding: 3px 16px; cursor: pointer; color: #a99cbd; background: none; border: 1px solid rgba(201, 168, 255, 0.25); border-bottom: 0; }
-.lb-tab.on { color: #160c26; background: var(--book-a); border-color: var(--book-a); }
-.lb-find { flex: none; margin: 8px 25px 2px; padding: 4px 12px; font: 19px var(--pixel); letter-spacing: 0.1em; color: #fff; background: rgba(10, 6, 18, 0.5); border: 1px solid rgba(201, 168, 255, 0.35); outline: none; }
-.lb-find:focus { border-color: var(--book-a); }
-.lb-find::placeholder { color: #a99cbd; }
+.lb-head { flex: none; height: 36px; display: flex; align-items: flex-end; gap: 26px; white-space: nowrap; }
+.lb-title { font: 34px/1 var(--pixel); letter-spacing: 0.42em; color: var(--c); text-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); }
+.lb-tabs { display: flex; align-items: flex-end; gap: 26px; }
+.lb-tab { letter-spacing: 0.2em; }
+/* Search: a caret on a hairline. */
+.lb-find { flex: none; margin: 18px 0 0; padding: 0 0 6px 2px; font: 13.5px/1.4 var(--mono); color: #fff; background: none; border: 0; border-bottom: 1px solid color-mix(in srgb, var(--c) 55%, transparent); outline: none; caret-color: var(--user, #7fe9ff); }
+.lb-find:focus { border-bottom-color: var(--c); }
+.lb-find::placeholder { font: 17px/1 var(--pixel); letter-spacing: 0.14em; color: var(--tp-dim); }
 .lb-find[hidden] { display: none; }
-.lb-note { flex: none; padding: 8px 25px 0; font: 18px var(--pixel); letter-spacing: 0.16em; color: #ff9a9a; }
+.lb-note { flex: none; padding: 14px 0 0; font: 17px var(--pixel); letter-spacing: 0.16em; color: var(--tp-amber); }
 .lb-note[hidden] { display: none; }
 
-.lb-list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 0 22px; scrollbar-width: thin; scrollbar-color: rgba(201, 168, 255, 0.4) transparent; }
-.lb-grp { padding: 8px 25px 3px; font: 17px var(--pixel); letter-spacing: 0.24em; color: var(--book-a); }
+/* Its right column stands in from the band's edge, where the shade has already thinned. */
+.lb-list { flex: 1; min-height: 0; margin-top: 12px; padding: 0 22px 14px 0; overflow-y: auto; scrollbar-width: none; }
+.lb-keys { flex: none; padding-top: 9px; border-top: 1px solid rgba(230, 238, 247, 0.16); }
+.lb-keys .hint-line b, .lb-keys b { color: var(--c); }
+.lb-grp { margin: 12px 0 4px; }
+.lb-grp:first-child { margin-top: 0; }
+.lb-grp::before { left: -24px; }
+
+/* A row is one line: the title, and at the right its section and the word that brought it up. */
 .lb-row,
-.lb-cat { display: block; width: 100%; text-align: left; cursor: pointer; color: inherit; background: none; border: 0; border-left: 3px solid transparent; }
-.lb-row { padding: 3px 22px; }
-.lb-row:hover,
-.lb-cat:hover { background: rgba(201, 168, 255, 0.08); }
-.lb-row.on { background: rgba(201, 168, 255, 0.16); border-left-color: var(--book-a); }
-.lb-row-title { display: block; font: 27px/1.15 var(--lb-teko); color: #f4eefc; }
-.lb-row-sub { display: block; font: 15px var(--pixel); letter-spacing: 0.16em; color: #a99cbd; }
-.lb-cat { padding: 6px 22px; font: 18px var(--pixel); letter-spacing: 0.2em; color: #a99cbd; }
-.lb-cat[aria-expanded='true'] { color: var(--book-a); }
-/* A section's fold, and its rows, a step in from the category's. */
-.lb-sec { padding: 4px 22px 4px 44px; font-size: 16px; }
-.lb-in .lb-row,
-.lb-in .lb-body { padding-left: 44px; }
+.lb-cat { position: relative; display: flex; align-items: baseline; gap: 12px; width: 100%; padding: 0; text-align: left; cursor: pointer; color: inherit; background: none; border: 0; white-space: nowrap; }
+.lb-row { height: 23px; }
+.lb-row:focus-visible, .lb-cat:focus-visible { outline: none; }
+.lb-row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 19px/23px var(--pixel); letter-spacing: 0.1em; color: var(--tp-text); text-transform: uppercase; }
+.lb-row-sub { flex: none; margin-left: auto; font: 14px/23px var(--pixel); letter-spacing: 0.12em; color: var(--tp-dim); }
+.lb-row-sub b { font-weight: normal; color: var(--tp-amber); }
+.lb-row:hover .lb-row-title, .lb-row:focus-visible .lb-row-title { color: #fff; }
+.lb-row.on .lb-row-title { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 70%, transparent); }
+/* The open row's ring, on the rail. */
+.lb-list > .lb-row.on::before { content: ''; position: absolute; left: -28px; top: 7px; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: var(--tp-ink); }
+
+/* ALL: a category is one line that names its sections; open, each section's entries run in two columns. */
+.lb-cat { height: 24px; overflow: hidden; font: 17px/24px var(--pixel); letter-spacing: 0.2em; color: var(--tp-dim); }
+.lb-cat::before { content: '▸'; flex: none; width: 10px; font-size: 13px; color: var(--tp-dim); }
+.lb-cat[aria-expanded='true']::before { content: '▾'; }
+.lb-cat:hover, .lb-cat:focus-visible, .lb-cat[aria-expanded='true'] { color: var(--tp-text); }
+.lb-cat-in { min-width: 0; overflow: hidden; text-overflow: ellipsis; font: 14px/24px var(--pixel); letter-spacing: 0.1em; color: color-mix(in srgb, var(--tp-dim) 75%, transparent); }
+.lb-sec { height: 22px; margin-top: 4px; font-size: 14px; line-height: 22px; color: var(--tp-dim); }
+.lb-sec::before { font-size: 11px; }
+.lb-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 22px; padding-bottom: 3px; }
+.lb-in .lb-row { height: 21px; }
+.lb-in .lb-row-title { font-size: 17px; line-height: 21px; }
+.lb-in .lb-body { grid-column: 1 / -1; }
+
+/* The open entry: small mono on a thin rail, no box. */
 .lb-body {
-  padding: 6px 22px 11px;
+  position: relative;
+  margin: 3px 0 9px;
+  padding: 0 0 0 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: var(--chat-font, var(--mono));
-  font-size: calc(15px * var(--text-scale, 1));
+  font-size: calc(12.5px * var(--text-scale, 1));
   line-height: 1.5;
-  background: rgba(201, 168, 255, 0.1);
-  border-left: 3px solid var(--book-a);
+  color: var(--tp-text);
+  text-shadow: 0 1px 2px #000;
 }
-.lb-body p { margin: 0 0 8px; }
+.lb-body::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 3px; width: 2px; background: var(--c); box-shadow: 0 0 6px var(--c); }
+.lb-body p { margin: 0 0 6px; }
 /* A corp's logo over its entry (light grey and one colour on transparent): kept small, left, with room under it. */
-.lb-art { display: block; max-width: 70%; max-height: 92px; margin: 4px 0 10px; object-fit: contain; object-position: left center; }
-.lb-art.lb-art-tall { max-height: 150px; }
+.lb-art { display: block; max-width: 60%; max-height: 64px; margin: 2px 0 8px; object-fit: contain; object-position: left center; }
+.lb-art.lb-art-tall { max-height: 110px; }
 .lb-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; }
-.lb-facts dt { font: 15px var(--pixel); letter-spacing: 0.16em; color: var(--book-a); }
+.lb-facts dt { font: 14px/1.35 var(--pixel); letter-spacing: 0.12em; color: var(--c); }
 .lb-facts dd { margin: 0; }
-.lb-secret-head { margin-top: 10px; font: 15px var(--pixel); letter-spacing: 0.16em; color: var(--book-a); }
+.lb-secret-head { margin-top: 8px; font: 14px var(--pixel); letter-spacing: 0.12em; color: var(--tp-amber); }
 .lb-body .lb-secret { margin: 2px 0 0; }
 
 /* Her line moves over while it's open, as the JOB column has it (job-column.css). At a table nothing moves: the drawer stands over the right of it (spec §6). */

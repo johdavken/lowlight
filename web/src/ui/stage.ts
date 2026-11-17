@@ -160,6 +160,13 @@ export class Stage {
     for (const s of SIDES) this.applyDrop(s);
   }
 
+  /** A sprite figure's waist changed (PEOPLE's ADJUST FIGURE): she moves to stand on the line by it. */
+  setWaist(side: Side, waist: number | null): void {
+    if (this.waists[side] === null && waist === null) return;
+    this.waists[side] = waist;
+    this.applyDrop(side);
+  }
+
   /** Re-crops a sprite figure live (the dev panel's STAGE sliders). */
   setCrop(side: Side, crop: Crop): void {
     const fig = this.figures[side];

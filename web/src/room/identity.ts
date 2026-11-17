@@ -1,4 +1,5 @@
 /** Routing and per-agent identity for the room page. */
+import { PERSON_ID_RE } from '../../../shared/person';
 import type { Location } from '../../../shared/types';
 
 const AGENT_ID_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -62,7 +63,9 @@ export function lastMatch(): Match | null {
     if (!('player' in parsed) || !('ai' in parsed)) return null;
 
     // Validate player and ai are valid agent IDs
-    if (typeof parsed.player !== 'string' || !AGENT_ID_RE.test(parsed.player)) return null;
+    // The player is a character's id, or a made person's tile (`@` + their library id).
+    const madePerson = typeof parsed.player === 'string' && parsed.player.startsWith('@') && PERSON_ID_RE.test(parsed.player.slice(1));
+    if (typeof parsed.player !== 'string' || (!madePerson && !AGENT_ID_RE.test(parsed.player))) return null;
     if (typeof parsed.ai !== 'string' || !AGENT_ID_RE.test(parsed.ai)) return null;
 
     // Her model is a server setting now: an older match's `model` is dropped.

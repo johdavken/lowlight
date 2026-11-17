@@ -158,6 +158,7 @@
       "from": "00:00",
       "to": "08:00",
       "room": "spine/soren-hab",
+      "sleeps": true,
       "days": [
         "wed",
         "sat"
@@ -167,6 +168,7 @@
       "from": "23:00",
       "to": "08:00",
       "room": "spine/soren-hab",
+      "sleeps": true,
       "days": [
         "mon",
         "wed",
@@ -187,7 +189,7 @@
   },
   "knows": {
     "adebayo": {
-      "line": "Xander Soren. You bought him at nineteen in a holding room, over tea: the Ninth Grant block's ledger stays clean for as long as his charge stays suspended. Ten years on he's your best case officer, and the one thing you have never put in a file: something between you that neither of you has named, and that would cost you both everything. You're running him on Rue. ASSET 7-114 in the system; Xander to you, and only you.",
+      "line": "Xander Soren. You bought him at nineteen in a holding room: told him why he'd done it before he said a word, then offered him tea. The Ninth Grant block's ledger stays clean for as long as his charge stays suspended. Ten years on he's your best case officer, and the one thing you have never put in a file: a game between you, played in plain sight, that he has never known whether you mean, and that would cost you both everything. You're running him on Rue. ASSET 7-114 in the system; Xander to you, and only you. He calls you Ilse with the door shut.",
       "trust": 1,
       "warmth": 6
     },
@@ -197,7 +199,7 @@
       "warmth": 1
     },
     "garro": {
-      "line": "Soren. A branch case officer, bought at nineteen by Adebayo the way you were bought by somebody long since retired. He comes by the listening post most afternoons for files and gossip. You like him. You'd still write him up if the branch asked.",
+      "line": "Soren. A branch case officer, bought at nineteen by Kroll the way you were bought by somebody long since retired. He comes by the listening post most afternoons for files and gossip. You like him. You'd still write him up if the branch asked.",
       "trust": 3,
       "warmth": 4
     },

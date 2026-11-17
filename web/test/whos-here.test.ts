@@ -63,6 +63,14 @@ describe('the party window (who\'s here, 2026-10-17)', () => {
     expect(ids(root)).toEqual([PARTY_ROLE.you, PARTY_ROLE.contact, 'hae', 'silas', 'stranger:Arlo Venn']);
   });
 
+  it('carries how many are here for its HERE · n label', () => {
+    const root = mount();
+    party!.setParty(YOU, NIX);
+    expect(root.dataset.count).toBe('2');
+    party!.set([hae, silas]);
+    expect(root.dataset.count).toBe('4');
+  });
+
   it('each row: their face, their name in capitals in their accent, and who they are here', () => {
     const root = mount();
     party!.setParty(YOU, NIX);

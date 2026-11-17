@@ -8,6 +8,7 @@ import { APPROACH_COSTS, COSTS, FORCED_FIRST, picksFor } from '../../../../share
 import { deckNotes, EFFECT_NAMES, kindResult, POSITION_NAMES, type Effect, type Pool, type Position } from '../../../../shared/dice';
 import { APPROACH_STATS, SPEC_STAT, type Approach } from '../../../../shared/hand';
 import { HOT_LOAD_NERVE, type ProgramKind } from '../../../../shared/programs';
+import { clearLead, hostRect, traceLead } from '../../ui/trace-lead';
 import { el } from './el';
 import { litNodes } from './tips';
 
@@ -22,6 +23,16 @@ const SLOP_PX = 10;
 const STILL_PX = 4;
 /** The most costs a roll deals (roll lifecycle spec §1.2). */
 const DEALT = 3;
+/** Between a card and its panel: room for the leader (overlay-hud.html B TRACE). */
+const LEAD_GAP = 34;
+/** How far down the card's edge the leader leaves from. */
+const LEAD_Y = 40;
+
+/** A line's key, when it opens on one in capitals ("IN THE OPEN: …", "FAIR: …"): drawn in pixel caps beside the rest. */
+export function splitKey(line: string): { key: string | null; text: string } {
+  const m = /^([A-Z][A-Z0-9 ·'’+−-]*[A-Z0-9]): (.+)$/su.exec(line);
+  return m ? { key: m[1], text: m[2] } : { key: null, text: line };
+}
 
 const routeLine = (n: number) => `This route: ALARM +${n}, whatever the dice.`;
 const fills = (effect: Effect, position: Position) => {
@@ -109,7 +120,7 @@ export const approachInfo = (a: Approach): Info => ({
 
 export const favourInfo = (plays?: string[], used = false): Info => ({ title: 'THE FAVOUR', lines: used ? ['Used.'] : ['+1d, once.', ...here(plays)] });
 
-const KIND_WORDS: Record<ProgramKind, string> = { position: 'a step out of danger', effect: 'a step more effect', quiet: 'takes 1 off the heat you leave with', firewall: 'cancels one cost' };
+const KIND_WORDS: Record<ProgramKind, string> = { position: 'a step out of danger', effect: 'a step more effect', quiet: 'takes 1 off the heat you leave with', firewall: 'cancels one cost, not on the wire' };
 
 /** A program's card: what it does, how it stands against the tier, and `plays`, where it would run on this beat. */
 export function programInfo(p: { name: string; stat: string; kind: ProgramKind; line: string; foil?: true; count?: number }, o: { tier?: number; quality?: number; plays?: string[]; nerve?: number; dead?: boolean; burned?: boolean }): Info {
@@ -135,7 +146,7 @@ export const slotInfo = (o: { setup: boolean; dead?: boolean }): Info => ({ titl
  * and drops a dwell under way, for a table that's changing.
  */
 export function mountCardInfo(root: HTMLElement, lookup: (card: HTMLElement) => Info | null): { hide(): void } {
-  const panel = el('div', 'tb-info');
+  const panel = el('div', 'tb-info hv-frame');
   panel.hidden = true;
   panel.setAttribute('role', 'tooltip');
   root.append(panel);
@@ -158,35 +169,47 @@ export function mountCardInfo(root: HTMLElement, lookup: (card: HTMLElement) => 
     stop();
     over = null;
     panel.hidden = true;
+    clearLead(root, 'card');
   };
-  /** Beside the card, the side with room, else under it, kept inside the root; a zoomed stage's offsets are scaled back to its own px, and a phone's table scrolls. */
+  /** Beside the card, the side with room, else under it, kept inside the root (a phone's table scrolls); a leader from the card's edge to the panel. */
   const place = (card: HTMLElement) => {
-    const r = root.getBoundingClientRect();
-    const c = card.getBoundingClientRect();
-    const z = root.offsetWidth > 0 ? r.width / root.offsetWidth : 1;
-    const gap = 10;
+    const c = hostRect(root, card);
     const w = panel.offsetWidth;
     const h = panel.offsetHeight;
-    const right = (c.right - r.left) / z + gap;
-    const left = (c.left - r.left) / z - gap - w;
+    const right = c.right + LEAD_GAP;
+    const left = c.left - LEAD_GAP - w;
     const beside = right + w <= root.offsetWidth ? right : left >= 0 ? left : null;
-    const top = (beside === null ? (c.bottom - r.top) / z + gap : (c.top - r.top) / z) + root.scrollTop;
-    panel.style.left = `${Math.max(0, beside ?? Math.min((c.left - r.left) / z, root.offsetWidth - w))}px`;
-    panel.style.top = `${Math.max(root.scrollTop, Math.min(top, root.scrollTop + root.offsetHeight - h))}px`;
+    const x = Math.max(0, beside ?? Math.min(c.left, root.offsetWidth - w));
+    const want = beside === null ? c.bottom + LEAD_GAP : c.top + 6;
+    const y = Math.max(root.scrollTop, Math.min(want, root.scrollTop + root.offsetHeight - h));
+    panel.style.left = `${x}px`;
+    panel.style.top = `${y}px`;
+    if (beside === null) {
+      const at = Math.min(Math.max(c.left + c.width / 2, x + 14), x + w - 14);
+      traceLead(root, 'card', [c.left + c.width / 2, c.bottom + 1], [at, y - 1]);
+    } else {
+      const fromY = c.top + Math.min(LEAD_Y, c.height / 2);
+      const toY = Math.min(Math.max(fromY, y + 14), y + h - 14);
+      traceLead(root, 'card', beside === right ? [c.right + 1, fromY] : [c.left - 2, fromY], beside === right ? [x - 1, toY] : [x + w, toY]);
+    }
   };
   const open = (card: HTMLElement): boolean => {
     const info = card.isConnected && card.dataset.state !== 'empty' ? lookup(card) : null;
     if (!info) return false;
-    // Dressed like a tip (tips.ts): the first line is the gist, the rest sit under a rule, the HUD's words in their colours.
-    const line = (l: string, i: number) => {
-      const d = el('div', i ? 'tb-info-line' : 'tb-info-line tb-info-gist');
-      d.append(...litNodes(l));
-      return d;
-    };
+    // In the HUD trace (style.css .hv-*): a pixel head, the first line the white gist, the rest rows keyed in caps where
+    // they open on a key, the HUD's words in their colours.
     const [first, ...rest] = info.lines;
-    const body = rest.length ? [el('div', 'tb-info-rows')] : [];
-    body[0]?.append(...rest.map((l) => line(l, 1)));
-    panel.replaceChildren(el('div', 'tb-info-title', info.title), ...(first === undefined ? [] : [line(first, 0)]), ...body);
+    const rows = el('div', 'tb-info-rows hv-rows');
+    for (const l of rest) {
+      const { key, text } = splitKey(l);
+      const t = el('div', key ? 'tb-info-line hv-t' : 'tb-info-line hv-t full');
+      t.append(...litNodes(text));
+      if (key) rows.append(el('span', 'hv-k', key));
+      rows.append(t);
+    }
+    const gist = first === undefined ? [] : [el('div', 'tb-info-line tb-info-gist hv-gist')];
+    gist[0]?.append(...litNodes(first!));
+    panel.replaceChildren(el('div', 'tb-info-title hv-head', info.title), ...gist, ...(rest.length ? [rows] : []));
     panel.hidden = false;
     place(card);
     return true;

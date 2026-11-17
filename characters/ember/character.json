@@ -33,6 +33,7 @@
     "pixel": true,
     "waist": 0.363
   },
+  "commsFigure": "ember-comms.png",
   "selectExpression": "happy",
   "expressions": {
     "happy": "ember-happy.png",
@@ -107,8 +108,14 @@
     },
     {
       "from": "20:00",
-      "to": "08:00",
+      "to": "02:00",
       "room": "karasu/zhou-flat"
+    },
+    {
+      "from": "02:00",
+      "to": "08:00",
+      "room": "karasu/zhou-flat",
+      "sleeps": true
     }
   ],
   "knows": {

@@ -229,3 +229,87 @@ export function followShore(shifts: ShoreShift[], reach = 22): (x: number, y: nu
     return [x + best.nx * best.o * k, y + best.ny * best.o * k];
   };
 }
+
+/** The filler land's coast as strips of smooth polygons (map px). Filler land (the gaps between districts, the Spine's
+ * strip) is a grid of cells, and `gapRuns` keeps it a cell and a half back from the water, so by itself its shore is a
+ * staircase. This walks the line between filler cells and water, smooths it, and returns it cut into short strips
+ * `depth` px deep that lie over the filler's edge; `naturalShore` then gives each the wander a district's coast has. */
+export function fillShores(map: CityMapData, g: LandGrid, depth = 28): P[][] {
+  const borders = map.districts.filter((d) => d.border && d.border.length >= 3).map((d) => d.border!);
+  const st = g.step;
+  const pct = (x: number, y: number): P => [(x / MAP_W) * 100, (y / MAP_H) * 100];
+  const inDistrict = (x: number, y: number) => borders.some((b) => insideBorder(pct(x, y), b));
+  const cell = (x: number, y: number) => (x < 0 || y < 0 || x >= g.cols || y >= g.rows ? -1 : g.cells[y * g.cols + x]!);
+  const filler = new Uint8Array(g.cols * g.rows);
+  for (let y = 0; y < g.rows; y++)
+    for (let x = 0; x < g.cols; x++) filler[y * g.cols + x] = g.cells[y * g.cols + x] === 1 && !inDistrict((x + 0.5) * st, (y + 0.5) * st) ? 1 : 0;
+  // Each side a filler cell shares with a water cell, as a directed edge between cell corners with the land on its left.
+  const W = g.cols + 1, node = (x: number, y: number) => y * W + x;
+  const next = new Map<number, number[]>();
+  const add = (a: number, b: number) => void (next.get(a) ?? next.set(a, []).get(a)!).push(b);
+  for (let y = 0; y < g.rows; y++)
+    for (let x = 0; x < g.cols; x++) {
+      if (!filler[y * g.cols + x]) continue;
+      if (cell(x, y - 1) === 0) add(node(x + 1, y), node(x, y));
+      if (cell(x + 1, y) === 0) add(node(x + 1, y + 1), node(x + 1, y));
+      if (cell(x, y + 1) === 0) add(node(x, y + 1), node(x + 1, y + 1));
+      if (cell(x - 1, y) === 0) add(node(x, y), node(x, y + 1));
+    }
+  // Chains: start where nothing leads in (an open coast's end), then whatever is left (closed loops).
+  const into = new Set<number>();
+  for (const bs of next.values()) for (const b of bs) into.add(b);
+  const chains: { pts: P[]; closed: boolean }[] = [];
+  const walk = (start: number) => {
+    const ids = [start];
+    let at = start;
+    for (;;) {
+      const outs = next.get(at);
+      if (!outs?.length) break;
+      at = outs.pop()!;
+      if (at === start) return { ids, closed: true };
+      ids.push(at);
+    }
+    return { ids, closed: false };
+  };
+  const starts = [...next.keys()].filter((k) => !into.has(k)).sort((a, b) => a - b);
+  for (const s of [...starts, ...[...next.keys()].sort((a, b) => a - b)]) {
+    while (next.get(s)?.length) {
+      const { ids, closed } = walk(s);
+      if (ids.length < 4) continue;
+      chains.push({ pts: ids.map((i): P => [(i % W) * st, Math.floor(i / W) * st]), closed });
+    }
+  }
+  const land = onLand(g);
+  const out: P[][] = [];
+  for (const ch of chains) {
+    // Smooth the stairs away (six 1-2-1 passes; an open chain keeps its ends, where it meets a district's coast).
+    let pts = ch.pts;
+    for (let pass = 0; pass < 6; pass++) {
+      const n = pts.length;
+      pts = pts.map((p, i): P => {
+        if (!ch.closed && (i === 0 || i === n - 1)) return p;
+        const a = pts[(i - 1 + n) % n]!, b = pts[(i + 1) % n]!;
+        return [(a[0] + 2 * p[0] + b[0]) / 4, (a[1] + 2 * p[1] + b[1]) / 4];
+      });
+    }
+    pts = pts.filter((_, i) => i % 2 === 0 || (!ch.closed && i === pts.length - 1));
+    if (ch.closed) pts.push(pts[0]!);
+    // The way inland at each point, and how deep the strip may go before it lies on a district's own slab.
+    const inner = pts.map((p, i): P => {
+      const a = pts[Math.max(0, i - 1)]!, b = pts[Math.min(pts.length - 1, i + 1)]!;
+      const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+      let nx = -dy / L, ny = dx / L;
+      if (!land(p[0] + nx * st * 1.5, p[1] + ny * st * 1.5) && land(p[0] - nx * st * 1.5, p[1] - ny * st * 1.5)) [nx, ny] = [-nx, -ny];
+      let d = depth;
+      // (a sliver of filler with water behind it too gets a strip as thin as it is)
+      while (d > 4 && (inDistrict(p[0] + nx * d, p[1] + ny * d) || !land(p[0] + nx * d, p[1] + ny * d))) d -= 8;
+      return [p[0] + nx * d, p[1] + ny * d];
+    });
+    const SEGS = 6;
+    for (let i = 0; i < pts.length - 1; i += SEGS) {
+      const j = Math.min(pts.length - 1, i + SEGS);
+      out.push([...pts.slice(i, j + 1), ...inner.slice(i, j + 1).reverse()]);
+    }
+  }
+  return out;
+}

@@ -11,6 +11,7 @@ import { openDb } from '../src/db';
 import { loadConfig } from '../src/config';
 import { openSettings } from '../src/settings';
 import { startStubAnthropic } from './fixtures/stub-anthropic';
+import { startStubNanoGpt } from './fixtures/stub-nanogpt';
 import { createPlaythroughs } from '../src/playthroughs';
 import { dispatchTool } from '../src/tools';
 import { startStubOpenRouter, chunk, okStep, type StubOpenRouter, type StubOpenRouterStep } from './fixtures/stub-openrouter';
@@ -73,7 +74,7 @@ interface Started {
  * starts with no active playthrough.
  */
 async function start(
-  overrides: { scenesDir?: string; dataDir?: string; persona?: object; cast?: string[]; dressed?: string[]; hae?: boolean; autoPlaythrough?: boolean; or?: StubOpenRouter; allowedHosts?: string[] } = {},
+  overrides: { scenesDir?: string; dataDir?: string; persona?: object; cast?: string[]; dressed?: string[]; hae?: boolean; autoPlaythrough?: boolean; or?: StubOpenRouter; allowedHosts?: string[]; figureEdits?: boolean } = {},
 ): Promise<Started> {
   // Nix is a direct character on an OpenRouter stub (default: "ok" to every turn).
   const or = overrides.or ?? (await orStub([]));
@@ -105,6 +106,7 @@ async function start(
   }
   if (overrides.autoPlaythrough !== undefined) cfg.autoPlaythrough = overrides.autoPlaythrough;
   if (overrides.allowedHosts) cfg.allowedHosts = overrides.allowedHosts;
+  cfg.figureEdits = overrides.figureEdits ?? false;
   const app = await buildApp(cfg);
   const rt = (await app.runtime('nix'))!;
   const built: BuiltApp = {
@@ -451,6 +453,113 @@ describe('buildApp / websocket hub', () => {
     } finally {
       fs.rmSync(dataDir, { recursive: true, force: true });
     }
+  });
+
+  describe('a persona with its own figure (spec 2026-11-12)', () => {
+    const figurePng = (rgb: [number, number, number]) => {
+      const png = new PNG({ width: 64, height: 96 });
+      for (let i = 0; i < png.data.length; i += 4) png.data.set([...rgb, 255], i);
+      return PNG.sync.write(png);
+    };
+    const meta = { face: { x: 0.5, y: 0.2 }, waist: 0.4, wears: 'a long grey coat, wet', model: 'openai/gpt-image-2', made: '2026-11-12T00:00:00.000Z', fields: {} };
+    async function withFigure(run: (o: { baseUrl: string; pts: ReturnType<typeof createPlaythroughs>; pt: string; other: string; dir: string }) => Promise<void>) {
+      const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nix-app-figure-'));
+      try {
+        const pts = createPlaythroughs(path.join(dataDir, 'playthroughs'));
+        const other = pts.create({ player: 'zed', startContact: 'nix', persona: { name: 'Kit', background: '' } }).id;
+        const pt = pts.create({ player: 'zed', startContact: 'nix', persona: { name: 'Vee', background: 'b', kind: 'custom' } }).id;
+        pts.setActive(pt);
+        const dir = pts.personaDir(pt);
+        fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, 'figure.png'), figurePng([200, 40, 40]));
+        fs.writeFileSync(path.join(dir, 'figure.json'), JSON.stringify(meta));
+        const { baseUrl } = await start({ cast: ['zed'], dressed: ['zed'], dataDir });
+        await run({ baseUrl, pts, pt, other, dir });
+      } finally {
+        fs.rmSync(dataDir, { recursive: true, force: true });
+      }
+    }
+
+    it('/api/persona: the figure, no wardrobe and no faces; the sprite route serves it', async () => {
+      await withFigure(async ({ baseUrl, dir }) => {
+        const { persona } = await (await fetch(`${baseUrl}/api/persona`)).json();
+        expect(persona).toMatchObject({ id: 'zed', name: 'Vee', figure: true, sprite: { waist: 0.4, pixel: true } });
+        expect(persona.sprite.url).toMatch(/^\/api\/persona\/sprite\?as=zed&v=/);
+        expect(persona.outfits).toBeUndefined();
+        expect(persona.baseOutfit).toBeUndefined();
+        expect(persona.expressions).toBeUndefined();
+        const img = Buffer.from(await (await fetch(`${baseUrl}/api/persona/sprite?as=zed`)).arrayBuffer());
+        expect(img.equals(fs.readFileSync(path.join(dir, 'figure.png')))).toBe(true);
+      });
+    });
+
+    it('POST /api/persona/outfit refuses: 409 figure', async () => {
+      await withFigure(async ({ baseUrl }) => {
+        const r = await fetch(`${baseUrl}/api/persona/outfit`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ outfit: 'indoors' }) });
+        expect(r.status).toBe(409);
+        expect(await r.json()).toEqual({ error: 'figure' });
+      });
+    });
+
+    it("thumbnails: /api/persona names the figure's, by playthrough; the roster's stays the character's", async () => {
+      await withFigure(async ({ baseUrl, pt, other, dir }) => {
+        const { persona } = await (await fetch(`${baseUrl}/api/persona`)).json();
+        expect(persona.thumb).toMatch(new RegExp(`^/api/persona/thumb\\?pt=${pt}&v=`));
+        expect(persona.sprite.url).toMatch(/^\/api\/persona\/sprite\?as=zed&v=/);
+        const a = await fetch(`${baseUrl}${persona.thumb}`);
+        const pa = PNG.sync.read(Buffer.from(await a.arrayBuffer()));
+        expect([pa.width, pa.height]).toEqual([208, 240]);
+        expect([...pa.data.subarray(0, 3)]).toEqual([200, 40, 40]);
+        // The roster's portrait of the character is never the persona's (select grid, LOAD, as someone's contact).
+        const roster = await fetch(`${baseUrl}/api/agents/zed/thumb`);
+        await roster.arrayBuffer();
+        expect(roster.headers.get('etag')).not.toBe(a.headers.get('etag'));
+        // Kept again in Studio: a later mtime, a new picture, no restart.
+        fs.writeFileSync(path.join(dir, 'figure.png'), figurePng([10, 200, 10]));
+        fs.utimesSync(path.join(dir, 'figure.png'), new Date(), new Date(Date.now() + 5000));
+        const b = await fetch(`${baseUrl}/api/persona/thumb?pt=${pt}`);
+        await b.arrayBuffer();
+        expect(b.headers.get('etag')).not.toBe(a.headers.get('etag'));
+        const r = await fetch(`${baseUrl}/api/persona/thumb?pt=${other}`, { redirect: 'manual' });
+        expect(r.status).toBe(302);
+        expect(r.headers.get('location')).toBe('/api/agents/zed/thumb');
+        expect((await fetch(`${baseUrl}/api/persona/thumb?pt=pt-nope`)).status).toBe(404);
+      });
+    });
+
+    it('/api/playthroughs marks the one with a figure', async () => {
+      await withFigure(async ({ baseUrl, pt, other }) => {
+        const { playthroughs } = await (await fetch(`${baseUrl}/api/playthroughs`)).json();
+        const by = Object.fromEntries(playthroughs.map((p: { id: string; figure: boolean }) => [p.id, p.figure]));
+        expect(by).toEqual({ [pt]: true, [other]: false });
+      });
+    });
+
+    it('a cleared persona keeps the figure on disk but plays the character', async () => {
+      await withFigure(async ({ baseUrl, pts, pt, dir }) => {
+        pts.setPersona(pt, null);
+        const { persona } = await (await fetch(`${baseUrl}/api/persona`)).json();
+        expect(persona.figure).toBeUndefined();
+        expect(fs.existsSync(path.join(dir, 'figure.png'))).toBe(true);
+      });
+    });
+
+    it("a bad figure.json: the character's body, one warning", async () => {
+      await withFigure(async ({ baseUrl, dir }) => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        try {
+          fs.writeFileSync(path.join(dir, 'figure.json'), '{"face":1}');
+          for (let i = 0; i < 2; i++) {
+            const { persona } = await (await fetch(`${baseUrl}/api/persona`)).json();
+            expect(persona.figure).toBeUndefined();
+            expect(persona.outfits).toEqual(['indoors']);
+          }
+          expect(warn.mock.calls.filter((c) => String(c[0]).includes('bad figure'))).toHaveLength(1);
+        } finally {
+          warn.mockRestore();
+        }
+      });
+    });
   });
 
   it("POST /api/persona/outfit saves the player's outfit in the active playthrough; /api/persona says it", async () => {
@@ -1041,6 +1150,39 @@ describe('buildApp / websocket hub', () => {
 
 });
 
+describe('ADJUST FIGURE routes (PEOPLE, dev only)', () => {
+  const put = (baseUrl: string, id: string, body: unknown, origin = 'http://localhost:5173') =>
+    fetch(`${baseUrl}/api/agents/${id}/figure`, { method: 'PUT', headers: { 'content-type': 'application/json', origin }, body: JSON.stringify(body) });
+
+  it('off: /api/figure-edits says so and the figure routes are not there', async () => {
+    const { baseUrl } = await start({ cast: ['zed'] });
+    expect(await (await fetch(`${baseUrl}/api/figure-edits`)).json()).toEqual({ on: false });
+    expect((await fetch(`${baseUrl}/api/agents/zed/figure`)).status).toBe(404);
+    expect((await put(baseUrl, 'zed', { waist: 0.4, face: { x: 0.5, y: 0.1 } })).status).toBe(404);
+  });
+
+  it('on: reads her fit, writes it into her character.json and the roster serves it at once', async () => {
+    const { baseUrl, cfg } = await start({ cast: ['zed'], figureEdits: true });
+    expect(await (await fetch(`${baseUrl}/api/figure-edits`)).json()).toEqual({ on: true });
+    const before = await (await fetch(`${baseUrl}/api/agents/zed/figure`)).json();
+    expect(before).toMatchObject({ own: true, waist: null, sprite: '/api/agents/zed/sprite' });
+    const r = await put(baseUrl, 'zed', { waist: 0.41234, face: { x: 0.48, y: 0.07 } });
+    expect(r.status).toBe(200);
+    expect(await r.json()).toEqual({ waist: 0.412, face: { x: 0.48, y: 0.07 } });
+    const file = JSON.parse(fs.readFileSync(path.join(cfg.charactersDir, 'zed', 'character.json'), 'utf8'));
+    expect(file).toMatchObject({ name: 'Zed', sprite: { src: 'zed.png', waist: 0.412 }, face: { x: 0.48, y: 0.07 } });
+    const { agents } = await (await fetch(`${baseUrl}/api/agents`)).json();
+    expect(agents.find((a: { id: string }) => a.id === 'zed').sprite.waist).toBe(0.412);
+  });
+
+  it('refuses a bad waist (400), a foreign origin (403) and someone with no figure (404)', async () => {
+    const { baseUrl } = await start({ cast: ['zed'], figureEdits: true });
+    expect((await put(baseUrl, 'zed', { waist: 0.9, face: { x: 0.5, y: 0.1 } })).status).toBe(400);
+    expect((await put(baseUrl, 'zed', { waist: 0.4, face: { x: 0.5, y: 0.1 } }, 'http://evil.example')).status).toBe(403);
+    expect((await put(baseUrl, 'nix', { waist: 0.4, face: { x: 0.5, y: 0.1 } })).status).toBe(404);
+  });
+});
+
 describe('tool lines in a direct turn', () => {
   it("a set_light call mid-turn broadcasts a tool_line with the streaming reply's id, persisted in its toolLines", async () => {
     const call = { choices: [{ index: 0, delta: { tool_calls: [{ index: 0, id: 'c1', type: 'function', function: { name: 'set_light', arguments: JSON.stringify({ light_id: 'monitor', intensity: 0.7 }) } }] }, finish_reason: null }] };
@@ -1155,7 +1297,7 @@ describe('model routes', () => {
   });
 
   /** A direct character ('direct') on a stubbed OpenRouter catalog. */
-  async function startModelApp(opts: { key?: string | null; steps?: StubOpenRouterStep[]; anthropicKey?: string } = {}) {
+  async function startModelApp(opts: { key?: string | null; steps?: StubOpenRouterStep[]; anthropicKey?: string; nanoKey?: string } = {}) {
     const or = await startStubOpenRouter(opts.steps ?? [{ chunks: [chunk('Hi.'), chunk(undefined, 'stop')] }]);
     cleanups.push(() => or.close());
     or.models = {
@@ -1179,6 +1321,10 @@ describe('model routes', () => {
     cleanups.push(() => an.close());
     cfg.anthropicBaseUrl = an.url;
     if (opts.anthropicKey) settings.setKey('anthropic', opts.anthropicKey);
+    const nano = await startStubNanoGpt({ reply: 'Hi from NanoGPT.', completion: '{"notes":[]}' });
+    cleanups.push(() => nano.close());
+    cfg.nanogptBaseUrl = nano.url;
+    if (opts.nanoKey) settings.setKey('nanogpt', opts.nanoKey);
     const app = await buildApp(cfg, { settings });
     cleanups.push(() => app.close());
     await app.app.listen({ port: 0, host: '127.0.0.1' });
@@ -1186,8 +1332,39 @@ describe('model routes', () => {
     if (!address || typeof address === 'string') throw new Error('expected a network address');
     const baseUrl = `http://127.0.0.1:${address.port}`;
     const wsUrl = `ws://127.0.0.1:${address.port}/ws/direct`;
-    return { app, baseUrl, wsUrl, or, an, settings };
+    return { app, baseUrl, wsUrl, or, an, nano, settings };
   }
+
+  it('a NanoGPT key beside OpenRouter: GLM (in the plan) turns on NanoGPT, the Residual too; OpenRouter gets nothing', async () => {
+    const { wsUrl, baseUrl, or, nano } = await startModelApp({ nanoKey: 'sk-nano-app-key-1' });
+    // The plan list loads at start (a key is linked): wait until GLM routes on it, so the first turn does.
+    let routed = false;
+    await waitFor(() => {
+      void fetch(`${baseUrl}/api/models`)
+        .then((r) => r.json() as Promise<{ picks: { id: string; via?: string }[] }>)
+        .then((b) => (routed ||= b.picks.some((p) => p.id === 'z-ai/glm-5.2' && p.via === 'nanogpt')));
+      return routed;
+    });
+    const { opened, events, ws } = connectWs(wsUrl);
+    await opened;
+    ws.send(JSON.stringify({ type: 'user_message', text: 'hello' }));
+    await waitFor(() => events.some((e) => e.type === 'message' && e.message.role === 'agent' && e.message.status === 'ok'));
+    const turn = nano.requests.find((r) => r.method === 'POST' && r.body?.stream);
+    expect([turn?.url, turn?.body.model, turn?.headers.authorization]).toEqual(['/api/v1/chat/completions', 'z-ai/glm-5.2', 'Bearer sk-nano-app-key-1']);
+    expect(events.some((e) => e.type === 'message' && e.message.role === 'agent' && e.message.text === 'Hi from NanoGPT.')).toBe(true);
+    await waitFor(() => nano.requests.some((r) => r.method === 'POST' && r.url === '/api/v1/chat/completions' && !r.body?.stream));
+    expect(or.requests.filter((r) => r.method === 'POST')).toHaveLength(0);
+  });
+
+  it("only a NanoGPT key: /api/models offers NanoGPT's list, picks marked via nanogpt", async () => {
+    const { baseUrl } = await startModelApp({ key: null, nanoKey: 'sk-nano-app-key-1' });
+    const body = (await (await fetch(`${baseUrl}/api/models`)).json()) as { picks: { id: string; via?: string }[] };
+    expect(body.picks.map((p) => [p.id, p.via])).toEqual([
+      ['z-ai/glm-5.2', 'nanogpt'],
+      ['deepseek/deepseek-v4-pro-0813', 'nanogpt'],
+      ['anthropic/claude-sonnet-5.5', 'nanogpt'],
+    ]);
+  });
 
   it('only an Anthropic key: a GLM character turns on Sonnet through it, and the Residual too (Anthropic backend spec §2)', async () => {
     const { wsUrl, or, an } = await startModelApp({ key: null, anthropicKey: 'sk-ant-app' });

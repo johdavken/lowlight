@@ -128,6 +128,45 @@ test('SETUP: a guest with no bust is a foil card with a crew face and her line',
   await page.screenshot({ path: 'test-results/guest-foil-no-bust.png' });
 });
 
+test('the table holds while the contact speaks, then lets go (ride-along replies)', async ({ page }) => {
+  // The server's half is in jobs.test.ts. Here a quest row she'll answer arrives over the socket while the table is up,
+  // so the turn tracker reads her as speaking; removing it ends that.
+  let toPage: (m: string) => void = () => {};
+  let sent = false;
+  await page.routeWebSocket(/\/ws|\/socket|\/api/, (ws) => {
+    const server = ws.connectToServer();
+    toPage = (m) => ws.send(m);
+    ws.onMessage((m) => server.send(m));
+    server.onMessage((m) => ws.send(m));
+  });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await skipSplash(page);
+  await enter(page);
+  if ((await scene(page).textContent()) !== 'LOWLIGHT INTAKE') {
+    await send(page, { type: 'dev_action', tool: 'go_to', args: { id: 'lowlight-intake', transition: 'fade' } });
+    await expect(scene(page)).toHaveText('LOWLIGHT INTAKE', { timeout: 10_000 });
+    await enter(page);
+  }
+  await page.locator('.hud-quest').click();
+  await page.locator('.ql-row.ql-job').first().click();
+  await page.locator('.ql-file .ql-start').click();
+  await page.locator('.ts-go').click();
+  await expect(page.locator('.tb-job .tb-deal .tb-card').first()).toBeVisible({ timeout: 15_000 });
+  // Let her opening line finish first, so only the injected row holds the table.
+  await expect(page.locator('.tb-job')).not.toHaveClass(/tb-held/, { timeout: 30_000 });
+  const row = { id: 'e2e-ride-along', role: 'user', mode: 'quest', status: 'ok', text: 'You pick.', toolLines: [], ts: Date.now(), quest: { id: 'x', title: 'X', beat: 'x' } };
+  toPage(JSON.stringify({ type: 'message', message: row }));
+  sent = true;
+  await expect(page.locator('.tb-job')).toHaveClass(/tb-held/);
+  await expect(page.locator('.tb-held-note')).toHaveText(/ ON THE LINE$/);
+  await expect(page.locator('.tb-job .tb-deal .tb-card').first()).toHaveCSS('pointer-events', 'none');
+  await page.screenshot({ path: 'test-results/ride-along-held.png' });
+  toPage(JSON.stringify({ type: 'messages_removed', ids: [row.id] }));
+  await expect(page.locator('.tb-job')).not.toHaveClass(/tb-held/);
+  await expect(page.locator('.tb-held-note')).toBeHidden();
+  expect(sent).toBe(true);
+});
+
 test('a beat with a song takes the music over the table, and hands it back', async ({ page }) => {
   // A beat's own track: it's never a room's song, so the room can't be what's heard.
   const song = ((await (await page.request.get('/api/songs')).json()) as { beats: { title: string; url: string }[] }).beats[0];

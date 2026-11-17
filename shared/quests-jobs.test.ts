@@ -338,3 +338,22 @@ describe('effect lines that would show as story', () => {
     }
   });
 });
+
+// The arrival screen's STORY (2026-11-11): a for: job with one with: contact may carry its own opening.
+describe('opening: and opening-view:', () => {
+  const ONE = JOB.replace('with: [hicks, ember, nix-direct]', 'with: [nix-direct]');
+  const withOpening = (t: string) => t.replace('starts: haes-noodles', 'starts: haes-noodles\nopening: You came up the stairs.\nopening-view: You asked him up.');
+  it('parse together on a for: job with one contact', () => {
+    expect(ok(withOpening(ONE.replace('starts: haes-noodles', 'starts: haes-noodles\nfor: hicks'))).opening).toEqual({ text: 'You came up the stairs.', view: 'You asked him up.' });
+  });
+  it('need each other', () => {
+    one(ONE.replace('starts: haes-noodles', 'starts: haes-noodles\nfor: hicks\nopening: You came up the stairs.'), /^opening-view: .*together/);
+  });
+  it('refuse text: beside them', () => {
+    one(withOpening(ONE.replace('starts: haes-noodles', 'starts: haes-noodles\nfor: hicks\ntext: Come up.')), /^opening: .*pick one/);
+  });
+  it('need for: and exactly one with: contact', () => {
+    one(withOpening(ONE), /^opening: .*for: and one with:/);
+    one(withOpening(JOB.replace('starts: haes-noodles', 'starts: haes-noodles\nfor: hicks')), /^opening: .*for: and one with:/);
+  });
+});

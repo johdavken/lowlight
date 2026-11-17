@@ -429,5 +429,11 @@
         340
       ]
     }
-  ]
+  ],
+  "sound": {
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
+    }
+  }
 }

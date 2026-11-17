@@ -74,6 +74,25 @@ describe('settings', () => {
     expect(JSON.parse(fs.readFileSync(file(d), 'utf8'))).not.toHaveProperty('narratorThinking');
   });
 
+  it('replyLength and chatThinking default to normal and auto, persist, and leave no field at the default', () => {
+    const d = tempDir('nix-set-');
+    const s = openSettings(d);
+    expect(s.replyLength()).toBe('normal');
+    expect(s.chatThinking()).toBe('auto');
+    s.setReplyLength('short');
+    s.setChatThinking('medium');
+    expect(openSettings(d).replyLength()).toBe('short');
+    expect(openSettings(d).chatThinking()).toBe('medium');
+    s.setReplyLength('normal');
+    s.setChatThinking('auto');
+    const raw = JSON.parse(fs.readFileSync(file(d), 'utf8'));
+    expect(raw).not.toHaveProperty('replyLength');
+    expect(raw).not.toHaveProperty('chatThinking');
+    fs.writeFileSync(file(d), JSON.stringify({ version: 1, keys: {}, recentModels: [], characterModels: {}, replyLength: 'epic', chatThinking: 'max' }));
+    expect(openSettings(d).replyLength()).toBe('normal');
+    expect(openSettings(d).chatThinking()).toBe('auto');
+  });
+
   it('an unknown narratorThinking in the file reads as auto', () => {
     const d = tempDir('nix-set-');
     fs.writeFileSync(file(d), JSON.stringify({ version: 1, keys: {}, recentModels: [], characterModels: {}, narratorThinking: 'high' }));

@@ -36,6 +36,35 @@ describe('the setup card', () => {
     expect($('.ts-pitch').textContent).toContain('KARASU · KNOWN · HEAT 2');
   });
 
+  it('off a phone it is the job table (playtest): HUD regions, the line as the top strip with the tier, GO IN and BACK in the levers, no clocks', () => {
+    open();
+    expect($('.tb-setup').classList.contains('hud')).toBe(true);
+    expect($('.tb-setup .tb-top .ts-strip').textContent).toBe('TIER 1KARASU · KNOWN · HEAT 2');
+    expect($('.tb-setup .tb-levers .ts-go')).not.toBeNull();
+    expect($('.tb-setup .tb-levers .ts-back')).not.toBeNull();
+    expect($('.tb-setup .tb-middle .ts-approach')).not.toBeNull();
+    expect($$('.tb-setup :is(.tb-take, .tb-alarm, .tb-nerve)').every((c) => c.hidden)).toBe(true);
+  });
+
+  it('on a phone it keeps the plain card: GO IN beside the approaches, no HUD', () => {
+    const w = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 400 });
+    try {
+      open();
+      expect($('.tb-setup').classList.contains('hud')).toBe(false);
+      expect($('.ts-mid .ts-buttons .ts-go')).not.toBeNull();
+      expect(document.querySelector('.ts-strip')).toBeNull();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: w });
+    }
+  });
+
+  it('a fresh offer updates the strip too', () => {
+    const { s } = open();
+    s.update({ ...OFFER, heat: 4 });
+    expect($('.ts-strip').textContent).toContain('KARASU · KNOWN · HEAT 4');
+  });
+
   it('an approach card selects one; GO IN sends what was chosen', () => {
     const { onGo } = open();
     expect($$('.ts-approach .tb-card').map((c) => c.dataset.id)).toEqual(['quiet', 'smooth', 'hard']);
@@ -348,5 +377,20 @@ describe('SETUP with the deck (programs spec §2.4)', () => {
     open({ ...OFFER, favour: 'ON HOLD', deck: null });
     expect($('.ts-hand .g-deck .tb-group-label').textContent).toBe('DECK · NONE');
     expect($$('.ts-hand .g-deck .tb-slot')).toEqual([]);
+  });
+});
+
+describe('SETUP sounds its own moments', () => {
+  it('a recruit brought in, one sent back, then GO IN: crew, the table step, go', () => {
+    const g = document.createElement('div');
+    g.id = 'game';
+    document.body.append(g);
+    const cue = vi.fn();
+    mountSetup(g, { offer: OFFER, title: 'Marked Cards', pitch: null, tier: 1, onGo: vi.fn(), onBack: vi.fn(), reduced: true, cue });
+    cue.mockClear();
+    $('.ts-ready .tb-slot[data-id="dez"]').click();
+    $('.g-people .tb-slot[data-id="dez"]').click();
+    $('.ts-go').click();
+    expect(cue.mock.calls.map((c) => c[0])).toEqual(['crew', 'move', 'go']);
   });
 });

@@ -49,6 +49,8 @@ export interface Deck {
   unreadNow(): { id: string; name: string }[];
   /** Her promised text (promised texts spec §5), on her queue like any text; true once it's sent. */
   promised(contact: string, o: { about: string; due: number; where: string; place: string; from: string }): Promise<boolean>;
+  /** Her job text (job texts spec §3), through the same queue as any text of hers. */
+  jobText(contact: string, o: { job: string; text: string; due: number }): Promise<boolean>;
 }
 
 interface Client {
@@ -340,6 +342,9 @@ export function createDeck(deps: DeckDeps): Deck {
     },
     promised(contact, o) {
       return text(null, contact, undefined, (rt, player) => rt.relay.sendPromised(player, { ...o, place: o.place }));
+    },
+    jobText(contact, o) {
+      return text(null, contact, undefined, (rt, player) => rt.relay.sendJobText(player, o));
     },
     refresh() {
       lastUnread = '';

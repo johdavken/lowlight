@@ -1,12 +1,12 @@
 /**
- * YOU, PEOPLE, TEXTS, QUEST, CREW, MAP and BOOK as one cycle (2026-10-18; CREW 2026-10-19; TEXTS 2026-10-29; QUEST 2026-11-02; BOOK
- * 2026-11-06), in the bar's order: Tab opens YOU, and with one of them open goes to the next (YOU → PEOPLE → TEXTS → QUEST → CREW → MAP →
- * BOOK → YOU, YOU's and PEOPLE's pages first, QUEST only while it's on the bar). Shift+Tab runs the other way, from BOOK with nothing open.
+ * YOU, PEOPLE, QUEST, CREW, MAP and BOOK as one cycle (2026-10-18; CREW 2026-10-19; QUEST 2026-11-02; BOOK 2026-11-06; TEXTS was one
+ * from 2026-10-29 until it became PEOPLE's tab, 2026-11-15), in the bar's order: Tab opens YOU, and with one of them open goes to the
+ * next (YOU → PEOPLE → QUEST → CREW → MAP → BOOK → YOU, YOU's and PEOPLE's pages first, QUEST only while it's on the bar). Shift+Tab runs the other way, from BOOK with nothing open.
  * In the room Tab only ever does this, never walks the page's buttons, unless a field of its own has focus or something is over it (the
  * hack window, a menu, the bug report).
  */
-export type CycleScreen = 'you' | 'people' | 'texts' | 'quest' | 'crew' | 'map' | 'book';
-export const CYCLE: CycleScreen[] = ['you', 'people', 'texts', 'quest', 'crew', 'map', 'book'];
+export type CycleScreen = 'you' | 'people' | 'quest' | 'crew' | 'map' | 'book';
+export const CYCLE: CycleScreen[] = ['you', 'people', 'quest', 'crew', 'map', 'book'];
 
 /** The next screen `dir` from `from` (null: nothing open, so the ring's first or last) that `shown` allows (all of them by default). */
 export function nextScreen(from: CycleScreen | null, dir: 1 | -1, shown: (s: CycleScreen) => boolean = () => true): CycleScreen {

@@ -5,6 +5,10 @@
  * entry is marked once per line. The glossary comes from GET /api/lore/glossary.
  */
 import { loreKeyMatches, type GlossaryEntry } from '../../../shared/lore';
+import { clearLead, hostRect, traceLead } from './trace-lead';
+
+/** Between the word and its card: room for the leader (overlay-hud.html B TRACE). */
+const LEAD_GAP = 30;
 
 let entries = new Map<string, GlossaryEntry>();
 /** Lowercased key → the entries with that key, as written (its capitals count: lore picking spec §1). */
@@ -97,11 +101,11 @@ export function markLore(root: HTMLElement): void {
 /** The one card for every lore word under `host`: hover, focus or tap shows it by the word; leaving, blur or Escape hides it. Returns its removal. */
 export function installLoreCard(host: HTMLElement): () => void {
   const card = document.createElement('div');
-  card.className = 'lore-card';
+  card.className = 'lore-card hv-frame';
   card.hidden = true;
   card.setAttribute('role', 'tooltip');
   const title = document.createElement('div');
-  title.className = 'lore-card-title';
+  title.className = 'lore-card-title hv-head';
   const body = document.createElement('div');
   body.className = 'lore-card-text';
   card.append(title, body);
@@ -116,16 +120,24 @@ export function installLoreCard(host: HTMLElement): () => void {
     body.textContent = g.text;
     card.hidden = false;
     showing = word;
-    // Above the word, kept inside the host; the stage may be zoomed, so screen offsets are scaled back to its own px.
-    const h = host.getBoundingClientRect();
-    const w = word.getBoundingClientRect();
-    const z = host.offsetWidth > 0 ? h.width / host.offsetWidth : 1;
-    card.style.left = `${Math.max(0, Math.min((w.left - h.left) / z, host.offsetWidth - card.offsetWidth))}px`;
-    card.style.top = `${Math.max(0, (w.top - h.top) / z - card.offsetHeight - 8)}px`;
+    // Above the word, a leader's length off, else below it; kept inside the host. The leader rises from the word's middle
+    // to the card's near edge, a little in from its left.
+    const w = hostRect(host, word);
+    const cw = card.offsetWidth;
+    const ch = card.offsetHeight;
+    const left = Math.max(0, Math.min(w.left + 12, host.offsetWidth - cw));
+    const above = w.top - LEAD_GAP - ch >= 0;
+    const top = above ? w.top - LEAD_GAP - ch : Math.min(w.bottom + LEAD_GAP, Math.max(0, host.offsetHeight - ch));
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+    card.dataset.side = above ? 'above' : 'below';
+    const mid = Math.min(Math.max(w.left + w.width / 2, left + 14), left + cw - 14);
+    traceLead(host, 'lore', [w.left + w.width / 2, above ? w.top - 1 : w.bottom + 1], [mid, above ? top + ch : top - 1]);
   };
   const hide = () => {
     card.hidden = true;
     showing = null;
+    clearLead(host, 'lore');
   };
   const over = (e: Event) => {
     const w = wordOf(e.target);
@@ -156,6 +168,7 @@ export function installLoreCard(host: HTMLElement): () => void {
     host.removeEventListener('focusout', out);
     host.removeEventListener('click', click);
     window.removeEventListener('keydown', key);
+    clearLead(host, 'lore');
     card.remove();
   };
 }

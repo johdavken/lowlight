@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { createAnthropicCatalog, createModelCatalog, createModelPicker, createRoutedCatalog } from '../src/model-catalog';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createAnthropicCatalog, createModelCatalog, createModelPicker, createNanoGptCatalog, createRoutedCatalog } from '../src/model-catalog';
+import { startStubNanoGpt } from './fixtures/stub-nanogpt';
 import { startStubOpenRouter, type StubOpenRouter } from './fixtures/stub-openrouter';
 
 let stub: StubOpenRouter | null = null;
@@ -213,7 +214,7 @@ describe('createModelPicker: via', () => {
       curated: () => ['anthropic/claude-sonnet-5.5'],
       store: { get: () => 'z-ai/glm-5.2', set: () => {} },
       credit: async () => 4.12,
-      via: (id) => id === 'anthropic/claude-sonnet-5.5',
+      via: (id) => (id === 'anthropic/claude-sonnet-5.5' ? 'anthropic' : null),
     });
     const e = await picker.event();
     expect(e.choices?.map((c) => [c.id, c.via])).toEqual([['z-ai/glm-5.2', undefined], ['anthropic/claude-sonnet-5.5', 'anthropic']]);
@@ -237,5 +238,113 @@ describe('createModelPicker: the model her route runs', () => {
     expect(e.model).toBe('anthropic/claude-sonnet-5.5');
     expect(e.choices?.map((c) => c.id)).toContain('anthropic/claude-sonnet-5.5');
     expect(stored).toBe('z-ai/glm-5.2');
+  });
+});
+
+describe('createNanoGptCatalog', () => {
+  it("reads the detailed list: labels, prices per million, the plan's models; no tools, not offered", async () => {
+    const nano = await startStubNanoGpt({
+      models: [
+        { id: 'z-ai/glm-5.2', included: true },
+        { id: 'anthropic/claude-sonnet-5.5', included: false },
+        { id: 'x/no-tools', included: true, tools: false },
+      ],
+    });
+    try {
+      const c = createNanoGptCatalog({ host: nano.url });
+      expect(c.baseUrl).toBe(`${nano.url}/api/v1`);
+      expect(c.included('z-ai/glm-5.2')).toBe(false); // not loaded yet
+      const list = await c.list();
+      expect(list?.map((m) => m.id)).toEqual(['z-ai/glm-5.2', 'anthropic/claude-sonnet-5.5']);
+      expect(list?.[0]).toMatchObject({ priceIn: 0.4, priceOut: 1.3, context: 200_000 });
+      expect([c.included('z-ai/glm-5.2'), c.included('anthropic/claude-sonnet-5.5'), c.included('x/no-tools')]).toEqual([true, false, false]);
+      expect(nano.requests[0]!.url).toBe('/api/v1/models?detailed=true');
+      expect(nano.requests[0]!.headers.authorization).toBeUndefined();
+    } finally {
+      await nano.close();
+    }
+  });
+
+  it('the routed catalog: OpenRouter when linked, else NanoGPT, else Anthropic', async () => {
+    const tag = (name: string) => ({ list: async () => [{ id: name, label: name, priceIn: null, priceOut: null }], get: async () => null, labelFor: () => name, labelSoon: async () => name, search: async () => [] });
+    let keys = { openrouter: 'or' as string | null, anthropic: 'an' as string | null, nanogpt: 'nk' as string | null };
+    const c = createRoutedCatalog({ openrouter: tag('or'), anthropic: tag('an'), nanogpt: tag('nk'), keys: () => keys });
+    expect(c.labelFor('x')).toBe('or');
+    keys = { ...keys, openrouter: null };
+    expect(c.labelFor('x')).toBe('nk');
+    keys = { ...keys, nanogpt: null };
+    expect(c.labelFor('x')).toBe('an');
+  });
+});
+
+describe('createModelPicker: via nanogpt', () => {
+  it('tags the choices that run through the NanoGPT key', async () => {
+    const catalog = await catalogWith();
+    const picker = createModelPicker({
+      catalog,
+      defaultModel: 'z-ai/glm-5.2',
+      provider: 'openrouter',
+      curated: () => [],
+      store: { get: () => 'z-ai/glm-5.2', set: () => {} },
+      credit: async () => 3.1,
+      via: (id) => (id === 'z-ai/glm-5.2' ? 'nanogpt' : null),
+    });
+    expect((await picker.event()).choices?.map((c) => [c.id, c.via])).toEqual([['z-ai/glm-5.2', 'nanogpt']]);
+  });
+});
+
+describe('createModelPicker: the provider her route goes to', () => {
+  it('reports the route of her current model, not her own provider', async () => {
+    const catalog = await catalogWith();
+    const picker = createModelPicker({
+      catalog,
+      defaultModel: 'z-ai/glm-5.2',
+      provider: 'openrouter',
+      providerFor: () => 'nanogpt',
+      curated: () => [],
+      store: { get: () => 'z-ai/glm-5.2', set: () => {} },
+      credit: async () => null,
+    });
+    expect((await picker.event()).provider).toBe('nanogpt');
+  });
+});
+
+describe('createNanoGptCatalog: staying current', () => {
+  it('a list that failed to load is tried again when routing asks, at most once a minute', async () => {
+    let t = 0;
+    let up = false;
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls++;
+      if (!up) throw new TypeError('offline');
+      return new Response(JSON.stringify({ data: [{ id: 'z-ai/glm-5.2', subscription: { included: true } }] }), { headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch;
+    const c = createNanoGptCatalog({ host: 'http://nano.test', fetchImpl, now: () => t });
+    await c.warm();
+    expect(c.included('z-ai/glm-5.2')).toBe(false);
+    up = true;
+    t = 30_000;
+    c.included('z-ai/glm-5.2');
+    expect(calls).toBe(1);
+    t = 61_000;
+    c.included('z-ai/glm-5.2');
+    await vi.waitFor(() => expect(c.included('z-ai/glm-5.2')).toBe(true));
+    expect(calls).toBe(2);
+  });
+
+  it("the allowance pause lasts the 429's Retry-After (an hour unsaid), and a relink clears it", () => {
+    let t = 0;
+    const c = createNanoGptCatalog({ host: 'http://nano.test', now: () => t });
+    expect(c.spent()).toBe(false);
+    c.markSpent(120);
+    t = 119_000;
+    expect(c.spent()).toBe(true);
+    t = 120_000;
+    expect(c.spent()).toBe(false);
+    c.markSpent(NaN);
+    t += 3_599_000;
+    expect(c.spent()).toBe(true);
+    c.clearSpent();
+    expect(c.spent()).toBe(false);
   });
 });

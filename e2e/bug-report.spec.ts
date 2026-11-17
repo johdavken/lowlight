@@ -48,5 +48,5 @@ test('REPORT A BUG on the title: no screenshot box, the tip, and Esc goes back',
   await expect(panel.locator('.bug-tip')).toHaveText('Tip: press F8 in a scene to report from there, with a screenshot.');
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
-  await expect(page.locator('.title-menu .tile[data-id="report"]')).toHaveClass(/\bon\b/);
+  await expect(page.locator('.title-menu .tm-item[data-id="report"]')).toHaveClass(/\bon\b/);
 });

@@ -145,11 +145,12 @@ export async function updateCards(ids, cast, base) {
   const s = settings();
   const byId = new Map(cast.characters.map((c) => [c.id, c]));
   const done = [];
-  const files = new Map(ctx().characters.map((ch) => [ch.name, String(ch.avatar).replace(/\.png$/i, '')]));
+  // Each card's own file name (not `files`: that's the fetch helper above, which this would shadow).
+  const avatars = new Map(ctx().characters.map((ch) => [ch.name, String(ch.avatar).replace(/\.png$/i, '')]));
   for (const id of ids) {
     const c = byId.get(id);
     // Over the card's own file, whatever SillyTavern named it.
-    await card(c, get, files.get(c.name) ?? c.name);
+    await card(c, get, avatars.get(c.name) ?? c.name);
     const [, spr, per] = (s.hashes[id] ?? '||').split('|');
     s.hashes[id] = `${c.hash.card}|${spr}|${per}`;
     done.push(id);

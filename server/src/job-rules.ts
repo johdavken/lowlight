@@ -5,7 +5,7 @@
 import type { QuestState } from '../../shared/types';
 import type { Kit } from '../../shared/mission';
 import type { Deck } from '../../shared/gear';
-import { beatAt, type Beat, type Outcome, type QuestEntry, type QuestRun } from '../../shared/quests';
+import { beatAt, outcomeFor, type Beat, type Outcome, type QuestEntry, type QuestRun } from '../../shared/quests';
 import { isLegacyPending, type Choice, type DicePending } from '../../shared/quests';
 import type { CostId } from '../../shared/costs';
 import { ALARM_MAX, jobTakeSize, kindResult } from '../../shared/dice';
@@ -60,7 +60,9 @@ export function afterRefusal(kind: string, q: QuestEntry, run: QuestRun, p: Pick
     if (kind === 'take-hit') return (p.dealt ?? []).length && p.pick ? null : 'NO COSTS TO TAKE';
     if (!missed) return 'that does nothing on this roll';
     if (kind === 'talk-down') {
-      const e = route?.fail ? q.outcomes.get(route.fail)?.effects : undefined;
+      // The version of the miss that would play (routes and posts spec §1): one a post already covers isn't a blow-up.
+      // The run's flags and ALARM decide it here; a version that turned on trust or who's with you would read as mid.
+      const e = route?.fail ? outcomeFor(q, route.fail, { flags: run.flags, trust: 'mid', warmth: 'mid', with: '', alarm: run.alarm ?? 0 })?.effects : undefined;
       return !p.roll.softened && (e?.blown || e?.take === 'none') ? null : 'NOT A BLOW-UP';
     }
     // A card behind `needs` might not show, so only a plain one counts as somewhere to go.

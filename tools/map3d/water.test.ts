@@ -2,15 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { MAP_H, MAP_W } from '../../shared/map-projection';
 import { generate } from './generate';
 import { loadCity } from './load';
-import { coastEdges, landGrid } from './water';
+import { coastEdges, fillShores, landGrid, onLand } from './water';
 import { insideBorder } from '../../shared/map-schema';
 import { spineGeometry } from './spine';
 
 const city = loadCity('.');
+// Generated once, outside the tests: each takes seconds.
+const off = generate(city, { joins: false }).geometry;
 describe('water and land', () => {
   const g = generate(city).geometry;
   it('every district with a border is land; the rest is water', () => {
-    expect(g.land.length).toBe(city.map.districts.filter((d) => d.border && d.border.length >= 3 && !city.styles[d.id]?.flooded && !city.styles[d.id]?.isle).length);
+    expect(off.land.length).toBe(city.map.districts.filter((d) => d.border && d.border.length >= 3 && !city.styles[d.id]?.flooded && !city.styles[d.id]?.isle).length);
   });
   it("the Strand's waterfront faces the bay: coast edges on its south side, none on edges shared with Karasu", () => {
     const spine = spineGeometry(city.spines[0]!, city.map.places, null);
@@ -74,5 +76,49 @@ describe('natural shores on every coast', () => {
       });
       for (const [x, y] of pts) expect(inPoly(x, y, slab) || onLine(x, y), `${d.id} ${x},${y}`).toBe(true);
     }
+  });
+});
+
+describe("the filler land's coast", () => {
+  const g = generate(city).geometry;
+  const spine = spineGeometry(city.spines[0]!, city.map.places, null);
+  const under = city.map.districts.filter((d) => city.styles[d.id]?.flooded).map((d) => d.id);
+  const isles = city.map.districts.filter((d) => city.styles[d.id]?.isle).map((d) => d.id);
+  const grid = landGrid(city.map, [spine.along], under, isles);
+  const strips = fillShores(city.map, grid);
+  it('is smooth: no strip turns a cell corner', () => {
+    expect(strips.length).toBeGreaterThan(20);
+    // The coast side is the first half of a strip. A cell grid's coast turns a right angle at every step; smoothed, a
+    // sharp turn is rare (a chain's fixed end, a one-cell notch).
+    let turns = 0, sharp = 0;
+    for (const poly of strips) {
+      const coast = poly.slice(0, poly.length / 2);
+      for (let i = 1; i < coast.length - 1; i++) {
+        const [a, b, c] = [coast[i - 1]!, coast[i]!, coast[i + 1]!];
+        const turn = Math.abs(Math.atan2(c[1] - b[1], c[0] - b[0]) - Math.atan2(b[1] - a[1], b[0] - a[0]));
+        turns++;
+        if (Math.min(turn, 2 * Math.PI - turn) > 1.2) sharp++;
+      }
+    }
+    expect(sharp / turns).toBeLessThan(0.05);
+  });
+  it("lies on the filler's edge, off every district's own slab", () => {
+    const land = onLand(grid);
+    const borders = city.map.districts.filter((d) => d.border && d.border.length >= 3).map((d) => d.border!);
+    let inside = 0;
+    for (const poly of strips) {
+      const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length, cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+      // Within a strip's depth of land; a cell's corner can sit a few px inside a district's line, so nearly none of the
+      // strips has its middle in a district.
+      expect([-40, -24, -8, 8, 24, 40].some((dx) => [-40, -24, -8, 8, 24, 40].some((dy) => land(cx + dx, cy + dy)))).toBe(true);
+      if (borders.some((b) => insideBorder([(cx / MAP_W) * 100, (cy / MAP_H) * 100], b))) inside++;
+    }
+    expect(inside / strips.length).toBeLessThan(0.15);
+  });
+  it('adds land only: the districts\' slabs and everything standing on them stay as they were', () => {
+    expect(g.land.slice(0, off.land.length)).toEqual(off.land);
+    expect(g.land.length).toBeGreaterThan(off.land.length);
+    expect(g.landDistricts.length).toBe(g.land.length);
+    expect(g.pinHeights).toEqual(off.pinHeights);
   });
 });

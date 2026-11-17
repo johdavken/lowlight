@@ -95,6 +95,13 @@ describe('buildReport', () => {
     expect(all).not.toContain('Old_Key');
   });
 
+  it('scrubs a NanoGPT-shaped key it was never told about', () => {
+    const old = 'sk-nano-Old_Key-77';
+    const r = buildReport(input({ description: 'x' }), state(), `error: auth ${old}`, []);
+    const all = [r.subject, r.text, ...r.attachments.map((a) => decode(a.content))].join('\n');
+    expect(all).not.toContain('Old_Key');
+  });
+
   it('scrubs the key everywhere', () => {
     const k = 'sk-or-v1-abc123';
     const r = buildReport(

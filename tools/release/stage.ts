@@ -28,6 +28,9 @@ export function stageContent(root: string, resolved: ResolvedRelease, defaultPla
   for (const id of resolved.characters) copyTree(path.join(root, 'characters', id), path.join(out, 'characters', id));
   fs.mkdirSync(path.join(out, 'map'));
   fs.copyFileSync(path.join(root, 'map', 'lowlight.json'), path.join(out, 'map', 'lowlight.json'));
+  // The cast palette the 1P creator cleans its takes with (CAST_PALETTE_FILE, character creator spec 2026-11-14).
+  fs.mkdirSync(path.join(out, 'shared'), { recursive: true });
+  fs.copyFileSync(path.join(root, 'shared', 'cast-palette.json'), path.join(out, 'shared', 'cast-palette.json'));
   // The district styles' blackout rates (blackouts phase 3); the rest of map/city is only the renderer's.
   const districts = path.join(root, 'map', 'city', 'districts');
   if (fs.existsSync(districts)) copyTree(districts, path.join(out, 'map', 'city', 'districts'));

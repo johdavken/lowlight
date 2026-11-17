@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createFlow, canBeAi, RANDOM, type RosterEntry } from '../src/landing/select-flow';
+import { createFlow, canBeAi, NEW_PERSON, personTile, YOURS, type RosterEntry } from '../src/landing/select-flow';
 import type { Match } from '../src/room/identity';
 
 // 7-entry roster of direct characters: 5 connected, 2 offline.
@@ -15,12 +15,13 @@ const roster: RosterEntry[] = [
   { id: 'hicks', name: 'Hicks', connected: false, backend: 'direct', link: 'unknown' }, // offline
 ];
 
-// Expected tile order: RANDOM, then connected sorted by name: Ash, Bray, Dixie, Echo, Nix
-// then the rest sorted by name: Ghost, Hicks
-const expectedTiles = [RANDOM, 'ash', 'bray', 'dixie', 'echo', 'nix', 'ghost', 'hicks'];
+// Expected tile order on 1P: + (make someone), then connected sorted by name: Ash, Bray, Dixie, Echo, Nix
+// then the rest sorted by name: Ghost, Hicks. 2P has the same without the +.
+const expectedTiles = [NEW_PERSON, 'ash', 'bray', 'dixie', 'echo', 'nix', 'ghost', 'hicks'];
+const expectedP2 = expectedTiles.slice(1);
 
-function makeFlow(rng?: () => number) {
-  return createFlow(roster, { columns: 6, rng });
+function makeFlow() {
+  return createFlow(roster, { columns: 6 });
 }
 
 // Direct characters (two of them offline) and a mindless one.
@@ -32,14 +33,14 @@ const mixed: RosterEntry[] = [
   { id: 'wint', name: 'Wintermute', connected: false, backend: 'direct', link: 'unreachable' },
   { id: 'case', name: 'Case', connected: false, backend: 'direct', link: 'unknown' },
 ];
-// tiles: [RANDOM, 'cass', 'dixie', 'nix', 'case', 'hicks', 'wint']
+// 1P tiles: [+, 'cass', 'dixie', 'nix', 'case', 'hicks', 'wint']; 2P without the +.
 
-function makeMixedFlow(rng?: () => number) {
-  return createFlow(mixed, { columns: 6, rng });
+function makeMixedFlow() {
+  return createFlow(mixed, { columns: 6 });
 }
 
 describe('tile order', () => {
-  it('orders tiles RANDOM, connected by name, then the rest by name', () => {
+  it('orders tiles +, connected by name, then the rest by name', () => {
     const flow = makeFlow();
     expect(flow.tiles).toEqual(expectedTiles);
   });
@@ -90,7 +91,7 @@ describe('p1 lock', () => {
     expect(result).toBe('ok');
     expect(flow.state.phase).toBe('p2');
     expect(flow.state.player).toBe('ghost');
-    expect(flow.state.cursor.p2).toBe(ghostIdx);
+    expect(flow.state.cursor.p2).toBe(flow.grids.p2.tiles.indexOf('ghost'));
 
     // a mindless entry (backend 'none'), from the mixed fixture
     const flow2 = makeMixedFlow();
@@ -102,26 +103,9 @@ describe('p1 lock', () => {
     expect(result2).toBe('ok');
     expect(flow2.state.phase).toBe('p2');
     expect(flow2.state.player).toBe('hicks');
-    expect(flow2.state.cursor.p2).toBe(hicksIdx);
+    expect(flow2.state.cursor.p2).toBe(flow2.grids.p2.tiles.indexOf('hicks'));
   });
 
-  it('p1 lock on RANDOM resolves with rng and moves the cursor to the resolved tile', () => {
-    // rng always returns a value that picks the 3rd candidate (index 2) among all 7 non-random tiles
-    const candidates = expectedTiles.slice(1); // all 7 non-random tiles are candidates for p1
-    const targetIdx = 2;
-    const rng = () => targetIdx / candidates.length;
-    const flow = makeFlow(rng);
-    flow.begin(null);
-    flow.hover(0); // RANDOM tile
-    const result = flow.lock();
-    flow.chooseYou(null);
-    expect(result).toBe('ok');
-    const resolvedId = candidates[targetIdx];
-    const resolvedTileIdx = flow.tiles.indexOf(resolvedId);
-    expect(flow.state.player).toBe(resolvedId);
-    expect(flow.state.cursor.p1).toBe(resolvedTileIdx);
-    expect(flow.state.phase).toBe('p2');
-  });
 });
 
 describe('you phase', () => {
@@ -137,15 +121,6 @@ describe('you phase', () => {
     expect(flow.state.persona).toBeNull();
   });
 
-  it('RANDOM on 1P resolves, then you', () => {
-    const flow = makeFlow(() => 0);
-    flow.begin(null);
-    flow.hover(0);
-    flow.lock();
-    expect(flow.state.phase).toBe('you');
-    expect(flow.state.player).toBe('ash');
-  });
-
   it('chooseYou stores the persona and goes to p2, the p2 cursor on the player tile', () => {
     const flow = makeFlow();
     flow.begin(null);
@@ -155,12 +130,13 @@ describe('you phase', () => {
     flow.chooseYou(vee);
     expect(flow.state.phase).toBe('p2');
     expect(flow.state.persona).toEqual(vee);
-    expect(flow.state.cursor.p2).toBe(nixIdx);
+    expect(flow.state.cursor.p2).toBe(flow.grids.p2.tiles.indexOf('nix'));
   });
 
   it('chooseYou(null) plays as them', () => {
     const flow = makeFlow();
     flow.begin(null);
+    flow.hover(flow.tiles.indexOf('ash'));
     flow.lock();
     flow.chooseYou(null);
     expect(flow.state.phase).toBe('p2');
@@ -212,7 +188,7 @@ describe('you phase', () => {
 });
 
 describe('p2 lock', () => {
-  it('p2 lock refuses offline and mindless; RANDOM never resolves to them (rng sweep 0..0.99)', () => {
+  it('p2 lock refuses offline and mindless', () => {
     const flow = makeFlow();
     flow.begin(null);
     flow.hover(flow.tiles.indexOf('ash'));
@@ -229,22 +205,6 @@ describe('p2 lock', () => {
     flow.hover(flow.tiles.indexOf('hicks'));
     expect(flow.lock()).toBe('refused');
     expect(flow.state.phase).toBe('p2');
-
-    // RANDOM sweep across the rng range never resolves to ghost or hicks
-    for (let i = 0; i < 100; i++) {
-      const rngVal = i / 100;
-      const sweepFlow = makeFlow(() => rngVal);
-      sweepFlow.begin(null);
-      sweepFlow.hover(sweepFlow.tiles.indexOf('ash'));
-      sweepFlow.lock();
-      sweepFlow.chooseYou(null);
-      sweepFlow.hover(0); // RANDOM
-      const result = sweepFlow.lock();
-      sweepFlow.chooseYou(null);
-      expect(result).toBe('ok');
-      expect(sweepFlow.state.ai).not.toBe('ghost');
-      expect(sweepFlow.state.ai).not.toBe('hicks');
-    }
   });
 
   it('p2 lock refuses a mindless entry (backend none)', () => {
@@ -253,22 +213,6 @@ describe('p2 lock', () => {
     flow.lock();
     flow.chooseYou(null);
     flow.hover(flow.tiles.indexOf('hicks'));
-    expect(flow.lock()).toBe('refused');
-    expect(flow.state.phase).toBe('p2');
-  });
-
-  it('p2 RANDOM with no connected characters -> refused', () => {
-    const noConnected: RosterEntry[] = [
-      { id: 'a', name: 'A', connected: false, backend: 'direct', link: 'unknown' },
-      { id: 'b', name: 'B', connected: false, backend: 'direct', link: 'unknown' },
-    ];
-    const flow = createFlow(noConnected, { columns: 6 });
-    flow.begin(null);
-    flow.hover(flow.tiles.indexOf('a'));
-    flow.lock(); // p1 locked -> p2
-    flow.chooseYou(null);
-    expect(flow.state.phase).toBe('p2');
-    flow.hover(0); // RANDOM
     expect(flow.lock()).toBe('refused');
     expect(flow.state.phase).toBe('p2');
   });
@@ -394,12 +338,12 @@ describe('begin', () => {
     flow.begin(match);
     expect(flow.state.phase).toBe('p1');
     expect(flow.state.cursor.p1).toBe(flow.tiles.indexOf('bray'));
-    expect(flow.state.cursor.p2).toBe(flow.tiles.indexOf('dixie'));
+    expect(flow.state.cursor.p2).toBe(flow.grids.p2.tiles.indexOf('dixie'));
 
     const flow2 = makeFlow();
     flow2.begin(null);
     expect(flow2.state.cursor.p1).toBe(0);
-    expect(flow2.state.cursor.p2).toBe(0); // player's tile (index 0, RANDOM) since no remembered ai
+    expect(flow2.state.cursor.p2).toBe(0); // the first contact, since no remembered ai
 
     const flow3 = makeFlow();
     const unknownMatch: Match = { player: 'nope', ai: 'alsonope', };
@@ -412,7 +356,7 @@ describe('begin', () => {
     const flow = makeFlow();
     const match: Match = { player: 'bray', ai: 'dixie', };
     flow.begin(match);
-    expect(flow.state.cursor.p2).toBe(flow.tiles.indexOf('dixie'));
+    expect(flow.state.cursor.p2).toBe(flow.grids.p2.tiles.indexOf('dixie'));
     // lock p1 on a different tile than the remembered player
     flow.hover(flow.tiles.indexOf('ash'));
     flow.lock();
@@ -468,8 +412,8 @@ describe('resume', () => {
     expect(flow.state.phase).toBe('ready');
     expect(flow.state.player).toBe('ash');
     expect(flow.state.ai).toBe('bray');
-    expect(flow.state.cursor.p1).toBe(flow.tiles.indexOf('ash'));
-    expect(flow.state.cursor.p2).toBe(flow.tiles.indexOf('bray'));
+    expect(flow.state.cursor.p1).toBe(flow.grids.p1.tiles.indexOf('ash'));
+    expect(flow.state.cursor.p2).toBe(flow.grids.p2.tiles.indexOf('bray'));
   });
 
   it('resume: ai connected but backend "none" -> p2', () => {
@@ -494,30 +438,9 @@ describe('resume', () => {
 });
 
 describe('one roster', () => {
-  it('every character on one band, led by RANDOM, connected-then-rest by name', () => {
+  it('every character on one band, led by +, connected-then-rest by name', () => {
     const flow = makeMixedFlow();
-    expect(flow.tiles).toEqual([RANDOM, 'cass', 'dixie', 'nix', 'case', 'hicks', 'wint']);
-  });
-
-  it('RANDOM for the CPU picks only who can be the AI', () => {
-    const flow = createFlow(mixed, { columns: 6, rng: () => 0.99 });
-    flow.hover(0); // RANDOM for 1P: anyone, the mindless and the offline too
-    const result = flow.lock();
-    flow.chooseYou(null);
-    expect(result).toBe('ok');
-    expect(flow.state.player).toBe('wint');
-
-    for (let i = 0; i < 100; i++) {
-      const rngVal = i / 100;
-      const sweepFlow = createFlow(mixed, { columns: 6, rng: () => rngVal });
-      sweepFlow.hover(sweepFlow.tiles.indexOf('cass'));
-      sweepFlow.lock();
-      sweepFlow.chooseYou(null);
-      sweepFlow.hover(0); // RANDOM
-      const result2 = sweepFlow.lock();
-      expect(result2).toBe('ok');
-      expect(['cass', 'dixie', 'nix']).toContain(sweepFlow.state.ai);
-    }
+    expect(flow.tiles).toEqual([NEW_PERSON, 'cass', 'dixie', 'nix', 'case', 'hicks', 'wint']);
   });
 
   it('begin places each cursor on its remembered tile', () => {
@@ -572,14 +495,14 @@ describe('grouped by district (spec 2026-10-25)', () => {
 
   it('orders tiles by group, largest first, and lays them out in rows', () => {
     const f = createFlow(cast, { columns: 6 });
-    expect(f.tiles).toEqual([RANDOM, 'cass', 'ember', 'hicks', 'nix', 'silas', 'adebayo', 'rue', 'soren', 'rot']);
+    expect(f.tiles).toEqual([NEW_PERSON, 'cass', 'ember', 'hicks', 'nix', 'silas', 'adebayo', 'rue', 'soren', 'rot']);
     expect(f.layout.labels.map((l) => `${l.group}@${l.row}:${l.col}+${l.span}`)).toEqual(['karasu@0:1+5', 'spine@1:0+3', 'marsh@1:3+1']);
   });
 
   it('↑/↓ go to the nearest column in the next row; ←/→ walk the order', () => {
     const f = createFlow(cast, { columns: 6 });
     f.begin(null);
-    for (let i = 0; i < 3; i++) f.move('right'); // RANDOM → cass → ember → hicks (c3)
+    for (let i = 0; i < 3; i++) f.move('right'); // + → cass → ember → hicks (c3)
     expect(at(f)).toBe('hicks');
     f.move('down');
     expect(at(f)).toBe('rot'); // row 1, c3
@@ -605,23 +528,32 @@ describe('a grid per step', () => {
     entry('f'),
     entry('g'),
   ];
-  const make = (rng?: () => number) => createFlow(cast, { columns: 6, rng });
+  const make = () => createFlow(cast, { columns: 6 });
   const toP2 = (flow: ReturnType<typeof make>, player: 'a' | 'b' = 'a') => {
     flow.hover(flow.grids.p1.tiles.indexOf(player));
     flow.lock();
     flow.chooseYou(null);
   };
 
-  it('1P holds ? and the playable ones; 2P everyone but the discover one', () => {
+  it('1P holds + and the playable ones; 2P everyone but the discover one', () => {
     const flow = make();
-    expect(flow.grids.p1.tiles).toEqual([RANDOM, 'a', 'b']);
-    expect(flow.grids.p2.tiles).toEqual([RANDOM, 'a', 'b', 'c', 'e', 'f', 'g']);
+    expect(flow.grids.p1.tiles).toEqual([NEW_PERSON, 'a', 'b']);
+    expect(flow.grids.p2.tiles).toEqual(['a', 'b', 'c', 'e', 'f', 'g']);
+  });
+
+  it('the stand-in is on neither grid, with or without playable entries', () => {
+    const withStandIn = createFlow([...cast, entry('s', { standIn: true, connected: false, backend: 'none' })], { columns: 6 });
+    expect(withStandIn.grids.p1.tiles).not.toContain('s');
+    expect(withStandIn.grids.p2.tiles).not.toContain('s');
+    const noLeads = createFlow([entry('c'), entry('s', { standIn: true, playable: true })], { columns: 6 });
+    expect(noLeads.grids.p1.tiles).not.toContain('s');
+    expect(noLeads.grids.p2.tiles).not.toContain('s');
   });
 
   it('with no playable anywhere, both grids are the whole roster', () => {
     const flow = makeFlow();
     expect(flow.grids.p1.tiles).toEqual(expectedTiles);
-    expect(flow.grids.p2.tiles).toEqual(expectedTiles);
+    expect(flow.grids.p2.tiles).toEqual(expectedP2);
   });
 
   it('shown(): 1P through p1 and you, 2P from p2 on; back from p2 shows 1P again', () => {
@@ -649,16 +581,6 @@ describe('a grid per step', () => {
     expect(flow.shown()).toBe('p1');
   });
 
-  it('? at 1P draws only from the leads; ? at 2P from every contact on it', () => {
-    const flow = make(() => 0.99);
-    flow.lock(); // cursor starts on ?
-    expect(flow.state.player).toBe('b');
-    flow.chooseYou(null);
-    flow.hover(0);
-    flow.lock();
-    expect(flow.state.ai).toBe('g');
-  });
-
   it('locking a player with no remembered match puts the 2P cursor on her 2P tile', () => {
     const flow = make();
     toP2(flow, 'b');
@@ -673,7 +595,7 @@ describe('a grid per step', () => {
     toP2(flow);
     flow.hover(5);
     expect(flow.state.cursor.p2).toBe(5);
-    expect(flow.idAt('p2')).toBe('f');
+    expect(flow.idAt('p2')).toBe('g');
   });
 
   it('moving at 1P wraps within the 1P grid', () => {
@@ -721,7 +643,7 @@ describe('a grid per step', () => {
     flow.back(); // you → p1
     expect(flow.state.phase).toBe('p1');
     expect(flow.state.cursor.p1).toBe(0);
-    expect(flow.idAt('p1')).toBe(RANDOM);
+    expect(flow.idAt('p1')).toBe(NEW_PERSON);
   });
 
   it('resume with a contact not on 2P opens on 2P, the player locked, the cursor on her tile', () => {
@@ -730,5 +652,104 @@ describe('a grid per step', () => {
     expect(flow.state.phase).toBe('p2');
     expect(flow.state.player).toBe('a');
     expect(flow.idAt('p2')).toBe('a');
+  });
+});
+
+// Character creator spec 2026-11-14: no RANDOM; 1P leads with + (make someone), then YOURS (made people), then the leads.
+describe('your people at 1P', () => {
+  const entry = (id: string, more: Partial<RosterEntry> = {}): RosterEntry => ({ id, name: id.toUpperCase(), connected: true, backend: 'direct', link: 'ok', ...more });
+  const cast: RosterEntry[] = [entry('a', { playable: true }), entry('b', { playable: true }), entry('c'), entry('s', { standIn: true, backend: 'none', connected: false })];
+  const people = [
+    { id: 'p-1794679903080-aaaaaa', name: 'Vee' },
+    { id: 'p-1794679903079-bbbbbb', name: 'Ash' },
+  ];
+  const make = (ps = people) => createFlow(cast, { columns: 6, people: ps });
+  const VEE = personTile(people[0].id);
+  const ASH = personTile(people[1].id);
+
+  it('neither grid has RANDOM; 1P is +, then your people newest first, then the leads; 2P starts with a contact', () => {
+    const flow = make();
+    expect(flow.grids.p1.tiles).toEqual([NEW_PERSON, VEE, ASH, 'a', 'b']);
+    expect(flow.grids.p2.tiles).toEqual(['a', 'b', 'c']);
+    expect(flow.grids.p1.layout.labels.map((l) => l.group)).toContain(YOURS);
+  });
+
+  it('Enter on + opens the creator (make), shown on 1P; Esc goes back to the grid on +', () => {
+    const flow = make();
+    flow.hover(0);
+    expect(flow.lock()).toBe('ok');
+    expect(flow.state.phase).toBe('make');
+    expect(flow.shown()).toBe('p1');
+    flow.move('right');
+    expect(flow.state.cursor.p1).toBe(0);
+    flow.back();
+    expect(flow.state.phase).toBe('p1');
+    expect(flow.idAt('p1')).toBe(NEW_PERSON);
+  });
+
+  it('Enter on a person goes straight to 2P with them, no YOU step; Esc there goes back to their tile', () => {
+    const flow = make();
+    flow.hover(flow.grids.p1.tiles.indexOf(ASH));
+    flow.lock();
+    expect(flow.state).toMatchObject({ phase: 'p2', person: people[1].id, player: null, persona: null });
+    expect(flow.shown()).toBe('p2');
+    flow.back();
+    expect(flow.state).toMatchObject({ phase: 'p1', person: null });
+    expect(flow.idAt('p1')).toBe(ASH);
+  });
+
+  it('a person kept in the creator joins the grid and goes on to 2P with them', () => {
+    const flow = make([]);
+    flow.hover(0);
+    flow.lock();
+    const kept = { id: 'p-1794679903090-cccccc', name: 'Kit' };
+    flow.setPeople([kept]);
+    flow.chooseMade(kept.id);
+    expect(flow.state).toMatchObject({ phase: 'p2', person: kept.id });
+    expect(flow.grids.p1.tiles).toEqual([NEW_PERSON, personTile(kept.id), 'a', 'b']);
+    flow.back();
+    expect(flow.idAt('p1')).toBe(personTile(kept.id));
+  });
+
+  it('a person deleted from the grid keeps the cursor on a tile that is there', () => {
+    const flow = make();
+    flow.hover(flow.grids.p1.tiles.indexOf(ASH));
+    flow.setPeople([people[0]]);
+    expect(flow.grids.p1.tiles).toEqual([NEW_PERSON, VEE, 'a', 'b']);
+    expect(flow.state.cursor.p1).toBeLessThan(flow.grids.p1.tiles.length);
+  });
+
+  it('a remembered person starts the cursor on them; one since deleted starts it on +; a lead on the lead', () => {
+    const flow = make();
+    flow.begin({ player: ASH, ai: 'c' });
+    expect(flow.idAt('p1')).toBe(ASH);
+    flow.begin({ player: personTile('p-1794679903000-dddddd'), ai: 'c' });
+    expect(flow.idAt('p1')).toBe(NEW_PERSON);
+    flow.begin({ player: 'b', ai: 'c' });
+    expect(flow.idAt('p1')).toBe('b');
+    expect(flow.idAt('p2')).toBe('c');
+  });
+
+  it('EDIT on a person (openMake) opens the creator from their tile; Esc goes back to it', () => {
+    const flow = make();
+    flow.hover(flow.grids.p1.tiles.indexOf(ASH));
+    flow.openMake();
+    expect(flow.state.phase).toBe('make');
+    flow.back();
+    expect(flow.state.phase).toBe('p1');
+    expect(flow.idAt('p1')).toBe(ASH);
+  });
+
+  it('a lead still goes through YOU', () => {
+    const flow = make();
+    flow.hover(flow.grids.p1.tiles.indexOf('a'));
+    flow.lock();
+    expect(flow.state).toMatchObject({ phase: 'you', player: 'a', person: null });
+  });
+
+  it('resume on a made person\'s save (the stand-in) starts over at 1P', () => {
+    const flow = make();
+    flow.resume({ player: 's', ai: 'c' });
+    expect(flow.state).toMatchObject({ phase: 'p1', player: null, person: null });
   });
 });

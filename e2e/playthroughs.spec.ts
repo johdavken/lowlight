@@ -113,11 +113,11 @@ test('continue cycles known contacts', async ({ page }) => {
 
   await page.locator('.hud-back').click();
   await toTitle(page);
-  const cont = page.locator('.title-menu .tile[data-id="continue"]');
+  const cont = page.locator('.title-menu .tm-item[data-id="continue"]');
   await expect(cont).toHaveClass(/\bon\b/);
   const who = page.locator('.title-menu .fighter.p2 .name');
   await expect(who).toHaveText(/^nix$/i);
-  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
   await expect(who).toHaveText(/^alpha$/i);
   // Enter on CONTINUE goes to the contact shown.
   await page.keyboard.press('Enter');
@@ -126,7 +126,7 @@ test('continue cycles known contacts', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('Esc pauses: LOAD over the room renames a save and comes back; SETTINGS opens SYS; Esc resumes', async ({ page }) => {
+test('Esc pauses: LOAD over the room renames a save and comes back; SETTINGS opens SYS in the panel; Esc resumes', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (err) => errors.push(err.message));
   await dialIn(page, DIRECT.id);
@@ -164,21 +164,33 @@ test('Esc pauses: LOAD over the room renames a save and comes back; SETTINGS ope
   // Typed keys never reached the chat prompt.
   await expect(page.locator('#input textarea')).toHaveValue('');
 
-  // Esc: back to PAUSED, then SETTINGS opens SYS; Esc closes it and the room is as it was.
+  // Esc: back to PAUSED, then SETTINGS opens SYS inside it, grouped; Esc goes back to the rows, Esc again resumes.
   await page.keyboard.press('Escape');
   await expect(page.locator('.pause-load')).toHaveCount(0);
   await expect(page.locator('.pause-menu')).toBeVisible();
   await page.locator('.pause-row[data-row="settings"]').click();
-  await expect(page.locator('.sys-menu')).toBeVisible();
+  await expect(page.locator('.pause-settings .sys-menu')).toBeVisible();
+  await expect(page.locator('.pause-title')).toHaveText('SETTINGS');
+  await expect(page.locator('.pause-settings .sys-group:not([hidden]) .sys-head')).toHaveText(['SOUND', 'STAGE', 'GAME', 'MODEL']);
+  // It all stands on the 900-tall stage.
+  const panel = await page.locator('.pause-panel').boundingBox();
+  const stage = await page.locator('#game').boundingBox();
+  expect(panel!.y + panel!.height).toBeLessThanOrEqual(stage!.y + stage!.height);
   await page.keyboard.press('Escape');
   await expect(page.locator('.sys-menu')).toBeHidden();
+  await expect(page.locator('.pause-title')).toHaveText('PAUSED');
+  await expect(page.locator('.pause-row.on')).toHaveAttribute('data-row', 'settings');
+  await page.keyboard.press('Escape');
   await expect(page.locator('.pause-menu')).toHaveCount(0);
   expect(page.url()).toContain(`/room/${DIRECT.id}`);
 
-  // Without a keyboard: SYS → MENU opens it too.
+  // Without a keyboard: the SYS word opens PAUSED on SETTINGS; a press outside the panel resumes.
   await page.locator('.hud-sys').click();
-  await page.locator('.sys-row[data-row="pause"]').click();
-  await expect(page.locator('.pause-menu')).toBeVisible();
+  await expect(page.locator('.pause-settings .sys-menu')).toBeVisible();
+  await page.locator('.pause-menu').click({ position: { x: 10, y: 450 } });
+  await expect(page.locator('.pause-menu')).toHaveCount(0);
+  await page.locator('.hud-sys').click();
+  await page.keyboard.press('Escape');
   await page.locator('.pause-row[data-row="resume"]').click();
   await expect(page.locator('.pause-menu')).toHaveCount(0);
   expect(errors).toEqual([]);

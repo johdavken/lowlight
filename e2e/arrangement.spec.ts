@@ -67,16 +67,18 @@ test('the Chair strikes a deal; a job with her shows her cut, the next job is ca
   await expect(page.locator('.ql-file .ql-start')).toBeDisabled();
   await page.screenshot({ path: 'test-results/arrangement-capped.png' });
 
-  // The Chair, again: locked, its requirements on hover.
+  // The Chair, again: locked, its requirements in its file (the trace panel has no hover card on the row).
   const again = page.locator('.ql-row', { hasText: 'Chair Again Test' });
   await expect(again).toHaveClass(/ql-locked/);
-  await again.hover();
-  await expect(again.locator('.ql-checks')).toBeVisible();
-  // In view, not clipped by the scrolling list (a card beside the row was).
-  const box = (await again.locator('.ql-checks').boundingBox())!;
-  const list = (await page.locator('.ql-list').boundingBox())!;
-  expect(box.x + box.width).toBeLessThanOrEqual(list.x + list.width + 1);
-  await expect(again.locator('.ql-check').first()).toContainText('6 JOBS WITH HER UNDER THE DEAL');
+  await again.click();
+  const checks = page.locator('.ql-file .ql-checks');
+  await expect(checks).toBeVisible();
+  // In view, inside the file.
+  const box = (await checks.boundingBox())!;
+  const file = (await page.locator('.ql-file').boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(file.x);
+  expect(box.y + box.height).toBeLessThanOrEqual(file.y + file.height + 1);
+  await expect(checks.locator('.ql-check').first()).toContainText('6 JOBS WITH HER UNDER THE DEAL');
   await page.screenshot({ path: 'test-results/chair-again-locked.png' });
   expect(errors).toEqual([]);
 

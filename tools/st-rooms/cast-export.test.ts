@@ -4,11 +4,20 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
 import { cardOf } from './cast';
-import { exportCast } from './cast-export';
+import { castIds, exportCast } from './cast-export';
 import { cardBox, selectFaceName, spriteWears } from './cast-export';
 
 const repo = path.resolve(__dirname, '../..');
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'st-cast-'));
+
+describe('castIds', () => {
+  it('every character with a file but nix and the made person\'s stand-in', () => {
+    const ids = castIds(repo);
+    expect(ids).toContain('cass');
+    expect(ids).not.toContain('nix');
+    expect(ids).not.toContain('newcomer');
+  });
+});
 
 describe('exportCast (package)', () => {
   it("writes Cass's card, sprites, persona and lore, and cast.json with her places", async () => {

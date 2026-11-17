@@ -1,4 +1,5 @@
 import type { Pronoun } from '../../../shared/pronoun';
+import { frontCue, setFrontCue } from './front-sound';
 import type { AgentInfo, LinkState, ModelEvent, RoomState, SceneDef, Transition } from '../../../shared/types';
 import { openBugReport } from '../ui/bug-report';
 import { lastMatch, rememberAgent, rememberMatch } from '../room/identity';
@@ -6,7 +7,8 @@ import { markSplashSeen, mountSplash, sessionSplashArt, shouldShowSplash, splash
 import { createTheme, THEME, THEME_IN_SECONDS, type MenuSong } from './theme';
 import type { EngineState } from '../audio/engine';
 import { COPY } from './copy';
-import { canBeAi, createFlow, type Flow, type FlowState, type Phase, type Step } from './select-flow';
+import { canBeAi, createFlow, NEW_PERSON, personOf, personTile, YOURS, type Flow, type FlowState, type Phase, type Step } from './select-flow';
+import type { PersonRow } from '../../../shared/person';
 import { COLUMNS, RosterGrid, type GridTile } from './roster-grid';
 import { FighterStrip, type StripModels } from './fighter-strip';
 import { glitchIn, mountStage } from './stage';
@@ -16,8 +18,12 @@ import { mountLoad } from './load';
 import { MENU_CUE_URL, menuCuePlayer } from './menu-sound';
 import * as playthroughs from '../net/playthroughs';
 import './select.css';
+import { setHints } from './hint-line';
+import { scheduleSelectLeads } from './select-leads';
 import { ModelBand, type BandTab } from './model-band';
 import { YouPanel } from './you-panel';
+import { Creator } from './creator/creator';
+import { peopleApi, type PeopleApi } from '../net/people';
 import type { PlaythroughPersona } from '../../../shared/persona';
 import * as link from '../net/link';
 import { gameRoot } from '../ui/game-stage';
@@ -49,6 +55,10 @@ export interface LandingApi {
   browseModels(): Promise<link.ModelBrowse>;
   /** Every map district's name (the select screen's group labels). */
   districts?(): Promise<{ id: string; name: string }[]>;
+  /** Your made people (character creator spec 2026-11-14), and whether an OpenRouter key is linked to make figures. */
+  people?(): Promise<{ people: PersonRow[]; key: boolean }>;
+  /** The creator's calls (tests pass a fake); the server's routes by default. */
+  peopleApi?: PeopleApi;
 }
 /** Draws the selected agent's room behind the preview (a stub in tests). */
 export interface PreviewLike {
@@ -124,23 +134,51 @@ export const POLL_MS = 15_000;
 const SPLASH = Symbol('splash');
 
 const ARROWS: Record<string, 'left' | 'right' | 'up' | 'down'> = { ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' };
-const TITLES: Record<Exclude<Phase, 'model'>, string> = { p1: COPY.titleP1, you: COPY.you.title, p2: COPY.titleP2, ready: '' };
+const TITLES: Record<Exclude<Phase, 'model'>, string> = { p1: COPY.titleP1, you: COPY.you.title, make: COPY.make.title, p2: COPY.titleP2, ready: '' };
 
 
 /** A direct contact with no key linked yet: pickable, and her model step opens on LINK A MIND. */
 const isNoLink = (a: LandingAgent): boolean => a.backend === 'direct' && a.connected && a.link === 'no-link';
 
 const UNLINKED: link.LinkInfo = { linked: false, last4: null, credit: null, state: 'no-link' };
-/** `status` with one provider's link replaced, and the combined state again: ok when either key works. */
+/** Every provider's link out of `status` (unlinked where it says nothing). */
+const linksOf = (status: Partial<Record<link.Provider, link.LinkInfo>> | undefined): Record<link.Provider, link.LinkInfo> =>
+  Object.fromEntries(link.PROVIDERS.map((p) => [p, status?.[p] ?? UNLINKED])) as Record<link.Provider, link.LinkInfo>;
+
+/** `status` with one provider's link replaced, and the combined state again: ok when any key works, else the first linked one's. */
 function withLink(status: link.LinkStatus | undefined, p: link.Provider, info: link.LinkInfo): link.LinkStatus {
-  const next = { openrouter: status?.openrouter ?? UNLINKED, anthropic: status?.anthropic ?? UNLINKED, [p]: info };
-  const [a, b] = [next.openrouter, next.anthropic];
-  const state = a.state === 'ok' || b.state === 'ok' ? 'ok' : a.linked ? a.state : b.linked ? b.state : 'no-link';
+  const next = { ...linksOf(status), [p]: info };
+  const all = link.PROVIDERS.map((q) => next[q]);
+  const state = all.some((l) => l.state === 'ok') ? 'ok' : (all.find((l) => l.linked)?.state ?? 'no-link');
   return { ...next, state };
 }
 
+/**
+ * A made person as the strip and grid draw them (character creator spec 2026-11-14): the stand-in's entry
+ * with their name, background and figure (the stand-in's silhouette when they have none).
+ */
+export function personAgent(p: PersonRow, standIn: LandingAgent | undefined): LandingAgent {
+  const paras = p.background.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
+  const base = standIn ?? ({ id: 'newcomer', accent: '#7fe9ff', pronoun: 'they', sprite: null, facts: [], bio: [], link: 'ok', room: null } as unknown as LandingAgent);
+  const sprite = p.figure && base.sprite ? { ...base.sprite, url: `/api/people/${encodeURIComponent(p.id)}/figure.png?v=${encodeURIComponent(p.figureMade ?? '')}` } : base.sprite;
+  return {
+    ...base,
+    id: personTile(p.id),
+    name: p.name,
+    pronoun: p.pronoun,
+    tagline: p.background.split('\n')[0]?.trim() ?? '',
+    bio: paras,
+    facts: [],
+    sprite,
+    thumb: `/api/people/${encodeURIComponent(p.id)}/thumb?v=${encodeURIComponent(p.figureMade ?? '')}`,
+    avatarKind: 'face',
+  };
+}
+
 function toTile(id: string, a: LandingAgent | undefined): GridTile {
-  if (!a) return { id, name: COPY.random, accent: '', thumb: null, avatar: null, avatarKind: 'monogram', offline: false, noLink: false };
+  if (id === NEW_PERSON || !a) return { id, name: COPY.newPerson, accent: '', thumb: null, avatar: null, avatarKind: 'monogram', offline: false, noLink: false };
+  // Your made people are never offline: they're played, not dialled.
+  if (personOf(id) !== null) return { id, name: a.name, accent: a.accent, thumb: a.thumb, avatar: null, avatarKind: 'face', offline: false, noLink: false };
   return {
     id,
     name: a.name,
@@ -210,6 +248,8 @@ export function mountLanding(
   let disposed = false;
   /** Whose grid the band holds now (select leads spec §4): it redraws when the step's grid changes. */
   let drawn: Step | null = null;
+  /** Your people changed: the 1P grid draws again on the next render. */
+  let gridStale = false;
   /** The pointer's last spot on the page (null: never seen). */
   let pointer: { x: number; y: number } | null = null;
   /**
@@ -251,6 +291,9 @@ export function mountLanding(
     },
     onWheel(rows) {
       grid.scrollTo(grid.top + rows);
+      // The cursors moved with the rows: their leaders follow.
+      cancelLeads?.();
+      if (flow) cancelLeads = scheduleSelectLeads(stage.el, () => flow?.state.phase ?? '');
     },
   });
   grid.el.querySelector('.cursor.c1')?.append(el('span', 'lbl', COPY.cursorP1));
@@ -307,7 +350,7 @@ export function mountLanding(
     // Her own link decides (a contact on a local endpoint needs no OpenRouter key); the OpenRouter
     // link only fills the band's KEYS.
     const needsKey = isNoLink(byId.get(ai)!);
-    const fallback: link.LinkStatus = { state: byId.get(ai)!.link, openrouter: { linked: !needsKey, last4: null, credit: null, state: byId.get(ai)!.link }, anthropic: UNLINKED };
+    const fallback: link.LinkStatus = { ...linksOf(undefined), state: byId.get(ai)!.link, openrouter: { linked: !needsKey, last4: null, credit: null, state: byId.get(ai)!.link } };
     void api.link().then(
       (info) => seq === panelSeq && !disposed && openBand(ai, info, { needsKey }),
       () => seq === panelSeq && !disposed && openBand(ai, fallback, { needsKey }),
@@ -325,14 +368,17 @@ export function mountLanding(
     void models.then((agentModels) => {
       if (seq !== panelSeq || disposed) return;
       const obj = new ModelBand(stage.el, {
-        links: { openrouter: info.openrouter, anthropic: info.anthropic },
+        links: linksOf(info),
         pronoun: a.pronoun,
         agentModels,
         needsKey: o.needsKey,
         ...(o.tab ? { tab: o.tab } : {}),
         browse: () => api.browseModels(),
         put: (k, p) => api.putLink(k, p),
-        onPick: (id) => void choose(ai, id, agentModels),
+        onPick: (id) => {
+          frontCue('model');
+          void choose(ai, id, agentModels);
+        },
         onBack: () => {
           closePanel();
           flow!.back();
@@ -340,6 +386,7 @@ export function mountLanding(
         },
         onChange: () => render(),
         onLinked: (linked, p) => {
+          frontCue('link');
           refreshRoster();
           openBand(ai, withLink(info, p, linked), { needsKey: false });
         },
@@ -472,18 +519,27 @@ export function mountLanding(
   function renderHints(s: FlowState): void {
     hints.replaceChildren();
     if (s.phase === 'you') {
-      hints.textContent = you?.obj.editing ? COPY.you.hintForm : COPY.you.hint;
+      setHints(hints, you?.obj.editing ? COPY.you.hintForm : COPY.you.hint);
+      return;
+    }
+    if (s.phase === 'make') {
+      setHints(hints, COPY.make.hint);
       return;
     }
     if (s.phase === 'ready') {
-      hints.textContent = COPY.hintReady;
+      setHints(hints, COPY.hintReady);
       return;
     }
     if (s.phase !== 'p1' && s.phase !== 'p2') {
-      hints.textContent = panel?.obj.hint ?? COPY.link.hint;
+      setHints(hints, panel?.obj.hint ?? COPY.link.hint);
       return;
     }
-    hints.textContent = `${COPY.hintGrid} · ${COPY.hintBack}`;
+    if (s.phase === 'p1' && deleting) {
+      setHints(hints, COPY.deleteAsk(deleting.name));
+      return;
+    }
+    const onPerson = s.phase === 'p1' && personOf(flow!.idAt('p1')) !== null;
+    setHints(hints, onPerson ? `${COPY.hintGrid} · ${COPY.hintPerson} · ${COPY.hintBack}` : `${COPY.hintGrid} · ${COPY.hintBack}`);
   }
 
   function loadDistricts(): void {
@@ -492,18 +548,21 @@ export function mountLanding(
       (list) => {
         if (disposed) return;
         for (const d of list) districts.set(d.id, d.name);
-        grid.setGroupNames((g) => districts.get(g) ?? null);
+        grid.setGroupNames((g) => (g === YOURS ? COPY.yours : (districts.get(g) ?? null)));
       },
       () => {},
     );
   }
 
+  /** The pending leader redraw (select-leads.ts). */
+  let cancelLeads: (() => void) | null = null;
   function render(): void {
     if (!flow || disposed) return;
     const s = flow.state;
-    if (drawn !== flow.shown()) {
+    if (drawn !== flow.shown() || gridStale) {
+      gridStale = false;
       // Tiles are built from the latest roster, so a poll's offline and NO LINK marks carry over.
-      grid.render(flow.tiles.map((id) => toTile(id, byId.get(id))), { layout: flow.layout, groupName: (g) => districts.get(g) ?? null });
+      grid.render(flow.tiles.map((id) => toTile(id, byId.get(id))), { layout: flow.layout, groupName: (g) => (g === YOURS ? COPY.yours : (districts.get(g) ?? null)) });
       if (drawn === null) loadDistricts();
       // Never seen the pointer: hold until it moves at all.
       else hoverHeld = pointer ?? { x: Number.NaN, y: Number.NaN };
@@ -515,8 +574,10 @@ export function mountLanding(
     const marks = flow.marks();
     grid.setCursor('p1', marks.p1, { live: s.phase === 'p1', locked: s.phase !== 'p1' });
     grid.setCursor('p2', marks.p2, { live: s.phase === 'p2', locked: aiLocked });
-    stripP1.show(s.phase === 'p1' ? picked(flow.idAt('p1')) : picked(s.player), { locked: s.phase !== 'p1' });
-    stripP1.showYou(s.phase === 'p1' || s.phase === 'you' ? null : s.persona);
+    const p1Id = s.phase === 'p1' ? flow.idAt('p1') : s.person ? personTile(s.person) : s.player;
+    stripP1.show(picked(p1Id), { locked: s.phase !== 'p1' });
+    // A made person's file is their background (personAgent); a lead's persona stands in after YOU.
+    stripP1.showYou(s.phase === 'p1' || s.phase === 'you' || s.person ? null : s.persona);
     stripP1.setPanel(s.phase === 'you' && you ? you.host : null);
     // Built before its host was in the page, a reopened form (back from p2) gets its focus once shown.
     if (s.phase === 'you' && you && !you.shown) {
@@ -529,6 +590,8 @@ export function mountLanding(
     renderHints(s);
     dialError.textContent = errorText ?? '';
     backdrop();
+    cancelLeads?.();
+    cancelLeads = scheduleSelectLeads(stage.el, () => flow?.state.phase ?? '');
   }
 
   /** The playthrough this dial-in already started, as JSON of {player, ai, persona} (a retry doesn't start another). */
@@ -539,8 +602,8 @@ export function mountLanding(
    */
   const dial = async () => {
     if (!flow || leaving) return;
-    const { player, ai, persona } = flow.state;
-    if (!player || !ai) return;
+    const { player, ai, persona, person } = flow.state;
+    if ((!player && !person) || !ai) return;
     leaving = true;
     stopPoll();
     errorText = null;
@@ -552,11 +615,12 @@ export function mountLanding(
       render();
     };
     const why = (err: unknown) => (err instanceof Error ? err.message : String(err));
-    const match = JSON.stringify({ player, ai, persona });
+    const match = JSON.stringify({ player, ai, persona, person });
     if (started !== match) {
       try {
         const create = opts.title.api.createPlaythrough;
-        await (persona ? create(player, ai, persona) : create(player, ai));
+        if (person) await opts.title.api.createPersonPlaythrough(person, ai);
+        else await (persona ? create(player!, ai, persona) : create(player!, ai));
         started = match;
       } catch (err) {
         if (err instanceof playthroughs.ApiError && err.error === 'busy') {
@@ -568,7 +632,7 @@ export function mountLanding(
     }
     // Her model was saved when it was picked (a setting, not part of the playthrough).
     // A cache only (the server's playthrough is the truth): NEW GAME starts its cursors here.
-    rememberMatch({ player, ai });
+    rememberMatch({ player: person ? personTile(person) : player!, ai });
     rememberAgent(ai);
     // No `?as=`: every turn in a playthrough uses its player.
     await leaveTo(`/room/${encodeURIComponent(ai)}`);
@@ -604,12 +668,88 @@ export function mountLanding(
   /** After any flow change: clear a stale error, open or close the YOU and model steps' panels, redraw. */
   const act = () => {
     if (disposed) return;
+    // A step taken (a lock, a click, a back) drops an unanswered DELETE question.
+    deleting = null;
     phaseCue();
     errorText = null;
     syncYou();
+    syncCreator();
     syncPanel();
     render();
   };
+
+  /** The creator over 1P while the flow is in `make` (character creator spec 2026-11-14); `editing` is who EDIT opened it on. */
+  let creator: Creator | null = null;
+  let editing: PersonRow | null = null;
+  /** X on a person: the hints ask before they go. */
+  let deleting: PersonRow | null = null;
+  const deletePerson = async (row: PersonRow) => {
+    try {
+      await (api.peopleApi ?? peopleApi).remove(row.id);
+    } catch (err) {
+      errorText = err instanceof Error ? err.message : String(err);
+    }
+    await refreshPeople();
+    if (!disposed) render();
+  };
+  /** EXPORT FOR SILLYTAVERN: their picture for a persona, and the persona's text to paste beside it. */
+  const exportPerson = (row: PersonRow) => {
+    for (const ext of ['png', 'txt']) {
+      const a = document.createElement('a');
+      a.href = `/api/people/${encodeURIComponent(row.id)}/export.${ext}`;
+      a.download = `${row.name}.${ext}`;
+      a.click();
+    }
+  };
+  /** Your people again from the server (the grid's tiles), keeping the cursor where it was. */
+  const refreshPeople = async (also?: PersonRow) => {
+    const list = await (api.people?.() ?? Promise.resolve({ people: madePeople, key: peopleKey })).catch(() => ({ people: madePeople, key: peopleKey }));
+    const people = also && !list.people.some((p) => p.id === also.id) ? [also, ...list.people] : list.people.map((p) => (also && p.id === also.id ? also : p));
+    peopleKey = list.key;
+    setPeople(people);
+    flow?.setPeople(people);
+    gridStale = true;
+  };
+  function syncCreator(): void {
+    const making = flow?.state.phase === 'make';
+    if (!making) {
+      creator?.destroy();
+      creator = null;
+      return;
+    }
+    if (creator) return;
+    const standIn = [...byId.values()].find((a) => a.standIn === true);
+    creator = new Creator(stage.el, {
+      api: api.peopleApi ?? peopleApi,
+      person: editing,
+      key: peopleKey,
+      defaults: { face: standIn?.face ?? { x: 0.49, y: 0.065 }, waist: standIn?.sprite?.waist ?? 0.4 },
+      onKeep: (row) => {
+        void refreshPeople(row).then(() => {
+          if (!flow || disposed) return;
+          editing = null;
+          flow.chooseMade(row.id);
+          act();
+        });
+      },
+      onCancel: () => {
+        if (!flow || disposed) return;
+        editing = null;
+        flow.back();
+        act();
+      },
+    });
+    creator.focus();
+    // The key may have been linked (or unlinked) since the page opened: ask again.
+    const made = creator;
+    void (api.people?.() ?? Promise.resolve({ people: madePeople, key: peopleKey })).then(
+      (r) => {
+        peopleKey = r.key;
+        if (creator === made) made.setKey(r.key);
+      },
+      () => {},
+    );
+  }
 
   let splash: Splash | null = null;
   let dismissing = false;
@@ -805,6 +945,37 @@ export function mountLanding(
       }
       return;
     }
+    // On a made person's tile at 1P: E edits, X deletes (asked in the hints), S exports for SillyTavern.
+    if (flow?.state.phase === 'p1' && !e.ctrlKey && !e.metaKey && !e.altKey && !leaving) {
+      if (deleting) {
+        e.preventDefault();
+        const who = deleting;
+        deleting = null;
+        if (e.key === 'Enter') void deletePerson(who);
+        render();
+        return;
+      }
+      const row = madePeople.find((p) => personTile(p.id) === flow!.idAt('p1'));
+      const k = e.key.toLowerCase();
+      if (row && (k === 'e' || k === 'x' || k === 's')) {
+        e.preventDefault();
+        if (k === 'e') {
+          editing = row;
+          flow.openMake();
+          act();
+        } else if (k === 'x') {
+          deleting = row;
+          render();
+        } else exportPerson(row);
+        return;
+      }
+    }
+    // The creator reads its own keys; its fields type (key() leaves them be).
+    if (flow?.state.phase === 'make') {
+      if (leaving) return;
+      if (creator?.key(e)) e.preventDefault();
+      return;
+    }
     // The YOU panel reads its own keys; while its form is open the fields type (key() leaves them be).
     if (flow?.state.phase === 'you') {
       if (leaving) return;
@@ -860,15 +1031,32 @@ export function mountLanding(
     stage.el.replaceChildren(el('div', 'select-message', text), titleHost);
   };
 
-  const ready = api.agents().then(
-    (data) => {
+  /** Your made people, newest first, as the 1P grid lists them; their tiles stand in byId as personAgent. */
+  let madePeople: PersonRow[] = [];
+  /** An OpenRouter key is linked: the creator can make figures. */
+  let peopleKey = false;
+  const setPeople = (list: PersonRow[]) => {
+    for (const id of [...byId.keys()]) if (personOf(id) !== null) byId.delete(id);
+    madePeople = list;
+    const standIn = [...byId.values()].find((a) => a.standIn === true);
+    for (const p of list) byId.set(personTile(p.id), personAgent(p, standIn));
+  };
+  const peopleLoaded = (api.people?.() ?? Promise.resolve({ people: [], key: false })).then(
+    (r) => r,
+    () => ({ people: [] as PersonRow[], key: false }),
+  );
+  const ready = Promise.all([api.agents(), peopleLoaded]).then(
+    ([data, people]) => {
+      madePeople = people.people;
+      peopleKey = people.key;
       if (disposed) return;
       if (data.agents.length === 0) {
         showMessage(COPY.empty);
         return;
       }
       byId = new Map(data.agents.map((a) => [a.id, a]));
-      const f = createFlow(data.agents, { columns: COLUMNS });
+      setPeople(madePeople);
+      const f = createFlow(data.agents, { columns: COLUMNS, people: madePeople });
       // NEW GAME starts on the last matchup's cursors (a cache; the playthrough is the truth).
       f.begin(lastMatch());
       flow = f;
@@ -891,7 +1079,9 @@ export function mountLanding(
     soundStarted,
     dispose() {
       disposed = true;
+      cancelLeads?.();
       closePanel();
+      creator?.destroy();
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('pageshow', onPageShow);
       window.removeEventListener('mousemove', onPointer);
@@ -932,6 +1122,7 @@ export async function startLanding(): Promise<void> {
   // if audio isn't unlocked yet; room-audio issues it on unlock).
   for (const url of Object.values(MENU_CUE_URL)) audio.preloadCue(url);
   const menuCue = menuCuePlayer(audio);
+  setFrontCue((n) => audio.cue(`/sound/front/${n}.ogg`, 0.9));
 
   // The theme Studio picked (the built-in on an error or no answer within 1 s), fetched as soon as it's
   // known so it's ready by the first key (the engine's fetch hits this cache).
@@ -1002,6 +1193,11 @@ export async function startLanding(): Promise<void> {
       putLink: (k, p) => link.putLink(k, p),
       deleteLink: (p) => link.deleteLink(p),
       browseModels: () => link.browseModels(),
+      people: async () => {
+        const res = await fetch('/api/people');
+        if (!res.ok) throw new Error(`/api/people: HTTP ${res.status}`);
+        return res.json() as Promise<{ people: PersonRow[]; key: boolean }>;
+      },
       districts: async () => {
         const res = await fetch('/api/district-list', { signal: AbortSignal.timeout(2000) });
         if (!res.ok) return [];

@@ -25,7 +25,7 @@
   "lights": [
     {
       "id": "monitors",
-      "label": "her two monitors of green code",
+      "label": "monitors",
       "pos": [
         715,
         355
@@ -37,7 +37,7 @@
     },
     {
       "id": "clamp_lamp",
-      "label": "the clamp lamp over the desk",
+      "label": "clamp lamp",
       "pos": [
         790,
         262
@@ -49,7 +49,7 @@
     },
     {
       "id": "heater",
-      "label": "the space heater by the bunk",
+      "label": "space heater",
       "pos": [
         140,
         528
@@ -61,7 +61,7 @@
     },
     {
       "id": "porthole",
-      "label": "the next pylon's windows through the porthole",
+      "label": "porthole",
       "pos": [
         1055,
         320
@@ -74,7 +74,7 @@
     },
     {
       "id": "city_above",
-      "label": "the lit windows of the habs and the deck above",
+      "label": "habs and deck above",
       "pos": [
         760,
         40
@@ -87,7 +87,7 @@
     },
     {
       "id": "city_right",
-      "label": "the hung habs' windows past the stair",
+      "label": "habs past the stair",
       "pos": [
         1450,
         350
@@ -491,6 +491,10 @@
       "songs": [
         "Forty and Forty-One.ogg"
       ]
+    },
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
     }
   },
   "effects": [
@@ -536,5 +540,19 @@
       "to": "spine/catwalk",
       "way": "up past the hangers to the catwalk"
     }
+  ],
+  "details": [
+    "onions frying two hangers over, the smell through the door seam",
+    "the cable stair creaking once, someone below deciding whether to climb",
+    "Oksana's radio drifting up from the counter, a call-in too faint for words",
+    "a drone under the deck, belly light on, everything white for a second",
+    "a power dip: the hab above running its heater, the whole cable paying for it",
+    "condensation down the inside wall, one slow line",
+    "a heavy hauler on the expansion joint overhead, every loose thing jumping",
+    "a board post pinging on the deck: forty sol, taken before it's read twice",
+    "kids along the row dropping bottle caps through the grating, listening for the bottom",
+    "a neighbour's argument through the steel, one name over and over",
+    "a gust swinging the hanger a few degrees, the chains complaining",
+    "a Sentinel spotlight sliding along the underside of the deck"
   ]
 }

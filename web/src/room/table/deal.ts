@@ -19,6 +19,8 @@ export interface TableCard {
   off?: true;
   /** A program marked to load or run on the next roll (programs spec §2.1). */
   on?: true;
+  /** A recruit at a post (routes and posts spec §2): away for the job, their card dimmed. */
+  away?: true;
 }
 
 export function cardEl(c: TableCard, cls: string): HTMLButtonElement {
@@ -27,6 +29,7 @@ export function cardEl(c: TableCard, cls: string): HTMLButtonElement {
   b.dataset.id = c.id;
   b.dataset.state = c.state;
   if (c.on) b.classList.add('on');
+  if (c.away) b.classList.add('away');
   if (typeof c.face === 'string') b.textContent = c.face;
   else b.append(c.face);
   return b;

@@ -1,6 +1,7 @@
 import { her } from '../room/her-copy';
 import type { ClientEvent, JournalEditor, Note } from '../../../shared/types';
 import '../room/journal-view.css';
+import { setTip } from './hover-tag';
 
 const UNDO_MS = 6000;
 const PAGE_MAX = 1375;
@@ -133,7 +134,7 @@ export class JournalView {
     const dossierTitle = this.playerName ? `Dossier: ${this.playerName}` : 'Dossier';
     if (count === 0) {
       const dossier = el('div', 'journal-section');
-      dossier.append(el('h3', 'journal-section-title', dossierTitle), this.pageBox());
+      dossier.append(el('h3', 'journal-section-title tp-head', dossierTitle), this.pageBox());
       list.append(dossier, el('div', 'journal-empty', '// NO NOTES YET'));
     } else {
       list.append(this.section(dossierTitle, this.notes.filter((n) => n.about === 'you'), 'me', true));
@@ -170,7 +171,7 @@ export class JournalView {
 
   private section(title: string, notes: Note[], toggleTo: 'me' | 'you', withPage = false): HTMLElement {
     const section = el('div', 'journal-section');
-    section.append(el('h3', 'journal-section-title', title));
+    section.append(el('h3', 'journal-section-title tp-head', title));
     if (withPage) section.append(this.pageBox());
     if (notes.length === 0) section.append(el('div', 'journal-section-empty', 'Nothing yet.'));
     else for (const n of notes) section.append(this.row(n, toggleTo));
@@ -221,7 +222,7 @@ export class JournalView {
     row.dataset.id = n.id;
     const pin = el('button', 'jr-pin', n.pinned ? '◆' : '◇');
     pin.type = 'button';
-    pin.title = n.pinned ? 'Unpin' : 'Pin';
+    setTip(pin, n.pinned ? 'Unpin' : 'Pin');
     pin.addEventListener('click', () => {
       this.error = '';
       this.send({ type: 'journal_edit', id: n.id, pinned: !n.pinned });
@@ -270,7 +271,7 @@ export class JournalView {
     });
     const del = el('button', 'jr-del', '✕');
     del.type = 'button';
-    del.title = 'Delete';
+    setTip(del, 'Delete');
     del.addEventListener('click', () => this.remove(n));
     row.append(pin, body, toggle, del);
     return row;
@@ -304,7 +305,7 @@ export class JournalView {
     }
     const row = el('button', 'jr-keys', keys.length > 0 ? `# ${keys.join(' · ')}` : '+ KEYWORDS');
     row.type = 'button';
-    row.title = 'Keywords: she remembers this note when one comes up';
+    setTip(row, 'Keywords: she remembers this note when one comes up');
     row.addEventListener('click', () => {
       this.editing = n.id;
       this.editField = 'keys';

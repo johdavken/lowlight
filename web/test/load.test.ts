@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlaythroughInfo, SaveInfo } from '../../shared/types';
 import { mountLoad } from '../src/landing/load';
+import { setFrontCue } from '../src/landing/front-sound';
 import { JACK_MS } from '../src/landing/title';
 import type { LandingAgent } from '../src/landing/landing';
 import { ApiError, type PlaythroughApi } from '../src/net/playthroughs';
@@ -347,12 +348,16 @@ describe('load screen', () => {
     expect(q('.ld-pts .pt.on')!.dataset.id).toBe('pt-2');
   });
 
-  it('Enter on a save: LOAD, then loadSave and nav after JACK_MS', async () => {
+  it('Enter on a save: LOAD (its own REWIND sound, not the menu confirm), then loadSave and nav after JACK_MS', async () => {
     const api = fakeApi();
     const deps = await mount(api);
+    const cues: string[] = [];
+    setFrontCue((n) => cues.push(n));
     key('ArrowDown');
     key('Enter');
-    expect(deps.sound).toHaveBeenCalledWith('confirm');
+    setFrontCue(() => {});
+    expect(cues).toEqual(['rewind']);
+    expect(deps.sound).not.toHaveBeenCalledWith('confirm');
     expect(t('.jack-in')).toBe('LOAD');
     expect(q('.jack-in')!.classList.contains('on')).toBe(true);
     expect(api.loadSave).not.toHaveBeenCalled();

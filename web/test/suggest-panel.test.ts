@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SuggestDraft } from '../src/net/suggest';
 import { openSuggestPanel, SUGGEST_COPY, type SuggestPanelOptions } from '../src/room/suggest-panel';
+import { setCardsCue } from '../src/room/cards-panel';
 
 const THREE: SuggestDraft[] = [
   { angle: 'PLAIN', text: '*I nod.* Fine.' },
@@ -98,5 +99,23 @@ describe('SUGGEST on the cards panel', () => {
     q.panel.showRefusal('Wait for her to finish.');
     expect(q.q('.sp-why')!.textContent).toBe('Wait for her to finish.');
     expect(q.cards()).toHaveLength(3);
+  });
+});
+
+describe('the cards panel sounds', () => {
+  it('three dealt, R sweeps them up and three more land, Enter plays one', async () => {
+    const cues: string[] = [];
+    setCardsCue((n) => cues.push(n));
+    try {
+      const p = open();
+      expect(cues).toEqual([]);
+      await flush();
+      p.key('r');
+      await flush();
+      p.key('Enter');
+      expect(cues).toEqual(['deal', 'redeal', 'deal', 'pick']);
+    } finally {
+      setCardsCue(() => {});
+    }
   });
 });

@@ -60,6 +60,8 @@ export interface Call {
   loss?: 'hurt' | 'held';
   /** An ability pressed (crew abilities spec §2): `card` is the recruit, this the ability id. */
   ability?: string;
+  /** Not a call: the post they held when its outcome's harm line landed on them (routes and posts spec §2), with `loss`. */
+  post?: string;
 }
 
 /** A recruit's stat (§2). FENCE plays itself at the end; WHEEL isn't playable yet. */

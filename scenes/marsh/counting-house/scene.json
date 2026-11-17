@@ -558,6 +558,10 @@
         "Drowned.ogg"
       ],
       "level": 1
+    },
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
     }
   },
   "effects": [

@@ -144,6 +144,18 @@ describe('the relay with a direct backend', () => {
     expect(notices(down.events)).toEqual(["// CAN'T REACH ANTHROPIC — CHECK YOUR CONNECTION"]);
   });
 
+  it('a NanoGPT failure names NanoGPT; its 429 credit is the plan allowance', async () => {
+    const allowance = relayWith(fakeBackend(() => new TurnError('credit', 'weekly limit', 429, undefined, 'nanogpt')), { identity: () => 'I' });
+    expect(await allowance.relay.send('hicks', 'hello')).toEqual({ ok: false, error: 'credit' });
+    expect(notices(allowance.events)).toEqual(['// NANOGPT ALLOWANCE IS OUT — WAIT FOR THE RESET OR RELINK']);
+    const balance = relayWith(fakeBackend(() => new TurnError('credit', 'Insufficient balance', 402, undefined, 'nanogpt')), { identity: () => 'I' });
+    await balance.relay.send('hicks', 'hello');
+    expect(notices(balance.events)).toEqual(['// NANOGPT CREDIT IS OUT']);
+    const down = relayWith(fakeBackend(() => new TurnError('unreachable', 'fetch failed', undefined, undefined, 'nanogpt')), { identity: () => 'I' });
+    await down.relay.send('hicks', 'hello');
+    expect(notices(down.events)).toEqual(["// CAN'T REACH NANOGPT — CHECK YOUR CONNECTION"]);
+  });
+
   it('refused → "// THE PROVIDER REFUSED THIS TURN — TRY ANOTHER MODEL"', async () => {
     const { relay, events } = relayWith(fakeBackend(() => new TurnError('refused', 'no', 403)), { identity: () => 'I' });
     expect(await relay.send('hicks', 'hello')).toEqual({ ok: false, error: 'refused' });

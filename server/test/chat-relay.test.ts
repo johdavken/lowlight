@@ -585,6 +585,21 @@ describe('ChatRelay roleplay / out-of-character mode', () => {
     expect(ooc).not.toContain('80 words');
   });
 
+  it('SYS → REPLY LENGTH: the beat line asks for about 50 or 150 words; NORMAL is the line as it was', async () => {
+    expect(beatLine('Hicks', 'short')).toMatch(/about 50 words/);
+    expect(beatLine('Hicks', 'long')).toMatch(/about 150 words/);
+    expect(beatLine('Hicks', 'normal')).toBe(beatLine('Hicks'));
+    let length: 'short' | 'normal' | 'long' = 'long';
+    const stub = await makeStub([okStream('sess1'), okStream('sess2')]);
+    const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend(stub.url), db: makeDb(), room: makeRoom(), emit: collector().emit, replyLength: () => length });
+    await relay.send('hicks', 'what now?');
+    length = 'short';
+    await relay.send('hicks', 'and then?');
+    const [first, second] = stub.requests.filter((r) => r.url === '/v1/chat/completions').map((r) => asTurn(r.bodyJson).message);
+    expect(first.endsWith(`\n${beatLine('hicks', 'long')}\n\nwhat now?`)).toBe(true);
+    expect(second.endsWith(`\n${beatLine('hicks', 'short')}\n\nand then?`)).toBe(true);
+  });
+
   it('[wearing] follows the room line at the head of the message, in and out of character; never in the system message', async () => {
     const stub = await makeStub([okStream('sess1'), okStream('sess2')]);
     const seen: Array<[string, number]> = [];
@@ -2122,6 +2137,48 @@ describe('ChatRelay journal lines', () => {
       old(db, 'a2', 2 * 60_000, { text: '*Under the paper lantern I close the bakery box.*' });
     }, (relay) => relay.send('hicks', '*opens the bakery box*'));
     expect(message).toContain(`\n[you keep writing these — "paper lantern". Leave them out of this reply; write what's new in this moment instead.]\n${beatLine('hicks')}\n\n*opens the bakery box*`);
+  });
+
+  it('the room line names the weather on her first turn here and in a new room, not after', async () => {
+    const stub = await makeStub(Array.from({ length: 3 }, (_, i) => chatStreamEntry(`w${i}`, [wireFrame('assistant.delta', { delta: 'ok' }), wireFrame('run.completed'), wireFrame('done')])));
+    const db = makeDb();
+    const room = makeRoom();
+    const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend(stub.url), db, room, emit: () => {} });
+    const sent = () => stub.requests.filter((r) => r.url === '/v1/chat/completions').map((r) => asTurn(r.bodyJson).message);
+    await relay.send('hicks', 'one');
+    await relay.send('hicks', 'two');
+    const other = room.listScenes().find((s) => s.id !== room.state.sceneId)!;
+    room.setScene({ id: other.id }, 'agent');
+    await relay.send('hicks', 'three');
+    const [one, two, three] = sent();
+    const firstLine = (m: string) => m.split('\n')[0]!;
+    // Turn one names it; turn two, in the same room, doesn't; turn three, in a new room, does again.
+    const weatherOf = (line: string) => / · (clear|rain \d+%|snow \d+%|ash \d+%|dust \d+%) · fog /.test(line);
+    expect(weatherOf(firstLine(one))).toBe(true);
+    expect(weatherOf(firstLine(two))).toBe(false);
+    expect(weatherOf(firstLine(three))).toBe(true);
+  });
+
+  it("a room's details come every third plain turn, with the room line at the head, one after another; never out of character", async () => {
+    const stub = await makeStub(Array.from({ length: 5 }, (_, i) => chatStreamEntry(`d${i}`, [wireFrame('assistant.delta', { delta: 'ok' }), wireFrame('run.completed'), wireFrame('done')])));
+    const db = makeDb();
+    const room = makeRoom();
+    const scene = room.scene();
+    vi.spyOn(room, 'scene').mockReturnValue({ ...scene, details: ['The stair creaks.', 'A drone goes over'] });
+    const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend(stub.url), db, room, emit: () => {} });
+    const sent = () => stub.requests.filter((r) => r.url === '/v1/chat/completions').map((r) => asTurn(r.bodyJson).message);
+    await relay.send('hicks', 'one');
+    await relay.send('hicks', 'two');
+    await relay.send('hicks', 'three');
+    await relay.send('hicks', 'four');
+    await relay.send('hicks', 'aside', 'ooc');
+    const [one, two, three, four, ooc] = sent();
+    const detailOf = (m: string) => /\[in the room, partway through this moment: (.+?) If you use it/.exec(m)?.[1] ?? null;
+    // Right after the room line, which heads the message; nowhere near their words.
+    expect(one.startsWith(`${room.summary()}\n[in the room, partway through this moment: `)).toBe(true);
+    expect(one).toContain(`\n\n${LIGHTS_LINE}\n${beatLine('hicks')}\n\none`);
+    for (const m of [two, three, ooc]) expect(m).not.toContain('[in the room,');
+    expect(new Set([detailOf(one), detailOf(four)])).toEqual(new Set(['The stair creaks.', 'A drone goes over.']));
   });
 
   describe('habits line (habits spec §2)', () => {

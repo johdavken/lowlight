@@ -85,6 +85,8 @@ export interface Block {
   days?: number[];
   why?: string;
   fixed?: boolean;
+  /** She's asleep in this block (job texts spec §5): no texts from her. */
+  sleeps?: true;
 }
 
 /** The longest `why` on a block; it rides in her prompt line each turn. */
@@ -126,6 +128,12 @@ export function scheduledRoom(blocks: Block[], m: number): string | null {
   return blocks.find((b) => coversWeek(b, x))?.room ?? null;
 }
 
+/** Whether she's awake at clock time `m` (job texts spec §5): asleep only inside a `sleeps` block. */
+export function awakeAt(blocks: Block[], m: number): boolean {
+  const x = weekMinute(m);
+  return !blocks.find((b) => coversWeek(b, x))?.sleeps;
+}
+
 /** A `fixed` block holding any minute of `[from, to)`, or null (shared plans spec §4). */
 export function fixedBlockDuring(blocks: Block[], from: number, to: number): Block | null {
   for (let m = from; m < to; m++) {
@@ -159,9 +167,13 @@ export function nextBlockStart(blocks: Block[], m: number): { block: Block; at: 
 /** Whether any block's start falls in `(after, upTo]` (clock minutes, across days). */
 export function blockStartedBetween(blocks: Block[], after: number, upTo: number): boolean {
   if (upTo <= after) return false;
+  // A block that carries on the room of the block just ending (a home block split for sleep) isn't a new one.
+  const carriesOn = (b: Block, at: number) => blocks.some((o) => o !== b && o.room === b.room && coversWeek(o, weekMinute(at - 1)));
   return blocks.some((b) => {
-    const next = nextBlockStart([b], after);
-    return next !== null && next.at <= upTo;
+    for (let next = nextBlockStart([b], after); next !== null && next.at <= upTo; next = nextBlockStart([b], next.at)) {
+      if (!carriesOn(b, next.at)) return true;
+    }
+    return false;
   });
 }
 

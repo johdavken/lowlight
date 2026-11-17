@@ -34,7 +34,11 @@ test('SYS → FRAME RATE starts at 60, caps the room live and stays picked over 
 
   // Under the map the room draws less; closing puts the pick back.
   await pick(page, '60');
+  // SYS stands in PAUSED (SETTINGS): Esc goes back to its rows, Esc again to the room.
   await page.keyboard.press('Escape');
+  await expect(page.locator('.pause-title')).toHaveText('PAUSED');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.pause-menu')).toHaveCount(0);
   await page.locator('.hud-map').click();
   await expect(page.locator('.map-screen')).toBeVisible();
   await expect.poll(() => cap(page)).toBe(10);

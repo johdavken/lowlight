@@ -12,7 +12,8 @@ export const MISSION_CUE_URL: Record<MissionCue, string> = {
   ...(Object.fromEntries(OWN.map((n) => [n, `/sound/mission/${n}.ogg`])) as Record<MissionCue, string>),
   lock: '/sound/gig/select.ogg',
   hover: '/sound/ui/move.ogg',
-  clean: '/sound/gig/clean.ogg',
+  // A job ending clean (picked 2026-11-16 on the Graft Sounds audition; was the gig's clean).
+  clean: '/sound/table/end-clean.ogg',
   blown: '/sound/mission/blown.ogg',
   // Graft's table (picked 2026-10-31 on the Graft Table Sounds audition): the dice tumble, and a new beat's cards dealt.
   // The tumble was re-picked 2026-11-02 with the pixel dice, and a die's knock on each bounce (Dice Rolls mockup).

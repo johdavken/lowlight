@@ -1,4 +1,5 @@
 import { BUILT_IN } from '../src/landing/splash';
+import type { PersonRow } from '../../shared/person';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelEvent } from '../../shared/types';
 import type { Match } from '../src/room/identity';
@@ -19,7 +20,7 @@ const crew: AgentsResponse = {
     agent({ id: 'nix', name: 'Nix', backend: 'direct', modelLabel: 'GLM 5.2', connected: true, link: 'ok', rooms: ['ribbon/lowlight-intake'], startRoom: 'ribbon/lowlight-intake' }),
   ],
 };
-/** A bigger cast: ?random, dixie, nix (connected), case (not connected), hicks (no mind). */
+/** A bigger cast: +, dixie, nix (connected), case (not connected), hicks (no mind). */
 const cast: AgentsResponse = {
   agents: [
     ...crew.agents,
@@ -39,7 +40,7 @@ const catalog: ModelEvent = {
 };
 /** The in-game link's routes, linked and answering. */
 const linkApi = () => ({
-  link: vi.fn(async (): Promise<LinkStatus> => ({ state: 'ok', openrouter: { linked: true, last4: '3f9a', credit: 4.12, state: 'ok' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } })),
+  link: vi.fn(async (): Promise<LinkStatus> => ({ state: 'ok', openrouter: { linked: true, last4: '3f9a', credit: 4.12, state: 'ok' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' }, nanogpt: { linked: false, last4: null, credit: null, state: 'no-link' } })),
   putLink: vi.fn(async (): Promise<LinkInfo | { error: LinkError }> => ({ linked: true, last4: '3f9a', credit: 4.12, state: 'ok' })),
   deleteLink: vi.fn(async () => {}),
   browseModels: vi.fn(async () => ({ picks: catalog.choices!, recent: [], all: catalog.choices! })),
@@ -94,7 +95,7 @@ const noPlaythroughs = () =>
   }) as unknown as PlaythroughApi & Record<'listPlaythroughs' | 'createPlaythrough', ReturnType<typeof vi.fn>>;
 const titleOpts = () => ({ api: noPlaythroughs(), sound: vi.fn() });
 const titling = () => document.querySelector('.landing')!.classList.contains('titling');
-const titleItems = () => [...document.querySelectorAll<HTMLElement>('.title-menu .tile')].map((i) => i.dataset.id);
+const titleItems = () => [...document.querySelectorAll<HTMLElement>('.title-menu .tm-item')].map((i) => i.dataset.id);
 
 /**
  * Mounts the landing. Without a splash (or `atTitle`) it picks NEW GAME on the title, so the test
@@ -165,7 +166,7 @@ async function pick() {
 }
 
 describe('character select', () => {
-  it('first visit: splash, then the title, then NEW GAME glitches in p1 with tiles RANDOM + roster order', async () => {
+  it('first visit: splash, then the title, then NEW GAME glitches in p1 with tiles + and the roster order', async () => {
     const { nav, pv, onSplashDismiss, onIntroGlitch } = await mount({ splash: true });
     const root = document.querySelector('.landing')!;
     expect(root.classList.contains('splashing')).toBe(true);
@@ -188,8 +189,8 @@ describe('character select', () => {
     expect(document.querySelector('.fighter.p1')!.classList.contains('glitch-in')).toBe(true);
     expect(phase()).toBe('p1');
     expect(pv.showSplash).toHaveBeenCalledTimes(1); // the title and p1 keep the splash's skyline
-    expect(tileIds()).toEqual(['?random', 'nix', 'hicks']);
-    expect(hot()).toEqual(['?random']);
+    expect(tileIds()).toEqual(['+new', 'nix', 'hicks']);
+    expect(hot()).toEqual(['+new']);
     expect(document.querySelector('.select-title')!.textContent).toBe(COPY.titleP1);
     expect(document.querySelector('.select-hints')!.textContent).toBe(`${COPY.hintGrid} · ${COPY.hintBack}`);
     expect(pv.show).not.toHaveBeenCalled();
@@ -280,8 +281,8 @@ describe('character select', () => {
     };
     await mount({ data, match: { player: 'nix', ai: 'nix' } });
     expect(phase()).toBe('p1');
-    expect(tileIds()).toEqual(['?random', 'cass', 'nix-direct']);
-    expect(hot()).toEqual(['?random']);
+    expect(tileIds()).toEqual(['+new', 'cass', 'nix-direct']);
+    expect(hot()).toEqual(['+new']);
   });
 
   it('NEW GAME starts the green cursor on the remembered player (lastMatch, a fallback cache)', async () => {
@@ -423,7 +424,7 @@ describe('character select', () => {
     key('Escape');
     expect(phase()).toBe('p1');
     expect(hot()).toEqual(['nix']);
-    keys('ArrowRight', 'ArrowRight', 'Enter', 'Enter', 'ArrowLeft', 'Enter'); // hicks vs nix
+    keys('ArrowRight', 'Enter', 'Enter', 'ArrowLeft', 'Enter'); // nix → hicks, PLAY AS; hicks vs nix
     await tick();
     expect(phase()).toBe('model');
     key('Escape');
@@ -647,6 +648,7 @@ describe('YOU step', () => {
     key('Escape');
     expect(phase()).toBe('p1');
     expect(youPanel()).toBeNull();
+    key('ArrowLeft'); // back to + (asVee walks from there)
     asVee();
     expect(phase()).toBe('p2');
     key('Escape');
@@ -680,7 +682,7 @@ describe('YOU step', () => {
     expect(phase()).toBe('you');
     fill('.yp-name', 'Vex');
     confirm();
-    keys('ArrowLeft', 'Enter');
+    key('Enter'); // the 2P cursor is still on nix
     await tick();
     await pick();
     key('Enter');
@@ -879,7 +881,7 @@ describe('select splash', () => {
     expect(titling()).toBe(true);
     key('Enter'); // NEW GAME
     expect(phase()).toBe('p1');
-    expect(hot()).toEqual(['?random']);
+    expect(hot()).toEqual(['+new']);
     key('ArrowRight');
     expect(hot()).toEqual(['nix']);
   });
@@ -961,10 +963,10 @@ describe('title menu (save/load)', () => {
     await tick(150);
     expect(pv.show).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'nix' }), { transition: 'glitch' });
     pv.showSplash.mockClear();
-    key('ArrowRight'); // NEW GAME
+    key('ArrowDown'); // NEW GAME
     expect(pv.showSplash).toHaveBeenCalledTimes(1);
-    key('ArrowLeft'); // back to CONTINUE before the rest: no swap yet
-    key('ArrowRight');
+    key('ArrowUp'); // back to CONTINUE before the rest: no swap yet
+    key('ArrowDown');
     await tick(150);
     expect(pv.show).toHaveBeenCalledTimes(1);
   });
@@ -1074,7 +1076,7 @@ describe('title menu (save/load)', () => {
       playthroughs: [{ id: 'pt-0', name: 'Old run', player: 'hicks', startContact: 'nix', updatedAt: 0, forkedFrom: null, location: null }],
     });
     const { nav } = await mount({ title, atTitle: true, splashHost: true });
-    keys('ArrowRight', 'Enter');
+    keys('ArrowDown', 'Enter');
     await tick();
     expect(document.querySelector('.title-menu')).toBeNull();
     expect(document.querySelector('.load-screen .ld-pts .pt .pt-name')!.textContent).toBe('Old run');
@@ -1094,7 +1096,7 @@ describe('title menu (save/load)', () => {
 
 describe('the in-game link (spec 2026-10-08)', () => {
   const unlinked: AgentsResponse = { ...crew, agents: crew.agents.map((a) => (a.id === 'nix' ? { ...a, link: 'no-link' as const } : a)) };
-  const noLink = vi.fn(async (): Promise<LinkStatus> => ({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } }));
+  const noLink = vi.fn(async (): Promise<LinkStatus> => ({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' }, nanogpt: { linked: false, last4: null, credit: null, state: 'no-link' } }));
   const chips = () => [...document.querySelectorAll<HTMLElement>('.tile')].filter((t) => t.querySelector('.tile-chip')).map((t) => t.dataset.id);
 
   it('a no-link contact is lit and tagged NO LINK on the band', async () => {
@@ -1192,11 +1194,11 @@ describe('the in-game link: stale answers (review fixes)', () => {
     await toModel();
     key('Escape');
     expect(phase()).toBe('p2');
-    resolve({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } });
+    resolve({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' }, nanogpt: { linked: false, last4: null, credit: null, state: 'no-link' } });
     await tick();
     expect(document.querySelector('.lp-field')).toBeNull();
     expect(document.querySelector('.model-band')).toBeNull();
-    link.mockImplementation(async () => ({ state: 'no-link' as const, openrouter: { linked: false, last4: null, credit: null, state: 'no-link' as const }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' as const } }));
+    link.mockImplementation(async () => ({ state: 'no-link' as const, openrouter: { linked: false, last4: null, credit: null, state: 'no-link' as const }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' as const }, nanogpt: { linked: false, last4: null, credit: null, state: 'no-link' as const } }));
     key('Enter');
     await tick();
     expect(document.querySelector('.lp-field')).not.toBeNull();
@@ -1243,7 +1245,7 @@ describe('the in-game link: stale answers (review fixes)', () => {
 
 describe('the in-game link: her own link decides (final review)', () => {
   it('a contact whose own link is fine opens her model list even with no OpenRouter key linked', async () => {
-    const link = vi.fn(async (): Promise<LinkStatus> => ({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } }));
+    const link = vi.fn(async (): Promise<LinkStatus> => ({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' }, nanogpt: { linked: false, last4: null, credit: null, state: 'no-link' } }));
     await mount({ api: { link } }); // nix: link 'ok' in the roster (a local endpoint, say)
     await toModel();
     expect(document.querySelector('.lp-field')).toBeNull();
@@ -1291,7 +1293,7 @@ describe('select by district (spec 2026-10-25)', () => {
   it('tiles in district order under their labels', async () => {
     await mount({ data: grouped, api: { districts } });
     await tick();
-    expect(tileIds()).toEqual(['?random', 'hicks', 'nix', 'ines', 'rue']);
+    expect(tileIds()).toEqual(['+new', 'hicks', 'nix', 'ines', 'rue']);
     expect([...document.querySelectorAll('.tile-group')].map((l) => l.textContent)).toEqual(['KARASU', 'DROWNWORKS', 'SPINE']); // one tile each: no leading THE
   });
 });
@@ -1307,10 +1309,10 @@ describe('a grid per step on the screen', () => {
       agent({ id: 'case', name: 'Case', modelLabel: 'GLM 5.2', connected: true, link: 'ok', discover: true }),
     ],
   };
-  const named = () => tileIds().filter((id) => id !== '?random');
+  const named = () => tileIds().filter((id) => id !== '+new');
   const lockedP1 = () => [...document.querySelectorAll<HTMLElement>('.tile.locked-p1')].map((t) => t.dataset.id);
 
-  it('1P shows ? and the playable ones; after YOU the grid holds every contact but the discover one', async () => {
+  it('1P shows + and the playable ones; after YOU the grid holds every contact but the discover one', async () => {
     await mount({ data: leads });
     expect(phase()).toBe('p1');
     expect(named()).toEqual(['dixie', 'hicks']);
@@ -1365,5 +1367,200 @@ describe('a grid per step on the screen', () => {
     key('Enter'); // back to p2
     expect(phase()).toBe('p2');
     expect(document.querySelector('.tile[data-id="nix"]')!.classList.contains('offline')).toBe(true);
+  });
+});
+
+// Character creator spec 2026-11-14: your made people stand on the 1P grid and dial in as themselves.
+describe('your people at select', () => {
+  const VEE: PersonRow = { id: 'p-1794679903080-aaaaaa', name: 'Vee', pronoun: 'she', background: 'From the Spine.\n\nRan papers for the Fourteenth.', wears: 'a grey jacket', made: '2026-11-14T00:00:00.000Z', figure: true, figureMade: '2026-11-14T00:01:00.000Z' };
+  const withStandIn: AgentsResponse = { agents: [...crew.agents, agent({ id: 'newcomer', name: 'Newcomer', backend: 'none', standIn: true, sprite: { url: '/api/agents/newcomer/sprite', crop: { top: 0, bottom: 0.5 } } })] };
+  const people = vi.fn(async () => ({ people: [VEE], key: true }));
+  const titleWithPerson = () => {
+    const t = noPlaythroughs() as ReturnType<typeof noPlaythroughs> & { createPersonPlaythrough: ReturnType<typeof vi.fn> };
+    t.createPersonPlaythrough = vi.fn(async (_person: string, startContact: string) => ({ id: 'pt-2', player: 'newcomer', startContact }) as unknown as Awaited<ReturnType<PlaythroughApi['createPersonPlaythrough']>>);
+    return t;
+  };
+
+  it('+ first, then your people under YOURS, then the cast; the stand-in nowhere', async () => {
+    await mount({ data: withStandIn, api: { people } });
+    expect(tileIds()).toEqual(['+new', `@${VEE.id}`, 'nix', 'hicks']);
+    expect([...document.querySelectorAll('.tile-group')].map((l) => l.textContent)).toContain('YOURS');
+    const veeTile = document.querySelector<HTMLElement>(`.tile[data-id="@${VEE.id}"]`)!;
+    expect(veeTile.querySelector('img')!.getAttribute('src')).toBe(`/api/people/${VEE.id}/thumb?v=${encodeURIComponent(VEE.figureMade!)}`);
+    expect(veeTile.classList.contains('offline')).toBe(false);
+  });
+
+  it('a person on the cursor fills the 1P strip with their figure, name and background', async () => {
+    await mount({ data: withStandIn, api: { people } });
+    key('ArrowRight');
+    const strip = document.querySelector('.fighter.p1')!;
+    expect(strip.querySelector('.name')!.textContent).toBe('VEE');
+    expect(strip.querySelector('.fighter-file')!.textContent).toContain('Ran papers for the Fourteenth.');
+    expect(strip.querySelector<HTMLImageElement>('img.fighter-art')?.getAttribute('src')).toContain(`/api/people/${VEE.id}/figure.png`);
+    // A made person has no mind on this side: no BACKEND or MODEL rows from the stand-in.
+    expect(strip.querySelector('.fighter-file dl')!.textContent).not.toMatch(/BACKEND|NO MIND|MODEL/);
+  });
+
+  it('Enter on a person skips YOU; READY dials in as them and remembers their tile', async () => {
+    const title = titleWithPerson();
+    await mount({ data: withStandIn, api: { people }, title });
+    keys('ArrowRight', 'Enter');
+    expect(phase()).toBe('p2');
+    expect(document.querySelector('.you-panel')).toBeNull();
+    await pick(); // nix
+    await pick(); // the model step's pick
+    key('Enter'); // READY
+    await tick();
+    expect(title.createPersonPlaythrough).toHaveBeenCalledExactlyOnceWith(VEE.id, 'nix');
+    expect(title.createPlaythrough).not.toHaveBeenCalled();
+    expect(JSON.parse(localStorage.getItem('lowlight.lastMatch')!)).toEqual({ player: `@${VEE.id}`, ai: 'nix' });
+  });
+
+  it('the next NEW GAME starts on the person and the contact remembered', async () => {
+    await mount({ data: withStandIn, api: { people }, match: { player: `@${VEE.id}`, ai: 'nix' } });
+    expect(hot()).toEqual([`@${VEE.id}`]);
+    key('Enter');
+    expect(phase()).toBe('p2');
+    expect(document.querySelector('.tile.hot')?.getAttribute('data-id')).toBe('nix');
+  });
+
+  it('Enter on + opens the creator step; Esc closes it back to +', async () => {
+    await mount({ data: withStandIn, api: { people } });
+    key('Enter');
+    expect(phase()).toBe('make');
+    key('Escape');
+    expect(phase()).toBe('p1');
+    expect(hot()).toEqual(['+new']);
+  });
+
+  it('+ → the creator → KEEP someone with no figure → their tile, and on to 2P as them', async () => {
+    const ASH: PersonRow = { ...VEE, id: 'p-1794679903090-cccccc', name: 'Ash', pronoun: 'they', background: '', wears: '', figure: false, figureMade: null };
+    let list: PersonRow[] = [VEE];
+    const listPeople = vi.fn(async () => ({ people: list, key: false }));
+    const peopleApi = {
+      draft: vi.fn(async () => ({ id: ASH.id })),
+      save: vi.fn(async () => {
+        list = [ASH, VEE];
+        return ASH;
+      }),
+      generate: vi.fn(),
+      takes: vi.fn(async () => ({ takes: [], busy: false })),
+      keep: vi.fn(),
+      dropTakes: vi.fn(async () => {}),
+      remove: vi.fn(async () => {}),
+      takeUrl: () => '',
+      figureUrl: () => '',
+    };
+    await mount({ data: withStandIn, api: { people: listPeople, peopleApi } });
+    key('Enter'); // + 
+    expect(phase()).toBe('make');
+    expect(document.querySelector('.creator')).not.toBeNull();
+    expect(document.querySelector('.creator .mk-nokey')).not.toBeNull();
+    document.querySelector<HTMLButtonElement>('.creator .mk-skip')!.click();
+    const name = document.querySelector<HTMLInputElement>('.creator .mk-name')!;
+    name.value = 'Ash';
+    name.dispatchEvent(new Event('input'));
+    document.querySelector<HTMLButtonElement>('.creator .mk-keep')!.click();
+    await tick();
+    await tick();
+    expect(peopleApi.save).toHaveBeenCalledWith(ASH.id, { name: 'Ash', pronoun: 'they', background: '', wears: '' });
+    expect(phase()).toBe('p2');
+    expect(document.querySelector('.creator')).toBeNull();
+    key('Escape'); // back to their tile on 1P
+    expect(phase()).toBe('p1');
+    expect(tileIds()).toEqual(['+new', `@${ASH.id}`, `@${VEE.id}`, 'nix', 'hicks']);
+    expect(hot()).toEqual([`@${ASH.id}`]);
+  });
+
+  describe('E, X and S on a person', () => {
+    const fakePeople = () => ({
+      draft: vi.fn(),
+      save: vi.fn(async (_id: string, who: { name: string }) => ({ ...VEE, ...who })),
+      generate: vi.fn(),
+      takes: vi.fn(async () => ({ takes: [], busy: false })),
+      keep: vi.fn(),
+      dropTakes: vi.fn(async () => {}),
+      remove: vi.fn(async () => {}),
+      takeUrl: () => '',
+      figureUrl: () => '',
+    });
+
+    it('the hints name them on a person, not on a lead', async () => {
+      await mount({ data: withStandIn, api: { people } });
+      key('ArrowRight');
+      expect(document.querySelector('.select-hints')!.textContent).toMatch(/\[E\] EDIT.*\[X\] DELETE.*\[S\] EXPORT/);
+      key('ArrowRight');
+      expect(document.querySelector('.select-hints')!.textContent).not.toMatch(/EDIT/);
+    });
+
+    it('E opens the creator on WHO with them in it', async () => {
+      await mount({ data: withStandIn, api: { people, peopleApi: fakePeople() } });
+      keys('ArrowRight', 'e');
+      expect(phase()).toBe('make');
+      expect(document.querySelector<HTMLInputElement>('.creator .mk-name')!.value).toBe('Vee');
+      key('Escape');
+      expect(phase()).toBe('p1');
+      expect(hot()).toEqual([`@${VEE.id}`]);
+    });
+
+    it('a key linked since the page opened: E on them brings GENERATE once the creator asks again', async () => {
+      let linked = false;
+      const listPeople = vi.fn(async () => ({ people: [VEE], key: linked }));
+      await mount({ data: withStandIn, api: { people: listPeople, peopleApi: fakePeople() } });
+      linked = true; // linked at the model step meanwhile
+      keys('ArrowRight', 'e');
+      await tick();
+      document.querySelector<HTMLButtonElement>('.creator .mk-to-look')!.click(); // EDIT opens on WHO; NEW FIGURE goes to LOOK
+      expect(document.querySelector('.creator .mk-generate')).not.toBeNull();
+    });
+
+    it('X asks in the hints; ESC keeps them, ENTER deletes them and their tile', async () => {
+      let list: PersonRow[] = [VEE];
+      const listPeople = vi.fn(async () => ({ people: list, key: true }));
+      const api = fakePeople();
+      api.remove.mockImplementation(async () => {
+        list = [];
+      });
+      await mount({ data: withStandIn, api: { people: listPeople, peopleApi: api } });
+      keys('ArrowRight', 'x');
+      expect(document.querySelector('.select-hints')!.textContent).toMatch(/DELETE VEE\?/);
+      key('Escape');
+      expect(api.remove).not.toHaveBeenCalled();
+      expect(phase()).toBe('p1');
+      keys('x', 'Enter');
+      await tick();
+      await tick();
+      expect(api.remove).toHaveBeenCalledWith(VEE.id);
+      expect(tileIds()).toEqual(['+new', 'nix', 'hicks']);
+    });
+
+    it('X, then a click away and back: the question is gone and Enter deletes nobody', async () => {
+      const api = fakePeople();
+      await mount({ data: withStandIn, api: { people, peopleApi: api } });
+      keys('ArrowRight', 'x');
+      document.querySelector<HTMLElement>('.tile[data-id="nix"]')!.click(); // locks nix: YOU
+      expect(phase()).toBe('you');
+      key('Escape');
+      expect(phase()).toBe('p1');
+      expect(document.querySelector('.select-hints')!.textContent).not.toMatch(/DELETE/);
+      await tick();
+      expect(api.remove).not.toHaveBeenCalled();
+    });
+
+    it('S saves their picture and their persona text', async () => {
+      const clicked: string[] = [];
+      const spy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push(`${this.getAttribute('href')} ${this.download}`);
+      });
+      await mount({ data: withStandIn, api: { people } });
+      keys('ArrowRight', 's');
+      spy.mockRestore();
+      expect(clicked).toEqual([`/api/people/${VEE.id}/export.png Vee.png`, `/api/people/${VEE.id}/export.txt Vee.txt`]);
+    });
+  });
+
+  it('with no people route the grid is + and the cast', async () => {
+    await mount({ data: withStandIn });
+    expect(tileIds()).toEqual(['+new', 'nix', 'hicks']);
   });
 });

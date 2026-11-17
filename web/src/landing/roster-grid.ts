@@ -1,6 +1,6 @@
 /** The roster grid: a scrolling window of character tiles with two player cursors. View only — see spec §5. */
 import { COPY } from './copy';
-import { labelText, RANDOM, type Layout } from './district-groups';
+import { labelText, NEW_PERSON, type Layout } from './district-groups';
 
 export const COLUMNS = 6;
 export const VISIBLE_ROWS = 2;
@@ -92,12 +92,12 @@ function buildTileEl(tile: GridTile, index: number, at: { left: number; top: num
   el.style.width = `${TILE_W}px`;
   el.style.height = `${TILE_H}px`;
 
-  if (tile.id === RANDOM) {
+  if (tile.id === NEW_PERSON) {
     const glyph = document.createElement('div');
-    glyph.className = 'tile-random';
-    glyph.textContent = '?';
-    glyph.title = COPY.random;
-    glyph.setAttribute('aria-label', COPY.random);
+    glyph.className = 'tile-random tile-new';
+    glyph.textContent = '+';
+    glyph.title = COPY.newPerson;
+    glyph.setAttribute('aria-label', COPY.newPerson);
     el.append(glyph);
   } else {
     el.append(buildArt(tile));

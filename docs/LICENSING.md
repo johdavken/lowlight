@@ -17,7 +17,8 @@ An audit of everything Lowlight ships, made on 2026-10-23 before the SillyTavern
 | Writing (identities, bios, voice sheets, lore, quests, gigs, briefs) | Farban's (drafts made with Claude, edited by Farban) | Yes, CC BY-NC-SA 4.0 | Anthropic's terms give the output to the user. As with the art, copyright in machine-made text isn't guaranteed. |
 | Songs: 11 files from Suno | Farban's | Yes, CC BY-NC-SA 4.0 | All made on Suno's **Pro** plan, which gives commercial rights (checked 2026-10-10). Suno makes no promise that copyright vests. |
 | Images: rooms, characters, map, splash, districts, papers, extras, quests | Farban's (ChatGPT) | Yes, CC BY-NC-SA 4.0 | OpenAI's terms give the output to the user, commercial use included. The shipped images have had their C2PA signature stripped by cropping and processing; the masters in `art/` mostly keep it (see below). |
-| Fonts (IBM Plex Mono, VT323, Teko, Chakra Petch, Courier Prime and the rest, via `@fontsource`; Special Elite) | Free | Yes | SIL OFL 1.1; Special Elite is Apache-2.0. They're bundled from npm. |
+| Fonts (IBM Plex Mono, VT323, Teko, Chakra Petch, Courier Prime and the rest, via `@fontsource`; Special Elite) | Free | Yes | SIL OFL 1.1; Special Elite is Apache-2.0. They're bundled from npm, except the decode effect's 54 Chinese glyphs, cut from Noto Sans CJK SC (© Adobe, SIL OFL 1.1) into `web/src/ui/fonts/lowlight-han.woff2` by `tools/decode-font.sh`, its licence beside it. |
+| Opening card title effect: decrypt, ported from TerminalTextEffects (`web/src/landing/decrypt.ts`) | Free (MIT) | Yes | The algorithm, rewritten in TypeScript; no files copied. Notice under [TerminalTextEffects](#terminaltexteffects). |
 | Card symbols: 11 Phosphor Icons, fill weight (`web/src/room/table/marks.ts`) | Free (MIT) | Yes | Trade and stat marks on crew and program cards. Notice under [Phosphor Icons](#phosphor-icons). |
 | Sounds: 20 files from Glitch Noises (Vladislav Zharkov) | Free (CC0) | Yes | Public domain. They're credited anyway. |
 | Sounds: 76 files from ElevenLabs (room beds, doors, rain, thunder, and every menu and minigame cue) | Farban's (generated) | Yes, CC BY-NC-SA 4.0 | Generated on a paid ElevenLabs Starter plan, whose terms give a commercial licence for audio made while subscribed; no third-party recording is in them. They replaced the Sonniss, Bleeoop and JDSherbert versions on 2026-10-28. |
@@ -184,6 +185,32 @@ Regenerated 2026-10-28 from `sounds/CREDITS.md` and the export's `audioStatus`, 
 MIT License
 
 Copyright (c) 2023 Phosphor Icons
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+## TerminalTextEffects
+
+```text
+MIT License
+
+Copyright (c) 2023 ChrisBuilds
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

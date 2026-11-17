@@ -555,7 +555,11 @@
     ]
   ],
   "sound": {
-    "indoor": true
+    "indoor": true,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    }
   },
   "effects": [
     {

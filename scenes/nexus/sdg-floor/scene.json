@@ -1,7 +1,7 @@
 {
   "id": "sdg-floor",
   "name": "The sixty-first floor",
-  "description": "The sixty-first floor of the Sentinel Tower in Nexus, the branch's floor, with no number on the lift panel. Adebayo's office: a wall of floor-to-ceiling glass in slim dark frames onto the city core, dark towers close by wrapped in lit windows and huge glowing advertisement panels, and the streets far below like a map. A long desk of real dark wood, nearly empty: a slim brass desk lamp, a thin terminal, folders squared at the corner, a tray with a white kettle, a teapot and two china cups. A high-backed black leather chair behind it, two lower visitor chairs in front angled toward each other, a tall fig tree by the glass. On the left, a glass partition and door onto a dim corridor of other glass offices, a built-in coffee machine glowing on its wall. A thin recessed light strip along the ceiling, deep charcoal carpet, nothing out of place. Rain runs down the glass most nights. Nobody raises their voice here.",
+  "description": "The sixty-first floor of the Sentinel Tower in Nexus, the branch's floor, with no number on the lift panel. Kroll's office: a wall of floor-to-ceiling glass in slim dark frames onto the city core, dark towers close by wrapped in lit windows and huge glowing advertisement panels, and the streets far below like a map. A long desk of real dark wood, nearly empty: a slim brass desk lamp, a thin terminal, folders squared at the corner, a tray with a white kettle, a teapot and two china cups. A high-backed black leather chair behind it, two lower visitor chairs in front angled toward each other, a tall fig tree by the glass. On the left, a glass partition and door onto a dim corridor of other glass offices, a built-in coffee machine glowing on its wall. A thin recessed light strip along the ceiling, deep charcoal carpet, nothing out of place. Rain runs down the glass most nights. Nobody raises their voice here.",
   "resolution": [
     1536,
     864
@@ -25,7 +25,7 @@
   "lights": [
     {
       "id": "desk_lamp",
-      "label": "the brass desk lamp on Adebayo's desk",
+      "label": "the brass desk lamp on Kroll's desk",
       "pos": [
         700,
         398
@@ -549,7 +549,11 @@
   ],
   "sound": {
     "indoor": true,
-    "hum": 0.15
+    "hum": 0.15,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    }
   },
   "effects": [
     {

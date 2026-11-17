@@ -5,12 +5,15 @@
  */
 import type { ClientEvent, ModelChoice, ModelEvent } from '../../../shared/types';
 import { searchModels } from '../net/link';
+import { setTip } from './hover-tag';
 
 const SEARCH_MIN = 2;
 const SEARCH_SHOWN = 8;
 const DEBOUNCE_MS = 150;
 /** Under a model that runs through the player's Anthropic key. */
-const VIA = 'YOUR ANTHROPIC KEY';
+const VIA = { anthropic: 'YOUR ANTHROPIC KEY', nanogpt: 'YOUR NANOGPT KEY' } as const;
+/** The menu's header when her current model runs on that key. */
+const VIA_KEY = { anthropic: 'ON YOUR ANTHROPIC KEY', nanogpt: 'ON YOUR NANOGPT KEY' } as const;
 
 const price = (n: number | null) => (n === null ? '—' : `$${n.toFixed(2)}`);
 const rejected = (reason: string): string | undefined =>
@@ -102,15 +105,16 @@ export class ModelMenu {
     const e = this.event;
     this.panel.replaceChildren();
     if (!e) return;
-    // Her model on the player's Anthropic key: OpenRouter's credit isn't what she spends.
-    if (e.choices?.find((c) => c.id === e.model)?.via) this.panel.append(el('div', 'mm-credit', 'ON YOUR ANTHROPIC KEY'));
+    // Her model on the player's Anthropic or NanoGPT key: OpenRouter's credit isn't what she spends.
+    const via = e.choices?.find((c) => c.id === e.model)?.via;
+    if (via) this.panel.append(el('div', 'mm-credit', VIA_KEY[via]));
     else if (typeof e.credit === 'number') this.panel.append(el('div', 'mm-credit', `$${e.credit.toFixed(2)} LEFT`));
     for (const c of e.choices ?? []) {
       const row = el('button', `mm-row${c.id === e.model ? ' current' : ''}`);
       row.type = 'button';
-      row.title = c.id;
+      setTip(row, c.id);
       row.append(el('span', 'mm-label', `${c.id === e.model ? '▸ ' : ''}${c.label}`), ' ', el('span', 'mm-price', `${price(c.priceIn)} / ${price(c.priceOut)}`));
-      if (c.via) row.append(el('span', 'mm-via', VIA));
+      if (c.via) row.append(el('span', 'mm-via', VIA[c.via]));
       row.onclick = () => {
         this.choose(c.id);
         this.close();
@@ -184,9 +188,9 @@ export class ModelMenu {
     this.results.slice(0, SEARCH_SHOWN).forEach((c, i) => {
       const row = el('button', `mm-row mm-hit${i === this.hit ? ' on' : ''}`);
       row.type = 'button';
-      row.title = c.id;
+      setTip(row, c.id);
       row.append(el('span', 'mm-label', c.label), ' ', el('span', 'mm-price', `${price(c.priceIn)} / ${price(c.priceOut)}`));
-      if (c.via) row.append(el('span', 'mm-via', VIA));
+      if (c.via) row.append(el('span', 'mm-via', VIA[c.via]));
       row.onclick = () => {
         this.error = '';
         this.choose(c.id);

@@ -1,4 +1,5 @@
 /** Who's where on the city map: residents at their pins, you and your contact where your room is, and each pin's side rooms. */
+import { playerFace } from '../../net/player-face';
 import type { CityMapData } from '../../../../shared/map-schema';
 import type { ResidentInfo, SceneDef } from '../../../../shared/types';
 import { exitPlaces, sideRooms, type SideRoom } from '../../../../shared/exits';
@@ -41,7 +42,7 @@ export function mapWho(o: MapWhoInputs): WhoIsWhere {
     ...fixed,
     // No persona: the default player, 'you' everywhere else in the room, with no face to show.
     o.player
-      ? { place: here, room, id: o.player.id, name: o.player.name, role: 'you', accent: '#7fe9ff', face: thumb(o.player.id) }
+      ? { place: here, room, id: o.player.id, name: o.player.name, role: 'you', accent: '#7fe9ff', face: playerFace(o.player.id) }
       : { place: here, room, id: 'you', name: 'You', role: 'you', accent: '#7fe9ff', face: null },
     { place: here, room, id: o.contact.id, name: o.contact.name, role: 'contact', accent: o.contact.accent, face: thumb(o.contact.id) },
   ];

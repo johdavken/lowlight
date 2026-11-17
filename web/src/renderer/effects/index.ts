@@ -123,14 +123,17 @@ export class EffectsLayer {
   constructor(
     scene: SceneDef,
     art: EffectsArt,
-    private readonly opts: { reducedMotion: boolean; seed: number },
+    private readonly opts: { reducedMotion: boolean; seed: number; leftOut?: ReadonlySet<string> },
   ) {
+    // SYS → EFFECTS: kinds left out are never built (dust is the lights', the rest the scene's).
+    const out = opts.leftOut ?? new Set<string>();
     this.rng = seededRng(opts.seed);
     this.sceneId = scene.id;
     this.sceneLights = new Map(scene.lights.map((l) => [l.id, l]));
     this.flashShapes = scene.weatherArea?.length ? scene.weatherArea : undefined;
     this.frame = scene.resolution;
     (scene.effects ?? []).forEach((def, i) => {
+      if (out.has(def.kind)) return;
       try {
         if (def.kind === 'screen') this.fx.push(this.screen(def, art));
         else if (def.kind === 'leds') this.fx.push(this.leds(def, art));
@@ -145,9 +148,9 @@ export class EffectsLayer {
       }
     });
     scene.lights.forEach((l, i) => {
-      if (l.dust) this.fx.push(this.dust(l, opts.seed * 31 + i));
+      if (l.dust && !out.has('dust')) this.fx.push(this.dust(l, opts.seed * 31 + i));
     });
-    const paths = (scene.effects ?? []).filter((e): e is Extract<EffectDef, { kind: 'passing' }> => e.kind === 'passing');
+    const paths = (scene.effects ?? []).filter((e): e is Extract<EffectDef, { kind: 'passing' }> => e.kind === 'passing' && !out.has('passing'));
     this.passing = paths.length ? new Passing(Math.floor(this.rng() * 2 ** 31), paths) : null;
   }
 

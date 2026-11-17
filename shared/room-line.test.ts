@@ -34,12 +34,27 @@ describe('roomLine', () => {
     expect(line).not.toContain('ways out:');
     expect(line.startsWith('[room: karasu/lowlight-intake "Lowlight Intake" · ambient')).toBe(true);
   });
+
+  it('groups: the lights as inside and outside, a light below its group named with its level', () => {
+    const lit = lights.map((l) => ({ ...l, base: l.intensity }));
+    expect(roomLine({ scene, atmosphere, lights: lit, places: [], ways: [], groups: true })).toContain(
+      ' · lights: inside 100% (desk lamp); outside 100% (window neon) · moods:',
+    );
+    const two = [...lit, { ...lit[0]!, id: 'tv', label: 'TV', intensity: 0, base: 0.5 }];
+    expect(roomLine({ scene, atmosphere, lights: two, places: [], ways: [], groups: true })).toContain('lights: inside 100% (desk lamp, TV 0%); outside');
+  });
+
+  it('weather false leaves the weather out, and nothing else', () => {
+    const line = roomLine({ scene, atmosphere, lights, places: [], ways: [], weather: false });
+    expect(line).not.toContain('rain');
+    expect(line).toContain('ambient #1a1030 35% · fog 20% · lights:');
+  });
 });
 
 describe('ROOM_TOOL_TEXT', () => {
   it("is the server's text: tools.ts reads these, not copies of them", () => {
     const tools = fs.readFileSync(path.join(__dirname, '../server/src/tools.ts'), 'utf8');
-    for (const name of ['apply_mood', 'set_atmosphere', 'set_light', 'go_to'] as const) {
+    for (const name of ['apply_mood', 'set_atmosphere', 'set_light_groups', 'go_to'] as const) {
       expect(ROOM_TOOL_TEXT[name].length).toBeGreaterThan(80);
       expect(tools).toContain(`description: ROOM_TOOL_TEXT.${name}`);
     }

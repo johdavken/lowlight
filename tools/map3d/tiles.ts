@@ -97,7 +97,8 @@ function grow(bd: Bounds, zHi: number, render: RenderSettings): Bounds {
     x0: bd.x0 + Math.min(0, dx),
     x1: bd.x1 + Math.max(0, dx),
     y0: bd.y0 + Math.min(0, dy),
-    y1: bd.y1 + Math.max(0, dy) + liftPct(zHi),
+    // Its reflection lies below it on the water, drawn out by the reflection's stretch, from no higher than its cut.
+    y1: bd.y1 + Math.max(0, dy) + liftPct(Math.min(zHi, render.reflection?.cut ?? zHi)) * Math.max(1, render.reflection?.stretch ?? 1),
   };
 }
 

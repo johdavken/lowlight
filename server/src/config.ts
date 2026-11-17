@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { figureEditsOn } from './figure-fit';
 
 export interface Config {
   port: number;
@@ -21,6 +22,10 @@ export interface Config {
   leadsDir?: string;
   /** Quest lines: world/quests/<id>.md (read once at startup). Default ./world/quests. */
   questsDir?: string;
+  /** Deduction board cases: world/cases/<id>.md (read once at startup). Default ./world/cases. */
+  casesDir?: string;
+  /** Two Stories accounts files: world/accounts/<id>.md (read once at startup). Default ./world/accounts. */
+  accountsDir?: string;
   /** Stranger faces: world/extras/ (extras.json and its PNGs; read once at startup). Default ./world/extras. */
   extrasDir?: string;
   /** The deck catalog: world/gear/decks.md (missions spec §1; read once at startup). Default ./world/gear. */
@@ -46,8 +51,12 @@ export interface Config {
   mapFile?: string;
   /** Where OpenRouter is reached (tests point it at a stub). Default OPENROUTER_BASE_URL. */
   openrouterBaseUrl?: string;
+  /** The cast's palette, which the 1P creator cleans takes with (CAST_PALETTE_FILE). Default ./shared/cast-palette.json. */
+  castPaletteFile?: string;
   /** Where Anthropic's API is reached (NIX_ANTHROPIC_BASE_URL; tests point it at a stub). Not ANTHROPIC_BASE_URL: Claude Code sets that. */
   anthropicBaseUrl?: string;
+  /** NanoGPT's host, without /api/v1 (NIX_NANOGPT_BASE_URL; tests point it at a stub). Default NANOGPT_BASE_URL. */
+  nanogptBaseUrl?: string;
   /** Playthroughs: index.json and one folder per playthrough. Default <dataDir>/playthroughs. */
   playthroughsDir: string;
   /** Tests and e2e only: at boot with no active playthrough, create and activate one. */
@@ -68,10 +77,14 @@ export interface Config {
   forcedOutages?: string[];
   /** Blackout rates in place of map/city/districts/ (tests: `{}` for none). */
   outageRates?: Record<string, number>;
+  /** ADJUST FIGURE on PEOPLE writes waists and portrait centres into characters/ (figure-fit.ts figureEditsOn). */
+  figureEdits?: boolean;
 }
 
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 export const ANTHROPIC_BASE_URL = 'https://api.anthropic.com';
+/** NanoGPT's direct API host: chat under /api/v1, the plan under /api/subscription/v1. */
+export const NANOGPT_BASE_URL = 'https://api.nano-gpt.com';
 
 const DEFAULT_PORT = 7700;
 export const DEFAULT_MAP_FILE = './map/lowlight.json';
@@ -100,6 +113,8 @@ export function loadConfig(env: NodeJS.ProcessEnv, opts: { generatedToken?: () =
     readoutsDir: env.READOUTS_DIR ?? './world/readouts',
     leadsDir: env.LEADS_DIR ?? './world/leads',
     questsDir: env.QUESTS_DIR ?? './world/quests',
+    casesDir: env.CASES_DIR ?? './world/cases',
+    accountsDir: env.ACCOUNTS_DIR ?? './world/accounts',
     extrasDir: env.EXTRAS_DIR ?? './world/extras',
     gearDir: env.GEAR_DIR ?? './world/gear',
     crewDir: env.CREW_DIR ?? './world/crew',
@@ -113,7 +128,9 @@ export function loadConfig(env: NodeJS.ProcessEnv, opts: { generatedToken?: () =
     mapFile: env.MAP_FILE ?? DEFAULT_MAP_FILE,
     artScenesDir: env.ART_SCENES_DIR,
     openrouterBaseUrl: env.OPENROUTER_BASE_URL ?? OPENROUTER_BASE_URL,
+    castPaletteFile: env.CAST_PALETTE_FILE ?? './shared/cast-palette.json',
     anthropicBaseUrl: env.NIX_ANTHROPIC_BASE_URL ?? ANTHROPIC_BASE_URL,
+    nanogptBaseUrl: (env.NIX_NANOGPT_BASE_URL ?? NANOGPT_BASE_URL).replace(/\/+$/, ''),
     playthroughsDir: env.PLAYTHROUGHS_DIR ?? path.join(dataDir, 'playthroughs'),
     bugRelayUrl: env.BUG_RELAY_URL || null,
     logFile: env.LOG_FILE || null,
@@ -122,6 +139,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, opts: { generatedToken?: () =
     allowedHosts: (env.NIX_ROOM_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
     forcedOutages: (env.NIX_ROOM_OUTAGES ?? '').split(',').map((d) => d.trim().toLowerCase()).filter(Boolean),
     reportsDir: env.LOG_FILE ? path.dirname(env.LOG_FILE) : path.join(dataDir, 'bug-reports'),
+    figureEdits: figureEditsOn(env),
   };
 }
 

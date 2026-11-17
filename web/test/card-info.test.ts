@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { abilityInfo, choiceInfo, DWELL_MS, favourInfo, HOLD_MS, mountCardInfo, plainInfo, programInfo, recruitInfo, slotInfo, type Info } from '../src/room/table/card-info';
+import { abilityInfo, choiceInfo, DWELL_MS, splitKey, favourInfo, HOLD_MS, mountCardInfo, plainInfo, programInfo, recruitInfo, slotInfo, type Info } from '../src/room/table/card-info';
 import type { Pool } from '../../shared/dice';
 
 const pool = (o: Partial<Pool> = {}): Pool => ({ stat: 'COOL', base: 3, dice: 4, parts: [{ label: 'SMOOTH', dice: 1, kind: 'setup' }], position: 'open', noDeck: false, effect: 'fair', effectParts: [], ...o });
@@ -126,6 +126,10 @@ describe('the panel', () => {
     expect(panel().hidden).toBe(false);
     expect(panel().textContent).toContain('COOL · 4 DICE');
     expect(panel().textContent).toContain('Two.');
+    // The HUD trace: a leader from the card to the panel, gone with it.
+    expect(root.querySelector('svg[data-lead="card"] path')).not.toBeNull();
+    fire(card, 'pointerdown');
+    expect(root.querySelector('svg[data-lead="card"]')!.childElementCount).toBe(0);
   });
   it('a click before the dwell cancels it', () => {
     mountCardInfo(root, () => INFO);
@@ -300,5 +304,14 @@ describe('the panel', () => {
     fire(card, 'pointerover', { pointerType: 'touch' });
     vi.advanceTimersByTime(1000);
     expect(panel().hidden).toBe(true);
+  });
+});
+
+describe('splitKey', () => {
+  it('a line opening on a key in capitals comes apart; plain lines stay whole', () => {
+    expect(splitKey('IN THE OPEN: a 4–5 makes you pick 1 cost.')).toEqual({ key: 'IN THE OPEN', text: 'a 4–5 makes you pick 1 cost.' });
+    expect(splitKey('TIER 2 −1: a HAND recruit lifts it.')).toEqual({ key: 'TIER 2 −1', text: 'a HAND recruit lifts it.' });
+    expect(splitKey('Deck: QUIET.')).toEqual({ key: null, text: 'Deck: QUIET.' });
+    expect(splitKey("Can't go: no dice.")).toEqual({ key: null, text: "Can't go: no dice." });
   });
 });

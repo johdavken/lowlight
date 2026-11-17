@@ -9,11 +9,12 @@ const marsh = city.map.districts.find((d) => d.id === 'marsh')!;
 const cfg = city.styles['marsh']!.flooded!;
 const inMarsh = (x: number, y: number) => insideBorder([(x / MAP_W) * 100, (y / MAP_H) * 100], marsh.border!);
 const out = generate(city);
+const slabs = generate(city, { joins: false }).geometry.land.length;
 const g = out.geometry;
 
 describe('the Marsh, the part of Lowlight that went under (2026-10-26)', () => {
   it('is water: no land slab under it, the bay runs in', () => {
-    expect(g.land.length).toBe(city.map.districts.filter((d) => d.border && d.border.length >= 3 && !city.styles[d.id]?.flooded && !city.styles[d.id]?.isle).length);
+    expect(slabs).toBe(city.map.districts.filter((d) => d.border && d.border.length >= 3 && !city.styles[d.id]?.flooded && !city.styles[d.id]?.isle).length);
     const [lx, ly] = [(marsh.label[0] / 100) * MAP_W, (marsh.label[1] / 100) * MAP_H];
     const c = out.land;
     const i = Math.floor(ly / c.step) * c.cols + Math.floor(lx / c.step);

@@ -35,7 +35,7 @@ describe('MapPanel', () => {
   it('its hint brackets the key', async () => {
     mount(async () => shipped()).open();
     await flush();
-    expect(root.querySelector('.map-hint')!.textContent).toBe('SCROLL ZOOM · DRAG MOVE · [ESC] CLOSE');
+    expect(root.querySelector('.map-hint')!.textContent).toBe('[SCROLL] ZOOM · [DRAG] MOVE · [↑↓] PLACE · [ENTER] GO · [ESC] CLOSE');
   });
 
   it('loads the map with your pin lit and no card open (map pins spec §1)', async () => {
@@ -362,7 +362,7 @@ describe('MapPanel camera, keys and cues', () => {
     expect(p.isOpen).toBe(false);
   });
 
-  it('plays move on a row, a fold and an arrow, and confirm going in', async () => {
+  it('plays move on a row and an arrow, fold on a district, and confirm going in', async () => {
     const onCue = vi.fn();
     await opened({ onCue });
     const row = root.querySelector<HTMLElement>('.map-places .row[data-place="the-tilt"]')!;
@@ -370,7 +370,7 @@ describe('MapPanel camera, keys and cues', () => {
     row.click();
     root.querySelector<HTMLElement>('.map-places .group')!.click();
     key('ArrowLeft');
-    expect(onCue.mock.calls.map((c) => c[0])).toEqual(['move', 'confirm', 'move', 'move']);
+    expect(onCue.mock.calls.map((c) => c[0])).toEqual(['move', 'confirm', 'fold', 'move']);
   });
 });
 

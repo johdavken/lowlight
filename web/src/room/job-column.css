@@ -3,7 +3,30 @@
    (the table ends there, table.css), so it never grows into the cards; long text scrolls inside it. */
 :root { --job-w: 460px; }
 /* Its own layer on the game stage, with the bust's (speaker-portrait.css): over the table and the scrim, under the input. */
-.jc-layer { position: absolute; inset: 0; z-index: 24; pointer-events: none; }
+.jc-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 24;
+  pointer-events: none;
+  --hf-c: #ffc56b;
+  /* The talk's theme (playtest 2026-11-11, docs/mockups/job-column-palettes.html B, "names carry the colour"): the text
+     one quiet neutral scale, narration pale, actions a dimmer grey, anything said a warm white (quotes in the job's text
+     too); each speaker's colour on their name alone; comms keeps its cyan, a channel rather than a person. */
+  --jc-narr: #e6e2ec;
+  --jc-act: #a29bb0;
+  --jc-said: #fff6e8;
+  --jc-com: #a8f0ea;
+  --jc-com-glow: 0 0 6px rgba(127, 233, 255, 0.35);
+  --jc-narrator: #b9b0c7;
+  --jc-tool: #8c859a;
+}
+/* The box's settings reach it too (main.ts applies them to this layer as to the box): a fixed BOX COLOUR colours it
+   (SPEAKER keeps the job's amber: the column carries several voices), BOX GLASS sets its glass. */
+.jc-layer.fixed-accent { --hf-c: var(--fixed-hc); }
+.jc-layer > .hf.hf-col .hf-fill { fill-opacity: calc(var(--box-glass, 0.6) * 0.97); }
+.jc-layer > .hf.hf-col > .hf-gb { backdrop-filter: blur(calc(6px * var(--ui-blur, 1))) brightness(calc(1 - var(--box-glass, 0.6) * 0.5)) saturate(1.1); }
+/* Its frame (job-column.ts, holo-frame 'col'): the subtitle box's glass and corners in the job's amber, gone with it. */
+.jc-layer > .hf:has(+ .jc[hidden]) { display: none; }
 .jc {
   position: absolute;
   right: var(--sub-x);
@@ -13,14 +36,57 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 10px 0 10px 18px;
-  border-left: 1px solid rgba(255, 197, 107, 0.45);
+  padding: 24px 6px 14px 22px;
   pointer-events: auto;
   animation: jc-in 220ms ease-out;
 }
 .jc[hidden] { display: none; }
-.jc-head { flex: none; font: 15px var(--pixel); letter-spacing: 0.22em; color: #ffc56b; text-shadow: 0 0 8px rgba(255, 197, 107, 0.45); }
-.jc-sub { flex: none; font: 13px var(--pixel); letter-spacing: 0.16em; color: rgba(255, 197, 107, 0.6); white-space: pre-line; }
+/* The head on the frame's top edge (the room HUD): the job's name on the subtitle box's plate (style.css .meta .name),
+   the details past its roof line, above the edge. */
+.jc-top { position: absolute; z-index: 2; top: -14px; left: 22px; right: 16px; height: 28px; display: flex; align-items: flex-start; gap: 40px; pointer-events: none; }
+.jc-head {
+  --pc: var(--hf-c, #ffc56b);
+  --pf: color-mix(in srgb, var(--pc) 22%, rgba(13, 22, 38, 0.9));
+  --pl: color-mix(in srgb, var(--pc) 45%, #e6eef7);
+  position: relative;
+  display: flex;
+  flex: none;
+  min-width: 0;
+  max-width: calc(100% - 60px);
+  height: 28px;
+  padding: 0 40px 0 16px;
+  font: 19px/28px var(--pixel);
+  letter-spacing: 0.26em;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--pc) 70%, #fff);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--pc) 70%, transparent);
+  background:
+    linear-gradient(var(--pc), var(--pc)) 0 0 / 4px 100% no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 0 0 / calc(100% - 28px) 1px no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 0 100% / 100% 1px no-repeat,
+    linear-gradient(color-mix(in srgb, var(--pc) 30%, transparent), color-mix(in srgb, var(--pc) 30%, transparent)) 8px 4px / calc(100% - 44px) 1px no-repeat,
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--pl) calc(50% - 1px) calc(50% + 0.5px), transparent calc(50% + 0.5px)) 100% 0 / 28px 28px no-repeat,
+    linear-gradient(to top right, var(--pf) 50%, transparent 50%) 100% 0 / 28px 28px no-repeat,
+    linear-gradient(var(--pf), var(--pf)) 0 0 / calc(100% - 28px) 100% no-repeat;
+}
+.jc-head::before {
+  content: '';
+  position: absolute;
+  left: calc(100% - 28px);
+  top: 0;
+  width: 66px;
+  height: 28px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--pl), var(--pl)) 0 0 / 62px 1px no-repeat,
+    linear-gradient(var(--pc), var(--pc)) 62px -1px / 3px 3px no-repeat,
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--pc) 70%, transparent) 0 6px, transparent 6px 9px) 32px 18px / 27px 4px no-repeat;
+}
+.jc-kind { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.jc-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* NEW keeps its place on a long name: the name gives way (review). */
+.jc.jc-new .jc-head::after { flex: none; }
+.jc-sub { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 13px/13px var(--pixel); letter-spacing: 0.16em; color: color-mix(in srgb, var(--hf-c, #ffc56b) 25%, #e6eef7); text-shadow: 0 0 2px #000, 0 1px 3px #000; }
 .jc-sub[hidden] { display: none; }
 .jc-body {
   flex: 1;
@@ -30,30 +96,66 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   font-family: var(--chat-font, var(--mono));
-  font-size: calc(14.5px * var(--text-scale, 1));
+  font-size: calc(15px * var(--text-scale, 1));
   line-height: 1.5;
-  color: #e6dcf2;
+  /* Narration (the job's prose): pale; its *actions* grey italic, as in the box. */
+  color: var(--jc-narr);
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 197, 107, 0.4) transparent;
 }
-.jc-body em { color: #b9a7d6; }
-/* The contact on the line (`{{ }}` on a beat): their words apart from the text, in the chat line's CRT cyan (comms-inset.css). */
-.jc-line {
+.jc-body em { color: var(--jc-act); }
+/* Sources by colour and type (the room HUD, docs/mockups/hud-frames.html TABLE): a speaker's name in small caps in their
+   colour before their words, no plaque; hers in her accent (a ≋ after it while she's on comms, her words with the CRT's
+   scanlines faintly), yours in yours. */
+.jc-line,
+.jc-reply {
+  --who: var(--agent, #ff4f8b);
   display: block;
-  margin: 6px 0;
+  margin: 8px 0;
   font-style: normal;
-  color: #9ff4e8;
-  text-shadow: 0 0 6px rgba(127, 233, 255, 0.55);
-  -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.62) 2px 3px);
-  mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.62) 2px 3px);
+  color: var(--jc-said);
+  -webkit-mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.82) 2px 3px);
+  mask-image: repeating-linear-gradient(0deg, #000 0 2px, rgba(0, 0, 0, 0.82) 2px 3px);
 }
-.jc-line::before {
-  content: attr(data-who);
-  display: block;
-  font: 13px var(--pixel);
-  letter-spacing: 0.16em;
+.jc-line::before,
+.jc-reply::before,
+.jc-say::before {
+  content: attr(data-name);
+  margin-right: 0.7em;
+  font: 14px var(--pixel);
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: #7fe9ff;
+  color: var(--who);
+  text-shadow: 0 0 6px color-mix(in srgb, var(--who) 50%, transparent);
+}
+/* On comms (playtest 2026-11-11): NIX (ON COMMS), in the box's CRT cyan, her words in its mint with the glow and the
+   scanlines; in the room she keeps her own colour. */
+.jc-line::before,
+.jc-reply:not(.jc-here)::before { content: attr(data-name) ' (ON COMMS)'; }
+.jc-line,
+.jc-reply:not(.jc-here) { --who: #7fe9ff; color: var(--jc-com); text-shadow: var(--jc-com-glow), 0 1px 2px #000; }
+/* The talk told the traditional way (job-column.ts talkParts): what's said in quotes in the theme's warm white (the comms
+   mint on the line); what's done as plain narration in its grey; someone else's name in small caps in their colour. A
+   paragraph to a line, a small indent, no blank lines. */
+.jc-t-act { color: var(--jc-act); text-shadow: 0 1px 2px #000; }
+.jc-t-say { color: var(--jc-said); }
+.jc-reply:not(.jc-here) .jc-t-say { color: var(--jc-com); }
+.jc-t-who { font: 13px var(--pixel); letter-spacing: 0.2em; color: var(--beat-c, #ff8a3c); }
+/* The job's own text in the theme's narration, and what's said in it in the warm white of anything said. */
+.jc-story, .jc-story em { color: var(--jc-narr); }
+.jc-t-quote { color: var(--jc-said); }
+/* Words on comms in the job's text (`{{ }}`) run on inline in the comms cyan, the narration around them naming who
+   speaks (`"…," Nix says.`): no line of their own, no label (playtest 2026-11-11). */
+.jc-story .jc-line { display: inline; margin: 0; -webkit-mask-image: none; mask-image: none; }
+.jc-story .jc-line::before { content: none; }
+/* The job's own text: NARRATOR before it, a quiet lilac (the narrator is no one's colour). */
+.jc-story::before {
+  content: 'NARRATOR';
+  margin-right: 0.7em;
+  font: 14px var(--pixel);
+  letter-spacing: 0.22em;
+  color: var(--jc-narrator);
+  text-shadow: none;
 }
 /* Scrolled down: the top fades, so the cut reads as more above. */
 .jc.jc-more .jc-body { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px); mask-image: linear-gradient(180deg, transparent 0, #000 28px); }
@@ -71,7 +173,7 @@
   animation: jc-new 800ms ease-in-out 3;
 }
 .jc.jc-new .jc-head::after,
-.feed-root.feed-stage.job-col.line-new:not(.expanded) .msg.agent .name::after { content: ' · NEW'; color: #fff; text-shadow: 0 0 10px #ffc56b; }
+.feed-root.feed-stage.job-col.line-new:not(.expanded) .msg.agent .name::after { content: '\00a0· NEW'; letter-spacing: 0.2em; color: #fff; text-shadow: 0 0 10px #ffc56b; }
 @keyframes jc-new { 0%, 100% { opacity: 0; } 35% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) {
   .jc { animation: none; }
@@ -90,15 +192,20 @@
 /* A phone's table keeps its own prose (table.css), so the column stays out. */
 :has(> .tb.phone:not([hidden])) > .jc-layer { display: none; }
 
+/* At the HUD the head's details stop short of the box settings key on the column's top edge (style.css .bs-key). */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .jc-layer .jc-top { right: 96px; }
 /* HUD (2026-11-02, mockup graft-layouts.html A): while the job table is up the column stands in its log region, left
    of the moment (job-table.ts publishes the region's place), and her line has the box back. */
-:has(> .tb.hud:not([hidden]):not(.phone)) > .jc-layer .jc { left: var(--hud-log-x); top: var(--hud-log-y); width: var(--hud-log-w); height: var(--hud-log-h); right: auto; bottom: auto; padding: 0; border-left: 0; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
-/* It ends over the line keys in the corner below it (playtest: a long contract ran under them): 232px is the stack's full five keys and arrow from the stage's floor, and a gap, so the text doesn't jump as the keys change. Folded, or stepped out for a debrief, it has the region's height back. */
-#game:has(> .tb.hud:not([hidden]):not(.phone)):not(:has(> .tb.hud .tb-debrief)):has(> .feed-root .line-keys:not(.folded)) > .jc-layer .jc { height: min(var(--hud-log-h), calc(100% - var(--hud-log-y) - 232px)); }
+/* Lifted 16px with the table's HEAT · PAY line (table.css .tb-top-l), so the two stand centred between the keys bar and
+   the hand's labels (playtest 2026-11-11: 38px above, 6px below; now 22 each). */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .jc-layer .jc { left: var(--hud-log-x); top: calc(var(--hud-log-y) - 16px); width: var(--hud-log-w); height: var(--hud-log-h); right: auto; bottom: auto; box-sizing: border-box; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
 /* Her line becomes a subtitle at the right, by her: the box no longer runs under the table. */
 /* It keeps to her side, near the edge now the scene's keys step out for the job (table.css), and to the box's height, paging a long reply
    instead of growing up over the cards (playtest). 320px of text, and a gutter for the pulse's edge. */
-:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .feed { left: auto; right: 36px; width: 332px; padding-left: 12px; box-sizing: border-box; }
+/* It widens left (2026-11-08, away from her figure, which stays clear above it) as far as the hand allows: 16px past where the
+   hand ends (`--hud-hand-r`, job-table.ts, on the 1600px stage), from 332px with a full crewed hand to 409px, where a waiting
+   roll's costs end (the moment's right edge at 1139, and the gap). */
+:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .feed { left: auto; right: 36px; width: clamp(332px, calc(1600px - 36px - 16px - var(--hud-hand-r, 1600px)), 409px); padding-left: 12px; box-sizing: border-box; }
 /* A stranger's bust steps aside while the job table is up: the subtitle's head names who speaks (playtest: the photo looked out of place). */
 :has(> .tb.hud:not([hidden]):not(.phone)) > .sp-layer { display: none; }
 /* Her subtitle stands taller by her than the band did under the table, so more of a reply reads before it pages (playtest). The feed reads its rest height from here, so the paging follows. */
@@ -113,12 +220,20 @@
    levers and the JOB column stay as they were. */
 #game:has(> .tb:not([hidden]):not(.phone)) > .feed-root.expanded { z-index: 25; }
 #game:has(> .tb.hud:not([hidden]):not(.phone)):has(> .feed-root.expanded) > :is(.stage, .jc-layer) { display: block; }
-/* Her column is the table's last track (table.css: 19% of the 1552px between its 24px sides, 295px), clear of the levers. */
-#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.expanded .feed-dim {
-  left: auto;
+/* The dim spans the stage as it does away from the table, so a click anywhere off the archive closes it and goes no
+   further (playtest 2026-11-08: it was only her column, so a click on the cards went to the table and the archive stayed);
+   it's drawn only on her column, the table's last track (table.css: 19% of the 1552px between its 24px sides, 295px),
+   clear of the levers. */
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.expanded .feed-dim { background: none; backdrop-filter: none; }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.expanded .feed-dim::before {
+  content: '';
+  position: absolute;
   top: 132px;
+  right: 0;
+  bottom: 0;
   width: 336px;
   background: rgba(4, 1, 10, 0.88);
+  backdrop-filter: blur(calc(2px * var(--ui-blur, 1))) saturate(0.6);
   -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px);
   mask-image: linear-gradient(90deg, transparent 0, #000 12px);
 }
@@ -142,3 +257,11 @@
 .jc .db-push .db-gain { grid-column: 2; min-width: 0; text-align: left; }
 .jc :is(.db-check, .db-push):not(:has(.db-die)) > * { grid-column: 1 / -1; }
 .jc .db-push-head { font: 13px var(--pixel); letter-spacing: 0.25em; color: #ffc56b; }
+/* Her live reply (2026-11-11): noise while she writes, then it decodes in. */
+.jc-tools:empty { display: none; }
+.jc-tool { margin-top: 4px; font: 12px var(--pixel); letter-spacing: 0.12em; color: var(--jc-tool); text-shadow: none; }
+.jc-reply .tb-noise { color: var(--who); opacity: 0.7; word-break: break-all; }
+.jc-reply .jc-noise { word-break: break-all; opacity: 0.75; }
+/* In person she isn't on the line: her words without the scanlines. Yours: your colour, under your name. */
+.jc-reply.jc-here { -webkit-mask-image: none; mask-image: none; }
+.jc-say { --who: var(--user, #7fe9ff); display: block; margin: 8px 0; font-style: normal; color: var(--jc-said); }

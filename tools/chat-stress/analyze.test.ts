@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { earlierOf, flagsOf, summary, type TurnRecord } from './analyze';
+import { earlierOf, flagsOf, stickySection, stickyWords, summary, type TurnRecord } from './analyze';
 
 const rec = (over: Partial<TurnRecord>): TurnRecord => ({
   contact: 'cass', turn: 1, mode: 'rp', you: 'hi', status: 'ok', end: 'end', text: 'Hey. Sit down.', calls: [], ms: 1000, ...over,
@@ -85,5 +85,40 @@ describe('summary', () => {
     expect(table).toContain('| turns | 1 | 2 | 3 |');
     expect(table).toContain('| missed-light | 1 | 1 | 2 |');
     expect(table).toContain('| repeat | 0 | 0 | 0 |');
+  });
+});
+
+describe('stickyWords', () => {
+  const replies = (texts: string[], over: Partial<TurnRecord> = {}) => texts.map((text, i) => rec({ contact: 'rue', turn: i + 1, text, ...over }));
+
+  it('a word in the actions of 40% or more of her replies, any form of it; speech and names left out', () => {
+    const r = replies([
+      "*The monitors scroll. She glances at Soren.* Fine.",
+      "*The monitor's glow dips.* Monitors, monitors.",
+      '*Shrugs.* No.',
+      '*Rain on the steel.* Why?',
+      '*Picks up the tea and turns to Soren.*',
+    ]);
+    expect(stickyWords(r).get('rue')).toEqual([{ word: 'monitor', n: 2, of: 5 }]);
+  });
+
+  it("leaves out what the player's lines bring up, and OOC turns", () => {
+    const r = [...replies(['*Rain.*', '*Rain again.*'], { you: '*comes in out of the rain*' }), rec({ contact: 'rue', mode: 'ooc', text: '*rain*' })];
+    expect(stickyWords(r).get('rue')).toEqual([]);
+  });
+
+  it('the section has a line per contact', () => {
+    expect(stickySection(replies(['*The monitors scroll.*', '*The monitor hums.*']))).toContain('- rue (1): monitor 2/2');
+  });
+});
+
+describe('tool talk: the light controls in the story (light groups)', () => {
+  it('flags a light given a level in her actions, and setting the mood', () => {
+    expect(kinds(rec({ text: '*Drops the monitors to 20%, the clamp lamp to 15%*' }))).toContain('tool-talk');
+    expect(kinds(rec({ text: '*I set the mood to quiet.* There.' }))).toContain('tool-talk');
+  });
+
+  it('a percentage in speech, or lights without a level, is the story', () => {
+    expect(kinds(rec({ text: "I'm ninety percent sure. *The lamps go low.* Maybe 80% sure." }))).not.toContain('tool-talk');
   });
 });

@@ -28,7 +28,7 @@ function setup(o: Partial<ModelBandOptions> & { model?: string; answer?: LinkInf
   let changes = 0;
   const browse = async (): Promise<ModelBrowse> => ({ picks: [GLM, SONNET], recent: [DEEP], all: ALL });
   const band = new ModelBand(host, {
-    links: { openrouter: LINK, anthropic: NONE },
+    links: { openrouter: LINK, anthropic: NONE, nanogpt: NONE },
     pronoun: 'she',
     agentModels: event(o.model ?? GLM.id),
     needsKey: false,
@@ -145,7 +145,7 @@ describe('FOR HER', () => {
     await settle();
     expect(t.labels()).toEqual(['GLM 5.2', 'Claude Sonnet 5.5', 'DeepSeek V4 Pro']);
     expect(t.tab('all').textContent).toBe('ALL MODELS 5');
-    expect(t.host.querySelector('.mp-via')!.textContent).toBe(COPY.link.via);
+    expect(t.host.querySelector('.mp-via')!.textContent).toBe(COPY.link.via.anthropic);
   });
 
   it('↓ moves the mark; Enter picks the row; the reset row picks null', async () => {
@@ -168,11 +168,24 @@ describe('FOR HER', () => {
   });
 
   it('the summary names what is linked, and warns of a key with no credit', () => {
-    const t = setup({ links: { openrouter: { ...LINK, state: 'no-credit' }, anthropic: NONE } });
+    const t = setup({ links: { openrouter: { ...LINK, state: 'no-credit' }, anthropic: NONE, nanogpt: NONE } });
     const s = t.host.querySelector('.mb-summary')!.textContent!;
     expect(s).toContain(`OPENROUTER ${COPY.link.noCreditShort}`);
     expect(s).not.toContain('ANTHROPIC');
     expect(setup().host.querySelector('.mb-summary')!.textContent).toContain('OPENROUTER $4.12');
+  });
+
+  it("NanoGPT's plan shows in the summary as the share of the week left, else its dollars", () => {
+    const plan = setup({ links: { openrouter: NONE, anthropic: NONE, nanogpt: { linked: true, last4: 'n4n0', credit: 3.1, state: 'ok', plan: { active: true, weekLeft: 0.75 } } } });
+    expect(plan.host.querySelector('.mb-summary')!.textContent).toContain('NANOGPT PLAN 75% OF THE WEEK');
+    const balance = setup({ links: { openrouter: NONE, anthropic: NONE, nanogpt: { linked: true, last4: 'n4n0', credit: 3.1, state: 'ok', plan: { active: false, weekLeft: null } } } });
+    expect(balance.host.querySelector('.mb-summary')!.textContent).toContain('NANOGPT $3.10');
+  });
+
+  it('a model on the NanoGPT key says so', async () => {
+    const t = setup({ agentModels: { ...event(GLM.id), choices: [{ ...GLM, via: 'nanogpt' }, DEEP, SONNET] } });
+    await settle();
+    expect(t.host.querySelector('.mp-via')!.textContent).toBe(COPY.link.via.nanogpt);
   });
 
   it('the on-screen BACK backs out, for a phone or a mouse', () => {
@@ -458,6 +471,30 @@ describe('KEYS', () => {
     expect(t.unlinks).toEqual(['openrouter']);
   });
 
+  it('a third row for NanoGPT: + LINK NANOGPT, and once linked its plan beside the last 4', () => {
+    expect(row(keysTab(), 'nanogpt').querySelector('.mp-add')!.textContent).toBe('+ LINK NANOGPT');
+    const t = keysTab({ links: { openrouter: LINK, anthropic: NONE, nanogpt: { linked: true, last4: 'n4n0', credit: 3.1, state: 'ok', plan: { active: true, weekLeft: 0.75 } } } });
+    expect(row(t, 'nanogpt').querySelector('.mp-line')!.textContent).toBe('NANOGPT …n4n0 · PLAN 75% OF THE WEEK · $3.10');
+  });
+
+  it("NanoGPT's form has its own words and sends the key for it; a refusal names NanoGPT", async () => {
+    const t = keysTab();
+    t.keys('ArrowDown', 'ArrowDown', 'Enter');
+    expect(input(t).getAttribute('aria-label')).toBe(COPY.link.nanogpt.fieldLabel);
+    expect(t.host.querySelector('.lp-why')!.textContent).toBe(COPY.link.nanogpt.why);
+    expect(t.host.querySelector<HTMLAnchorElement>('.lp-get a')!.href).toBe(COPY.link.nanogpt.href);
+    input(t).value = 'sk-nano-1';
+    t.key('Enter');
+    await settle();
+    expect(t.puts).toEqual([['sk-nano-1', 'nanogpt']]);
+    const r = keysTab({ answer: { error: 'key-rejected' } });
+    r.keys('ArrowDown', 'ArrowDown', 'Enter');
+    input(r).value = 'nope';
+    r.key('Enter');
+    await settle();
+    expect(r.host.querySelector('.lp-msg')!.textContent).toBe(COPY.link.nanogpt.errors['key-rejected']);
+  });
+
   it('↓ and Enter open the row under the mark, focused, with its own words; Esc closes it and the step stays', () => {
     const t = keysTab();
     t.keys('ArrowDown', 'Enter');
@@ -541,7 +578,7 @@ describe('KEYS', () => {
     let browsed = 0;
     const t = setup({
       needsKey: true,
-      links: { openrouter: NONE, anthropic: NONE },
+      links: { openrouter: NONE, anthropic: NONE, nanogpt: NONE },
       browse: async () => {
         browsed++;
         return { picks: [], recent: [], all: null };
@@ -558,7 +595,7 @@ describe('KEYS', () => {
   });
 
   it("with no key, Anthropic's + LINK swaps the field over", () => {
-    const t = setup({ needsKey: true, links: { openrouter: NONE, anthropic: NONE } });
+    const t = setup({ needsKey: true, links: { openrouter: NONE, anthropic: NONE, nanogpt: NONE } });
     row(t, 'anthropic').querySelector<HTMLButtonElement>('.mp-add')!.click();
     expect(input(t).getAttribute('aria-label')).toBe(COPY.link.anthropic.fieldLabel);
     expect(t.host.querySelectorAll('.lp-field')).toHaveLength(1);

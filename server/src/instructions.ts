@@ -1,5 +1,5 @@
 import { named } from '../../shared/pronoun';
-import type { Present } from '../../shared/types';
+import type { Present, ReplyLength } from '../../shared/types';
 
 /**
  * Each in-character turn's lights rule, first by their words (the [room: …] line heads the turn since 2026-10-23). It lived mid-paragraph in the room
@@ -7,7 +7,7 @@ import type { Present } from '../../shared/types';
  * change the player narrated, read as already done.
  */
 export const LIGHTS_LINE =
-  "[the lights follow the story: if anything in this turn changes them — the power cuts out, a lamp goes off or on, whoever does it, even when the person you're talking to narrates it — the room hasn't changed until you call set_light with the light ids above (or apply_mood), in this reply. Writing it without the call leaves the room as it was.]";
+  "[the lights follow the story: if anything in this turn changes them — the power cuts out, a lamp goes off or on, whoever does it, even when the person you're talking to narrates it — the room hasn't changed until you call set_light on inside (or a light it names) or apply_mood, in this reply. Writing it without the call leaves the room as it was. In the story, say what the light does in the room, never a level or a mood's name.]";
 
 /** Heads the room and writing rules in the system message, so they don't read as the last section of her identity. */
 export const RP_HEADING = '# The room and how you write';
@@ -19,8 +19,15 @@ export const RP_HEADING = '# The room and how you write';
  * The last sentence: the [room: …] and [wearing …] lines come every turn, and GLM wrote the paper lantern and her bare
  * feet back into eight replies running (2026-10-23).
  */
-export const beatLine = (player: string): string =>
-  `[your reply: one beat — a short action and a line or two, about 80 words. ${player}'s actions, words and feelings are theirs to write; don't write them. The room, its lights and what you both wear are already there: bring them up only when they change.]`;
+const BEAT_LENGTH: Record<ReplyLength, string> = {
+  short: 'a short action and a line, about 50 words',
+  normal: 'a short action and a line or two, about 80 words',
+  long: 'an action and a few lines, about 150 words',
+};
+
+/** `length`: SYS → REPLY LENGTH (NORMAL is the line as measured on 2026-10-20). */
+export const beatLine = (player: string, length: ReplyLength = 'normal'): string =>
+  `[your reply: one beat — ${BEAT_LENGTH[length]}. ${player}'s actions, words and feelings are theirs to write; don't write them. The room, its lights and what you both wear are already there: bring them up only when they change.]`;
 
 /** Jobs and quests are separate threads (a job's Sentinel once turned up in Paper Trail, 2026-10-21): her rule in the room instructions. */
 export const ROOM_JOBS_APART =
@@ -95,6 +102,10 @@ export const MISSION_OPEN =
 export const MISSION_CLOSE =
   "The job is over. The [job — …: …] line at the end of this message is how it ended, and the [mission summary] says how it went. Say one short line in character about how it went: one or two sentences, no more. Don't retell it, and don't make it sound better or worse than the summary says. Talk like a person, not a game: no odds, rolls or numbers, and never say clean, messy, blown, heat, rep, tier, ALARM or EDGE.";
 
+/** A ride-along job's pick (2026-11-08): you're on the job with them, by their side or on their line; one short reaction. */
+export const MISSION_BEAT =
+  "You're on this job with them, by their side or on their line, and you've just seen or heard their last move land: the [job — …: …] line at the end of this message, as far as it reached you. React to that move and how it went, not to what's starting next; that comes later. Keep it under forty words: one or two short spoken sentences, and at most one short action in asterisks. Don't retell it, don't describe their room, and don't decide what they do next. If you're on the line, you only know what came over it. At most one question. Talk like a person, not a game: no odds, rolls or numbers, and never say heat, rep, tier, ALARM or EDGE.";
+
 export const ENCOUNTER_INSTRUCTIONS =
   "Something has just happened in the scene: the [event] line. React to it now, in character and in one beat, the way you would if it really cut into your evening. If it brings someone in, they are here now; give them a line if the moment calls for it. Don't resolve it for the user. If it changes the room itself — smoke fills the air, the weather turns — make that change with your room tools in this same turn.";
 
@@ -132,7 +143,7 @@ export function oocInstructions(name: string): string {
  * (not OOC). One place for every agent. It names the plain-text conflict outright: models are often
  * told to avoid markdown and asterisks, and the room needs both.
  */
-export const ROLEPLAY_GUIDE = `How to write roleplay here. Put actions and narration in *asterisks*; anything outside them is speech, with no quotes needed. This room renders that markup, and it overrides any general instruction to write plain text or avoid asterisks. Write in beats, the way a visual novel does: a beat is a short action and a line or two of speech. Your reply appears a few lines at a time in a dialogue box, so go longer only when the moment earns it: a story you're telling, something that matters. Never write the user's actions, words or feelings; their part is theirs to write. Ground the scene in concrete detail — the rain, the light, what's in your hands — rather than adjectives about mood, and let subtext carry feeling instead of naming it. Vary how you begin; don't open every reply the same way or echo their words back. Move the scene now and then: a small event, a want of your own, something from the room. End on something to answer — a look, a move, a question, a silence that asks for something — but not always a question. When the user ends the scene in character, close it in character: a last beat, no summary, no report on what you saved or couldn't do. When the story skips ahead, or your reply moves to a later hour — you talked till dawn, you'll see them tomorrow, the night goes on — call pass_time first so Lowlight's clock agrees; don't call it for ordinary back-and-forth.`;
+export const ROLEPLAY_GUIDE = `How to write roleplay here. Put actions and narration in *asterisks*; anything outside them is speech, with no quotes needed. This room renders that markup, and it overrides any general instruction to write plain text or avoid asterisks. Write in beats, the way a visual novel does: a beat is a short action and a line or two of speech. Your reply appears a few lines at a time in a dialogue box, so go longer only when the moment earns it: a story you're telling, something that matters. Never write the user's actions, words or feelings; their part is theirs to write. Ground the scene in one concrete detail rather than adjectives about mood, most often something the other person just did, said or brought, and not one you've already used; let subtext carry feeling instead of naming it. Vary how you begin; don't open every reply the same way or echo their words back. Move the scene now and then: a small event, a want of your own, something from the room. End on something to answer — a look, a move, a question, a silence that asks for something — but not always a question. When the user ends the scene in character, close it in character: a last beat, no summary, no report on what you saved or couldn't do. When the story skips ahead, or your reply moves to a later hour — you talked till dawn, you'll see them tomorrow, the night goes on — call pass_time first so Lowlight's clock agrees; don't call it for ordinary back-and-forth.`;
 
 /** Someone here the contact voices: who they are, and what her model is told about them. */
 export interface OtherVoice extends Present {
@@ -218,6 +229,29 @@ export function textPlanLine(plan: { going: { place: string; until: string } | n
 }
 
 /** The line a promised text answers (promised texts spec §5): what she said she'd text, and where things stand now. */
+/** Her job text's hidden line (job texts spec §3): she texts first, about what she needs; never the job's name. */
+export function jobTextLine(o: { you: string; text: string }): string {
+  return `[you're texting ${o.you} first, about something you need from them: ${o.text} Text them now.]`;
+}
+
+/**
+ * A STORY opening's job (its `opening-view:`), while the opening scene is on and the job hasn't started: why they're
+ * here tonight. On her greeting she raises it herself; the job's name is never said.
+ */
+export function storyLine(o: { you: string; view: string; raise: boolean }): string {
+  return o.raise ? `[why ${o.you} is here tonight, to raise now, in your own words: ${o.view}]` : `[why ${o.you} is here tonight: ${o.view}]`;
+}
+
+/** Under her greeting's reply in the chat, once she has raised the STORY's job: where to start it. */
+export function storyJobLine(title: string): string {
+  return `// ${title.toUpperCase()} · NOW ON JOBS (ALT+Q)`;
+}
+
+/** With you when her job's gate opened (job texts spec §4): she raises it herself, on this turn. */
+export function jobRoomLine(o: { you: string; text: string }): string {
+  return `[something you need from ${o.you}, to raise now, in your own words: ${o.text}]`;
+}
+
 export function promisedLine(o: { you: string; about: string; where: string }): string {
   return `[you told ${o.you} you'd text ${o.about} — ${o.where}. Text them now.]`;
 }

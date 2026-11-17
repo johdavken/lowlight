@@ -77,6 +77,39 @@ async function open(v: CrewView = view(), act: (a: CrewAction) => void = vi.fn()
 }
 
 describe('the CREW screen', () => {
+  it('the trace panel: no frame, the counts on the head line, a key line per tab', async () => {
+    const h = await open();
+    expect($('.crew-screen')!.classList.contains('scr-trace')).toBe(true);
+    expect($('.crew-screen .hf')).toBeNull();
+    expect($('.tp-title')!.textContent).toBe('CREW');
+    expect($('.cr-tab.on')!.textContent).toBe('ROSTER4/5');
+    expect($('.tp-keys')!.textContent).toBe('[↑↓] WHO · [←→] TAB · [ENTER] ASSIGN · [ESC] CLOSE');
+    expect($$('.tp-keys b').map((b) => b.textContent)).toEqual(['[↑↓]', '[←→]', '[ENTER]', '[ESC]']);
+    h.show('assign');
+    expect($('.tp-keys')!.textContent).toContain('[ENTER] SEND');
+    h.show('hire');
+    expect($('.tp-keys')!.textContent).toBe('[↑↓] PLACE · [←→] TAB · [ESC] CLOSE');
+  });
+
+  it('Enter does the filled key: ASSIGN on a ready recruit; nothing for one who is out', async () => {
+    const h = await open();
+    const key = (k: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    expect($('.cr-acts .cr-go')!.textContent).toBe('ASSIGN');
+    key('ArrowDown');
+    expect($('.cr-acts .cr-go')).toBeNull();
+    key('Enter');
+    expect(h.tab).toBe('roster');
+    key('ArrowUp');
+    key('Enter');
+    expect(h.tab).toBe('assign');
+  });
+
+  it('a free ability slot shows as a dashed place, apart from the cards', async () => {
+    await open(view({ roster: [entry({ recruit: recruit({}), slots: 2 })] }));
+    expect($$('.cr-ab-empty').length).toBe(2);
+    expect($$('.cr-ab').length).toBe(0);
+  });
+
   it('tabs and strip', async () => {
     await open();
     expect($$('.cr-tab').map((t) => t.textContent)).toEqual(['ROSTER4/5', 'ERRANDS1 OUT', 'HIRE']);
@@ -151,10 +184,10 @@ describe('the CREW screen', () => {
 });
 
 describe('CREW in the room chrome', () => {
-  it('Alt+K is crew; the cycle goes PEOPLE → TEXTS → QUEST → CREW → MAP', () => {
+  it('Alt+K is crew; the cycle goes PEOPLE → QUEST → CREW → MAP', () => {
     expect(chromeKey(new KeyboardEvent('keydown', { altKey: true, code: 'KeyK', key: 'k' }), false)).toBe('crew');
     expect(chromeKey(new KeyboardEvent('keydown', { altKey: true, code: 'KeyB', key: 'b' }), false)).toBe('book');
-    expect(nextScreen('texts', 1)).toBe('quest');
+    expect(nextScreen('people', 1)).toBe('quest');
     expect(nextScreen('quest', 1)).toBe('crew');
     expect(nextScreen('crew', 1)).toBe('map');
   });
@@ -527,7 +560,7 @@ describe('crew phase 2 on the screen (crew spec §5)', () => {
     await open(held({ canSpring: false, springWhy: 'one rescue a night', springPlace: 'The Long Haul' }));
     const b = $$('.cr-acts button')[1] as HTMLButtonElement;
     expect(b.disabled).toBe(true);
-    expect(b.title).toBe('one rescue a night');
+    expect(b.dataset.tip).toBe('one rescue a night');
     expect($('.cr-status')!.textContent).toBe('HELD BY SDG · THEIR PEOPLE AT THE LONG HAUL ARE WAITING');
   });
 });
@@ -573,7 +606,7 @@ describe('ABILITIES (crew abilities spec §4)', () => {
     await open(juno({ state: 'out', due: 1600 }));
     const b = $<HTMLButtonElement>('.cr-ab[data-id="spoof"] .cr-ab-btn')!;
     expect(b.disabled).toBe(true);
-    expect(b.title).toMatch(/^OUT/);
+    expect(b.dataset.tip).toMatch(/^OUT/);
   });
   it('an open pick comes first: two cards and KEEP', async () => {
     const act = vi.fn();

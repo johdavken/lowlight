@@ -159,6 +159,8 @@ export class Grade {
   private scale = 1;
   private amount = 0;
   private signalAmount = 0;
+  /** SYS → POST EFFECTS: the scanlines and vignette (the CRT pass). Glitches and signal drops keep their own passes. */
+  private post = true;
 
   constructor(private readonly target: { filters: Filter | readonly Filter[] | null | undefined }) {
     this.apply();
@@ -170,6 +172,12 @@ export class Grade {
     // Scanline period is ~5.24·lineWidth/2 screen px (min 5.24): align it to whole art pixels.
     const rows = Math.max(1, Math.ceil(5.24 / this.scale));
     this.crt.lineWidth = Math.max(1, (2 * rows * this.scale) / 5.24);
+    this.apply();
+  }
+
+  setPost(on: boolean): void {
+    if (on === this.post) return;
+    this.post = on;
     this.apply();
   }
 
@@ -200,11 +208,15 @@ export class Grade {
       this.glitchFx.seed = Math.random();
       this.glitchFx.slices = 6 + Math.floor(Math.random() * 10);
       this.glitchFx.refresh();
-      this.target.filters = [this.glitchFx, this.split, this.crt];
+    }
+    const crt = this.post ? [this.crt] : [];
+    if (a > 0) {
+      this.target.filters = [this.glitchFx, this.split, ...crt];
     } else if (this.signalAmount > 0) {
-      this.target.filters = [this.signalFx, this.split, this.crt];
+      this.target.filters = [this.signalFx, this.split, ...crt];
     } else {
-      this.target.filters = [this.split, this.crt];
+      // At rest the split is a no-op: no pass for it (and none at all without the CRT).
+      this.target.filters = crt;
     }
   }
 }

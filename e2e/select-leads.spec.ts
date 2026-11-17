@@ -4,7 +4,7 @@ import { lockPlayer, newGame, phase, SECOND, skipSplash } from './fixtures';
 // Four leads on select (spec 2026-11-07), on the live roster (e2e/serve.ts): 1P offers only the
 // playable leads; 2P every contact but those found in play.
 const named = (page: Page) =>
-  page.locator('.grid .tile[data-id]').evaluateAll((ts) => ts.map((t) => (t as HTMLElement).dataset.id!).filter((id) => !id.includes('random')));
+  page.locator('.grid .tile[data-id]').evaluateAll((ts) => ts.map((t) => (t as HTMLElement).dataset.id!).filter((id) => id !== '+new' && !id.startsWith('@')));
 
 test('select: the four leads at 1P, every contact but Rot and Ines at 2P', async ({ page }) => {
   await skipSplash(page);

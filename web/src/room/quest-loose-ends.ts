@@ -1,6 +1,7 @@
 /**
  * QUEST's LOOSE ENDS tab (cipher spec §2.8; on QUEST since 2026-11-04): the small things you noticed that point somewhere, grouped by what
- * they point to but never naming it, and the truths you learned with what pointed to them. Read-only.
+ * they point to but never naming it, and the truths you learned with what pointed to them. Read-only: a page of two
+ * columns on the trace panel (2026-11-15), what you noticed at the left, what you worked out at the right.
  */
 import type { LooseClue, LooseEndsView } from '../../../shared/types';
 import { formatClock } from '../../../shared/clock';
@@ -19,22 +20,29 @@ function line(c: LooseClue): HTMLElement {
 }
 
 export function looseEndsTab(v: LooseEndsView): HTMLElement {
-  const root = el('div', 'ql-loose-tab');
+  const root = el('div', 'ql-loose-tab ql-read');
   if (v.open.length === 0 && v.solved.length === 0) {
     root.append(el('div', 'ql-none', "Nothing you've noticed yet."));
     return root;
   }
+  const noticed = el('div', 'ql-col');
+  noticed.append(el('div', 'ql-loose-head ql-sub tp-head', 'NOTICED'));
   for (const group of v.open) {
     const g = el('div', 'ql-loose-group');
     g.append(...group.map(line));
-    root.append(g);
+    noticed.append(g);
   }
-  if (v.solved.length > 0) root.append(el('div', 'ql-group', 'SOLVED'));
+  if (v.open.length > 0) noticed.append(el('p', 'ql-loose-note', 'Lines that sit together point at the same thing. Nothing here names it.'));
+  root.append(noticed);
+  if (v.solved.length === 0) return root;
+  const solved = el('div', 'ql-col');
+  solved.append(el('div', 'ql-group ql-solved-head tp-head', 'SOLVED'));
   for (const s of v.solved) {
     const card = el('div', 'ql-loose-solved');
     card.append(el('div', 'ql-loose-truth', s.truth));
-    if (s.clues.length > 0) card.append(el('div', 'ql-loose-label', 'WHAT POINTED TO IT'), ...s.clues.map(line));
-    root.append(card);
+    if (s.clues.length > 0) card.append(el('div', 'ql-loose-label tp-head quiet', 'WHAT POINTED TO IT'), ...s.clues.map(line));
+    solved.append(card);
   }
+  root.append(solved);
   return root;
 }

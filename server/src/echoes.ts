@@ -105,9 +105,59 @@ export function inActions(text: string, phrase: string): boolean {
   return runs(text).some((w) => ` ${w.join(' ')} `.includes(` ${phrase} `));
 }
 
-/** The turn's line naming what she's been repeating, or null when she hasn't. */
-export function echoLine(replies: readonly string[], theirs: readonly string[] = []): string | null {
-  const said = echoes(replies, theirs);
+/** Her replies looked at for the room's props, newest last; a prop in `PROP_HITS` of them is named. */
+export const PROP_WINDOW = 3;
+export const PROP_HITS = 2;
+
+/** Label words that aren't a prop of their own ("the lit windows of the habs above"). */
+const GENERIC = new Set(
+  (
+    'room wall walls floor door doors window windows light lights lit glow city street above below past through behind beside ' +
+    'next near over under outside inside along across around little small big old left right front corner side end top bottom ' +
+    'other others another every each whole'
+  ).split(' '),
+);
+
+/** A word's plain form: lower case, no possessive, no plural s ("monitor's", "monitors" → "monitor"). */
+const plain = (w: string) => {
+  const x = w.toLowerCase().replace(/[’‘]/g, "'").replace(/'s$/, '');
+  return x.length > 4 && x.endsWith('s') && !x.endsWith('ss') ? x.slice(0, -1) : x;
+};
+
+/**
+ * The room's props as words she might keep writing: each light label's own words (the room line names them every turn)
+ * and the weather when there is some. Rue wrote the monitors into 10 of 14 replies and the rain into 6; as single words
+ * they never made a repeated phrase (2026-11-12).
+ */
+export function propWords(labels: readonly string[], weather: string): string[] {
+  const out = new Set<string>();
+  for (const label of labels) {
+    for (const w of label.toLowerCase().match(/[a-z]+(?:'[a-z]+)?/g) ?? []) {
+      const p = plain(w);
+      if (p.length >= 4 && !COMMON.has(p) && !GENERIC.has(p)) out.add(p);
+    }
+  }
+  if (weather !== 'none') out.add(plain(weather));
+  return [...out];
+}
+
+/** The props in the *actions* of `PROP_HITS` or more of her last `PROP_WINDOW` replies, and not in their last lines. */
+export function propEchoes(replies: readonly string[], props: readonly string[], theirs: readonly string[] = []): string[] {
+  if (props.length === 0) return [];
+  const asked = new Set((theirs.join(' ').match(/[a-zA-Z]+(?:['’][a-z]+)?/g) ?? []).map(plain));
+  const recent = replies.slice(-PROP_WINDOW).filter((t) => t.trim() !== '');
+  const inEach = recent.map((t) => new Set(runs(t).flat().map(plain)));
+  return props.filter((p) => !asked.has(p) && inEach.filter((s) => s.has(p)).length >= PROP_HITS);
+}
+
+/**
+ * The turn's line naming what she's been repeating, or null when she hasn't: her repeated phrases, then the room's
+ * props she keeps coming back to (`props`, from propWords), unless a named phrase already has them.
+ */
+export function echoLine(replies: readonly string[], theirs: readonly string[] = [], props: readonly string[] = []): string | null {
+  const phrased = echoes(replies, theirs);
+  const more = propEchoes(replies, props, theirs).filter((p) => !phrased.some((x) => x.split(' ').map(plain).includes(p)));
+  const said = [...phrased, ...more].slice(0, ECHO_MAX);
   if (said.length === 0) return null;
   return `[you keep writing these — ${said.map((p) => `"${p}"`).join(', ')}. Leave them out of this reply; write what's new in this moment instead.]`;
 }

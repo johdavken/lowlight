@@ -69,7 +69,7 @@ describe('room chrome: HUD buttons', () => {
     expect(root.querySelector('.hud-title')).toBeNull();
     const back = root.querySelector<HTMLElement>('.hud-left > .hud-back')!;
     expect(back.textContent).toBe('‹');
-    expect([...root.querySelectorAll<HTMLElement>('.hud-bar span')].filter((s) => s.title === 'Title (Alt+T)')).toHaveLength(1);
+    expect([...root.querySelectorAll<HTMLElement>('.hud-bar span')].filter((s) => s.dataset.tip === 'Title (Alt+T)')).toHaveLength(1);
     root.querySelector<HTMLElement>('.hud-people')!.click();
     key(back, 'Enter');
     expect(contacts).toHaveBeenCalledTimes(1);
@@ -296,8 +296,8 @@ describe('room chrome: navigation', () => {
     h.setBackLink(() => {});
     // SAVE isn't in SYS any more (the pause menu has it, ALT+S on its row).
     expect(root.querySelector('.sys-row[data-row="save"]')).toBeNull();
-    expect(root.querySelector<HTMLElement>('.hud-people')!.title).toBe('People (Alt+P)');
-    expect(root.querySelector<HTMLElement>('.hud-back')!.title).toBe('Title (Alt+T)');
+    expect(root.querySelector<HTMLElement>('.hud-people')!.dataset.tip).toBe('People (Alt+P)');
+    expect(root.querySelector<HTMLElement>('.hud-back')!.dataset.tip).toBe('Title (Alt+T)');
   });
 
   it('a socket closed with 4410 or 4409 is not retried; the code is reported', async () => {

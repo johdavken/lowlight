@@ -88,3 +88,143 @@ describe('blowsOnMiss', () => {
     expect(q.beats.get('b0')![0].choices.map((c) => blowsOnMiss(q, c))).toEqual([false, false]);
   });
 });
+
+import { outcomeFor, type CondCtx } from './quests';
+
+describe('outcome versions (routes and posts spec §1)', () => {
+  const ctx = (flags: Record<string, string> = {}): CondCtx => ({ flags, trust: 'mid', warmth: 'mid', with: 'hicks' });
+  const versioned = (s: string) => s.replace('## o2\n*On.*\npay: full\ntake: full\n→ end', '## o2\n*On.*\npay: full\ntake: full\n→ end\n\n## caught if post.door\n*Out, rough.*\ntake: part\n→ end\n\n## caught\n*Caught.*\ntake: none\n→ end').replace('- y: Y. → o2 / o2', '- y: Y. → o2 / caught');
+  const problems = (s: string) => {
+    const r = parseQuestFile('t', s, { roster: null, places: null });
+    return r.ok ? [] : r.problems.map((p) => `${p.field}: ${p.message}`);
+  };
+  it('reads outcome versions, the plain one last', () => {
+    const q = parse(text({ patch: versioned })).entry;
+    expect(q.outcomes.get('caught')!.effects.take).toBe('none');
+    expect(q.outcomes.get('caught')!.versions).toHaveLength(1);
+    expect(outcomeFor(q, 'caught', ctx({ 'post.door': 'yes' }))!.effects.take).toBe('part');
+    expect(outcomeFor(q, 'caught', ctx())!.effects.take).toBe('none');
+    expect(outcomeFor(q, 'nope', ctx())).toBeUndefined();
+  });
+  it('refuses an outcome version with no plain one after it', () => {
+    expect(problems(text({ patch: (s) => versioned(s).replace('\n\n## caught\n*Caught.*\ntake: none\n→ end', '') }))).toContain('caught: needs a last version without `if` (the default)');
+  });
+  it('refuses a plain outcome before a version', () => {
+    const swapped = (s: string) => versioned(s).replace('## caught if post.door', '## caught-x').replace('\n## caught\n', '\n## caught if post.door\n').replace('## caught-x', '## caught');
+    expect(problems(text({ patch: swapped }))).toContain('caught: the version without `if` must be the last one, and there can be only one');
+  });
+  it('a miss blows the job unless the version that plays keeps a take', () => {
+    const q = parse(text({ patch: versioned })).entry;
+    const card = q.beats.get('b2')!.at(-1)!.choices.find((c) => c.id === 'y')!;
+    expect(blowsOnMiss(q, card)).toBe(true);
+    expect(blowsOnMiss(q, card, ctx())).toBe(true);
+    expect(blowsOnMiss(q, card, ctx({ 'post.door': 'yes' }))).toBe(false);
+  });
+});
+
+import { beatTitle, jobPosts, type Beat } from './quests';
+
+describe('post lines and beat titles (routes and posts spec §2)', () => {
+  const problems = (s: string) => {
+    const r = parseQuestFile('t', s, { roster: null, places: null });
+    return r.ok ? [] : r.problems.map((p) => p.message);
+  };
+  const POST = 'post door: Someone holds the service door. [suits muscle]\ngives door: The way out stays open.';
+  /** Tier 2's five beats: a post on b1, read by a version of the last miss, which hurts whoever holds it. */
+  const posted = (o: { post?: string; harm?: string; read?: boolean; on?: string } = {}) =>
+    text({
+      tier: 2,
+      patch: (s) =>
+        s
+          .replace(`# ${o.on ?? 'b1'}\n\n*A beat.*`, `# ${o.on ?? 'b1'}\n\ntitle: The Stairwell\n${o.post ?? POST}\n\n*A beat.*`)
+          .replace('- y: Y. → o4 / o4', '- y: Y. → o4 / caught')
+          .replace('## o4\n', `${o.read === false ? '' : `## caught if post.door\n*Out, rough.*\ntake: part\n${o.harm ?? 'post door: hurt'}\n→ end\n\n`}## caught\n*Caught.*\ntake: none\n→ end\n\n## o4\n`),
+    });
+  it('reads a post, its promise and what suits it', () => {
+    const q = parse(posted()).entry;
+    expect(q.beats.get('b1')!.at(-1)!.post).toEqual({ id: 'door', line: 'Someone holds the service door.', gives: 'The way out stays open.', suits: 'muscle' });
+    expect(jobPosts(q).map((p) => p.id)).toEqual(['door']);
+  });
+  it('reads a post that suits nobody in particular', () => {
+    expect(parse(posted({ post: 'post door: Someone holds the door.\ngives door: The way out stays open.' })).entry.beats.get('b1')!.at(-1)!.post).toEqual({ id: 'door', line: 'Someone holds the door.', gives: 'The way out stays open.' });
+  });
+  it('reads the harm line on an outcome', () => {
+    const q = parse(posted()).entry;
+    expect(q.outcomes.get('caught@0')!.effects.postHarm).toEqual({ post: 'door', harm: 'hurt' });
+    expect(parse(posted({ harm: 'post door: held' })).entry.outcomes.get('caught@0')!.effects.postHarm).toEqual({ post: 'door', harm: 'held' });
+  });
+  it('titles a beat', () => {
+    const q = parse(posted()).entry;
+    expect(beatTitle(q.beats.get('b1')!.at(-1)!)).toBe('THE STAIRWELL');
+    expect(beatTitle({ id: 'the-floor' } as Beat)).toBe('THE FLOOR');
+    expect(q.beats.get('b1')!.at(-1)!.text).toBe('*A beat.*');
+  });
+  it.each([
+    ['a post with no gives line', posted({ post: 'post door: Someone holds the door.' }), "post door needs a 'gives door:' line"],
+    ['suits that is not a specialty', posted({ post: 'post door: Someone holds the door. [suits wizard]\ngives door: Out.' }), "suits: 'wizard' isn't a specialty"],
+    ['two posts on one beat', posted({ post: `${POST}\npost desk: Someone talks.\ngives desk: Talk.` }), 'one post on a beat'],
+    ['a harm line for a post the job has not got', posted({ harm: 'post desk: hurt' }), "no post 'desk' in this file"],
+    ['a post nothing reads', posted({ read: false }), 'post door: no later beat or outcome reads post.door'],
+    ['a post on a push beat or the getaway', text({ tier: 2, patch: (s) => s + `\n# push-1\n\n${POST}\n\n*More.*\n\n- a: A. → won / lost1 [check cool 55]\n- b: B. → won / lost1 [check wits 55]\n\n## won\n*Won.*\npay: +50\n→ end\n\n## lost1\n*Lost.*\nlost\n→ end\n` }), 'a post goes on a rolled beat'],
+  ])('refuses %s', (_n, file, message) => expect(problems(file)).toContain(message));
+  it('refuses three posts in a job', () => {
+    const three = posted()
+      .replace('# b2\n\n*A beat.*', '# b2\n\npost desk: Someone talks.\ngives desk: Talk.\n\n*A beat.*')
+      .replace('# b3\n\n*A beat.*', '# b3\n\npost roof: Someone watches.\ngives roof: Eyes.\n\n*A beat.*');
+    expect(problems(three)).toContain('at most two posts in a job');
+  });
+  it('a job with no posts has none', () => expect(jobPosts(parse(text()).entry)).toEqual([]));
+});
+
+import { paths } from './job-template';
+
+describe('the template per path (routes and posts spec §1)', () => {
+  const beat = (id: string, a: string, b: string, n: number, to: string, o: { head?: string; tagA?: string; tagB?: string; idA?: string; idB?: string; toA?: string; toB?: string } = {}) =>
+    `# ${id}\n\n*A beat.*\n\n- ${o.idA ?? 'x'}: X. → ${o.toA ?? `${id}-o`} / ${o.toA ?? `${id}-o`} [check ${a} ${n}${o.tagA ?? ''}]\n- ${o.idB ?? 'y'}: Y. → ${o.toB ?? `${id}-o`} / ${o.toB ?? `${id}-o`} [check ${b} ${n}${o.tagB ?? ''}]\n\n${o.toA ? '' : `## ${id}-o\n*On.*\n→ ${to}\n`}`;
+  /** Tier 2, forked at the lobby: charm → desk → floor-front, stairs → stairwell → floor-back, then closet and out for both. */
+  const forked = (o: { closet?: string; short?: boolean } = {}) =>
+    [
+      '---\ntitle: T\nkind: mission\ntier: 2\ntake-size: 4\nstarts: anywhere\nafter: null\npay: 360-440\n---\n',
+      beat('lobby', 'cool', 'reflex', 55, '', { idA: 'charm', idB: 'stairs', toA: 'front', toB: 'back', tagA: ', set route=front', tagB: ', set route=back' }),
+      '## front\n*Front.*\n→ desk\n',
+      `## back\n*Back.*\n→ ${o.short ? 'floor-back' : 'stairwell'}\n`,
+      beat('desk', 'wits', 'reflex', 55, 'floor-front'),
+      beat('floor-front', 'cool', 'body', 55, 'closet'),
+      ...(o.short ? [] : [beat('stairwell', 'body', 'wits', 55, 'floor-back')]),
+      beat('floor-back', 'tech', 'reflex', 55, 'closet'),
+      beat('closet', 'tech', o.closet ?? 'body', 50, 'out'),
+      '# out if route=front\n\n*Past the glass.*\n\n- x: X. → home / home [check cool 50]\n- y: Y. → home / home [check tech 50]\n',
+      '# out\n\n*The stair.*\n\n- x: X. → home / home [check reflex 50]\n- y: Y. → home / home [check body 50]\n\n## home\n*Out.*\npay: full\ntake: full\n→ end\n',
+    ].join('\n');
+  const entry = (s: string) => parse(s).entry;
+  it('finds both routes of a forked job', () => {
+    const ps = paths(entry(forked()));
+    expect(ps.map((p) => p.via)).toEqual(['charm', 'stairs']);
+    expect(ps.map((p) => p.beats.map((b) => b.id))).toEqual([
+      ['lobby', 'desk', 'floor-front', 'closet', 'out'],
+      ['lobby', 'stairwell', 'floor-back', 'closet', 'out'],
+    ]);
+  });
+  it('judges a beat version by the flags the route set', () => {
+    const [front, back] = paths(entry(forked()));
+    const stats = (p: typeof front) => p.beats.at(-1)!.versions.map((v) => v.choices.map((c) => c.check!.stat));
+    expect(stats(front)).toEqual([['cool', 'tech']]);
+    expect(stats(back)).toEqual([['reflex', 'body']]);
+  });
+  it('a forked job to template has no flags', () => expect(offTemplate(entry(forked()))).toEqual([]));
+  it('flags a route one beat short', () => expect(offTemplate(entry(forked({ short: true })))).toContain('via stairs: 4 rolled beats, tier 2 wants 5'));
+  it('judges an approach per path', () => {
+    const lines = offTemplate(entry(forked({ closet: 'wits' })));
+    expect(lines).toContain('via charm: SMOOTH covers every beat');
+    expect(lines.filter((l) => /^via stairs: .*covers every beat/.test(l))).toEqual([]);
+  });
+  it('a job with one path has one, and its lines carry no prefix', () => {
+    const q = entry(text({ tier: 2 }));
+    expect(paths(q).map((p) => p.via)).toEqual([null]);
+    expect(offTemplate(entry(text({ tier: 2, beats: 4 })))).toContain('4 rolled beats, tier 2 wants 5');
+  });
+  it('refuses a route that loops', () => {
+    const loop = forked().replace('→ closet\n', '→ lobby\n');
+    expect(offTemplate(entry(loop))).toContain('a route loops back to lobby');
+  });
+});

@@ -22,8 +22,12 @@ describe('stageContent', () => {
   it('copies listed packs and characters with their bases, nothing else', () => {
     expect(fs.readdirSync(path.join(out, 'scenes'))).toEqual(['p']);
     expect(fs.existsSync(path.join(out, 'scenes/p/_music/Song (Remastered).ogg'))).toBe(true);
-    expect(fs.readdirSync(path.join(out, 'characters')).sort()).toEqual(['a', 'b', 'player']);
+    expect(fs.readdirSync(path.join(out, 'characters')).sort()).toEqual(['a', 'b', 'player', 'stand']);
     expect(fs.existsSync(path.join(out, 'characters/a/a.png'))).toBe(true);
+  });
+
+  it('ships the cast palette the creator cleans takes with', () => {
+    expect(JSON.parse(fs.readFileSync(path.join(out, 'shared', 'cast-palette.json'), 'utf8')).block).toBe(2);
   });
 
   it('leaves out history folders and art sources', () => {
@@ -69,7 +73,7 @@ describe('stageContent', () => {
   it('replaces a previous stage instead of merging into it', () => {
     stageContent(root, resolveRelease(root, { version: 1, packs: ['q'], characters: ['c', 'player'], defaultPlayer: 'player' }), 'player', out);
     expect(fs.readdirSync(path.join(out, 'scenes'))).toEqual(['q']);
-    expect(fs.readdirSync(path.join(out, 'characters')).sort()).toEqual(['c', 'player']);
+    expect(fs.readdirSync(path.join(out, 'characters')).sort()).toEqual(['c', 'player', 'stand']);
   });
 });
 

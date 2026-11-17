@@ -44,7 +44,7 @@ const dotsFor = (people: MapPerson[]): HTMLElement => {
 
 export class PlaceList {
   readonly el = el('div', 'map-places');
-  private readonly head = el('div', 'map-places-head', '◆ LOWLIGHT');
+  private readonly head = el('div', 'map-places-head', 'LOWLIGHT');
   private readonly threads = el('div', 'map-threads');
   private picked: string | null = null;
   private revealing = 0;

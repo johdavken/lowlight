@@ -2,6 +2,8 @@ import { named, type Pronoun } from '../../shared/pronoun';
 import type { Crop, Fact } from '../../shared/types';
 import { AGENT_ID_RE, type AgentRecord } from './agents';
 import { BIO_MAX } from './character-profile';
+import { DEFAULT_CROP } from './character';
+import type { PersonaFigure } from './persona-figure';
 import { capAtWordBoundary, type PlaythroughPersona } from '../../shared/persona';
 import { DESCRIPTION_MAX, descriptionFromProfile, oneLine, personaLine } from './persona';
 
@@ -18,6 +20,12 @@ export interface Player {
   sprite: { file: string; crop: Crop; waist?: number; pixel?: true } | null;
   /** The character's tagline; absent under a playthrough persona (her file isn't theirs). */
   tagline?: string;
+  /** What the persona's own figure wears (`[wearing]`), over the character's wardrobe; absent without a figure. */
+  wears?: string;
+  /** Set when the sprite is the persona's own figure: no wardrobe, no faces. */
+  figure?: true;
+  /** When that figure was kept (its `made`): versions its URLs. */
+  figureMade?: string;
 }
 
 /**
@@ -90,7 +98,7 @@ export function createPlayers(deps: {
  * `DESCRIPTION_MAX`) and who's-here (the whole background) over the character's id and sprite.
  * Nothing of the character's own file (tagline, bio, facts) is kept.
  */
-export function withPersona(p: Player, persona: PlaythroughPersona): Player {
+export function withPersona(p: Player, persona: PlaythroughPersona, figure?: PersonaFigure | null): Player {
   const pronoun = persona.pronoun ?? p.pronoun;
   const head = `[who's here: ${named(oneLine(persona.name), pronoun)}]`;
   return {
@@ -99,6 +107,8 @@ export function withPersona(p: Player, persona: PlaythroughPersona): Player {
     pronoun,
     line: personaLine({ name: persona.name, description: capAtWordBoundary(oneLine(persona.background), DESCRIPTION_MAX), pronoun }),
     whosHere: persona.background ? `${head}\n${persona.background}` : head,
-    sprite: p.sprite,
+    // Their own figure (spec 2026-11-12) is drawn on the character's framing, so it keeps the character's crop.
+    sprite: figure ? { file: figure.file, crop: p.sprite?.crop ?? DEFAULT_CROP, waist: figure.meta.waist, pixel: true } : p.sprite,
+    ...(figure ? { wears: figure.meta.wears, figure: true as const, figureMade: figure.meta.made } : {}),
   };
 }

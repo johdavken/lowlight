@@ -1,0 +1,195 @@
+/* The panel frame (holo-frame.ts): an SVG behind the pane in --hf-c, the panel's own colour. hf- only. Glass (the (playtest) pick
+   over BOLD and SOFT, docs/mockups/hud-frames.html EDGE): a fine pale line with a glow, a see-through fill over a blur of
+   the room (the frame's .hf-gb, clipped to the outline), glints on the long edges, the solid accents dimmed. Picked
+   tabs and head bars stay solid; the title stands on the subtitle box's name plate. */
+:root {
+  /* Clear of `main`'s bottom-right cut (140px tall, 184px along the foot): a bottom row's extra right padding, so it
+     ends left of the cut, and the cut's height, which a column reaching the foot ends above (less its own padding). */
+  --hf-clear: 156px;
+  --hf-lift: 140px;
+}
+.hf { position: absolute; pointer-events: none; }
+.hf[hidden] { display: none; }
+.hf > svg { position: absolute; left: 0; top: 0; overflow: visible; }
+.hf { --hf-line: color-mix(in srgb, var(--hf-c) 40%, #e6eef7); }
+.hf .hf-fill { fill: color-mix(in srgb, var(--hf-c) 16%, #0d1626); fill-opacity: 0.58; }
+.hf > .hf-gb { position: absolute; left: 0; top: 0; backdrop-filter: blur(calc(6px * var(--ui-blur, 1))) brightness(0.7) saturate(1.1); }
+/* BOX GLASS (the box's settings, --box-glass 0–1 on the feed): how solid and dark the subtitle box is; 0.6 is the box as
+   it shipped (fill 0.58, the room behind at 70 %). */
+.hf.hf-box .hf-fill { fill-opacity: calc(var(--box-glass, 0.6) * 0.97); }
+.hf.hf-box > .hf-gb { backdrop-filter: blur(calc(6px * var(--ui-blur, 1))) brightness(calc(1 - var(--box-glass, 0.6) * 0.5)) saturate(1.1); }
+.hf .hf-glint { filter: drop-shadow(0 0 3px var(--hf-c)) drop-shadow(0 0 8px color-mix(in srgb, var(--hf-c) 50%, transparent)); opacity: 0.8; }
+.hf .hf-grid { fill: none; stroke: var(--hf-c); stroke-opacity: 0.16; stroke-dasharray: 2 4; }
+.hf .hf-dot { fill: var(--hf-c); fill-opacity: 0.4; }
+.hf .hf-solid, .hf .hf-speed { fill: var(--hf-c); }
+.hf .hf-solid { opacity: 0.6; }
+.hf .hf-speed { opacity: 0.5; }
+.hf .hf-edge { fill: none; stroke: var(--hf-line); stroke-width: 1; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--hf-c) 65%, transparent)); }
+.hf .hf-hatch { stroke: var(--hf-c); stroke-width: 1; opacity: 0.3; }
+/* Finer details ((playtest), from the pink sheet): an inner line inset from the edge, dots, a corner bracket. */
+.hf .hf-inner { fill: none; stroke: var(--hf-c); stroke-width: 1; stroke-opacity: 0.22; }
+.hf .hf-dot2 { fill: var(--hf-c); opacity: 0.7; }
+.hf .hf-brk { fill: none; stroke: var(--hf-line); stroke-width: 1; opacity: 0.75; }
+.hf .hf-piece { fill: color-mix(in srgb, var(--hf-c) 18%, #0d1626); fill-opacity: 0.6; stroke: var(--hf-line); stroke-width: 1; }
+.hf .hf-key { font: 600 54px/1 var(--cs-teko, 'Teko', var(--pixel)); fill: var(--hf-c); shape-rendering: auto; }
+.hf .hf-alt { font: 13px var(--pixel); letter-spacing: 0.2em; fill: var(--hf-c); opacity: 0.8; }
+/* The live trim (setState): the count under the key, the meter under the bottom edge, the lines that run. */
+.hf .hf-mtext { font: 16px var(--pixel); letter-spacing: 0.16em; fill: var(--hf-c); }
+.hf .hf-count { letter-spacing: 0.12em; }
+.hf .hf-mtrack { fill: none; stroke: var(--hf-line); stroke-opacity: 0.6; stroke-width: 1; }
+.hf .hf-mfill { opacity: 0.9; }
+.hf .hf-speedg.live .hf-speed { animation: hf-run 0.6s steps(5, end) infinite; }
+.hf .hf-speedg.live .hf-speed:nth-child(2n) { animation-duration: 0.9s; }
+.hf .hf-speedg.live .hf-speed:nth-child(3n) { animation-duration: 0.75s; }
+@keyframes hf-run { from { transform: translateX(0); } to { transform: translateX(-10px); } }
+
+/* The head's title, in the tab: dark on the panel's colour. The head is position: relative in each pane's CSS. */
+/* The title on the subtitle box's name plate (playtest), across `main`'s top edge (holo-frame.ts TOP): glass in the
+   panel's colour, a solid stripe at its left, a fine outline cut at 45° on the right, an inner line; ::before is the
+   roof line running on past the cut to a dot, with three small blocks. The pane's clip leaves room for it. */
+.hf-title {
+  --pc: var(--hf-c);
+  --pf: color-mix(in srgb, var(--pc) 22%, rgba(13, 22, 38, 0.9));
+  --pl: color-mix(in srgb, var(--pc) 45%, #e6eef7);
+  position: absolute;
+  z-index: 3;
+  left: 22px;
+  top: 0;
+  height: 28px;
+  padding: 0 44px 0 18px;
+  font: 23px/28px var(--pixel);
+  letter-spacing: 0.3em;
+  color: color-mix(in srgb, var(--pc) 70%, #fff);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--pc) 70%, transparent);
+  white-space: nowrap;
+  background:
+    linear-gradient(var(--pc), var(--pc)) 0 0 / 4px 100% no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 0 0 / calc(100% - 28px) 1px no-repeat,
+    linear-gradient(var(--pl), var(--pl)) 0 100% / 100% 1px no-repeat,
+    linear-gradient(color-mix(in srgb, var(--pc) 30%, transparent), color-mix(in srgb, var(--pc) 30%, transparent)) 8px 4px / calc(100% - 44px) 1px no-repeat,
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--pl) calc(50% - 1px) calc(50% + 0.5px), transparent calc(50% + 0.5px)) 100% 0 / 28px 28px no-repeat,
+    linear-gradient(to top right, var(--pf) 50%, transparent 50%) 100% 0 / 28px 28px no-repeat,
+    linear-gradient(var(--pf), var(--pf)) 0 0 / calc(100% - 28px) 100% no-repeat;
+}
+.hf-title::before {
+  content: '';
+  position: absolute;
+  left: calc(100% - 28px);
+  top: 0;
+  width: 78px;
+  height: 28px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--pl), var(--pl)) 0 0 / 74px 1px no-repeat,
+    linear-gradient(var(--pc), var(--pc)) 74px -1px / 3px 3px no-repeat,
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--pc) 70%, transparent) 0 6px, transparent 6px 9px) 34px 18px / 27px 4px no-repeat;
+}
+
+/* Draw on: the edge traces round in 12 steps, the fill and trim step in, then the content flickers on. */
+.hf.hf-opening .hf-edge { stroke-dasharray: 1 1; animation: hf-trace 0.24s steps(12, end) both; }
+.hf.hf-opening svg > :not(.hf-edge):not(defs) { animation: hf-step-in 0.12s steps(3, end) 0.2s backwards; }
+.hf-pane.hf-opening { animation: hf-content-in 0.24s steps(1, end) 0.32s backwards; }
+@keyframes hf-trace { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes hf-step-in { from { opacity: 0; } }
+@keyframes hf-content-in { 0% { opacity: 0; } 25% { opacity: 0.6; } 40% { opacity: 0.1; } 60% { opacity: 1; } 75% { opacity: 0.4; } }
+/* Draw off (FRAME_OUT_MS): content off, trim off, the edge untraces. */
+.hf-pane.hf-closing { animation: hf-out 0.1s steps(2, end) forwards; pointer-events: none; }
+.hf.hf-closing svg > :not(.hf-edge):not(defs) { animation: hf-out 0.1s steps(2, end) 0.08s forwards; }
+.hf.hf-closing .hf-edge { stroke-dasharray: 1 1; animation: hf-untrace 0.2s steps(10, end) 0.14s forwards; }
+@keyframes hf-out { to { opacity: 0; } }
+@keyframes hf-untrace { from { stroke-dashoffset: 0; } to { stroke-dashoffset: -1; } }
+/* ---- The inside: the frame's language at head, row, tab, button and card size (mockup INSIDE: SHAPED). Inside a
+   framed pane only. Each panel's own rules stay; these sit on top, keyed by the panels' own classes. ---- */
+
+/* Section heads: the label on a short solid bar with a cut end (hl() puts it in .hf-hl), on the head's rule. */
+.hf-pane :is(.cs-dh, .pe-sub, .cr-dh, .cr-grp, .ql-group, .lb-grp, .journal-section-title) {
+  padding-bottom: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--hf-c) 32%, transparent);
+}
+.hf-pane .cs-dh { align-items: flex-end; }
+.hf-pane :is(.hf-hl, .cs-dh > span:first-child) {
+  display: inline-block;
+  padding: 1px 22px 0 8px;
+  line-height: 1.2;
+  color: #05020a;
+  background: var(--hf-hl, var(--hf-c));
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 100%, 0 100%);
+}
+.hf-pane .planned .cs-dh > span:first-child { background: color-mix(in srgb, var(--hf-c) 30%, #6b6874); }
+/* Heads whose colour says something keep it on their bar: a crew file's state, the contract, PROMOTED. */
+.hf-pane .cr-dh, .hf-pane .cr-grp.hot { --hf-hl: var(--c); }
+.hf-pane .cr-choose .cr-dh { --hf-hl: var(--cr-terms); }
+
+/* The picked row: a tapered notch on its left and thin lines fading right, not a box with a left border. Hover
+   keeps only a tint. (Hover first: on a hovered picked row, the picked look wins.) */
+.hf-pane :is(.pe-tile, .ql-list .ql-row, .lb-row, .cr-errand):hover { border-left-color: transparent; background: color-mix(in srgb, var(--hf-c) 7%, transparent); }
+.hf-pane :is(.pe-tile.on, .ql-list .ql-row[aria-selected='true'], .lb-row.on, .cr-errand.on, .cs-deck.on, .cs-dist.here, .pause-row.on, .dk-holo .dk-row.dk-on) {
+  position: relative;
+  border-left-color: transparent;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--hf-c) 12%, transparent), transparent 80%);
+}
+.hf-pane :is(.pe-tile.on, .ql-list .ql-row[aria-selected='true'], .lb-row.on, .cr-errand.on, .cs-deck.on, .cs-dist.here, .pause-row.on, .dk-holo .dk-row.dk-on)::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  color: transparent;
+  background: var(--hf-c);
+  clip-path: polygon(0 0, 100% 8px, 100% calc(100% - 8px), 0 100%);
+}
+.hf-pane :is(.pe-tile.on, .ql-list .ql-row[aria-selected='true'], .lb-row.on, .cr-errand.on, .cs-deck.on, .cs-dist.here, .pause-row.on, .dk-holo .dk-row.dk-on)::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 0 11px;
+  pointer-events: none;
+  border-top: 1px solid var(--hf-c);
+  border-bottom: 1px solid var(--hf-c);
+  mask-image: linear-gradient(90deg, #000 30%, transparent);
+}
+
+/* Tabs: small title tabs, the right side sloped; a faint fill, not a border. The picked one keeps its own solid
+   fill (each panel's .on rule), so only the others take the faint one. CREW's places keep a vouched tint. */
+.hf-pane :is(.cs-page-tab, .pe-tab, .cr-tab, .ql-tab, .lb-tab, .cr-place) {
+  border: 0;
+  padding-right: 30px;
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 100%, 0 100%);
+}
+.hf-pane :is(.cs-page-tab, .pe-tab, .cr-tab, .lb-tab):not(.on), .hf-pane .ql-tab:not([aria-selected='true']), .hf-pane .cr-place:not(.on):not(.vouched) {
+  background: color-mix(in srgb, var(--hf-c) 9%, transparent);
+}
+.hf-pane .cr-place { padding-right: 22px; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 100%, 0 100%); }
+.hf-pane .cr-place.vouched:not(.on) { background: color-mix(in srgb, var(--cr-vouch, var(--hf-c)) 14%, transparent); }
+
+/* Buttons, cards and chips: corners cut at 45°, the cut drawn (an overlay's diagonals in the edge colour); their
+   own border and fill stay. --hf-k is the cut, --hf-ol the stroke. */
+.hf-pane :is(.cr-btn, .ql-start, .ql-goto, .ql-walk, .ql-buy, .pe-go, .cs-carry, .dk-holo .dk-send, .jd-save, .cs-chip, .ql-chip) { --hf-k: 8px; }
+.hf-pane :is(.cr-card, .cs-wallet) { --hf-k: 12px; }
+.hf-pane :is(.cr-btn, .ql-start, .ql-goto, .ql-walk, .ql-buy, .pe-go, .cs-carry, .dk-holo .dk-send, .jd-save, .cs-chip, .ql-chip, .cr-card, .cs-wallet) {
+  --hf-ol: color-mix(in srgb, var(--hf-c) 50%, transparent);
+  position: relative;
+  clip-path: polygon(var(--hf-k) 0, 100% 0, 100% calc(100% - var(--hf-k)), calc(100% - var(--hf-k)) 100%, 0 100%, 0 var(--hf-k));
+}
+/* The cut's stroke in the element's own edge colour: an outlined button's text, a crew card's state. */
+.hf-pane :is(.cr-btn.soft, .cr-btn.warn, .ql-walk, .dk-holo .dk-send, .jd-save) { --hf-ol: color-mix(in srgb, currentColor 50%, transparent); }
+.hf-pane .cr-card { --hf-ol: color-mix(in srgb, var(--c) 45%, transparent); }
+/* The clip cuts a focus ring off: drawn inside instead. */
+.hf-pane :is(.cr-btn, .ql-start, .ql-goto, .ql-walk, .ql-buy, .pe-go, .cs-carry, .dk-holo .dk-send, .jd-save, .cs-page-tab, .pe-tab, .cr-tab, .ql-tab, .lb-tab, .cr-place):focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, currentColor 70%, transparent);
+}
+/* Only the outlined ones need the cut drawn; a solid button's cut is its fill's edge. */
+.hf-pane :is(.cr-btn.soft, .cr-btn.warn, .ql-walk, .dk-holo .dk-send, .jd-save, .cs-chip, .ql-chip, .cr-card, .cs-wallet)::after {
+  --d: linear-gradient(to bottom right, transparent calc(50% - 1px), var(--hf-ol) calc(50% - 1px) calc(50% + 0.5px), transparent calc(50% + 0.5px));
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: var(--d) 0 0 / var(--hf-k) var(--hf-k) no-repeat, var(--d) 100% 100% / var(--hf-k) var(--hf-k) no-repeat;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hf.hf-opening *, .hf.hf-closing *, .hf-pane.hf-opening, .hf-pane.hf-closing, .hf .hf-speedg.live .hf-speed { animation: none !important; }
+}

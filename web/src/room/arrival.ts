@@ -1,7 +1,8 @@
 /**
  * The arrival screen (spec 2026-10-27), in the district load screen's place: you see it every time
  * you arrive. A 1600×900 stage on the game stage, the district's art left, the place right.
- * - `opening`: a new game's first room; the box takes how the scene opens, ENTER sends it with the greeting.
+ * - `opening`: a new game's first room; the box takes how the scene opens, ENTER sends it with the greeting. When the pair
+ *   has a STORY (her job's authored opening, 2026-11-11) that's the default, with CUSTOM (the box) and SUGGEST under it.
  * - `travel`: GO on the map; the box takes your line on the way, GO moves you, BACK leaves all as it was.
  * - `resume`: CONTINUE or LOAD; no box, ENTER once the room is up.
  * A page-load screen starts with no mode (no box, no ENTER) until the history says which it is.
@@ -45,6 +46,13 @@ export interface Arrival {
   close(): void;
   /** A refusal of GO, shown above the keys; GO can be pressed again and the box keeps its text. */
   notice(text: string): void;
+  /**
+   * The opening's STORY (her job's authored scene): shown as the default while the box is untouched; null takes it away.
+   * Only before ENTER.
+   */
+  setStory(story: { job: string; text: string } | null): void;
+  /** What ENTER sent: the story's job when it opened on the STORY, else null. */
+  story(): string | null;
   /** The box's text right now, trimmed ('' when empty or there's no box). */
   text(): string;
   /** ENTER (opening) or GO (travel), with text(). Opening closes after; travel stays up until ready(). */
@@ -75,6 +83,9 @@ const MODE_FALLBACK_MS = 4000;
 
 const RULE: Record<ArrivalMode | 'none', string> = { none: 'NOW ENTERING', opening: 'OPENING AT', travel: 'HEADING TO', resume: 'BACK AT' };
 const LABEL = { opening: 'HOW IT OPENS', travel: 'WHAT YOU SAY ON THE WAY' } as const;
+/** The opening's STORY: her job's own scene, the default when the pair has one. */
+const STORY_LABEL = 'STORY';
+const STORY_HINT = 'How the story opens. CUSTOM writes your own; SUGGEST deals three.';
 const HINT = {
   opening: 'Leave it empty and she greets you as she would. Typed words steer SUGGEST.',
   travel: 'Leave it empty and you just go. Typed words steer SUGGEST.',
@@ -146,6 +157,11 @@ export function createArrival(
   let drafting = false;
   /** What ENTER or GO sent: the greeting reads it, so a close that wasn't ENTER sends nothing (review I3). */
   let sentText = '';
+  /** The opening's STORY, when the pair has one, and whether the screen is showing it (else the box is CUSTOM). */
+  let story: { job: string; text: string } | null = null;
+  let onStory = false;
+  /** The story's job, when ENTER sent the STORY. */
+  let sentStory: string | null = null;
   /** A page-load screen with no mode this long after it's ready resumes, so the room is never stuck behind it. */
   let modeFallback: ReturnType<typeof setTimeout> | null = null;
   /** The resume is the fallback's, not the history's: a late history that says opening still wins. */
@@ -188,17 +204,32 @@ export function createArrival(
   hadFocus?.blur();
 
   /** The box and its parts, once the mode has one. */
-  let box: { area: HTMLTextAreaElement; label: HTMLElement; fail: HTMLElement; suggest: HTMLButtonElement | null; back: HTMLButtonElement | null } | null = null;
-  /** Focus the box, unless a panel above (the bug report) owns the keyboard (review M5). */
+  let box: {
+    wrap: HTMLElement;
+    area: HTMLTextAreaElement;
+    label: HTMLElement;
+    optional: HTMLElement;
+    hint: HTMLElement;
+    storyText: HTMLElement;
+    fail: HTMLElement;
+    suggest: HTMLButtonElement | null;
+    back: HTMLButtonElement | null;
+    /** The opening's CUSTOM / STORY switch, while it has a story. */
+    flip: HTMLButtonElement | null;
+  } | null = null;
+  /** Focus the box, unless a panel above (the bug report) owns the keyboard (review M5), or the STORY is showing. */
   const focusBox = () => {
-    if (box && !o.paused?.()) box.area.focus();
+    if (box && !onStory && !o.paused?.()) box.area.focus();
   };
 
   function buildBox(m: 'opening' | 'travel'): void {
     const wrap = el('div', 'ar-box');
     const label = el('span', '', LABEL[m]);
     const head = el('div', 'ar-label');
-    head.append(label, el('span', 'ar-optional', 'OPTIONAL'));
+    const optional = el('span', 'ar-optional', 'OPTIONAL');
+    head.append(label, optional);
+    const storyText = el('div', 'ar-story-text');
+    storyText.hidden = true;
     const area = el('textarea', 'ar-area');
     area.maxLength = m === 'opening' ? SCENE_TEXT_MAX : TRAVEL_LINE_MAX;
     area.rows = 3;
@@ -208,7 +239,8 @@ export function createArrival(
       fail.textContent = '';
     });
     const fail = el('div', 'ar-fail');
-    wrap.append(head, area, el('div', 'ar-hint', HINT[m]), fail);
+    const hint = el('div', 'ar-hint', HINT[m]);
+    wrap.append(head, storyText, area, hint, fail);
     notice.before(wrap);
     let suggest: HTMLButtonElement | null = null;
     if (o.suggest || (m === 'opening' && o.openings)) {
@@ -232,8 +264,48 @@ export function createArrival(
       });
       keys.append(back);
     }
-    box = { area, label, fail, suggest, back };
+    box = { wrap, area, label, optional, hint, storyText, fail, suggest, back, flip: null };
+    if (m === 'opening' && story) showStory(true);
     focusBox();
+  }
+
+  /** The opening's STORY (`on`) or CUSTOM, the box; a story comes with a key that flips between them. */
+  function showStory(on: boolean): void {
+    if (!box || !story || state === 'closed') return;
+    const b = box;
+    onStory = on;
+    b.wrap.classList.toggle('ar-story', on);
+    b.label.textContent = on ? STORY_LABEL : LABEL.opening;
+    b.optional.hidden = on;
+    b.storyText.textContent = story.text;
+    b.storyText.hidden = !on;
+    b.area.hidden = on;
+    b.hint.textContent = on ? STORY_HINT : HINT.opening;
+    b.fail.textContent = '';
+    if (!b.flip) {
+      b.flip = el('button', 'ar-flip');
+      b.flip.type = 'button';
+      b.flip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showStory(!onStory);
+      });
+      keys.prepend(b.flip);
+    }
+    b.flip.replaceChildren(on ? 'CUSTOM' : 'STORY', el('small', '', on ? 'C' : 'ESC'));
+    if (on) b.area.blur();
+    else focusBox();
+  }
+
+  /** Takes the STORY away (no story for the pair after all): the box as it always was. */
+  function dropStory(): void {
+    if (box?.flip) {
+      showStory(false);
+      box.flip.remove();
+      box.flip = null;
+      box.wrap.classList.remove('ar-story');
+    }
+    story = null;
+    onStory = false;
   }
 
   function showGo(): void {
@@ -318,7 +390,8 @@ export function createArrival(
     if (state === 'closed') return;
     if (mode === 'opening') {
       if (state !== 'ready') return;
-      sentText = typed();
+      sentStory = onStory && story ? story.job : null;
+      sentText = sentStory && story ? story.text : typed();
       for (const cb of senders) cb(sentText);
       close();
     } else if (mode === 'travel') {
@@ -364,6 +437,7 @@ export function createArrival(
         if (state !== 'ready') return ROOM_LOADING;
         cards?.destroy();
         cards = null;
+        if (onStory) showStory(false);
         b.area.value = text;
         send();
         return null;
@@ -371,6 +445,7 @@ export function createArrival(
       edit: (text) => {
         b.area.value = text;
         closeCards();
+        if (onStory) showStory(false);
       },
       close: closeCards,
     });
@@ -428,7 +503,8 @@ export function createArrival(
         if (!e.repeat) send();
       } else if (e.key === 'Escape') {
         e.preventDefault();
-        goBack();
+        if (mode === 'opening' && story) showStory(true);
+        else goBack();
       } else if (e.altKey && (e.key === 'g' || e.key === 'G')) {
         e.preventDefault();
         suggestNow();
@@ -446,11 +522,13 @@ export function createArrival(
     e.stopImmediatePropagation();
     e.preventDefault();
     if (e.repeat) return;
-    if (e.key === 'Escape') return goBack();
+    if (e.key === 'Escape') return mode === 'opening' && story && !onStory ? showStory(true) : goBack();
     if (e.altKey && (e.key === 'g' || e.key === 'G')) return suggestNow();
     if (!plain) return;
     if (mode === 'opening' || mode === 'travel') {
       if (e.key === 'Enter') send();
+      // The STORY's keys: C writes your own (CUSTOM).
+      else if (mode === 'opening' && onStory && (e.key === 'c' || e.key === 'C')) showStory(false);
       return;
     }
     if (mode === 'resume' && (e.key === 'Enter' || e.key === ' ') && state === 'ready') close();
@@ -569,6 +647,16 @@ export function createArrival(
       if (box?.suggest) box.suggest.disabled = drafting;
       focusBox();
     },
+    setStory(s) {
+      if (state === 'closed' || sentText || sentStory) return;
+      if (!s) return dropStory();
+      // Only while the box is untouched: what's typed, or a story already up, stays.
+      const fresh = !story && !(box?.area.value.trim());
+      story = s;
+      // Behind what's typed, it waits on its key (STORY).
+      if (box && mode === 'opening') showStory(fresh || onStory);
+    },
+    story: () => sentStory,
     text,
     onSend(cb) {
       senders.push(cb);

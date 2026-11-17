@@ -527,7 +527,7 @@ describe('CityMap listed (the game map)', () => {
     expect(open()).toEqual(['a', 'b']);
     click($('.rail', thread('a')));
     expect(open()).toEqual(['b']);
-    expect(cues).toEqual(['move', 'move']);
+    expect(cues).toEqual(['fold', 'fold']);
   });
 
   it('picking from a pin unfolds its thread; folding it keeps the card and marks the name', () => {

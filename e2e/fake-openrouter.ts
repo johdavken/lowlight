@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { PNG } from 'pngjs';
 import type { ServerResponse } from 'node:http';
 import { BAD_KEY, DIRECT, SECOND, STUB_OR_LOG_PORT } from './fixtures';
 
@@ -29,6 +30,20 @@ const LONG_STORY = [
  * Plain prose exactly `n` characters long (LONG_STORY repeated and cut), with its `*actions*`
  * kept balanced: a cut that leaves an action open turns that last `*` into a space.
  */
+let takePng: string | null = null;
+/** A 1024×1536 take: a dark grey figure (grey like a jacket the old grey backdrop cut through) on #00FF00. */
+function fakeTake(): string {
+  if (takePng) return takePng;
+  const p = new PNG({ width: 1024, height: 1536 });
+  for (let y = 0; y < 1536; y++)
+    for (let x = 0; x < 1024; x++) {
+      const figure = x >= 400 && x < 624 && y >= 90 && y < 1450;
+      p.data.set(figure ? [98, 97, 99, 255] : [0, 255, 0, 255], (y * 1024 + x) * 4);
+    }
+  takePng = PNG.sync.write(p).toString('base64');
+  return takePng;
+}
+
 export function proseOfLength(n: number): string {
   let s = LONG_STORY;
   while (s.length < n) s += ` ${LONG_STORY}`;
@@ -57,6 +72,9 @@ export const E2E_ENCOUNTERS = [
 
 /** The fake SUGGEST line (e2e "suggest:"). */
 export const E2E_SUGGESTION = '*I tap the counter twice.* "E2E suggested line."';
+/** A reply with actions and speech, for `act and speak`. */
+export const ACT_AND_SPEAK = "*I'm on the daybed, taping paper to the wall.*\n\nYou knocked twice. Good.\n\n*I climb down.*\n\nIntake's shut Sundays.";
+
 /** SUGGEST's PUSH and TURN lines, after the PLAIN one (E2E_SUGGESTION) when the prompt asks for three angles. */
 export const E2E_SUGGESTION_PUSH = '*I lean in.* "E2E pushed line."';
 export const E2E_SUGGESTION_TURN = '*I glance at the door.* "E2E turned line."';
@@ -89,6 +107,8 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         if (req.headers.authorization === `Bearer ${BAD_KEY}`) return void res.writeHead(401, { 'Content-Type': 'application/json' }).end('{}');
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data: { limit_remaining: 9.5 } }));
       }
+      // The 1P creator's take (character creator spec 2026-11-14): a dark figure on the flat green backdrop.
+      if (req.url === '/api/v1/images') return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ data: [{ b64_json: fakeTake() }], usage: { cost: 0.19 } }));
       if (req.url === '/api/v1/models') {
         const listed = [...DIRECT.models, { id: 'google/no-tools', name: 'Google: No Tools', supported_parameters: ['temperature'] }];
         const data = listed.map((m) => ({ ...m, pricing: { prompt: '0.0000004', completion: '0.0000016' }, context_length: 131072 }));
@@ -236,6 +256,9 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
         return next();
       }
       if (sent.includes('tell me a long story')) return sse(res, [choice({ content: LONG_STORY }), choice({}, 'stop')]);
+      // `act and speak`: a reply as models write them, actions in asterisks and what she says between (the JOB column
+      // tells it the traditional way, job-column.ts talkParts).
+      if (sent.includes('act and speak')) return sse(res, [choice({ content: ACT_AND_SPEAK }), choice({}, 'stop')]);
       // Each reply is numbered, so two takes differ; the journal line she was sent is echoed, so a
       // test can see the player's edit reach her next turn.
       const system = body.messages?.[0]?.role === 'system' ? (body.messages[0].content ?? '') : '';

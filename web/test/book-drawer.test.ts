@@ -47,7 +47,11 @@ const press = (key: string, o: KeyboardEventInit = {}, on: EventTarget = window)
 };
 const message = (o: Partial<ChatMessage>): ChatMessage => ({ id: 'm', role: 'agent', text: 'x', toolLines: [], ts: 0, status: 'ok', ...o });
 
+/** Reduced motion unless a test says otherwise: the drawer goes at once, no draw-off left running between tests. */
+let reducedMotion = true;
 beforeEach(() => {
+  reducedMotion = true;
+  window.matchMedia = ((q: string) => ({ matches: reducedMotion, media: q })) as unknown as typeof window.matchMedia;
   document.body.innerHTML = '<div id="game"></div><textarea id="box"></textarea>';
   host = document.getElementById('game')!;
   box = document.getElementById('box') as HTMLTextAreaElement;
@@ -59,6 +63,40 @@ beforeEach(() => {
   book.load(PAGE);
 });
 afterEach(() => book.close());
+
+describe('the drawer drawing off', () => {
+  beforeEach(() => {
+    reducedMotion = false;
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    // Nothing left drawing off (or catching Esc) for the next test: the outer afterEach closes at once.
+    reducedMotion = true;
+    vi.runOnlyPendingTimers();
+    vi.useRealTimers();
+  });
+  const root = () => document.querySelector<HTMLElement>('.lb-root')!;
+  it('has no frame: it goes at once, and its head line with it', () => {
+    book.open();
+    expect(root().hidden).toBe(false);
+    expect(document.querySelector('.lb-layer .hf')).toBeNull();
+    expect(root().querySelector('.lb-head .lb-title')!.textContent).toBe('BOOK');
+    expect(root().querySelector('.lb-head .lb-tabs .lb-tab.tp-tab')).not.toBeNull();
+    expect(root().querySelector('.lb-keys')!.textContent).toContain('ESC');
+    book.close();
+    expect(book.isOpen).toBe(false);
+    expect(root().hidden).toBe(true);
+    expect(document.querySelector('.lb-layer > svg.hv-lead path')).toBeNull();
+  });
+  it('opened again meanwhile, it stays up', () => {
+    book.open();
+    book.close();
+    book.open();
+    vi.advanceTimersByTime(1000);
+    expect(root().hidden).toBe(false);
+    expect(book.isOpen).toBe(true);
+  });
+});
 
 describe('bookLines', () => {
   it('skips what the player wasn’t reading, newest first', () => {
@@ -237,8 +275,10 @@ describe('the lore drawer', () => {
   });
 
   describe('sections', () => {
-    const cats = () => [...host.querySelectorAll('.lb-cat')].map((c) => c.textContent);
-    const cat = (text: string) => [...host.querySelectorAll<HTMLElement>('.lb-cat')].find((c) => c.textContent === text)!;
+    /** A fold's own label: a shut category's line goes on to name its sections (`.lb-cat-in`). */
+    const name = (c: Element) => c.firstChild!.textContent;
+    const cats = () => [...host.querySelectorAll('.lb-cat')].map(name);
+    const cat = (text: string) => [...host.querySelectorAll<HTMLElement>('.lb-cat')].find((c) => name(c) === text)!;
     beforeEach(async () => {
       book.load({
         ...PAGE,
@@ -256,37 +296,51 @@ describe('the lore drawer', () => {
       tab('all').click();
     });
 
-    it('folds a category\'s sections inside it, its loose entries first', () => {
+    it('a shut category names its sections on its own line; opened, it is an index: its loose entries first, then every section open', () => {
       expect(cats()).toEqual(['CITY 4', 'PLACES 1']);
+      expect(cat('CITY 4').querySelector('.lb-cat-in')!.textContent).toBe('CORPS 1 · DISTRICTS 2');
+      // No sections: nothing to name.
+      expect(cat('PLACES 1').querySelector('.lb-cat-in')).toBeNull();
       cat('CITY 4').click();
+      expect(cat('CITY 4').querySelector('.lb-cat-in')).toBeNull();
       expect(cats()).toEqual(['CITY 4', 'CORPS 1', 'DISTRICTS 2', 'PLACES 1']);
-      expect(rows()).toEqual(['A Stray']);
+      expect(rows()).toEqual(['A Stray', 'Sentinel Defense Group', 'Iron Reach', 'Karasu']);
+      // Each run of entries is a block of two columns (.lb-in), the loose ones too.
+      expect([...host.querySelectorAll('.lb-in')].map((n) => n.querySelectorAll('.lb-row').length)).toEqual([1, 1, 2]);
+      // A section still folds on its own.
       cat('DISTRICTS 2').click();
-      expect(rows()).toEqual(['A Stray', 'Iron Reach', 'Karasu']);
+      expect(rows()).toEqual(['A Stray', 'Sentinel Defense Group']);
     });
 
-    it('keeps a section open through its category closing', () => {
+    it('opening a category again opens its sections again', () => {
       cat('CITY 4').click();
       cat('CORPS 1').click();
+      expect(rows()).toEqual(['A Stray', 'Iron Reach', 'Karasu']);
       cat('CITY 4').click();
       expect(rows()).toEqual([]);
       cat('CITY 4').click();
-      expect(rows()).toEqual(['A Stray', 'Sentinel Defense Group']);
+      expect(rows()).toEqual(['A Stray', 'Sentinel Defense Group', 'Iron Reach', 'Karasu']);
     });
 
     it('walks sections with Alt+arrows, as it does categories', () => {
       const down = () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', altKey: true, bubbles: true }));
+      // The first stop is CITY: it opens, its sections with it.
       down();
+      expect(cat('CITY 4').getAttribute('aria-expanded')).toBe('true');
+      expect(cat('CORPS 1').getAttribute('aria-expanded')).toBe('true');
+      // Then its loose entry, opened.
       down();
-      expect(rows()).toEqual(['A Stray']);
+      expect(host.querySelector('.lb-row.on .lb-row-title')!.textContent).toBe('A Stray');
+      // Then the first section's head: open already, so it is walked past, not shut.
       down();
       expect(cat('CORPS 1').getAttribute('aria-expanded')).toBe('true');
-      expect(rows()).toEqual(['A Stray', 'Sentinel Defense Group']);
+      down();
+      expect(host.querySelector('.lb-row.on .lb-row-title')!.textContent).toBe('Sentinel Defense Group');
+      expect(rows()).toEqual(['A Stray', 'Sentinel Defense Group', 'Iron Reach', 'Karasu']);
     });
 
     it('names the section under a search result, and nothing under a row in its fold', () => {
       cat('CITY 4').click();
-      cat('DISTRICTS 2').click();
       expect(row('Iron Reach')!.querySelector('.lb-row-sub')).toBeNull();
       find().value = 'reach';
       find().dispatchEvent(new Event('input', { bubbles: true }));

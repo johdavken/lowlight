@@ -28,3 +28,18 @@ describe('a run with the hand', () => {
     expect(r?.calls).toEqual([{ beat: 'b1', choice: 'c1', card: 'favour', again: false, at: 2 }]);
   });
 });
+
+describe("a pick's change on the clocks (SO FAR on the table, 2026-11-15)", () => {
+  const roll = { stat: 'COOL', dice: 3, position: 'open', faces: [5, 2, 1], keep: 'high', kind: 'cost', pass: true };
+  it('parseRun keeps take and alarm on a pick, and a pick without them', () => {
+    const picks = [{ beat: 'b1', choice: 'c1', roll, take: 1, alarm: 1 }, { beat: 'b2', choice: 'c2', roll, take: -1 }, { beat: 'b3', choice: 'c3', alarm: -1 }, { beat: 'b4', choice: 'c4', roll }, { beat: 'b5', choice: 'c5' }];
+    const r = run({ picks });
+    expect(r?.picks).toEqual(picks);
+    expect(r?.picks[3]).not.toHaveProperty('take');
+    expect(r?.picks[4]).not.toHaveProperty('alarm');
+  });
+  it('a change that is not a whole number is not a run', () => {
+    expect(run({ picks: [{ beat: 'b1', choice: 'c1', take: 0.5 }] })).toBeNull();
+    expect(run({ picks: [{ beat: 'b1', choice: 'c1', alarm: 'one' }] })).toBeNull();
+  });
+});

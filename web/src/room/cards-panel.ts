@@ -1,10 +1,12 @@
 /**
  * The three-card modal (spec 2026-10-09 encounter cards §2), shared by ◆ DRAW's events and SUGGEST's
  * lines: a title over a panel of cards, ▲▼ to choose, Enter (or a click) to play one, R to deal again,
- * Esc to cancel, plus any keys of the use's own. It wears SET THE SCENE's look (scene.css) in the room.
+ * Esc to cancel, plus any keys of the use's own. It stands on the HUD trace (cards-panel.css, 2026-11-15).
  * Text goes in through textContent.
  */
-import '../landing/scene.css';
+import '../ui/trace-panel.css';
+import './cards-panel.css';
+import { setHints } from '../landing/hint-line';
 
 export interface CardsCopy {
   title: string;
@@ -52,6 +54,13 @@ export interface CardsPanelOptions<T> {
   extraKey?(key: string, item: T): boolean;
 }
 
+/** The panel's sounds: the three dealt, one played, R. Set once by the page (every use of the panel sounds the same). */
+export type CardsCue = 'deal' | 'pick' | 'redeal';
+let cardsCue: (n: CardsCue) => void = () => {};
+export function setCardsCue(fn: (n: CardsCue) => void): void {
+  cardsCue = fn;
+}
+
 export function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: string): HTMLElementTagNameMap[K] {
   const n = document.createElement(tag);
   n.className = cls;
@@ -91,12 +100,16 @@ export class CardsPanel<T> {
     if (o.note) panel.append(el('div', 'sp-note', o.note));
     panel.append(this.body, this.refusal);
     if (o.copy.foot) panel.append(el('div', 'ep-foot', o.copy.foot));
-    this.el.append(title, panel, el('div', 'ep-hints', o.copy.hints));
+    const hints = el('div', 'ep-hints');
+    setHints(hints, o.copy.hints);
+    this.el.append(title, panel, hints);
     host.append(this.el);
     this.el.addEventListener('mousemove', () => (this.mouseMoved = true), { once: true });
     this.options = o.cached;
-    if (this.options) this.render();
-    else this.load();
+    if (this.options) {
+      cardsCue('deal');
+      this.render();
+    } else this.load();
   }
 
   /** The cards on screen: none while a load runs or after one failed. */
@@ -115,8 +128,8 @@ export class CardsPanel<T> {
       this.render();
     } else if (k === 'Enter') {
       const shown = this.shown;
-      if (shown) this.o.onPlay(shown[this.index]!);
-    } else if (k === 'r' || k === 'R') this.load();
+      if (shown) this.play(shown[this.index]!);
+    } else if (k === 'r' || k === 'R') this.again();
     else {
       const shown = this.shown;
       return shown && this.o.extraKey ? this.o.extraKey(k, shown[this.index]!) : false;
@@ -135,6 +148,18 @@ export class CardsPanel<T> {
     this.el.remove();
   }
 
+  private play(item: T): void {
+    cardsCue('pick');
+    this.o.onPlay(item);
+  }
+
+  /** R: the cards on the table are swept up; the new three sound as they land. */
+  private again(): void {
+    if (this.loading) return;
+    if (this.options) cardsCue('redeal');
+    this.load();
+  }
+
   private load(): void {
     // One deal at a time: R while one runs would pay for a second.
     if (this.loading) return;
@@ -150,6 +175,7 @@ export class CardsPanel<T> {
         this.options = options;
         this.index = 0;
         this.o.onCache(options);
+        cardsCue('deal');
         this.render();
       },
       (err: unknown) => {
@@ -183,7 +209,7 @@ export class CardsPanel<T> {
         else text.append(v.text);
         card.append(el('span', 'sp-n', String(i + 1)), title, text);
         if (v.extra) card.append(v.extra);
-        card.onclick = () => this.o.onPlay(item);
+        card.onclick = () => this.play(item);
         card.onmouseenter = () => {
           if (!this.mouseMoved || this.index === i) return;
           this.index = i;
@@ -192,10 +218,10 @@ export class CardsPanel<T> {
         this.body.append(card);
       });
     const row = el('div', 'sp-options');
-    const redraw = el('button', 'sp-reroll', C.redraw);
+    const redraw = el('button', 'sp-reroll tp-key soft sm', C.redraw);
     redraw.type = 'button';
-    redraw.onclick = () => this.load();
-    const cancel = el('button', 'sp-cancel', C.cancel);
+    redraw.onclick = () => this.again();
+    const cancel = el('button', 'sp-cancel tp-key soft sm', C.cancel);
     cancel.type = 'button';
     cancel.onclick = () => this.o.onCancel();
     row.append(redraw, cancel);

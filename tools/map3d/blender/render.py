@@ -18,6 +18,16 @@ JOBS = json.load(open(os.path.join(OUT, 'jobs.json')))
 W, H = 4608.0, 3072.0
 ELEV = math.radians(R['elevDeg'])
 STRETCH = 1 / math.sin(ELEV)
+# The city's reflection on the water (render.json `reflection`): how much of the mirrored city shows through the ripples
+# (0: none), how far it is drawn out down the screen, the depth at which its light has halved, and the depth past which
+# nothing reflects (a raised highway's lamps would land far out in the bay).
+_RF = R.get('reflection') or {}
+MIRROR_FLAT = 0.001
+MIRROR = _RF.get('strength', 0.0); MIRROR_STRETCH = _RF.get('stretch', 2.0); MIRROR_HALF = _RF.get('half', 90.0); MIRROR_CUT = _RF.get('cut', 150.0)
+# Land and walls a little lighter than near-black, so the moon shows the city's form (render.json `landLift`, 1: as drawn).
+LAND_LIFT = R.get('landLift', 1.0)
+# Contact shadows between blocks (render.json `occlusion`: its reach in map px, 0: off).
+OCCLUSION = R.get('occlusion', 0)
 
 def note(msg):
     print('NOTE ' + msg, flush=True)
@@ -58,6 +68,10 @@ def hexcol(h, a=1.0):
     r, g, b = (int(h[i:i + 2], 16) / 255 for i in (0, 2, 4))
     lin = lambda c: c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
     return (lin(r), lin(g), lin(b), a)
+
+def lift(h):
+    c = hexcol(h); k = LAND_LIFT
+    return (c[0] * k, c[1] * k, c[2] * k * (1 + (k - 1) * 0.15), 1.0)
 
 _mats = {}
 def mat(name, base='#0b0910', rough=0.8, emit=None, strength=0.0, metal=0.0):
@@ -123,8 +137,8 @@ def building_material():
     mp = N.new('ShaderNodeMapping'); mp.inputs['Scale'].default_value = (0.12, 0.12, 0.02); L.new(geo.outputs['Position'], mp.inputs['Vector'])
     nz = N.new('ShaderNodeTexNoise'); nz.inputs['Scale'].default_value = 1.0; nz.inputs['Detail'].default_value = 6; L.new(mp.outputs[0], nz.inputs['Vector'])
     ramp = N.new('ShaderNodeValToRGB'); L.new(nz.outputs['Fac'], ramp.inputs['Fac'])
-    ramp.color_ramp.elements[0].position = 0.35; ramp.color_ramp.elements[0].color = hexcol('#100c14')
-    ramp.color_ramp.elements[1].position = 0.75; ramp.color_ramp.elements[1].color = hexcol('#2e262c')
+    ramp.color_ramp.elements[0].position = 0.35; ramp.color_ramp.elements[0].color = lift('#100c14')
+    ramp.color_ramp.elements[1].position = 0.75; ramp.color_ramp.elements[1].color = lift('#2e262c')
     st = N.new('ShaderNodeAttribute'); st.attribute_name = 'style'
     bc = N.new('ShaderNodeCombineXYZ'); L.new(M('ADD', pos.outputs['X'], pos.outputs['Y']), bc.inputs[0]); L.new(pos.outputs['Z'], bc.inputs[1])
     brick = N.new('ShaderNodeTexBrick'); L.new(bc.outputs[0], brick.inputs['Vector'])
@@ -191,6 +205,7 @@ dark = mat('dark', '#0e0b12', 0.85)
 
 def wet_ground():
     m = mat('ground', '#07060a', 0.35)
+    m.node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value = lift('#07060a')
     gn = m.node_tree
     tx = gn.nodes.new('ShaderNodeTexNoise'); tx.inputs['Scale'].default_value = 0.04; tx.inputs['Detail'].default_value = 3
     rr = gn.nodes.new('ShaderNodeValToRGB'); gn.links.new(tx.outputs['Fac'], rr.inputs['Fac'])
@@ -388,7 +403,7 @@ for (kind, color, di, supply), items in groups.items():
     elif kind == 'container':
         # Dockside's containers: painted steel in the stack's colour, a faint glow of it so the yard's patchwork reads
         # in the dark between floodlights.
-        m = mat(f'container{color}', color or '#6a6e78', 0.6, color or '#6a6e78', 0.08, metal=0.3)
+        m = mat(f'container{color}', color or '#6a6e78', 0.6, color or '#6a6e78', 0.048, metal=0.3)
     elif kind in ('clarifier', 'clarifier-mid', 'clarifier-edge'):
         m = {'clarifier': BAY, 'clarifier-mid': BAY_MID, 'clarifier-edge': BAY_EDGE}[kind]
     else:
@@ -419,7 +434,7 @@ SMAT = {'walkway': mat('walkway', '#2e2430', 0.5, metal=0.3), 'rail': metal, 'so
         # Sludge drying beds: dark, wet, brown-black; wet sheen but rough enough for the tile rule.
         'sludge': mat('sludge', '#120c08', 0.3),
         # Dockside's gantry cranes: red-painted steel, a faint red glow so they read against the night as painted.
-        'crane': mat('crane', '#7a1c14', 0.5, '#ff3a1e', 0.35, metal=0.4)}
+        'crane': mat('crane', '#7a1c14', 0.5, '#ff3a1e', 0.21, metal=0.4)}
 sgroups = {}
 for s in G['strips']:
     key = (s['material'], s.get('color') if s['material'] == 'street-light' else None, didx(s))
@@ -517,6 +532,8 @@ try:
     sc.eevee.ray_tracing_options.trace_max_roughness = 0.1
 except Exception as e:
     note(f'ray tracing roughness: {e}')
+if OCCLUSION > 0:
+    sc.eevee.use_fast_gi = True; sc.eevee.fast_gi_method = 'AMBIENT_OCCLUSION_ONLY'; sc.eevee.fast_gi_distance = OCCLUSION
 sc.view_settings.view_transform = 'AgX'
 try:
     sc.view_settings.look = R['grade']['look']
@@ -546,6 +563,78 @@ LL.new(cur, bcn.inputs['Image']); LL.new(bcn.outputs[0], outn.inputs[0])
 sc.compositing_node_group = ng; sc.render.use_compositing = True
 sc.render.image_settings.file_format = 'PNG'
 
+# ── the city's reflection: a copy of everything that glows, laid flat on the water toward the camera. Geometry, not a
+# screen-space effect, so tiles meet; the land hides it everywhere but the water. ──
+MIRRORS = []
+if MIRROR > 0:
+    import numpy as np
+    S = MIRROR_STRETCH
+    # Laid flat on the water, not hung under it: each point slides toward the camera by its height (times the stretch),
+    # which from this camera is where its reflection lies, and sits a hair above the water, under the land's slabs. The
+    # water stays opaque (see-through water tripled every render).
+    FLAT = Matrix(((1, 0, 0, 0), (0, 1, -S / math.tan(ELEV), 0), (0, 0, -MIRROR_FLAT, -0.3), (0, 0, 0, 1)))
+    # Only what stands near water is mirrored (a copy of each mesh with the rest cut away): a second whole city under
+    # the map made every tile's render three times as long, and inland it is never seen.
+    NC = 16; ncols, nrows = int(W // NC) + 1, int(H // NC) + 1
+    wet = np.ones((nrows, ncols), dtype=bool)
+    def _dry(poly):
+        xs = [q[0] for q in poly]; ys = [q[1] for q in poly]
+        for cy in range(max(0, int(min(ys) // NC)), min(nrows - 1, int(max(ys) // NC)) + 1):
+            y = (cy + 0.5) * NC; hits = []
+            for i in range(len(poly)):
+                (x1, y1), (x2, y2) = poly[i], poly[i - 1]
+                if (y1 > y) != (y2 > y): hits.append(x1 + (y - y1) * (x2 - x1) / (y2 - y1))
+            hits.sort()
+            for k in range(0, len(hits) - 1, 2):
+                wet[cy, max(0, int(hits[k] // NC)):min(ncols, int(hits[k + 1] // NC) + 1)] = False
+    for poly in G.get('land') or []: _dry(poly)
+    _fill = G.get('landFill')
+    if _fill:
+        fs = _fill['step']
+        for row, c0, c1 in _fill['runs']:
+            wet[int(row * fs // NC):int((row + 1) * fs // NC) + 1, int(c0 * fs // NC):int((c1 + 1) * fs // NC) + 1] = False
+    # Within reach of water: a reflection lies up to the cut's height, stretched, from what casts it.
+    reach = int((MIRROR_CUT * S + 60) // NC) + 1
+    near = wet.copy()
+    for _ in range(reach):
+        grown = near.copy()
+        grown[1:, :] |= near[:-1, :]; grown[:-1, :] |= near[1:, :]; grown[:, 1:] |= near[:, :-1]; grown[:, :-1] |= near[:, 1:]
+        near = grown
+    def _by_water(co):
+        cx = int((co.x + W / 2) // NC); cy = int((H / 2 - co.y / STRETCH) // NC)
+        return 0 <= cx < ncols and 0 <= cy < nrows and near[cy, cx]
+    _dg = bpy.context.evaluated_depsgraph_get()
+    for ob in list(sc.collection.objects):
+        if ob.name == 'buildings' or ob.name.startswith(('props-', 'strips-', 'curves-')):
+            # A curve (neon, cable) as the mesh of its tube: a curve flattened by its points keeps a round tube, which
+            # stood up through the land.
+            src = ob.data if ob.type == 'MESH' else bpy.data.meshes.new_from_object(ob.evaluated_get(_dg))
+            if True:
+                bm = bmesh.new(); bm.from_mesh(src)
+                bmesh.ops.delete(bm, geom=[v for v in bm.verts if not _by_water(v.co)], context='VERTS')
+                if not bm.verts:
+                    bm.free()
+                    if ob.type != 'MESH': bpy.data.meshes.remove(src)
+                    continue
+                data = bpy.data.meshes.new('mirror-' + ob.name); bm.to_mesh(data); bm.free()
+                for m in src.materials: data.materials.append(m)
+                if ob.type != 'MESH': bpy.data.meshes.remove(src)
+                # Where each point and face really stood: the windows are drawn from position and facing, and flat on the
+                # water every face looks up.
+                stood = np.empty(len(data.vertices) * 3, dtype=np.float32); data.vertices.foreach_get('co', stood)
+                data.attributes.new('opos', 'FLOAT_VECTOR', 'POINT').data.foreach_set('vector', stood)
+                nr = np.empty(len(data.polygons) * 3, dtype=np.float32); data.polygons.foreach_get('normal', nr)
+                data.attributes.new('onrm', 'FLOAT_VECTOR', 'FACE').data.foreach_set('vector', nr)
+            # In the data, not the object: an object's transform can't hold a shear.
+            data.transform(FLAT)
+            mo = bpy.data.objects.new('mirror-' + ob.name, data)
+            mo.visible_shadow = False
+            for k in ob.keys(): mo[k] = ob[k]
+            mo['mirror'] = 1.0
+            mo.hide_render = ob.hide_render
+            sc.collection.objects.link(mo); MIRRORS.append(mo)
+            if ob in EMERGENCY_OBJECTS: EMERGENCY_OBJECTS.append(mo)
+            else: MASK_HIDDEN.append(mo)
 # ── blackouts: every emission × its supply's level (phase 2). With `power` the view layer's (1 lit, 0 dark), the
 # object's `own` / `emergency` flags and a building face's `backup` share:
 #   level = max(power + own·(1 − power) + emergency·(1 − 2·power), backup)
@@ -573,7 +662,19 @@ _pw = _attr('VIEW_LAYER', 'power')
 _own = _math('MULTIPLY', _attr('OBJECT', 'own'), _math('SUBTRACT', 1.0, _pw))
 _em = _math('MULTIPLY', _attr('OBJECT', 'emergency'), _math('SUBTRACT', 1.0, _math('MULTIPLY', _pw, 2.0)))
 _base = _math('ADD', _math('ADD', _pw, _own), _em)
-_l.new(_math('MAXIMUM', _base, _attr('GEOMETRY', 'backup')), _out.inputs['Level'])
+_lvl = _math('MAXIMUM', _base, _attr('GEOMETRY', 'backup'))
+if MIRROR > 0:
+    # On a mirror (the object's `mirror` is 1) light dies with the height of what cast it: half at MIRROR_HALF down the
+    # stretched reflection, so a tower's fades out from the shore; nothing higher than the cut reflects.
+    _g = _n.new('ShaderNodeNewGeometry'); _sz = _n.new('ShaderNodeSeparateXYZ'); _l.new(_g.outputs['Position'], _sz.inputs[0])
+    _h = _math('MAXIMUM', _math('DIVIDE', _math('SUBTRACT', -0.3, _sz.outputs['Z']), MIRROR_FLAT), 0.0)
+    _fall = _math('POWER', 2.0, _math('DIVIDE', _math('MULTIPLY', _h, -MIRROR_STRETCH), MIRROR_HALF))
+    _fade = _math('DIVIDE', _math('SUBTRACT', MIRROR_CUT, _h), 20.0); _fade.node.use_clamp = True
+    _dim = _math('MULTIPLY', _fall, _fade)
+    # 1 off a mirror, the fade on one.
+    _mir = _attr('OBJECT', 'mirror')
+    _lvl = _math('MULTIPLY', _lvl, _math('ADD', _math('SUBTRACT', 1.0, _mir), _math('MULTIPLY', _mir, _dim)))
+_l.new(_lvl, _out.inputs['Level'])
 for m in bpy.data.materials:
     if not m.node_tree or m.name in MOONLIT:
         continue
@@ -590,6 +691,69 @@ for m in bpy.data.materials:
             mul.inputs[0].default_value = es.default_value
         nt.links.new(level.outputs['Level'], mul.inputs[1])
         nt.links.new(mul.outputs[0], es)
+# The mirrored city gives only its light: each mirror wears a copy of its material that is the emission (already wired
+# to its supply and the depth fade) where it glows and nothing where it doesn't, so unlit walls don't show as dark shapes
+# in the bay.
+_glow = {}
+def glow_only(m):
+    if m.name in _glow:
+        return _glow[m.name]
+    b = next((n for n in m.node_tree.nodes if n.type == 'BSDF_PRINCIPLED'), None) if m.node_tree else None
+    es = b.inputs['Emission Strength'] if b else None
+    src = es.links[0].from_node if es is not None and es.is_linked else None
+    lit = src is not None and (src.inputs[0].is_linked or src.inputs[0].default_value > 0)
+    if not lit:
+        _glow[m.name] = None
+        return None
+    c = m.copy(); c.name = 'glow-' + m.name; nt = c.node_tree
+    cb = next(n for n in nt.nodes if n.type == 'BSDF_PRINCIPLED')
+    # The material reads where a point stood and how its face faced from the mirror mesh's own record of them.
+    for gn in [n for n in nt.nodes if n.type == 'NEW_GEOMETRY']:
+        for out_name, attr_name in (('Position', 'opos'), ('Normal', 'onrm')):
+            links = list(gn.outputs[out_name].links)
+            if not links: continue
+            at = nt.nodes.new('ShaderNodeAttribute'); at.attribute_type = 'GEOMETRY'; at.attribute_name = attr_name
+            for l in links:
+                to = l.to_socket; nt.links.remove(l); nt.links.new(at.outputs['Vector'], to)
+    em = nt.nodes.new('ShaderNodeEmission'); tr = nt.nodes.new('ShaderNodeBsdfTransparent'); mix = nt.nodes.new('ShaderNodeMixShader')
+    ec = cb.inputs['Emission Color']
+    if ec.is_linked: nt.links.new(ec.links[0].from_socket, em.inputs['Color'])
+    else: em.inputs['Color'].default_value = ec.default_value
+    strength = cb.inputs['Emission Strength'].links[0].from_socket
+    nt.links.new(strength, em.inputs['Strength'])
+    # Where it glows it is drawn, where it doesn't it isn't there (dithered, so it stays in the fast opaque pipeline:
+    # blended, every render took five times as long).
+    # Only what outshines the water: a faint glow (wet asphalt, a dim wall) drawn at all would darken the bay.
+    fac = nt.nodes.new('ShaderNodeMapRange'); fac.inputs['From Min'].default_value = 0.6; fac.inputs['From Max'].default_value = 1.4
+    # Broken into wind-drawn bands, long across and short up the screen, as ripples break a reflection.
+    geo = nt.nodes.new('ShaderNodeNewGeometry'); mp2 = nt.nodes.new('ShaderNodeMapping'); mp2.inputs['Scale'].default_value = (0.02, 0.28, 0.02)
+    nt.links.new(geo.outputs['Position'], mp2.inputs['Vector'])
+    nz2 = nt.nodes.new('ShaderNodeTexNoise'); nz2.inputs['Detail'].default_value = 3; nt.links.new(mp2.outputs[0], nz2.inputs['Vector'])
+    band = nt.nodes.new('ShaderNodeMapRange'); band.inputs['From Min'].default_value = 0.44; band.inputs['From Max'].default_value = 0.56
+    band.inputs['To Min'].default_value = 0.0; band.inputs['To Max'].default_value = MIRROR
+    nt.links.new(nz2.outputs['Fac'], band.inputs['Value'])
+    show = nt.nodes.new('ShaderNodeMath'); show.operation = 'MULTIPLY'
+    nt.links.new(strength, fac.inputs['Value']); nt.links.new(fac.outputs['Result'], show.inputs[0]); nt.links.new(band.outputs['Result'], show.inputs[1])
+    nt.links.new(show.outputs[0], mix.inputs['Fac'])
+    nt.links.new(tr.outputs[0], mix.inputs[1]); nt.links.new(em.outputs[0], mix.inputs[2])
+    outm = next(n for n in nt.nodes if n.type == 'OUTPUT_MATERIAL'); nt.links.new(mix.outputs[0], outm.inputs['Surface'])
+    c.surface_render_method = 'DITHERED'
+    _glow[m.name] = c
+    return c
+_gone = []
+for mo in MIRRORS:
+    keep = False
+    for slot in mo.material_slots:
+        g = glow_only(slot.material) if slot.material else None
+        slot.link = 'OBJECT'; slot.material = g
+        keep = keep or g is not None
+    if not keep:
+        # Nothing on it glows: it is taken out altogether (left in a pass's list, the pass would show it again).
+        for lst in (EMERGENCY_OBJECTS, MASK_HIDDEN):
+            if mo in lst: lst.remove(mo)
+        _gone.append(mo)
+for mo in _gone:
+    MIRRORS.remove(mo); bpy.data.objects.remove(mo)
 # The mask: flat emission of max(face 'district', object 'district') × 8/255 on red, nothing else.
 mask_mat = bpy.data.materials.new('district-mask'); mn = mask_mat.node_tree.nodes; ml = mask_mat.node_tree.links
 mn.remove(mn['Principled BSDF'])

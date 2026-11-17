@@ -101,5 +101,9 @@
     }
   ],
   "stats": { "body": 5, "reflex": 3, "tech": 6, "cool": 7, "wits": 8, "edge": 4 },
-  "deck": "old-karasu"
+  "deck": "old-karasu",
+  "face": {
+    "x": 0.571,
+    "y": 0.115
+  }
 }

@@ -15,7 +15,7 @@ const PAGE_ROWS = 10;
 
 export type BandTab = 'her' | 'all' | 'keys';
 export type SortCol = 'name' | 'context' | 'price';
-type ListRow = { kind: 'current' | 'reset' | 'pick' | 'recent'; id: string | null; label: string; price: string; why?: string; via?: boolean };
+type ListRow = { kind: 'current' | 'reset' | 'pick' | 'recent'; id: string | null; label: string; price: string; why?: string; via?: 'anthropic' | 'nanogpt' };
 
 const price = (n: number | null) => (n === null ? '—' : `$${n.toFixed(2)}`);
 /** "$in / $out" per million tokens; "—" when neither is known; FREE when both are nothing. */
@@ -39,7 +39,7 @@ export function vendorOf(id: string): string {
 const VENDOR_NAMES: Record<string, string> = { 'z-ai': 'Z.AI', mistralai: 'MISTRAL', moonshotai: 'MOONSHOT', 'x-ai': 'XAI', 'bytedance-seed': 'BYTEDANCE', 'aion-labs': 'AION' };
 export const vendorName = (v: string): string => VENDOR_NAMES[v] ?? v.toUpperCase();
 
-const row = (kind: ListRow['kind'], c: ModelChoice): ListRow => ({ kind, id: c.id, label: c.label, price: priceText(c), ...(c.why ? { why: c.why } : {}), ...(c.via ? { via: true } : {}) });
+const row = (kind: ListRow['kind'], c: ModelChoice): ListRow => ({ kind, id: c.id, label: c.label, price: priceText(c), ...(c.why ? { why: c.why } : {}), ...(c.via ? { via: c.via } : {}) });
 
 /** FOR HER's rows in order: current, reset (when she's off her default), picks, recent; each model once. */
 export function modelRows(d: { current: ModelChoice; def: ModelChoice; picks: ModelChoice[]; recent: ModelChoice[]; pronoun?: Pronoun }): ListRow[] {
@@ -431,6 +431,7 @@ export class ModelBand {
       if (info.state !== 'ok') dot.dataset.state = info.state;
       this.summary.append(dot, ` ${L.providers[p]} `);
       if (info.state === 'no-credit') this.summary.append(el('span', 'mp-warn', L.noCreditShort), ' ');
+      else if (info.plan?.active) this.summary.append(`${L.planLine(info.plan.weekLeft)} `);
       else if (info.credit !== null) this.summary.append(`$${info.credit.toFixed(2)} `);
     }
   }
@@ -452,7 +453,7 @@ export class ModelBand {
       const n = el('div', `mp-row mp-${r.kind}${i === this.herIndex ? ' on' : ''}`);
       n.append(el('span', 'mp-label', r.label), el('span', 'mp-price', r.price));
       if (r.why) n.append(el('span', 'mp-why', r.why));
-      if (r.via) n.append(el('span', 'mp-via', L.via));
+      if (r.via) n.append(el('span', 'mp-via', L.via[r.via]));
       n.onclick = () => this.o.onPick(r.id);
       col.append(n);
     });
@@ -520,7 +521,7 @@ export class ModelBand {
       const n = el('div', `mp-row${m.id === this.current.id ? ' mp-current' : ''}${i === this.allIndex ? ' on' : ''}`);
       n.dataset.id = m.id;
       n.append(el('span', 'mp-label', m.label), el('span', 'mp-mem', contextText(m.context)), el('span', 'mp-price', priceText(m)));
-      if (m.via) n.append(el('span', 'mp-via', L.via));
+      if (m.via) n.append(el('span', 'mp-via', L.via[m.via]));
       n.onclick = () => this.o.onPick(m.id);
       return n;
     });
@@ -537,7 +538,7 @@ export class ModelBand {
 
   private side(p: Provider): { why: string; fieldLabel: string; getKey: string; href: string } {
     const L = COPY.link;
-    return p === 'anthropic' ? L.anthropic : { why: L.why, fieldLabel: L.fieldLabel, getKey: L.getKey, href: 'https://openrouter.ai/keys' };
+    return p === 'anthropic' ? L.anthropic : p === 'nanogpt' ? L.nanogpt : { why: L.why, fieldLabel: L.fieldLabel, getKey: L.getKey, href: 'https://openrouter.ai/keys' };
   }
 
   private renderKeys(): void {
@@ -552,7 +553,7 @@ export class ModelBand {
       if (!info.linked) n.classList.add('mp-off');
       const dot = el('span', 'mp-dot', '●');
       if (info.state !== 'ok') dot.dataset.state = info.state;
-      n.append(dot, el('span', 'mp-line', info.linked ? L.linkLine(info.last4, info.credit, p) : L.providers[p]), el('span', 'mp-sp'));
+      n.append(dot, el('span', 'mp-line', info.linked ? L.linkLine(info.last4, info.credit, p, info.plan) : L.providers[p]), el('span', 'mp-sp'));
       if (this.keyOpen !== p) {
         if (info.linked) {
           n.append(button('mp-change', L.changeKey, () => this.openKey(p)));
@@ -639,7 +640,7 @@ export class ModelBand {
       if ('error' in r) {
         this.pending = false;
         input.disabled = false;
-        this.say((provider === 'anthropic' ? L.anthropic.errors : L.errors)[r.error], 'error');
+        this.say((provider === 'anthropic' ? L.anthropic.errors : provider === 'nanogpt' ? L.nanogpt.errors : L.errors)[r.error], 'error');
         input.focus();
         return;
       }

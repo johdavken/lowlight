@@ -1,10 +1,10 @@
 /**
  * Click away to close (spec 2026-10-15): a pointerdown outside a panel closes it, as the map's
- * backdrop closes the map. Pointerdowns on the top bar, SYS, the MODEL menu, the bug report or the
+ * backdrop closes the map. Pointerdowns on the top bar, SYS, PAUSED (it can stand over a panel with SYS open), the MODEL menu, the bug report or the
  * dev panel are left to them (the bar's buttons already switch screens; the report sits over
  * everything; the dev panel is used alongside the room's panels).
  */
-const LEFT_ALONE = '.hud-bar, .sys-menu, .model-menu, .bug-report, .devpanel';
+const LEFT_ALONE = '.hud-bar, .sys-menu, .pause-menu, .model-menu, .bug-report, .devpanel';
 
 /** Calls `away` on a pointerdown outside `inside` (capture phase, on the document). Returns the remover. */
 export function onClickAway(inside: (n: Node) => boolean, away: () => void): () => void {

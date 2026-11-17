@@ -24,6 +24,6 @@ A dealt cost shows one of these until the GM's own line arrives, and keeps it if
 - The next door opens onto less than you hoped.
 
 # take
-- Some of what you carry slips away into the rain.
-- A seam gives, and part of what you carried is gone before you notice.
+- What you'd only just got your hands on is gone again.
+- A seam gives, and part of the haul is gone before you notice.
 - You leave a piece of it behind; there's no going back for it.

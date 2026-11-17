@@ -28,9 +28,12 @@ const BACK_HOLD_MS = 60;
 /** Recruits the table turns over at once go one after another. */
 const AUTO_STAGGER_MS = 160;
 
-export function mountHand(host: HTMLElement, o: { onLift(id: string | null): void; onTap?(id: string): void; cue?(name: TableCue): void }): { show(groups: HandGroup[], o?: { dealIn?: boolean }): void; lifted(): string | null; press(): string | null; drop(): void; root: HTMLElement } {
+export function mountHand(host: HTMLElement, o: { onLift(id: string | null): void; onTap?(id: string): void; /** A tap on any card, before the hand acts on it, whatever its state: true takes the tap (an armed post taking a recruit). */ onPick?(id: string): boolean; cue?(name: TableCue): void }): { show(groups: HandGroup[], o?: { dealIn?: boolean }): void; lifted(): string | null; press(): string | null; drop(): void; root: HTMLElement } {
   const root = el('div', 'tb-hand');
   host.append(root);
+  // A phone's hand, by the same test as the table's shell (shell.ts open: the stage), so a hand drawn before the table
+  // opens (a new job's deal) lays out as the table will (review).
+  const phone = () => isPhone((host.closest('#game') as HTMLElement | null) ?? host);
   let lifted: string | null = null;
   // An ON A ROLL ability lifted beside a call (ability pass spec §1).
   let press: string | null = null;
@@ -75,6 +78,7 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
     if (s.id === lifted || s.id === press) b.classList.add('lifted');
     if (s.tap) b.classList.add('tb-after');
     b.addEventListener('click', () => {
+      if (o.onPick?.(s.id)) return;
       if (s.state !== 'up' && s.state !== 'lifted') return;
       if (s.tap) return o.onTap?.(s.id);
       tapCard(s.id);
@@ -95,6 +99,20 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
     box.dataset.stack = id;
     const front = cards[0];
     const abilities = cards.filter((c) => c.glyph);
+    // The HUD table (playtest 2026-11-11): no turning over. Their abilities stand beside the card as small cards, two
+    // spots one over the other (a recruit slots at most two, shared/crew.ts ABILITY_SLOTS), an outline where there's none.
+    // Each lifts, presses beside a call, taps when ready and shows its hover panel as the turned card did.
+    if (!phone()) {
+      box.classList.add('minis');
+      box.append(slotEl(front, ''));
+      const col = el('div', 'tb-abil');
+      for (let k = 0; k < Math.max(2, abilities.length); k++) {
+        const a = abilities[k];
+        col.append(a ? slotEl(a, ` tb-mini${a.off ? ' off' : ''}`) : el('span', 'tb-mini-empty'));
+      }
+      box.append(col);
+      return box;
+    }
     // Nothing to turn over to: the recruit's card alone.
     if (abilities.length === 0) {
       box.append(slotEl(front, ''));
@@ -181,8 +199,8 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
       const g = el('button', `tb-tab t-${a.glyph!.timing}${a.tap ? ' ready' : ''}${a.state === 'down' ? ' used' : ''}${a.off ? ' off' : ''}${(shown.get(id) ?? front.id) === a.id ? ' on' : ''}`);
       g.type = 'button';
       g.dataset.id = a.id;
-      g.title = a.glyph!.label.toUpperCase();
-      g.setAttribute('aria-label', g.title);
+      // Its words are the card panel's (card-info.ts): no tag of its own.
+      g.setAttribute('aria-label', a.glyph!.label.toUpperCase());
       g.disabled = down;
       g.append(el('i', 'tb-tab-dot'), document.createTextNode(tabWords(a.glyph!.kind, a.glyph!.label)));
       g.addEventListener('click', () => {
@@ -225,7 +243,10 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
       pending.delete(id);
       turning.delete(id);
     }
-    root.classList.toggle('scroll-x', isPhone(host));
+    root.classList.toggle('scroll-x', phone());
+    // Turning is a phone's: stacks drawn now set their own (a switch from a phone leaves none behind to fire, review).
+    turners.clear();
+    stackCards.clear();
     // Six cards in the row: a recruit and their abilities count as one.
     root.classList.toggle('tuck', last.flatMap((g) => g.slots).filter((s) => !s.stack || s.id === s.stack).length >= 6);
     root.replaceChildren(
@@ -245,9 +266,11 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
           // A text pocket still says why it's locked (a picture card carries it as its chip).
           if (s.state === 'locked' && g.group === 'POCKETS' && typeof s.face === 'string') b.append(el('span', 'tb-lock', 'SPEC 3'));
           if (dealIn) {
-            const card = b.matches('.tb-slot') ? b : b.querySelector<HTMLElement>('.tb-slot:not(.tb-cardback)')!;
-            card.classList.add('dealt-down');
-            card.style.setProperty('--i', String(i));
+            // A recruit's minis are dealt with their card.
+            for (const card of b.matches('.tb-slot') ? [b] : [...b.querySelectorAll<HTMLElement>('.tb-slot:not(.tb-cardback)')]) {
+              card.classList.add('dealt-down');
+              card.style.setProperty('--i', String(i));
+            }
             // A face-up card sounds as it turns over; a face-down or empty one stays quiet.
             if (s.state !== 'down' && s.state !== 'empty') flips.push(setTimeout(() => o.cue?.('flip'), i * DEAL_STAGGER_MS + FLIP_AT_MS));
             i++;
@@ -281,7 +304,8 @@ export function mountHand(host: HTMLElement, o: { onLift(id: string | null): voi
       const can = (id: string | null) => slots.some((s) => s.id === id && (s.state === 'up' || s.state === 'lifted'));
       if (lifted && !can(lifted)) lifted = null;
       if (press && (!lifted || !can(press))) press = null;
-      const moves = autoTurns(slots);
+      // The HUD shows abilities beside the card, lit when ready: nothing to turn over.
+      const moves = phone() ? autoTurns(slots) : [];
       // An ability that's played (or gone) turns its recruit back over; a recruit down shows their back. One the table
       // turns back itself (moves) shows the side it's leaving first.
       for (const [rid, cid] of shown) {

@@ -25,7 +25,7 @@ export function herCopy(p: Pronoun) {
           case 'bad-answer':
             return `${cap(f.hers)} model's answer didn't fit. Try again, or pick another model from ${f.hers} MODEL menu.`;
           case 'busy':
-            return `OpenRouter couldn't reach ${f.hers} model just now. Try again in a moment.`;
+            return `The provider couldn't reach ${f.hers} model just now. Try again in a moment.`;
           case 'refused':
             return `${cap(f.hers)} model turned the request down. Pick another model from ${f.hers} MODEL menu.`;
           default:
@@ -40,7 +40,8 @@ export function herCopy(p: Pronoun) {
     diceLastDie: `The loser opens the next round. Lose your last die and the game is ${OWN[p]}.`,
     diceTruth: (won: boolean) => (won ? ` · ask ${f.her} one` : ` · ${f.she} ask${f.s} you one`),
     diceBack: `[ENTER] BACK TO ${f.her.toUpperCase()}`,
-    changeModel: (label: string) => `${label} — change ${f.hers} model`,
+    /** SYS → MODEL's foot hint. */
+    changeModel: `The model that plays ${f.her}. Click or Enter to pick another.`,
   };
 }
 

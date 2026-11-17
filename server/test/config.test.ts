@@ -51,3 +51,11 @@ describe('loadConfig allowed hosts', () => {
     expect(loadConfig(T).allowedHosts).toEqual([]);
   });
 });
+
+describe('loadConfig cast palette (character creator spec 2026-11-14)', () => {
+  it('CAST_PALETTE_FILE names it; unset, shared/cast-palette.json from where the server runs', () => {
+    const env = { NIX_ROOM_TOKEN: 't'.repeat(20) };
+    expect(loadConfig({ ...env, CAST_PALETTE_FILE: '/content/shared/cast-palette.json' }).castPaletteFile).toBe('/content/shared/cast-palette.json');
+    expect(loadConfig(env).castPaletteFile).toBe('./shared/cast-palette.json');
+  });
+});

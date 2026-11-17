@@ -101,7 +101,7 @@ describe('EncounterPanel', () => {
       ['timeout', 'His model took too long to answer. Try again, or pick a faster model from his MODEL menu.'],
       ['too-long', "His model's answer didn't fit. Try again, or pick another model from his MODEL menu."],
       ['bad-answer', "His model's answer didn't fit. Try again, or pick another model from his MODEL menu."],
-      ['busy', "OpenRouter couldn't reach his model just now. Try again in a moment."],
+      ['busy', "The provider couldn't reach his model just now. Try again in a moment."],
       ['refused', 'His model turned the request down. Pick another model from his MODEL menu.'],
       ['unknown', 'Something went wrong dealing the events. Try again.'],
       ['plain', 'Something went wrong dealing the events. Try again.'],

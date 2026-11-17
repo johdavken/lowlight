@@ -3,20 +3,27 @@
 import type { Match } from '../room/identity';
 import type { LinkState } from '../../../shared/types';
 import type { PlaythroughPersona } from '../../../shared/persona';
-import { layoutTiles, orderTiles, RANDOM, stepVertical, type Layout } from './district-groups';
+import { layoutTiles, NEW_PERSON, orderTiles, personOf, personTile, stepVertical, YOURS, type Layout } from './district-groups';
 
-export type Phase = 'p1' | 'you' | 'p2' | 'model' | 'ready';
+/** `make`: the creator is open over 1P (character creator spec 2026-11-14). */
+export type Phase = 'p1' | 'you' | 'make' | 'p2' | 'model' | 'ready';
 
 /** A select step's grid: 1P (who you play) or 2P (your contact). */
 export type Step = 'p1' | 'p2';
 
-/** One step's tiles (`?` first) and where each sits (district-groups). */
+/** One step's tiles (1P: + first) and where each sits (district-groups). */
 export interface Grid {
   tiles: string[];
   layout: Layout;
 }
 
-export { RANDOM };
+export { NEW_PERSON, personOf, personTile, YOURS };
+
+/** A made person as the 1P grid lists them (newest first). */
+export interface PersonEntry {
+  id: string;
+  name: string;
+}
 
 export interface RosterEntry {
   id: string;
@@ -30,15 +37,19 @@ export interface RosterEntry {
   playable?: boolean;
   /** Found in play: never on the 2P grid (select leads spec §1). */
   discover?: boolean;
+  /** The made person's stand-in (character creator spec 2026-11-14): on neither grid. */
+  standIn?: boolean;
 }
 
 export interface FlowState {
   phase: Phase;
   cursor: { p1: number; p2: number }; // tile indexes
-  player: string | null; // locked ids (never RANDOM)
+  player: string | null; // a locked lead's id (null for a made person)
   ai: string | null;
   /** Who you are on the locked player (the YOU step); null: play as them. */
   persona: PlaythroughPersona | null;
+  /** The made person locked at 1P (their library id); null for a lead. */
+  person: string | null;
 }
 
 export type LockResult = 'ok' | 'refused' | 'noop' | 'dial';
@@ -46,9 +57,9 @@ export type LockResult = 'ok' | 'refused' | 'noop' | 'dial';
 export interface Flow {
   /** Each step's grid from the one roster (select leads spec §4): `cursor.p1` indexes the 1P grid, `cursor.p2` the 2P one. */
   readonly grids: Readonly<Record<Step, Grid>>;
-  /** The grid that's up: 1P in `p1` and `you`, 2P in `p2`, `model` and `ready`. */
+  /** The grid that's up: 1P in `p1`, `you` and `make`, 2P in `p2`, `model` and `ready`. */
   shown(): Step;
-  /** The shown grid's tiles, `?` first. */
+  /** The shown grid's tiles. */
   readonly tiles: string[];
   /** Where each of the shown grid's tiles sits, and the group labels (district-groups). */
   readonly layout: Layout;
@@ -66,6 +77,12 @@ export interface Flow {
   chooseModel(): void;
   /** The YOU step's choice (null: play as them): on to the AI pick. Only in `you`. */
   chooseYou(persona: PlaythroughPersona | null): void;
+  /** The creator kept someone (already in setPeople): on to the AI pick with them. Only in `make`. */
+  chooseMade(personId: string): void;
+  /** Your people changed (made, kept, deleted): the 1P grid again, the cursor on the same tile if it's still there. */
+  setPeople(people: PersonEntry[]): void;
+  /** EDIT on a made person: the creator opens from their tile (Esc goes back to it). Only in `p1`. */
+  openMake(): void;
   /** The tile id under the given cursor. */
   idAt(which: 'p1' | 'p2'): string;
   /** Refreshes connected/link for known ids from a fresh fetch. Never reorders tiles or moves cursors/locks. */
@@ -78,22 +95,26 @@ function buildTiles(entries: RosterEntry[]): string[] {
   return orderTiles(entries.map((e) => ({ id: e.id, name: e.name, connected: e.connected === true, group: e.group ?? null })));
 }
 
-/** A step's grid (select leads spec §4): 1P the playable entries (all of them when none is), 2P all but the discover ones. */
-function gridFor(entries: RosterEntry[], step: Step, columns: number): Grid {
-  const anyPlayable = entries.some((e) => e.playable === true);
-  const on = entries.filter((e) => (step === 'p1' ? !anyPlayable || e.playable === true : e.discover !== true));
-  const tiles = buildTiles(on);
-  const groupById = new Map(on.map((e) => [e.id, e.group ?? null]));
+/**
+ * A step's grid (select leads spec §4): 1P + and your people, then the playable entries (all of them when none is);
+ * 2P all but the discover ones. The stand-in is on neither.
+ */
+function gridFor(entries: RosterEntry[], step: Step, columns: number, people: PersonEntry[]): Grid {
+  const listed = entries.filter((e) => e.standIn !== true);
+  const anyPlayable = listed.some((e) => e.playable === true);
+  const on = listed.filter((e) => (step === 'p1' ? !anyPlayable || e.playable === true : e.discover !== true));
+  const yours = step === 'p1' ? people.map((p) => personTile(p.id)) : [];
+  const tiles = [...(step === 'p1' ? [NEW_PERSON] : []), ...yours, ...buildTiles(on)];
+  const groupById = new Map<string, string | null>([...on.map((e) => [e.id, e.group ?? null] as const), ...yours.map((t) => [t, YOURS] as const)]);
   return { tiles, layout: layoutTiles(tiles, (id) => groupById.get(id) ?? null, columns) };
 }
 
-export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?: () => number }): Flow {
+export function createFlow(entries: RosterEntry[], opts: { columns: number; people?: PersonEntry[] }): Flow {
   const columns = opts.columns;
-  const rng = opts.rng ?? Math.random;
   let byId = new Map(entries.map((e) => [e.id, e]));
 
   /** Each step's grid (district-groups): ↑/↓ follow its layout, and the grid draws the shown one. */
-  const grids: Record<Step, Grid> = { p1: gridFor(entries, 'p1', columns), p2: gridFor(entries, 'p2', columns) };
+  const grids: Record<Step, Grid> = { p1: gridFor(entries, 'p1', columns, opts.people ?? []), p2: gridFor(entries, 'p2', columns, []) };
 
   let state: FlowState = {
     phase: 'p1',
@@ -101,6 +122,7 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
     player: null,
     ai: null,
     persona: null,
+    person: null,
   };
   // Whether the p2 cursor should jump to wherever p1 locks (true when begin()
   // found no remembered AI, so p2 defaulted to the player's tile).
@@ -114,13 +136,7 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   }
 
   function shown(): Step {
-    return state.phase === 'p1' || state.phase === 'you' ? 'p1' : 'p2';
-  }
-
-  function resolveRandom(candidateIds: string[]): string | null {
-    if (candidateIds.length === 0) return null;
-    const i = Math.floor(rng() * candidateIds.length);
-    return candidateIds[Math.min(i, candidateIds.length - 1)];
+    return state.phase === 'p1' || state.phase === 'you' || state.phase === 'make' ? 'p1' : 'p2';
   }
 
   function liveCursorKey(): 'p1' | 'p2' | null {
@@ -153,35 +169,35 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
       player: null,
       ai: null,
       persona: null,
+      person: null,
     };
   }
 
   function lockP1(): LockResult {
-    const tiles = grids.p1.tiles;
     const idx = state.cursor.p1;
-    const tileId = tiles[idx];
-    let resolvedId: string;
-    let resolvedIdx: number;
-    if (tileId === RANDOM) {
-      const candidates = tiles.filter((t) => t !== RANDOM);
-      const picked = resolveRandom(candidates);
-      if (picked === null) return 'refused';
-      resolvedId = picked;
-      resolvedIdx = tiles.indexOf(picked);
-    } else {
-      resolvedId = tileId;
-      resolvedIdx = idx;
+    const tileId = grids.p1.tiles[idx];
+    if (tileId === undefined) return 'refused';
+    // + opens the creator; a made person goes straight to 2P (who they are is settled).
+    if (tileId === NEW_PERSON) {
+      state = { ...state, phase: 'make', player: null, persona: null, person: null };
+      return 'ok';
+    }
+    const person = personOf(tileId);
+    if (person !== null) {
+      state = { ...state, phase: 'p2', player: null, persona: null, person };
+      return 'ok';
     }
     // p2's cursor moves to the locked player's tile only when begin() found
     // no remembered AI (see p2FollowsPlayerLock); otherwise it stays where the remembered AI
     // placed it.
-    const p2 = p2FollowsPlayerLock ? (indexIn('p2', resolvedId) ?? 0) : state.cursor.p2;
+    const p2 = p2FollowsPlayerLock ? (indexIn('p2', tileId) ?? 0) : state.cursor.p2;
     state = {
       ...state,
       phase: 'you',
-      player: resolvedId,
+      player: tileId,
       persona: null,
-      cursor: { p1: resolvedIdx, p2 },
+      person: null,
+      cursor: { p1: idx, p2 },
     };
     return 'ok';
   }
@@ -196,29 +212,12 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   }
 
   function lockP2(): LockResult {
-    const tiles = grids.p2.tiles;
     const idx = state.cursor.p2;
-    const tileId = tiles[idx];
-    let resolvedId: string;
-    let resolvedIdx: number;
-    if (tileId === RANDOM) {
-      const candidates = tiles.filter((t) => t !== RANDOM && canBeAi(byId.get(t)!));
-      const picked = resolveRandom(candidates);
-      if (picked === null) return 'refused';
-      resolvedId = picked;
-      resolvedIdx = tiles.indexOf(picked);
-    } else {
-      const entry = byId.get(tileId);
-      if (!entry || !canBeAi(entry)) return 'refused';
-      resolvedId = tileId;
-      resolvedIdx = idx;
-    }
-    state = {
-      ...state,
-      ai: resolvedId,
-      cursor: { ...state.cursor, p2: resolvedIdx },
-    };
-    afterAiLocked(resolvedId);
+    const tileId = grids.p2.tiles[idx];
+    const entry = tileId === undefined ? undefined : byId.get(tileId);
+    if (!entry || !canBeAi(entry)) return 'refused';
+    state = { ...state, ai: entry.id };
+    afterAiLocked(entry.id);
     return 'ok';
   }
 
@@ -231,13 +230,32 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
     state = { ...state, phase: 'p2', persona };
   }
 
+  function chooseMade(personId: string): void {
+    if (state.phase !== 'make') return;
+    const at = indexIn('p1', personTile(personId));
+    if (at === null) return;
+    state = { ...state, phase: 'p2', person: personId, cursor: { ...state.cursor, p1: at } };
+  }
+
+  function openMake(): void {
+    if (state.phase === 'p1') state = { ...state, phase: 'make', player: null, persona: null, person: null };
+  }
+
+  function setPeople(people: PersonEntry[]): void {
+    const was = grids.p1.tiles[state.cursor.p1];
+    grids.p1 = gridFor(entries, 'p1', columns, people);
+    const at = was === undefined ? null : indexIn('p1', was);
+    state = { ...state, cursor: { ...state.cursor, p1: at ?? Math.min(state.cursor.p1, grids.p1.tiles.length - 1) } };
+  }
+
   function begin(remembered: Match | null): void {
     placeBegin(remembered);
   }
 
   function resume(match: Match): void {
     const playerEntry = byId.get(match.player);
-    if (!playerEntry) {
+    // A made person's save plays on the stand-in, which isn't on the grid to lock: start over.
+    if (!playerEntry || playerEntry.standIn === true) {
       placeBegin(null);
       return;
     }
@@ -255,25 +273,26 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
         player: match.player,
         ai: null,
         persona: null,
+        person: null,
       };
       return;
     }
     const cursor = { p1: playerLoc, p2: aiOnGrid };
     // Her model is a setting the server keeps: a linked direct contact is ready as she is.
     const phase: Phase = aiEntry.backend === 'direct' && aiEntry.link === 'no-link' ? 'model' : 'ready';
-    state = { phase, cursor, player: match.player, ai: match.ai, persona: null };
+    state = { phase, cursor, player: match.player, ai: match.ai, persona: null, person: null };
   }
 
   function move(dir: 'left' | 'right' | 'up' | 'down'): void {
-    // The YOU and model steps' panels read their own keys.
-    if (state.phase === 'you' || state.phase === 'model' || state.phase === 'ready') return;
+    // The YOU, creator and model steps' panels read their own keys.
+    if (state.phase === 'you' || state.phase === 'make' || state.phase === 'model' || state.phase === 'ready') return;
     const key = liveCursorKey();
     if (!key) return;
     moveCursor(key, dir);
   }
 
   function hover(index: number): void {
-    if (state.phase === 'you' || state.phase === 'model' || state.phase === 'ready') return;
+    if (state.phase === 'you' || state.phase === 'make' || state.phase === 'model' || state.phase === 'ready') return;
     const key = liveCursorKey();
     if (!key) return;
     if (index < 0 || index >= grids[key].tiles.length) return;
@@ -283,13 +302,16 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
   function lock(): LockResult {
     if (state.phase === 'p1') return lockP1();
     if (state.phase === 'p2') return lockP2();
-    if (state.phase === 'you' || state.phase === 'model') return 'noop';
+    if (state.phase === 'you' || state.phase === 'make' || state.phase === 'model') return 'noop';
     return 'dial';
   }
 
   function back(): void {
-    if (state.phase === 'you') {
-      state = { ...state, phase: 'p1', player: null, persona: null };
+    if (state.phase === 'you' || state.phase === 'make') {
+      state = { ...state, phase: 'p1', player: null, persona: null, person: null };
+    } else if (state.phase === 'p2' && state.person !== null) {
+      // A made person had no YOU step: back to their tile.
+      state = { ...state, phase: 'p1', ai: null, person: null };
     } else if (state.phase === 'p2') {
       state = { ...state, phase: 'you', ai: null };
     } else if (state.phase === 'model') {
@@ -345,6 +367,9 @@ export function createFlow(entries: RosterEntry[], opts: { columns: number; rng?
     back,
     chooseModel,
     chooseYou,
+    chooseMade,
+    setPeople,
+    openMake,
     idAt,
     updateLinks,
   };

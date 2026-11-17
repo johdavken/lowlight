@@ -13,56 +13,61 @@ after: rue_one and trust>=mid
 trust: 1 / 2
 pitch: Nine thousand sol of a dead man's rent has a new owner. She wants to see the paper.
 posted-by: Rue
+text: The landlord sold your father's arrears on, to something called Graymark Receivables, and you've got the notice. You want Soren at the hab to look at it. Don't put the details on the Relay. Say it's your father's debt and you need him to come. Don't thank him in advance.
 brief: Her father's arrears were sold on to something called Graymark Receivables. Follow the paper down to a stall on the deck market and see who's holding it.
 pay: 360-440
 loot: what's in the broker's cash box
 ---
 
 # notice if cover=cracked
+title: The Notice
 
-*She doesn't let you past the top of the stair. There's a printed notice taped to the door, and she pulls it off and holds it out at arm's length.*
+*You get as far as the top of the stair and no further; the door's half shut and stays that way. Taped to the green steel at eye height is a printed notice, landlord's letterhead and a barcode, the tape already lifting in the damp. It comes away with a sound like a plaster pulled off, and is held out to you at arm's length.*
 
 *"You," she says. "I know what you are, so don't. The landlord's sold my father's arrears. Nine thousand, to something called Graymark Receivables, off a stall on the deck market. Is that you people? I'm going to find out either way. You can come and help me do it, and I'll listen to you lie the whole way down."*
 
 view rue: This follows from the night at Kestrel's yard, when you heard him call the branch. You know what he is. You came to him because he's the only way to see inside it, and you hate that. He doesn't get to be kind to you. Ask him one thing at a time.
 
 - come: Say you'll go. → going
-- ask: Ask what she'd do with the paper. → asked
+- ask: Ask what she'd do with the paper. → asked [set hold=said]
 
 # notice if stamp=told
+title: The Notice
 
-*She lets you in. There's a printed notice on the crate, weighted with a dead cart, and the run sheet's folded beside it.*
+*The door's open. On the crate under the clamp lamp there's a printed notice, landlord's letterhead and a barcode, weighted with a dead cart whose contacts have gone green, and the run sheet folded beside it along its old creases.*
 
 *"You told me what that stamp was," she says, "so here's the next one. The landlord's sold my father's arrears. Nine thousand, to something called Graymark Receivables, off a stall on the deck market. Is that you people?"*
 
 view rue: This follows from Kestrel's yard: you asked for a sheet, he got it, and he told you the truth about the stamp when he didn't have to. You don't like how much that counted. You still think he might own your debt.
 
 - come: Say you don't know, and you'll find out. → going
-- ask: Ask what she'd do with the paper. → asked
+- ask: Ask what she'd do with the paper. → asked [set hold=said]
 
 # notice
+title: The Notice
 
-*She lets you in. There's a printed notice on the crate, weighted with a dead cart.*
+*The door's open. On the crate under the clamp lamp there's a printed notice, landlord's letterhead and a barcode, weighted with a dead cart whose contacts have gone green.*
 
 *"Audit," she says. "That's what you told me. Here's another one for you to audit. The landlord's sold my father's arrears. Nine thousand, to something called Graymark Receivables, off a stall on the deck market. Does Kestrel do debt now?"*
 
 view rue: This follows from Kestrel's yard: he got you the sheet and told you the stamp was an audit mark, and you didn't believe him. You're giving him another chance to lie to you, and you'll keep count.
 
 - come: Say you'll find out who they are. → going
-- ask: Ask what she'd do with the paper. → asked
+- ask: Ask what she'd do with the paper. → asked [set hold=said]
 
 ## going
-*She's already got the jacket on. "Not with me," she says. "On your ear. I'll take the stall's lacquer and you take the stall."*
+*The jacket's already on, its stripe catching the heater's glow. "Not with me," she says. "On your ear. I'll take the stall's lacquer and you take the stall."*
 → market
 
 ## asked
-*"Hold it," she says. "That's all. Nobody's ever let me see one thing I owe." She picks up her deck. "On your ear. I'll take the stall's lacquer and you take the stall."*
+*"Hold it," she says. "That's all. Nobody's ever let me see one thing I owe." The monitors wake green on the plank. "On your ear. I'll take the stall's lacquer and you take the stall."*
 → market
 
 # market
+title: The Market
 room: spine/deck-market
 
-*The deck market runs between the pylons on a floor of welded plate, a mile of tarps and wet light with the Spine going over like weather. Graymark Receivables is a card taped to a stall that sells phone screens. The man behind it has a good coat and doesn't sell any phone screens.*
+*The deck market runs between the pylons on a floor of welded plate, a mile of patched tarps and wet bulbs and red paper lanterns sagging on their strings, the Spine going over like weather. Graymark Receivables is a business card taped to a stall that sells phone screens: cracked ones, refurbished ones, ones still in somebody else's case. The man behind it has a good coat, camel, bone dry, and doesn't sell any phone screens.*
 
 view rue: You're on the line, and in the stall's little grid, which is badly kept. This is the same trouble as the notice on your door. You're quick when you're scared, so you talk more than you mean to.
 
@@ -70,33 +75,37 @@ view rue: You're on the line, and in the stall's little grid, which is badly kep
 - tail: Lose yourself in the crowd and follow his runner down the row. → placed / marked [check reflex 55]
 
 ## placed
-*Two people bring him envelopes and nobody takes one away. Behind the tarp there's a shipping box with a door in it, and that's where the paper goes.*
+*Two people bring him envelopes in the time it takes to drink a bad coffee, and nobody takes one away. Behind the tarp there's a shipping box, rust coming up through the paint, with a door cut in its side and a hasp on the door, and that's where the paper goes.*
 → tarp
 
 ## marked
-*You get the box, the door and the envelopes. You also get a long look from the man in the coat, who's seen a lot of people pretending to buy phone screens.*
+*You get the box, the door and the envelopes. You also get a long, unhurried look from the man in the camel coat, who has watched a great many people pretend to want a phone screen.*
 → tarp
 
 # tarp
+title: The Tarp
 room: spine/deck-market
+post row: Someone stays out on the row, between her chair and the man in the camel coat. [suits muscle]
+gives row: You've someone at your back when you come out. A miss at the end doesn't lose the note.
 
-*Between the stall and the box stands a big woman on a folding chair, eating noodles out of a tin. She's the reason nobody's robbed it.*
+*Between the stall and the box, on a folding chair that complains every time she breathes, sits a big woman eating noodles out of a tin with chopsticks cut down from something else. She's the reason nobody's robbed it.*
 
 - talk: Sit down beside her and tell her you've come about a debt. → past / shoved [check cool 55]
 - move: Put her in the tarp and be through the door before she's up. → past / shoved [check body 55]
 
 ## past
-*She looks you over and goes back to the tin. You've got four minutes, and she's counting them.*
+*She looks you over the way a scale looks at a sack, and goes back to the tin. You've got four minutes, and she's counting them.*
 → box
 
 ## shoved
-*You get through. The noodles go across the plate and half the row looks round.*
+*You get through. The noodles go across the plate in a long greasy fan, and half the row looks round.*
 → box
 
 # box
+title: The Box
 room: spine/deck-market
 
-*Inside: a folding table, a cash box, two steel drawers of paper and one old grey terminal. Two thousand debts, maybe. Every one's a person.*
+*Inside: a folding table, a cash box with the key left in it, two steel drawers of paper and one old grey terminal, its fan whining like something trapped. Two thousand debts, maybe, filed by people who'll never meet them. Every one's a person.*
 
 *{{"I've got the terminal open,"}} she says, {{"and I can't read it. It's indexed by something that isn't names."}}*
 
@@ -106,33 +115,37 @@ view rue: You're in Graymark's terminal and it's indexed by case number, not nam
 - think: Work out how a debt man files, and go to the drawer by hand. → drawer / lost-time [check wits 55]
 
 ## drawer
-*Lysenko's in the second drawer, nine thousand two hundred and six, and clipped to it a slip with a case number you assigned yourself. Graymark bought her father's rent because you asked for a read on what she owes. You remember signing the request. It took about a minute.*
+*Lysenko's in the second drawer, nine thousand two hundred and six in a dot-matrix face gone faint, and clipped to it a slip with a case number you assigned yourself. Graymark bought her father's rent because you asked for a read on what she owes. You remember signing the request. It took about a minute.*
 → stair
 
 ## lost-time
-*It takes too long, and it's in the second drawer. Nine thousand two hundred and six, and clipped to it a slip with a case number you assigned yourself. Graymark bought her father's rent because you asked for a read on what she owes. You remember signing the request. It took about a minute.*
+*It takes too long, every drawer a slow scrape of steel, and it's in the second one. Nine thousand two hundred and six, and clipped to it a slip with a case number you assigned yourself. Graymark bought her father's rent because you asked for a read on what she owes. You remember signing the request. It took about a minute.*
 → stair
 
 # stair
+title: The Catwalk
 room: spine/catwalk
 
-*Out by the back of the box and up the service catwalk, cash tin under your arm, the note inside your shirt. The man in the good coat is on the plate below you with a phone at his ear, and he's stopped pretending.*
+*Out by the back of the box and up the service catwalk, cash tin under your arm, the note inside your shirt going soft against your skin. Below you on the plate the man in the camel coat has a phone at his ear, and he's stopped pretending to be anything.*
+
+[post.row] *Somebody you brought has drifted between him and the foot of the catwalk, slow as a man choosing a screen.*
 
 - run: Run the catwalk to Forty-One and drop onto the stair. → above / spotted [check reflex 50]
-- stand: Stand still against the girders in the wet and let him look past you. → above / spotted [check body 50]
+- stand: Stand still against the girders in the wet and let him look past you. → above / spotted [check body 50 · if post.row=fit +10 "your muscle's in his light"]
 
 ## above
-*He looks the wrong way for just long enough.*
+*He looks the wrong way for just long enough, the way men do when they're sure what they're looking for.*
 → line
 
 ## spotted
-*He sees you, and he's got a phone, and now it's a race to the pylon.*
+*He sees you. He has a phone, and you have a pylon a long way off, and now it's a race.*
 → line
 
 # line
+title: The Second Man
 room: spine/catwalk
 
-*The stair's in sight. So is the second man, coming along the catwalk from Forty-One with his hands out of his coat. The note's against your skin. The whole of her father's rent weighs about what a letter weighs.*
+*The stair's in sight. So is the second man, coming along the catwalk from Forty-One with his hands out of his coat, the padlocks on the rail ticking as he passes them. The note's against your skin. The whole of her father's rent weighs about what a letter weighs.*
 
 *{{"Have you got it?"}} she says. {{"Tell me you've got it."}}*
 
@@ -142,20 +155,30 @@ view rue: You can hear the catwalk ringing under him, and you can't help him fro
 - wipe: Put his phone to sleep with your deck and go past him in the dark. → through / taken-off [check tech 50 grid, set rue_two=yes]
 
 ## through
-*He goes past you. The stair moves under your feet like it always does.*
+*He goes past you, close enough that you smell the rain on his coat. Then the cable stair, taking your weight with its long familiar sway.*
 pay: full
 → hand
 
+## taken-off if post.row
+*He's stronger than he looks, and quicker, and he has a fistful of your coat when somebody comes up the gantry behind him at a run: whoever you left on the row. He turns, and they get what he had ready for you. You're on the cable stair with the note against your skin, half the cash gone over the rail, and one fewer.*
+pay: full
+take: part
+post row: hurt
+→ hand
+
 ## taken-off
-*He's stronger than he looks. The cash goes, and the note with it, all but the slip that came away in your fist. The stair moves under your feet. You've got a case number in your hand, and it's yours.*
+*He's stronger than he looks, and quicker. The cash goes, and the note with it, all but the slip that came away in your fist, and then he's gone along the gantry and there's only the rain. You've got a case number in your hand, and it's yours.*
 take: none
 → short
 
 # hand
+title: Her Door
 
-*She's standing at the top of the stair. You've wiped ledgers before. You did it at nineteen, for two hundred and twelve households, and you could do this one on her crate in ten minutes. You know what it cost you to be given that.*
+*The door's open at the top of the stair, the heater's orange spilling out onto the wet grating. You've wiped ledgers before. You did it at nineteen, for two hundred and twelve households, and you could do this one on her crate in ten minutes. You know what it cost you to be given that.*
 
-*You take out the note. The slip's still clipped to it.*
+*The note comes out of your shirt warm and soft as cloth. The slip's still clipped to it.*
+
+[hold=said] *Hold it, she said. That's all. Nobody's ever let her see one thing she owes.*
 
 view rue: He has the paper in his hand and you haven't seen what's on it. You're frightened of what he's about to offer. If he gives it to you to hold, that's the first thing anyone's ever given you without a price on it, and you'd check it twice. If he makes it go away for you, you've been bought, however kind it is.
 
@@ -164,26 +187,27 @@ view rue: He has the paper in his hand and you haven't seen what's on it. You're
 - wipe: Tell her you can make it go away, tonight. → gone [set note=wiped]
 
 ## hers
-*She reads it standing up. Then the slip. She doesn't look at you for a long time. "You asked for this," she says. "You." She holds onto it with both hands. {hire} is waiting on the stair, someone who works the market, who saw you in the box and has been looking for someone to work for. You've got two now.*
+*The note, then the slip, read standing up under the clamp lamp, and a long time after with nobody looking at anybody. "You asked for this," she says. "You." Both hands on it now, as if it might be taken back. {hire} is waiting on the stair, someone who works the market, who saw you in the box and has been looking for someone to work for. You've got two now.*
 gives: recruit ears hand
 hire-pitch: I work the market. I saw you in the box, and I see a lot more than that.
 → end
 
 ## slip
-*She reads it standing up, and she holds onto it with both hands. The slip's in your pocket, about the size of a tram ticket. {hire} is waiting on the stair, saw you in the box, and has been looking for someone to work for. You've got two now.*
+*It's read standing up under the clamp lamp, and held with both hands after. The slip's in your pocket, about the size of a tram ticket and a good deal heavier. {hire} is waiting on the stair, saw you in the box, and has been looking for someone to work for. You've got two now.*
 gives: recruit ears hand
 hire-pitch: I work the market. I saw you in the box, and I see a lot more than that.
 → end
 
 ## gone
-*She looks at you as if you've hit her. "That's it, then," she says. "That's what it is. That's how it starts." She takes the note out of your hand and goes inside. {hire} is on the stair, saw you in the box, and has been looking for someone to work for. You've got two now.*
+*The look you get is the one people give a hand that's just hit them. "That's it, then," she says. "That's what it is. That's how it starts." The note leaves your hand, and the door swings to on the heater's glow. {hire} is on the stair, saw you in the box, and has been looking for someone to work for. You've got two now.*
 gives: recruit ears hand
 hire-pitch: I work the market. I saw you in the box, and I see a lot more than that.
 → end
 
 # short
+title: Her Door
 
-*She's standing at the top of the stair, and you've got nothing to give her but a slip with a number on it.*
+*The door's open at the top of the stair, heater-light on the wet grating, and you've got nothing to give her but a slip with a number on it.*
 
 view rue: He went for the paper and came back without it. Whatever he tells you now, the debt's still out there with someone else's name on it. You don't know yet what he's holding.
 
@@ -191,26 +215,27 @@ view rue: He went for the paper and came back without it. Whatever he tells you 
 - pocket: Say you lost it. Keep the slip. → pocketed [set note=lost]
 
 ## shown
-*She reads it. It's a small thing to be that heavy. She shuts the door without slamming it, and that's worse.*
+*It's read once. It's a small thing to be that heavy, a strip of paper the size of a tram ticket. The door shuts without slamming, and that's worse.*
 → end
 
 ## pocketed
-*She says nothing. She goes in. The slip stays where it is, and you go on knowing what's on it.*
+*Nothing's said. The door closes on the heater's glow. The slip stays where it is, against your thigh, and you go on knowing what's on it.*
 → end
 
 # getaway
+title: The Rail
 room: spine/catwalk
 
-*Both of them now, and a third on the plate. There's no talking this one down. The note's in your shirt and the catwalk's running out.*
+*Both of them now, and a third on the plate below with his face turned up into the rain. There's no talking this one down. The note's in your shirt and the catwalk's running out: rail, grating, then nothing but the drop.*
 
 - drop: Go over the rail and drop to the cable stair. → away / dropped [check reflex 55, set rue_two=yes]
 - call: Call Garro and get the catwalk closed. → away / dropped [check cool 55, set rue_two=yes, set cover=cracked]
 
 ## away
-*You get clear, and you hurt, and it's your own stair. The note's torn across, but it's all there.*
+*You get clear, and you hurt, every joint filing its own complaint, and it's your own stair. The note's torn across, but it's all there.*
 → end
 
 ## dropped
-*You come down hard, without the paper, and they keep it. It's still out there, and now they know someone wanted it.*
+*You come down hard on the deck plate, without the paper, and they keep it. It's still out there, and now they know someone wanted it.*
 take: none
 → end

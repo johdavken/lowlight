@@ -5,7 +5,7 @@
  * The key goes only into the request's auth header; error text is redacted before it leaves here.
  */
 import { modelLabel } from '../../shared/model-label';
-import type { LinkState } from '../../shared/types';
+import type { ChatThinking, LinkState } from '../../shared/types';
 import type { DirectSetup } from './agents';
 import type { Backend, TurnRequest } from './backend';
 import { DIRECT_TOOL_ROUNDS, runToolCall, ToolCallAssembler, toolDefinitions } from './direct-tools';
@@ -15,6 +15,7 @@ import { StrayCallFilter } from './stray-calls';
 import type { AnthropicUsage, ChatBody, ChunkData } from './anthropic-convert';
 import { checkAnthropicKey, openAnthropicRound } from './anthropic';
 import type { Route } from './model-route';
+import { checkNanoGptKey, isAllowanceOut } from './nanogpt';
 
 /** Extra room for the retry of a round her thinking used up (the narrator's retry uses the same, scenario.ts). */
 const DIRECT_THINKING_ROOM = 2100;
@@ -88,6 +89,8 @@ export interface DirectBackendOptions {
   route?: (model: string) => Route | null;
   /** Where Anthropic is reached (tests point it at a stub). */
   anthropicBaseUrl?: string;
+  /** NanoGPT's plan allowance: a 429 saying it ran out pauses plan models there (their route moves on). */
+  nanoAllowance?: { spent(): boolean; markSpent(retryAfterS: number): void };
   /** What each Anthropic round cost, cache included (the dev log). */
   onUsage?: (u: AnthropicUsage) => void;
   /** A quiet line for the dialogue box. */
@@ -101,6 +104,8 @@ export interface DirectBackendOptions {
   probeTimeoutMs?: number;
   /** A round's stream that sends nothing for this long has stalled (default 60 s). */
   stallMs?: number;
+  /** SYS → REPLY THINKING, read per turn (absent: auto). */
+  chatThinking?: () => ChatThinking;
 }
 
 export type DirectBackend = Backend & {
@@ -171,7 +176,8 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
   let probed: { at: number; state: LinkState } | null = null;
   let credit: number | null = null;
   /** Anthropic said the credits are spent (it has no balance to ask): until resetProbe. */
-  let creditOut = false;
+  /** Providers whose money ran out on a turn: their link reads no-credit until it's checked afresh (a relink resets it). */
+  const creditOut = new Set<'anthropic' | 'nanogpt'>();
 
   /** Every key a request was sent with (the key can change mid-turn): all are redacted. */
   const sentKeys = new Set<string>();
@@ -185,7 +191,10 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
 
   /** Removes the key (and anything key-shaped) from text that may reach a log or the page. */
   const redact = (text: string): string => {
-    let out = text.replace(/sk-or-[A-Za-z0-9_-]+/g, 'sk-or-…').replace(/sk-ant-[A-Za-z0-9_-]+/g, 'sk-ant-…');
+    let out = text
+      .replace(/sk-or-[A-Za-z0-9_-]+/g, 'sk-or-…')
+      .replace(/sk-ant-[A-Za-z0-9_-]+/g, 'sk-ant-…')
+      .replace(/sk-nano-[A-Za-z0-9_-]+/g, 'sk-nano-…');
     const current = opts.apiKey();
     for (const key of current ? [...sentKeys, current] : sentKeys) out = out.split(key).join('…');
     return out;
@@ -203,15 +212,17 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
     try {
       return await fetchImpl(`${route.baseUrl}${path}`, { ...init, headers: headers(key) });
     } catch (err) {
-      if (err instanceof TypeError) throw new TurnError('unreachable', redact(err.message));
+      if (err instanceof TypeError) throw new TurnError('unreachable', redact(err.message), undefined, undefined, route.provider === 'nanogpt' ? 'nanogpt' : undefined);
       throw err;
     }
   }
 
-  async function errorFor(res: Response): Promise<TurnError> {
+  async function errorFor(res: Response, route: Exclude<Route, { provider: 'anthropic' }>): Promise<TurnError> {
     let message = `HTTP ${res.status}`;
+    let allowanceOut = false;
     try {
       const text = await res.text();
+      allowanceOut = route.provider === 'nanogpt' && isAllowanceOut(res.status, text);
       try {
         const body = JSON.parse(text) as { error?: { message?: unknown } };
         if (typeof body.error?.message === 'string') message = body.error.message;
@@ -223,8 +234,9 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
       // keep the status-only message
     }
     message = redact(message).slice(0, 300);
-    const kind = res.status === 401 ? 'auth' : res.status === 402 ? 'credit' : res.status === 403 ? 'refused' : res.status === 429 ? 'busy' : 'http';
-    return new TurnError(kind, message, res.status);
+    // NanoGPT's plan allowance running out is a 429 with a Retry-After of hours: spent, not busy.
+    const kind = allowanceOut ? 'credit' : res.status === 401 ? 'auth' : res.status === 402 ? 'credit' : res.status === 403 ? 'refused' : res.status === 429 ? 'busy' : 'http';
+    return new TurnError(kind, message, res.status, undefined, route.provider === 'nanogpt' ? 'nanogpt' : undefined);
   }
 
   type Source = { kind: 'sse'; res: Response } | { kind: 'chunks'; chunks: AsyncIterable<ChunkData> };
@@ -242,23 +254,40 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
       } catch (err) {
         if (!(err instanceof TurnError)) throw err;
         // Spent credits: her link reads no-credit until it's checked afresh (a relink resets it).
-        if (err.kind === 'credit') creditOut = true;
+        if (err.kind === 'credit') creditOut.add('anthropic');
         return { ok: false, err: new TurnError(err.kind, redact(err.message), err.status, err.retryAfter, err.provider), retryAfter: err.retryAfter ?? NaN, anthropic: true };
       }
     }
-    const res = await request('/chat/completions', { method: 'POST', body: JSON.stringify({ ...body, model: route.model }), signal }, route);
+    // The player's REPLY THINKING is OpenRouter's effort words: NanoGPT's models take their own, so it goes without.
+    const { playerEffort, ...wire } = body;
+    const sent = playerEffort && route.provider === 'nanogpt' ? { ...wire, reasoning: undefined } : wire;
+    const res = await request('/chat/completions', { method: 'POST', body: JSON.stringify({ ...sent, model: route.model }), signal }, route);
     if (res.ok) return { ok: true, source: { kind: 'sse', res }, model: route.model };
     const retryAfter = Number(res.headers.get('retry-after'));
-    return { ok: false, err: await errorFor(res), retryAfter, anthropic: false };
+    const err = await errorFor(res, route);
+    if (err.kind === 'credit' && route.provider === 'nanogpt') {
+      // The plan's allowance (a 429) pauses plan models on NanoGPT until it resets; a spent balance (402) is credit out.
+      if (err.status === 429) opts.nanoAllowance?.markSpent(retryAfter);
+      else creditOut.add('nanogpt');
+    }
+    return { ok: false, err, retryAfter, anthropic: false };
   }
 
   /** Opens a streamed round: one wait-and-retry on 429, one fall back to her default on an unknown model. */
   async function open(body: Record<string, unknown>, chat: ChatBody, model: string, signal?: AbortSignal): Promise<{ source: Source; model: string }> {
     let a = await attempt(body, chat, model, signal);
-    if (!a.ok && a.err.status === 429) {
+    if (!a.ok && a.err.status === 429 && a.err.kind === 'busy') {
       const after = a.retryAfter;
       await sleep(Number.isFinite(after) && after > 0 ? Math.min(after * 1000, RETRY_AFTER_CAP_MS) : RETRY_AFTER_DEFAULT_MS);
       a = await attempt(body, chat, model, signal);
+    }
+    // NanoGPT's allowance ran out: a model that now routes elsewhere (OpenRouter) is tried there at once.
+    if (!a.ok && a.err.provider === 'nanogpt' && a.err.kind === 'credit' && a.err.status === 429) {
+      const next = routeOf(model);
+      if (next && next.provider !== 'nanogpt') {
+        opts.onNotice(`// NANOGPT ALLOWANCE IS OUT — ON ${next.provider === 'anthropic' ? 'ANTHROPIC' : 'OPENROUTER'} UNTIL IT RESETS`);
+        a = await attempt(body, chat, model, signal);
+      }
     }
     if (a.ok) return a;
     const err = a.err;
@@ -294,16 +323,19 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
       // Her hidden thinking counts toward the cap: a round can run out before a word (GLM on some providers,
       // 2026-10-15). Such a round is asked once more, thinking low with more room.
       let thinkingLow = false;
+      // SYS → REPLY THINKING: LOW or MEDIUM asks for that much, with the same room under the cap as the retry gets.
+      const chatThinking = opts.chatThinking?.() ?? 'auto';
+      const playerEffort = chatThinking === 'auto' ? null : chatThinking;
       for (let round = 1; ; round++) {
         // The nudge round may not call tools: she's there to speak.
         const body = {
           stream: true,
           temperature,
-          max_tokens: thinkingLow ? setup.maxTokens + DIRECT_THINKING_ROOM : setup.maxTokens,
+          max_tokens: thinkingLow || playerEffort ? setup.maxTokens + DIRECT_THINKING_ROOM : setup.maxTokens,
           ...(tools ? { tools } : {}),
           messages,
           ...(tools && (nudging || finishing) ? { tool_choice: 'none' } : {}),
-          ...(thinkingLow ? { reasoning: { effort: 'low' } } : {}),
+          ...(thinkingLow ? { reasoning: { effort: 'low' } } : playerEffort ? { reasoning: { effort: playerEffort }, playerEffort: true } : {}),
         };
         // The same round for Anthropic: no temperature (spec §3); its thinking is always low here.
         const chat: ChatBody = {
@@ -311,7 +343,7 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
           messages,
           ...(tools ? { tools } : {}),
           ...(tools && (nudging || finishing) ? { tool_choice: 'none' as const } : {}),
-          effort: 'low',
+          effort: !thinkingLow && playerEffort === 'medium' ? 'medium' : 'low',
         };
         const idle = new AbortController();
         let stallTimer: ReturnType<typeof setTimeout> | undefined;
@@ -473,7 +505,15 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
       if (route.provider === 'anthropic') {
         // Anthropic reports no balance: spent credits show on the turn that hits them.
         credit = null;
-        state = creditOut ? 'no-credit' : await checkAnthropicKey(route.key, { baseUrl: opts.anthropicBaseUrl, fetchImpl: opts.fetchImpl, timeoutMs: opts.probeTimeoutMs ?? PROBE_TIMEOUT_MS });
+        state = creditOut.has('anthropic') ? 'no-credit' : await checkAnthropicKey(route.key, { baseUrl: opts.anthropicBaseUrl, fetchImpl: opts.fetchImpl, timeoutMs: opts.probeTimeoutMs ?? PROBE_TIMEOUT_MS });
+        probed = { at: now(), state };
+        return state;
+      }
+      if (route.provider === 'nanogpt') {
+        // The plan and the balance; a spent allowance shows as no-credit until the link is checked afresh.
+        const c = await checkNanoGptKey(route.key, { host: route.baseUrl.replace(/\/api\/v1$/, ''), fetchImpl, timeoutMs: opts.probeTimeoutMs ?? PROBE_TIMEOUT_MS });
+        credit = 'credit' in c ? c.credit : null;
+        state = creditOut.has('nanogpt') || opts.nanoAllowance?.spent() ? 'no-credit' : c.state;
         probed = { at: now(), state };
         return state;
       }
@@ -505,7 +545,7 @@ export function createDirectBackend(opts: DirectBackendOptions): DirectBackend {
     ready: () => routeOf(opts.model.get()) !== null,
     resetProbe() {
       probed = null;
-      creditOut = false;
+      creditOut.clear();
     },
   };
 }

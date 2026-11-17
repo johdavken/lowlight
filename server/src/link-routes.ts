@@ -1,19 +1,20 @@
 /**
- * The in-game link (spec §4): the player's keys — OpenRouter's and Anthropic's (Anthropic backend spec §1) — each
- * checked before it's saved, the model lists the select screen offers, and SYS → NARRATOR THINKING. A key never
+ * The in-game link (spec §4): the player's keys — OpenRouter's, Anthropic's (Anthropic backend spec §1) and
+ * NanoGPT's — each checked before it's saved, the model lists the select screen offers, and SYS → NARRATOR THINKING. A key never
  * leaves the server: answers carry its last 4 only.
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
-import { NARRATOR_THINKING, type LinkState, type ModelChoice, type NarratorThinking } from '../../shared/types';
+import { CHAT_THINKING, NARRATOR_THINKING, REPLY_LENGTHS, type ChatThinking, type LinkState, type ModelChoice, type NarratorThinking, type ReplyLength } from '../../shared/types';
 import { modelLabel } from '../../shared/model-label';
 import { MODEL_PICKS } from './default-models';
 import type { ModelCatalog } from './model-catalog';
 import type { AgentRuntime } from './runtime';
 import type { Settings } from './settings';
 import { checkAnthropicKey } from './anthropic';
-import { toNative } from './model-route';
+import { routeFor, type NanoIndex } from './model-route';
+import { checkNanoGptKey, type NanoPlan } from './nanogpt';
 
-export const PROVIDERS = ['openrouter', 'anthropic'] as const;
+export const PROVIDERS = ['openrouter', 'anthropic', 'nanogpt'] as const;
 export type Provider = (typeof PROVIDERS)[number];
 const KEY_MIN = 8;
 const KEY_MAX = 300;
@@ -27,24 +28,25 @@ export interface LinkInfo {
   last4: string | null;
   credit: number | null;
   state: LinkState;
+  /** NanoGPT only: the player's plan, when the key has one to report. */
+  plan?: NanoPlan;
 }
 
-/** Both links, and the one state that decides the select screen: ok when either key works. */
+/** Every link, and the one state that decides the select screen: ok when any key works. */
 export interface LinkStatus {
   state: LinkState;
   openrouter: LinkInfo;
   anthropic: LinkInfo;
+  nanogpt: LinkInfo;
 }
 
-/** ok if either is ok; no-link if neither is linked; else the linked one's state (OpenRouter's when both are). */
-export function combinedState(a: LinkInfo, b: LinkInfo): LinkState {
-  if (a.state === 'ok' || b.state === 'ok') return 'ok';
-  if (a.linked) return a.state;
-  if (b.linked) return b.state;
-  return 'no-link';
+/** ok if any is ok; no-link if none is linked; else the first linked one's state (in PROVIDERS order). */
+export function combinedState(...links: LinkInfo[]): LinkState {
+  if (links.some((l) => l.state === 'ok')) return 'ok';
+  return links.find((l) => l.linked)?.state ?? 'no-link';
 }
 
-type Check = { state: 'ok' | 'no-credit'; credit: number | null } | { state: 'key-rejected' } | { state: 'unreachable' };
+type Check = { state: 'ok' | 'no-credit'; credit: number | null; plan?: NanoPlan | null } | { state: 'key-rejected' } | { state: 'unreachable' };
 
 export function registerLinkRoutes(
   app: FastifyInstance,
@@ -52,6 +54,10 @@ export function registerLinkRoutes(
     settings: Settings;
     baseUrl: string;
     anthropicBaseUrl?: string;
+    /** NanoGPT's host (without /api/v1); absent: NanoGPT keys can't be checked, so can't be linked. */
+    nanogptHost?: string;
+    /** NanoGPT's list: which models its plan covers (the `via` tags), warmed when a key is linked. */
+    nanogpt?: NanoIndex & { warm(): unknown; clearSpent(): void };
     fetchImpl?: typeof fetch;
     catalog: ModelCatalog;
     runtimes: () => AgentRuntime[];
@@ -84,6 +90,10 @@ export function registerLinkRoutes(
 
   const check = async (p: Provider, key: string): Promise<Check> => {
     if (p === 'openrouter') return checkOpenRouter(key);
+    if (p === 'nanogpt') {
+      if (!o.nanogptHost) return { state: 'unreachable' };
+      return checkNanoGptKey(key, { host: o.nanogptHost, ...(o.fetchImpl ? { fetchImpl: o.fetchImpl } : {}), timeoutMs: CHECK_TIMEOUT_MS });
+    }
     const state = await checkAnthropicKey(key, { ...(o.anthropicBaseUrl ? { baseUrl: o.anthropicBaseUrl } : {}), ...(o.fetchImpl ? { fetchImpl: o.fetchImpl } : {}), timeoutMs: CHECK_TIMEOUT_MS });
     return state === 'ok' ? { state: 'ok', credit: null } : { state };
   };
@@ -93,6 +103,7 @@ export function registerLinkRoutes(
     last4: key.slice(-4),
     credit: 'credit' in c ? c.credit : null,
     state: c.state,
+    ...('plan' in c && c.plan ? { plan: c.plan } : {}),
   });
   const unlinked: LinkInfo = { linked: false, last4: null, credit: null, state: 'no-link' };
   async function infoOf(p: Provider): Promise<LinkInfo> {
@@ -111,8 +122,8 @@ export function registerLinkRoutes(
   const providerOf = (raw: string): Provider | null => ((PROVIDERS as readonly string[]).includes(raw) ? (raw as Provider) : null);
 
   app.get('/api/link', async (): Promise<LinkStatus> => {
-    const [openrouter, anthropic] = await Promise.all([infoOf('openrouter'), infoOf('anthropic')]);
-    return { state: combinedState(openrouter, anthropic), openrouter, anthropic };
+    const [openrouter, anthropic, nanogpt] = await Promise.all([infoOf('openrouter'), infoOf('anthropic'), infoOf('nanogpt')]);
+    return { state: combinedState(openrouter, anthropic, nanogpt), openrouter, anthropic, nanogpt };
   });
 
   app.put<{ Params: { provider: string } }>('/api/link/:provider', sameOrigin, async (req, reply) => {
@@ -125,6 +136,11 @@ export function registerLinkRoutes(
     if (c.state === 'key-rejected') return reply.code(400).send({ error: 'key-rejected' });
     if (c.state === 'unreachable') return reply.code(502).send({ error: 'unreachable' });
     o.settings.setKey(p, key);
+    // Her first turn on it routes by NanoGPT's plan list: load it now.
+    if (p === 'nanogpt') {
+      o.nanogpt?.clearSpent();
+      void o.nanogpt?.warm();
+    }
     const info = infoFor(key, c);
     cached.set(p, { key, at: Date.now(), info });
     resetAll();
@@ -135,6 +151,7 @@ export function registerLinkRoutes(
     const p = providerOf(req.params.provider);
     if (!p) return reply.code(404).send({ error: 'provider' });
     o.settings.deleteKey(p);
+    if (p === 'nanogpt') o.nanogpt?.clearSpent();
     cached.delete(p);
     resetAll();
     return reply.code(204).send();
@@ -149,14 +166,31 @@ export function registerLinkRoutes(
     return { thinking: o.settings.narratorThinking() };
   });
 
+  // SYS → REPLY LENGTH and REPLY THINKING: how her chat replies run, for every contact. A PUT may carry either.
+  const replyPrefs = () => ({ length: o.settings.replyLength(), thinking: o.settings.chatThinking() });
+  app.get('/api/reply-prefs', async (): Promise<{ length: ReplyLength; thinking: ChatThinking }> => replyPrefs());
+
+  app.put('/api/reply-prefs', sameOrigin, async (req, reply) => {
+    const b = typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>) : {};
+    const badLength = b.length !== undefined && !(REPLY_LENGTHS as readonly unknown[]).includes(b.length);
+    const badThinking = b.thinking !== undefined && !(CHAT_THINKING as readonly unknown[]).includes(b.thinking);
+    if (badLength || badThinking || (b.length === undefined && b.thinking === undefined)) return reply.code(400).send({ error: 'bad-reply-prefs' });
+    if (b.length !== undefined) o.settings.setReplyLength(b.length as ReplyLength);
+    if (b.thinking !== undefined) o.settings.setChatThinking(b.thinking as ChatThinking);
+    return replyPrefs();
+  });
+
   app.get<{ Querystring: { q?: string; all?: string } }>('/api/models', async (req) => {
     const all = await o.catalog.list();
     const byId = new Map((all ?? []).map((m) => [m.id, m]));
     const fallback = (id: string): ModelChoice => ({ id, label: modelLabel(id), priceIn: null, priceOut: null });
-    // A Claude model goes through the Anthropic key when one is linked: the list says so.
-    const anthropic = Boolean(o.settings.key('anthropic'));
-    const onlyAnthropic = anthropic && !o.settings.key('openrouter');
-    const via = (m: ModelChoice): ModelChoice => (anthropic && toNative(m.id) !== null ? { ...m, via: 'anthropic' } : m);
+    // A model that goes through the Anthropic or NanoGPT key rather than OpenRouter: the list says so.
+    const keys = { openrouter: o.settings.key('openrouter'), anthropic: o.settings.key('anthropic'), nanogpt: o.settings.key('nanogpt'), own: null };
+    const onlyAnthropic = Boolean(keys.anthropic) && !keys.openrouter && !keys.nanogpt;
+    const via = (m: ModelChoice): ModelChoice => {
+      const r = routeFor({ provider: 'openrouter', baseUrl: '', keyName: 'openrouter' }, keys, m.id, o.nanogpt);
+      return (r?.provider === 'anthropic' || r?.provider === 'nanogpt') && r.model === m.id ? { ...m, via: r.provider } : m;
+    };
     // With the catalog down every pick shows (by its id); with it up, only the ones it still lists. Anthropic-only: Claude's.
     const picks = MODEL_PICKS.filter((p) => (!onlyAnthropic || p.id.startsWith('anthropic/')) && (all === null || byId.has(p.id))).map((p) => via({ ...(byId.get(p.id) ?? fallback(p.id)), why: p.why }));
     const recent = o.settings

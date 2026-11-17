@@ -1,8 +1,11 @@
-/* Who's here as a party window (whos-here.ts, 2026-10-17): one row per person down the left, under
-   the top bar, framed by two corner brackets like the speaker portrait. Everyone in full colour; the
-   speaker's face gets a lit border in their accent and a speaker icon in its corner. Every class is wh-
-   (global class names collide across screens). */
+/* Who's here as a party window (whos-here.ts, 2026-10-17): one row per person down the left, under the top bar.
+   As quiet as it can be (the room HUD, docs/mockups/hud-frames.html: it's there only so the room holds everyone without
+   their figures): no fill, no frame. A small HERE · n, a hairline rail down the left from a ring by it with a tick to
+   each face; faces taller than wide, cut at 45° top-left, held by fine corner brackets in their colour. The speaker's
+   brackets light and the rail runs bright beside them; the rest sit dimmer. Every class is wh- (global class names
+   collide across screens). */
 .wh-party {
+  --wh-line: color-mix(in srgb, var(--hud, #7fe9ff) 40%, #e6eef7);
   position: absolute;
   z-index: 19;
   top: calc(21.6px + 56px + 18px);
@@ -10,31 +13,35 @@
   width: 244px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 26px 10px 10px;
-  background: rgba(11, 7, 22, 0.55);
+  gap: 12px;
+  padding: 24px 10px 10px 22px;
   pointer-events: none;
 }
 .wh-party::before {
-  content: '// HERE';
+  content: 'HERE · ' attr(data-count);
   position: absolute;
-  top: 6px;
-  left: 12px;
-  font: 13px var(--mono, 'IBM Plex Mono', monospace);
+  top: 0;
+  left: 18px;
+  font: 13px var(--pixel, 'VT323', monospace);
+  line-height: 12px;
   letter-spacing: 0.3em;
-  color: rgba(127, 233, 255, 0.75);
+  color: color-mix(in srgb, var(--hud, #7fe9ff) 55%, #8a7fa0);
+  text-shadow: 0 1px 2px #000;
 }
-/* The frame's two top corners. */
+/* The rail: a ring by the label, a hairline down, a small square at its foot. */
 .wh-party::after {
   content: '';
   position: absolute;
-  inset: -6px -6px auto -6px;
-  height: 22px;
-  border-top: 2px solid rgba(127, 233, 255, 0.7);
-  -webkit-mask-image: linear-gradient(90deg, #000 0 22px, transparent 22px calc(100% - 22px), #000 calc(100% - 22px));
-  mask-image: linear-gradient(90deg, #000 0 22px, transparent 22px calc(100% - 22px), #000 calc(100% - 22px));
-  border-left: 2px solid rgba(127, 233, 255, 0.7);
-  border-right: 2px solid rgba(127, 233, 255, 0.7);
+  left: 4px;
+  top: 2px;
+  bottom: 0;
+  width: 9px;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 4.5px 4.5px, transparent 2.5px, var(--wh-line) 2.5px 3.5px, transparent 3.5px) 0 0 / 9px 9px no-repeat,
+    linear-gradient(var(--wh-line), var(--wh-line)) 4px 9px / 1px calc(100% - 12px) no-repeat,
+    linear-gradient(var(--hud, #7fe9ff), var(--hud, #7fe9ff)) 3px 100% / 3px 3px no-repeat;
+  opacity: 0.6;
 }
 /* An open file card sits over the scene and encounter banners. */
 .wh-party:has(> .wh-card) { z-index: 21; }
@@ -43,8 +50,10 @@
 
 .wh-tile {
   --wh-accent: #7fe9ff;
+  --wh-cb: color-mix(in srgb, var(--wh-accent) 60%, #e6eef7);
+  position: relative;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 14px;
   padding: 0;
   text-align: left;
@@ -54,25 +63,45 @@
   color: inherit;
   background: none;
   border: 0;
+  opacity: 0.72;
   transition: opacity 300ms ease;
+}
+.wh-tile.wh-lit { opacity: 1; }
+/* The tick from the rail to the face, and the speaker's bright run on the rail. */
+.wh-tile::before {
+  content: '';
+  position: absolute;
+  left: -13px;
+  top: 40px;
+  width: 7px;
+  height: 1px;
+  background: var(--wh-line);
+  opacity: 0.6;
+}
+.wh-tile.wh-lit::after {
+  content: '';
+  position: absolute;
+  left: -15px;
+  top: 12px;
+  width: 2px;
+  height: 56px;
+  background: var(--wh-accent);
+  box-shadow: 0 0 4px var(--wh-accent);
 }
 .wh-face {
   position: relative;
   flex: none;
   box-sizing: border-box;
   width: 64px;
-  height: 64px;
+  height: 80px;
   display: grid;
   place-items: center;
   overflow: visible;
   font: 40px var(--pixel, 'VT323', monospace);
   color: var(--wh-accent);
-  background: rgba(4, 2, 10, 0.85);
-  border: 1px solid color-mix(in srgb, var(--wh-accent) 45%, transparent);
-  transition: border-color 200ms ease, box-shadow 200ms ease;
 }
 /* Laid over the frame's inside: as a grid item its 100% height didn't resolve, and a 208×240 thumb
-   kept its own shape and hung below the border. */
+   kept its own shape and hung below the border. Cut at 45° top-left; it fades out at the foot. */
 .wh-face img {
   position: absolute;
   inset: 0;
@@ -81,41 +110,79 @@
   object-fit: cover;
   object-position: top;
   image-rendering: pixelated;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%, 0 10px);
+  -webkit-mask-image: linear-gradient(#000 72%, transparent);
+  mask-image: linear-gradient(#000 72%, transparent);
 }
-.wh-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+/* The brackets, 3px out from the face: ::before the top two (the left one following the cut), ::after the bottom two
+   and a small square past the bottom right. */
+.wh-face::before,
+.wh-face::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  opacity: 0.75;
+}
+.wh-face::before {
+  inset: -3px -3px auto -3px;
+  height: 20px;
+  background:
+    linear-gradient(var(--wh-cb), var(--wh-cb)) 0 10px / 1px 10px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.5px), var(--wh-cb) calc(50% - 0.5px) calc(50% + 0.5px), transparent calc(50% + 0.5px)) 0 0 / 11px 11px no-repeat,
+    linear-gradient(var(--wh-cb), var(--wh-cb)) 10px 0 / 10px 1px no-repeat,
+    linear-gradient(var(--wh-cb), var(--wh-cb)) 100% 0 / 12px 1px no-repeat,
+    linear-gradient(var(--wh-cb), var(--wh-cb)) 100% 0 / 1px 12px no-repeat;
+}
+.wh-face::after {
+  inset: auto -6px -6px -3px;
+  height: 15px;
+  background:
+    linear-gradient(var(--wh-cb), var(--wh-cb)) 0 calc(100% - 3px) / 1px 12px no-repeat,
+    linear-gradient(var(--wh-cb), var(--wh-cb)) 0 calc(100% - 3px) / 12px 1px no-repeat,
+    linear-gradient(var(--wh-cb), var(--wh-cb)) calc(100% - 3px) calc(100% - 3px) / 12px 1px no-repeat,
+    linear-gradient(var(--wh-cb), var(--wh-cb)) calc(100% - 3px) calc(100% - 3px) / 1px 12px no-repeat,
+    linear-gradient(var(--wh-accent), var(--wh-accent)) 100% 100% / 3px 3px no-repeat;
+}
+.wh-tile.wh-lit .wh-face { --wh-cb: var(--wh-accent); }
+.wh-tile.wh-lit .wh-face::before,
+.wh-tile.wh-lit .wh-face::after { opacity: 1; filter: drop-shadow(0 0 3px var(--wh-accent)); }
+.wh-who { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-bottom: 6px; }
 .wh-name {
   font: 19px var(--pixel, 'VT323', monospace);
   letter-spacing: 0.24em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--wh-accent);
-  text-shadow: 0 0 4px #000;
+  color: color-mix(in srgb, var(--wh-accent) 80%, #fff);
+  text-shadow: 0 1px 2px #000;
 }
+.wh-tile.wh-lit .wh-name { text-shadow: 0 1px 2px #000, 0 0 8px color-mix(in srgb, var(--wh-accent) 70%, transparent); }
 .wh-role {
   font: 11px var(--mono, 'IBM Plex Mono', monospace);
   letter-spacing: 0.22em;
   color: #9aa6b4;
+  text-shadow: 0 1px 2px #000;
 }
-/* The speaker: a lit border in their accent, and the speaker icon in the face's bottom corner. */
-.wh-tile.wh-lit .wh-face {
-  border: 2px solid var(--wh-accent);
-  box-shadow: 0 0 10px color-mix(in srgb, var(--wh-accent) 55%, transparent);
-}
+.wh-tile.wh-lit .wh-role { color: var(--wh-accent); }
+/* The speaker icon, small, in the face's bottom corner. */
 .wh-speaker {
   position: absolute;
-  right: -7px;
-  bottom: -7px;
-  width: 20px;
-  height: 20px;
+  z-index: 1;
+  right: -5px;
+  bottom: -5px;
+  width: 16px;
+  height: 16px;
   display: grid;
   place-items: center;
   color: #0b0716;
   background: var(--wh-accent);
 }
+.wh-speaker svg { width: 12px; height: 12px; }
 /* Many here: the rows shrink so the window stays clear of the subtitles. */
-.wh-party:has(> button.wh-tile:nth-of-type(6)) .wh-face { width: 48px; height: 48px; font-size: 30px; }
-.wh-party:has(> button.wh-tile:nth-of-type(6)) { gap: 5px; }
+.wh-party:has(> button.wh-tile:nth-of-type(6)) .wh-face { width: 48px; height: 60px; font-size: 30px; }
+.wh-party:has(> button.wh-tile:nth-of-type(6)) { gap: 6px; }
+.wh-party:has(> button.wh-tile:nth-of-type(6)) .wh-tile::before { top: 30px; }
+.wh-party:has(> button.wh-tile:nth-of-type(6)) .wh-tile.wh-lit::after { top: 9px; height: 42px; }
 .wh-tile:focus-visible { outline: 1px solid var(--wh-accent); outline-offset: 4px; }
 .wh-tile.wh-entering,
 .wh-tile.wh-leaving { opacity: 0; }

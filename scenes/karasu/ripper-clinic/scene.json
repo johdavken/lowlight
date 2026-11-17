@@ -242,7 +242,11 @@
         "level": 0.6,
         "onEntry": true
       }
-    ]
+    ],
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    }
   },
   "effects": [
     {

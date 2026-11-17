@@ -1,3 +1,4 @@
+import { afterRefusal } from '../src/job-rules';
 import type { GmComplete } from '../src/gm';
 import type { Pool } from '../../shared/dice';
 import { facesFor } from '../../shared/dice';
@@ -14,7 +15,7 @@ import { openDb, type Db } from '../src/db';
 import { COSTS, FORCED_FIRST, type CostId } from '../../shared/costs';
 import { dealAs, settleLikeOld } from './settle';
 import { GM_HOLD_MS } from '../src/gm';
-import { MISSION_CLOSE, QUEST_INSTRUCTIONS } from '../src/instructions';
+import { MISSION_BEAT, MISSION_CLOSE, QUEST_INSTRUCTIONS } from '../src/instructions';
 import { Journal } from '../src/journal';
 import { Room } from '../src/room-state';
 import { SceneRegistry } from '../src/scenes';
@@ -36,6 +37,7 @@ import { fixerKey, parseFixer, parseStock } from '../../shared/stock';
 import type { CrewMember, CrewState } from '../../shared/crew-fold';
 import { contractBlock, payFor } from '../src/mission-run';
 import { CONTRACT } from '../../shared/quests.contract.fixture';
+import { parseAccountsFile } from '../../shared/accounts';
 import { settleTake } from '../src/take-run';
 
 let tmpDir: string;
@@ -127,7 +129,7 @@ const ABILITIES = parseCrewBook({
   ].join('\n'),
 }).book.abilities;
 
-function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?: number[]; deck?: string; rolls?: number[]; nerve?: number; heat?: number; gm?: GmComplete; book?: QuestEntry[]; stats?: Stats; clock?: () => number; burner?: number; rep?: number; sol?: number; crew?: Partial<CrewState>; contacts?: () => ContactCard[]; guests?: () => GuestCard[]; onLiveClock?: (relay: ChatRelay) => void; /** Programs owned (owned programs); default every one. */ programs?: string[]; foils?: Record<string, number> } = {}) {
+function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?: number[]; deck?: string; rolls?: number[]; nerve?: number; heat?: number; gm?: GmComplete; book?: QuestEntry[]; stats?: Stats; clock?: () => number; burner?: number; rep?: number; sol?: number; crew?: Partial<CrewState>; contacts?: () => ContactCard[]; guests?: () => GuestCard[]; onLiveClock?: (relay: ChatRelay) => void; /** Programs owned (owned programs); default every one. */ programs?: string[]; foils?: Record<string, number>; clips?: NonNullable<ChatRelayDeps['quests']>['clips'] } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const events: ServerEvent[] = [];
@@ -162,6 +164,7 @@ function relayWith(o: { tie?: string; leads?: string[]; gamble?: number; rerun?:
     heldLeads: () => o.leads ?? [],
     contact,
     book: () => o.book ?? [BACK],
+    ...(o.clips ? { clips: o.clips } : {}),
     status,
     placeId: () => 'haes-noodles',
     contactName: (id) => id,
@@ -1475,6 +1478,137 @@ describe('final review fixes', () => {
     expect(questRows(db).at(-1)!.quest!.silent).toBe(true);
     await pick(relay, 'desk', 'grab');
     expect(questRows(db).at(-1)!.quest!.silent).toBeUndefined();
+  });
+
+  describe('ride-along replies (2026-11-08): she answers a pick on a beat with her view line', () => {
+    const RIDE_TEXT = JOB.replaceAll("*\n\n- talk: Talk your way in.", "*\n\nview nix-direct: You're on his ear at the door.\n\n- talk: Talk your way in.");
+    const RIDE = job(RIDE_TEXT);
+    const ANY = job(JOB.replaceAll("*\n\n- talk: Talk your way in.", "*\n\nview any: Someone's watching the door.\n\n- talk: Talk your way in."));
+    it('a pick on a ride-along beat gets one reply, told MISSION_BEAT and the beat\'s view', async () => {
+      const d = plainDoor('easy');
+      const { relay, db, backend } = relayWith({ book: [RIDE], clock: () => evening(d) });
+      await relay.startQuest('hicks', 'back-door');
+      expect(backend.reqs).toHaveLength(1);
+      await pick(relay, 'door', 'wait');
+      expect(backend.reqs).toHaveLength(2);
+      const sent = lastUser(backend.reqs[1]);
+      expect(sent).toContain(MISSION_BEAT);
+      expect(sent).toContain("You're on his ear at the door.");
+      expect(sent).not.toContain(QUEST_INSTRUCTIONS);
+      expect(questRows(db).at(-1)!.quest!.silent).toBeUndefined();
+    });
+    it("a beat reply reacts to the beat just played: the next beat's view stays out of her job block (live check)", async () => {
+      const BOTH = job(JOB.replaceAll("*\n\n- talk: Talk your way in.", "*\n\nview nix-direct: You're on his ear at the door.\n\n- talk: Talk your way in.").replace('*The ledger.*\n', "*The ledger.*\n\nview nix-direct: DESK-VIEW-FOR-LATER\n"));
+      const d = plainDoor('easy');
+      const { relay, backend } = relayWith({ book: [BOTH], clock: () => evening(d) });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      const all = JSON.stringify(backend.reqs[1].messages);
+      expect(all).toContain("You're on his ear at the door.");
+      expect(all).not.toContain('DESK-VIEW-FOR-LATER');
+    });
+    it('reads the beat just played with its own variant, not the next beat\'s (review I3)', async () => {
+      // The plain door is variant 1 (after the caper one); the desk the run moves to is variant 0.
+      const PLAIN = job(JOB.replace('*A steel door behind the stall. One man on it.*\n', "*A steel door behind the stall. One man on it.*\n\nview nix-direct: PLAIN-DOOR-VIEW\n"));
+      const d = plainDoor('easy');
+      const { relay, db, backend } = relayWith({ book: [PLAIN], clock: () => evening(d) });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      expect(backend.reqs).toHaveLength(2);
+      expect(lastUser(backend.reqs[1])).toContain(MISSION_BEAT);
+      expect(lastUser(backend.reqs[1])).toContain('PLAIN-DOOR-VIEW');
+      expect(relay['jobs'].silentMissionRow(questRows(db).at(-1)!)).toBe(false);
+    });
+    it("a pick on a beat she's on the line for marks the ride line: true; in person it doesn't (2026-11-11)", async () => {
+      const d = plainDoor('easy');
+      const near = relayWith({ book: [RIDE], clock: () => evening(d) });
+      await near.relay.startQuest('hicks', 'back-door');
+      await pick(near.relay, 'door', 'wait');
+      expect(questRows(near.db).at(-1)!.quest!.ride).toEqual({ beat: 'door', variant: 1 });
+      const LINE = job(RIDE_TEXT.replace('temper: door\n', 'temper: door\ncomms: yes\n'));
+      const far = relayWith({ book: [LINE], clock: () => evening(d) });
+      await far.relay.startQuest('hicks', 'back-door');
+      await pick(far.relay, 'door', 'wait');
+      expect(questRows(far.db).at(-1)!.quest!.ride).toEqual({ beat: 'door', variant: 1, line: true });
+    });
+    it('the next beat is marked held on a ride-along row: the move and its outcome first, then the beat (2026-11-08)', async () => {
+      const d = plainDoor('easy');
+      const { relay, db } = relayWith({ book: [RIDE], clock: () => evening(d) });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      const row = questRows(db).at(-1)!;
+      const held = row.quest!.held!;
+      expect(row.text.slice(0, held.at)).toContain("*You're in.*");
+      expect(row.text.slice(0, held.at)).not.toContain('*The ledger.*');
+      expect(row.text.slice(held.at)).toMatch(/^\*The ledger\.\*/);
+      expect(held.clips).toBe(0);
+    });
+    it('the held beat keeps its own clips: the ones before `held.clips` read the move, the rest the beat', async () => {
+      const d = plainDoor('easy');
+      const voiced = new Map([["*You're in.*", '/in.ogg'], ['*The ledger.*', '/ledger.ogg']]);
+      const clips = (_q: string, texts: readonly string[]) => texts.flatMap((t) => (voiced.has(t) ? [voiced.get(t)!] : []));
+      const { relay, db } = relayWith({ book: [RIDE], clock: () => evening(d), clips });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      const q = questRows(db).at(-1)!.quest!;
+      expect(q.clips).toEqual(['/in.ogg', '/ledger.ogg']);
+      expect(q.held!.clips).toBe(1);
+    });
+    it("her answer to the move hears the move, not the next beat or who it brings in (House Glass live check)", async () => {
+      const NEXT = job(JOB.replaceAll("*\n\n- talk: Talk your way in.", "*\n\nview nix-direct: You're on his ear at the door.\n\n- talk: Talk your way in.").replace('*The ledger.*\n', 'stranger: Clerk Mo — the desk clerk: bored, slow\n\n*The ledger.*\n'));
+      const d = plainDoor('easy');
+      const { relay, backend } = relayWith({ book: [NEXT], clock: () => evening(d) });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      const sent = lastUser(backend.reqs[1]);
+      expect(sent).toContain("You're in.");
+      expect(sent).not.toContain('The ledger.');
+      expect(JSON.stringify(backend.reqs[1].messages)).not.toContain('Clerk Mo');
+    });
+    it('a pick on a beat nobody rides along holds nothing back', async () => {
+      const d = plainDoor('easy');
+      const { relay, db } = relayWith({ book: [ANY], clock: () => evening(d) });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      expect(questRows(db).at(-1)!.quest!.held).toBeUndefined();
+    });
+    it('a roll that lands on a ride-along beat gets one reply', async () => {
+      const d = plainDoor('easy');
+      const { relay, backend } = relayWith({ book: [RIDE], clock: () => evening(d), rolls: [6] });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'talk');
+      expect(backend.reqs).toHaveLength(2);
+      expect(lastUser(backend.reqs[1])).toContain(MISSION_BEAT);
+    });
+    it('a beat with only a view any line stays silent', async () => {
+      const d = plainDoor('easy');
+      const { relay, db, backend } = relayWith({ book: [ANY], clock: () => evening(d) });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      expect(backend.reqs).toHaveLength(1);
+      expect(questRows(db).at(-1)!.quest!.silent).toBe(true);
+    });
+    it('the last pick gets the closing reply only, not two', async () => {
+      const d = plainDoor('easy');
+      const { relay, backend } = relayWith({ book: [RIDE], clock: () => evening(d), rolls: [6, 6] });
+      await relay.startQuest('hicks', 'back-door');
+      await pick(relay, 'door', 'wait');
+      await pick(relay, 'desk', 'grab');
+      expect(backend.reqs).toHaveLength(3);
+      expect(lastUser(backend.reqs[2])).toContain(MISSION_CLOSE);
+      expect(lastUser(backend.reqs[2])).not.toContain(MISSION_BEAT);
+    });
+    it('REGENERATE works on a replied middle row, and stays refused on a silent one', async () => {
+      const d = plainDoor('easy');
+      const ride = relayWith({ book: [RIDE], clock: () => evening(d) });
+      await ride.relay.startQuest('hicks', 'back-door');
+      await pick(ride.relay, 'door', 'wait');
+      expect(ride.relay['jobs'].silentMissionRow(questRows(ride.db).at(-1)!)).toBe(false);
+      const plain = relayWith({ book: [ANY], clock: () => evening(d) });
+      await plain.relay.startQuest('hicks', 'back-door');
+      await pick(plain.relay, 'door', 'wait');
+      expect(plain.relay['jobs'].silentMissionRow(questRows(plain.db).at(-1)!)).toBe(true);
+    });
   });
 
   it('time tokens read the row\'s story clock in the row and in her prompt', async () => {
@@ -3242,6 +3376,24 @@ describe("a roll's life, phase 1 (roll lifecycle spec §1)", () => {
     expect(pend(wire).pick).toBe(2);
   });
 
+  it('TAKE −1 shows what the roll earns and what the cost leaves, and lands as shown (2026-11-08, playtest)', async () => {
+    // An OPEN 4–5 at TAKE 0 fills 1; TAKE −1 takes it back. Find a day whose deal has TAKE −1 in it.
+    for (let n = 0; n < 40; n++) {
+      const t = await at({ rolls: [5], day: plainDay(n) });
+      await go(t.relay, 'door', 'talk');
+      const take = active(t.relay).costs!.dealt.find((c) => c.cost === 'take');
+      if (!take) continue;
+      expect(take.take).toEqual({ banked: 0, earned: 1, other: 0, after: 0, size: 4 });
+      expect(active(t.relay).costs!.dealt.filter((c) => c.cost !== 'take').every((c) => c.take === undefined)).toBe(true);
+      await go(t.relay, 'door', '!cost', 'take');
+      expect(active(t.relay).costs!.dealt.find((c) => c.cost === 'take')!.take).toMatchObject({ after: 0 });
+      await go(t.relay, 'door', '!take', 'take');
+      expect(runOn(t.db, t.d)).toMatchObject({ pending: null, takeFill: 0 });
+      return;
+    }
+    throw new Error('no deal with TAKE −1');
+  });
+
   it('deals only costs that can bite: no TAKE at TAKE 0, no NEXT ROLL on a last check, no HEAT on a hidden deck', async () => {
     for (let i = 0; i < 6; i++) {
       const miss = await at({ rolls: [2], nerve: 5 - (i % 2) });
@@ -3316,7 +3468,45 @@ describe("a roll's life, phase 1 (roll lifecycle spec §1)", () => {
     expect(active(plain.relay).costs!.armour).toEqual({ ok: false, left: 0 });
   });
 
-  it('NEXT ROLL WORSE makes the next checked card a position worse, then it clears; SMALL a step smaller; a no-roll pick clears it too', async () => {
+  describe('NEXT ROLL costs wait for a dice check (2026-11-08)', () => {
+    // The desk's skim walks on to a street with checks: NEXT ROLL WORSE has to survive it to land there.
+    const onward = job(
+      JOB.replace('- skim: Take what fits in a pocket. → part', '- skim: Take what fits in a pocket. → onward').replace(
+        '## part',
+        '## onward\n*Out the side.*\n→ street\n\n# street\n*The street.*\n\n- run: Run for it. → paid / part [check reflex 50]\n- walk: Walk it. → paid / part [check cool 50]\n\n## part',
+      ),
+    );
+    // The desk is a crack and a no-roll pick, and both end the job: no dice check left after the door.
+    const cracked = job(JOB.replace('- grab: Take it all. → paid / part [check reflex 50]', '- grab: Crack the ledger. → paid / part [crack 6]'));
+    it('kept past a no-roll pick, it lands on the next checked card, then clears', async () => {
+      for (let n = 0; n < 40; n++) {
+        const t = await at({ rolls: [5, 6], day: plainDay(n), book: [onward] });
+        await go(t.relay, 'door', 'talk');
+        if (!pend(t).dealt!.some((c) => c.cost === 'worse')) continue;
+        await go(t.relay, 'door', '!cost', 'worse');
+        await go(t.relay, 'door', '!take', 'worse');
+        expect(runOn(t.db, t.d)).toMatchObject({ next: { worse: true }, owed: { worse: true } });
+        await go(t.relay, 'desk', 'skim');
+        expect(runOn(t.db, t.d)).toMatchObject({ beat: 'street', next: { worse: true }, owed: { worse: true } });
+        expect(active(t.relay).choices.find((c) => c.id === 'run')!.pool!.position).toBe('wire');
+        await go(t.relay, 'street', 'run');
+        expect(runOn(t.db, t.d)!.next).toBeUndefined();
+        expect(runOn(t.db, t.d)!.owed).toBeUndefined();
+        return;
+      }
+      throw new Error('no deal with NEXT ROLL WORSE');
+    });
+    it('not dealt where only a crack or a no-roll pick is left', async () => {
+      for (let n = 0; n < 12; n++) {
+        const t = await at({ rolls: [5], day: plainDay(n), book: [cracked] });
+        await go(t.relay, 'door', 'talk');
+        expect(pend(t).dealt!.map((c) => c.cost)).not.toContain('worse');
+        expect(pend(t).dealt!.map((c) => c.cost)).not.toContain('small');
+      }
+    });
+  });
+
+  it('NEXT ROLL WORSE makes the next checked card a position worse, then it clears; SMALL a step smaller; it ends with the job', async () => {
     const take = async (cost: 'worse' | 'small') => {
       for (let n = 0; n < 40; n++) {
         const t = await at({ rolls: [5], day: plainDay(n) });
@@ -3763,15 +3953,29 @@ describe('programs: FIREWALL (programs spec §2.3)', () => {
     expect(runOn(t.db, t.d)!.programs ?? []).toEqual([]);
   });
 
+  it('FIREWALL is shown off and refused on a wire roll: on the wire nothing shields you (2026-11-08)', async () => {
+    // PROG with the desk on the wire (base 40).
+    const wire: QuestEntry = { ...PROG, beats: new Map([...PROG.beats].map(([id, vs]) => [id, id === 'desk' ? vs.map((b) => ({ ...b, choices: b.choices.map((c) => (c.check ? { ...c, check: { ...c.check, base: 40 } } : c)) })) : vs])) };
+    const t = await costed({ book: [wire], deck: 'meridian' });
+    expect(t.relay.questState('hicks').active!.costs!.armour).toEqual({ ok: false, left: 1, why: 'ON THE WIRE' });
+    expect(await raw(t.relay, 'desk', '!armour', t.cost)).toBe('ON THE WIRE');
+    expect(runOn(t.db, t.d)!.programs ?? []).not.toContainEqual(expect.objectContaining({ id: 'firewall' }));
+    // RESIST still works there.
+    expect(await raw(t.relay, 'desk', '!resist', t.cost)).toMatchObject({ ok: true });
+  });
+
   it('a loaded FIREWALL is offered without load', async () => {
-    const t = await go({ deck: 'meridian', rolls: [4] });
+    // The door is a wire check (no FIREWALL there): a clean door, then a 4–5 at the desk, in the open.
+    const t = await go({ deck: 'meridian', rolls: [6, 4] });
     const run = runOn(t.db, t.d)!;
     t.db.setMeta(keyOn(t.d), JSON.stringify({ ...run, programs: [{ id: 'firewall', at: 1 }] }));
     await choose(t.relay, 'door', 'talk', {});
+    await settleLikeOld(t.relay, 'back-door', 'door');
+    await choose(t.relay, 'desk', 'grab', {});
     const p = runOn(t.db, t.d)!.pending as DicePending;
-    await raw(t.relay, 'door', '!cost', p.dealt![0].cost);
+    await raw(t.relay, 'desk', '!cost', p.dealt![0].cost);
     expect(t.relay.questState('hicks').active!.costs!.armour).toEqual({ ok: true, left: 1 });
-    await raw(t.relay, 'door', '!armour', p.dealt![0].cost);
+    await raw(t.relay, 'desk', '!armour', p.dealt![0].cost);
     expect(runOn(t.db, t.d)!.programs).toEqual([{ id: 'firewall', at: 1, burned: true }]);
   });
 
@@ -4157,6 +4361,15 @@ describe('alarm becomes heat (tier template spec §2)', () => {
   });
 });
 
+describe('here: on a beat (House Glass spec, engine §1)', () => {
+  it('a here beat sends here with its room', async () => {
+    const t = relayWith({ book: [job(JOB.replace('# desk\n', '# desk\nroom: karasu/dead-blocks\nhere: yes\n'))] });
+    expect(await t.relay.startQuest('hicks', 'back-door', { approach: 'quiet' as const, people: [], favour: false })).toMatchObject({ ok: true });
+    await t.relay.chooseQuest('hicks', { id: 'back-door', beat: 'door', choice: 'wait' });
+    expect(t.relay.questState('hicks').active).toMatchObject({ room: 'karasu/dead-blocks', here: true });
+  });
+});
+
 describe('a guest from a guest file, on a mission (The Passenger spec, engine §2)', () => {
   const NOA: GuestCard = { id: 'noa', name: 'Noa Vey', accent: '#9fd', portrait: null, spec: 'runner', art: null, line: 'Dark Cart' };
   const EMBER: ContactCard = { id: 'ember', name: 'Ember Zhou', accent: '#ff4f8b', portrait: null, spec: 'runner' };
@@ -4219,6 +4432,14 @@ describe('a contract (tier 3 contracts spec §2)', () => {
     const t = await start({ book: [job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('# offer\n', '# offer\ncomms: yes\n'), 'the-contract'), BACK] });
     expect(t.relay.questState('hicks').active).toMatchObject({ comms: true });
     expect(t.relay.questState('hicks').active!.room).toBeUndefined();
+  });
+
+  it("an offer beat with her view stays silent: only a contract's night rides along (review I2)", async () => {
+    const OFF = job(CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]').replace('*He turns the ledger round.*\n', '*He turns the ledger round.*\n\nview nix-direct: OFFER-VIEW\n').replace('## taken\n*He closes the ledger.*\n→ back', '## taken\n*He closes the ledger.*\n→ opened\n\n# opened\n\n*He waits.*\n\n- go: Go. → gone\n- stay: Stay. → gone\n\n## gone\n*Gone.*\n→ back'), 'the-contract');
+    const t = await start({ book: [OFF, BACK] });
+    const n = t.backend.reqs.length;
+    await t.pick('offer', 'take');
+    expect(t.backend.reqs.length).toBe(n);
   });
 
   describe('a guest (guest crew spec §2)', () => {
@@ -4685,6 +4906,45 @@ describe('a contract (tier 3 contracts spec §2)', () => {
       expect(t.run()).toMatchObject({ done: true, recruit: { spec: 'runner' } });
       expect(t.run().contract!.closedAt).toBeGreaterThan(0);
     });
+    it('TELL in a fallout goes on to crate, and crate\'s ending settles by the verdict (Two Stories spec §3)', async () => {
+      const story = parseAccountsFile('mini-story', `---
+title: Mini
+quest: the-contract
+patience: adebayo 2, rue 1
+---
+# cards
+- UNLUCKY [cover] UNLUCKY: He got unlucky. | fills: LAST | from: free
+- POST [street] THE NIGHT: The post. | fills: WHERE | from: free
+- NAMED [said] HIS NAME: You said his name. | from: free
+# adebayo
+asks: WHERE | WHERE · TAKE | TAKE · HELP | HELP
+# rue
+asks: WHO | WHO · OFFER | OFFER · LAST | LAST
+- knows NAMED
+# clashes
+- UNLUCKY × NAMED: "Unlucky?"
+`, { roster: null });
+      if (!story.ok) throw new Error(JSON.stringify(story.problems));
+      const text = CONTRACT.replace('with: [mother-rot]', 'with: [nix-direct]')
+        .replace("# fallout\n\n*She's at his table.*\n\n- nod: Nod. → done\n- say: Say nothing. → done\n", "# fallout\naccounts: mini-story\n\n*Two days.*\n\n## told\n*Told.*\n→ crate\n\n# crate\n\n*She's at his table.*\n\n- nod: Nod. → done\n- say: Say nothing. → done\n")
+        .replace("## done\n*That's that.*\n", "## done\n*That's that.*\nsettles: nix-direct if story.rue=caught: Caught.\nsettles: nix-direct: Plain.\n");
+      const t = await start({ rolls: [6, 6, 6, 6, 6, 6, 6], book: [job(text, 'the-contract'), BACK] });
+      t.relay['deps'].quests!.accounts = () => [story.entry];
+      await toNight(t);
+      await t.relay.startQuest('hicks', 'the-contract', go);
+      for (const b of ['night', 'n1', 'n2', 'n3', 'n4', 'n5', 'n6']) await t.pick(b, 'x');
+      t.later(49);
+      await t.relay.playDueQuest('hicks');
+      expect(t.run().beat).toBe('fallout');
+      expect(t.relay.questState('hicks').active!.accounts).toBeDefined();
+      await t.relay.accountsMove('hicks', { id: 'the-contract', move: { kind: 'place', card: 'UNLUCKY', listener: 'rue', blank: 'LAST' } });
+      expect(await t.relay.accountsMove('hicks', { id: 'the-contract', move: { kind: 'tell' } })).toMatchObject({ ok: true });
+      expect(t.run()).toMatchObject({ beat: 'crate', done: false });
+      expect(t.run().flags['story.rue']).toBe('caught');
+      await t.pick('crate', 'nod');
+      expect(t.run().done).toBe(true);
+      expect(t.run().settles).toEqual([{ who: 'nix-direct', text: 'Caught.' }]);
+    });
     it("the room isn't tense through the wait", async () => {
       const t = await rolled([6, 6, 6, 6, 6, 6, 6]);
       t.db.setMeta(questKey('hicks', t.id), JSON.stringify({ ...t.run(), alarm: 2 }));
@@ -4901,5 +5161,269 @@ describe('programs at the fixer (owned programs plan)', () => {
     expect(relay.buy('hicks', 'solvent')).toMatch(/already have/);
     expect(relay.buy('hicks', 'leech')).toEqual({ ok: true, text: 'ok' });
     expect(kit()).toMatchObject({ sol: 300, programs: { owned: ['firewall', 'solvent', 'leech'] } });
+  });
+});
+
+describe('posts (routes and posts spec §2)', () => {
+  const POSTS = (suits = ' [suits muscle]') => `---\ntitle: Back Door\nkind: mission\ntier: 2\ntake-size: 4\nstarts: haes-noodles\nafter: null\npay: 400\n---\n
+# lobby\n\n*A lobby.*\n\n- charm: Talk your way in. → front / front [check cool 55, set route=front]\n- stairs: Take the stair. → back / back [check reflex 55, set route=back]\n
+## front\n*In by the front.*\n→ desk\n\n## back\n*In by the back.*\n→ stairwell\n
+# desk\n\ntitle: The Desk\n\n*He signs you in.*\n\n- read: Read his screen. → up / up [check wits 55]\n- palm: Palm the key. → up / up [check reflex 55]\n
+# stairwell\n\ntitle: The Stairwell\npost door: Someone holds the service door.${suits}\ngives door: The way out stays open.\n\n*Concrete and one door.*\n\n- force: Force the fire door. → up / up [check body 55]\n- wait: Wait out the laundry shift. → up / up [check wits 55]\n
+## up\n*Upstairs.*\n→ out\n
+# out\n\n*The way out.*\n\n- run: Run for it. → home / caught [check reflex 50]\n- loud: Go through them. → home / caught [check body 50, alarm +1]\n
+## home\n*Out.*\npay: full\n→ end\n\n## caught if post.door\n*The door's still open. You get out with half of it.*\ntake: part\npost door: hurt\n→ end\n\n## caught\n*The door is shut.*\ntake: none\n→ end\n`;
+  const crew = { members: [member('dez', 'runner'), member('koji', 'muscle'), member('moss', 'fence'), member('ash', 'runner', { state: 'hurt' })] };
+  const d = 0;
+  const go = async (o: Parameters<typeof relayWith>[0] = {}, people = ['dez', 'koji', 'moss'], text = POSTS()) => {
+    const r = relayWith({ clock: () => evening(d), crew, book: [job(text)], ...o });
+    expect(await r.relay.startQuest('hicks', 'back-door', { approach: 'smooth', people, favour: false })).toMatchObject({ ok: true });
+    return r;
+  };
+  const choose = async (relay: ChatRelay, beat: string, choice: string, more: { post?: string; card?: string } = {}) => {
+    const r = await relay.chooseQuest('hicks', { id: 'back-door', beat, choice, ...more });
+    return (await settleLikeOld(relay, 'back-door', beat)) ?? r;
+  };
+  const active = (relay: ChatRelay) => relay.questState('hicks').active!;
+  const run = (db: Db) => runOn(db, d)!;
+
+  it('the view marks a fork and the post', async () => {
+    const t = await go({ rolls: [6] });
+    expect(active(t.relay).choices.map((c) => c.leads)).toEqual(['THE DESK', 'THE STAIRWELL']);
+    expect(active(t.relay).post).toBeUndefined();
+    await choose(t.relay, 'lobby', 'stairs');
+    expect(active(t.relay).post).toEqual({ id: 'door', line: 'Someone holds the service door.', gives: 'The way out stays open.', suits: 'muscle' });
+    expect(active(t.relay).choices.map((c) => c.leads)).toEqual([undefined, undefined]);
+  });
+
+  // The table in the trace (plan 2026-11-15 §1): the route's shape and what a pass and a miss do, for the cards and the JOB column.
+  it('the view carries the route: both ways, their posts, the beats played', async () => {
+    const t = await go({ rolls: [6, 6] });
+    const way = (via: string, mid: string, title: string, post?: object) => ({ via, beats: [{ id: 'lobby', title: 'LOBBY' }, { id: mid, title, ...(post ? { post } : {}) }, { id: 'out', title: 'OUT' }] });
+    expect(active(t.relay).route).toEqual({ ways: [way('charm', 'desk', 'THE DESK'), way('stairs', 'stairwell', 'THE STAIRWELL', { id: 'door', suits: 'muscle' })], played: [] });
+    await choose(t.relay, 'lobby', 'stairs');
+    expect(active(t.relay).route!.played).toEqual(['lobby']);
+    await choose(t.relay, 'stairwell', 'force', { post: 'koji' });
+    expect(active(t.relay).route!.ways[1].beats[1].post).toEqual({ id: 'door', suits: 'muscle', by: 'koji' });
+    expect(active(t.relay).route!.played).toEqual(['lobby', 'stairwell']);
+  });
+
+  it("a card says what its miss does: nothing kept without the post, half and the holder's hit with it", async () => {
+    const bare = await go({ rolls: [6, 6] });
+    await choose(bare.relay, 'lobby', 'stairs');
+    expect(active(bare.relay).choices.map((c) => c.on)).toEqual([undefined, undefined]);
+    await choose(bare.relay, 'stairwell', 'force');
+    expect(active(bare.relay).choices.map((c) => c.on)).toEqual([{ miss: 'none' }, { miss: 'none' }]);
+    const held = await go({ rolls: [6, 6] });
+    await choose(held.relay, 'lobby', 'stairs');
+    await choose(held.relay, 'stairwell', 'force', { post: 'koji' });
+    expect(active(held.relay).choices.map((c) => c.on)).toEqual([{ miss: 'part', harm: { who: 'koji', harm: 'hurt' } }, { miss: 'part', harm: { who: 'koji', harm: 'hurt' } }]);
+  });
+
+  it('a pick with a send posts them and sets the flag', async () => {
+    const t = await go({ rolls: [6, 6] });
+    await choose(t.relay, 'lobby', 'stairs');
+    await choose(t.relay, 'stairwell', 'force', { post: 'koji' });
+    expect(run(t.db).posts).toEqual({ door: 'koji' });
+    expect(run(t.db).flags['post.door']).toBe('fit');
+    expect(active(t.relay).hand!.people.find((p) => p.id === 'koji')).toMatchObject({ at: 'DOOR', free: 0 });
+    const u = await go({ rolls: [6, 6] });
+    await choose(u.relay, 'lobby', 'stairs');
+    await choose(u.relay, 'stairwell', 'force', { post: 'dez' });
+    expect(run(u.db).flags['post.door']).toBe('yes');
+  });
+
+  it('a posted recruit cannot call or press', async () => {
+    const t = await go({ rolls: [6, 6, 6] });
+    await choose(t.relay, 'lobby', 'stairs');
+    await choose(t.relay, 'stairwell', 'force', { post: 'koji' });
+    expect(await choose(t.relay, 'out', 'loud', { card: 'koji' })).toBe('KOJI IS AT THE DOOR');
+    expect(active(t.relay).choices.find((c) => c.id === 'loud')!.plays?.koji).toBeUndefined();
+  });
+
+  it('a posted fence still fences', async () => {
+    const t = await go({ rolls: [6, 6, 6] }, ['dez', 'koji', 'moss'], POSTS(''));
+    await choose(t.relay, 'lobby', 'stairs');
+    await choose(t.relay, 'stairwell', 'force', { post: 'moss' });
+    await choose(t.relay, 'out', 'run');
+    expect(run(t.db).setup!.fenced).toBe(true);
+  });
+
+  it('the harm line hurts whoever holds the post, and the miss keeps part of the take', async () => {
+    const t = await go({ rolls: [6, 6, 2] });
+    await choose(t.relay, 'lobby', 'stairs');
+    await choose(t.relay, 'stairwell', 'force', { post: 'koji' });
+    await choose(t.relay, 'out', 'run');
+    expect(run(t.db).take).toBe('part');
+    expect(run(t.db).calls).toContainEqual({ beat: 'out', choice: 'run', card: 'koji', again: false, at: expect.any(Number), loss: 'hurt', post: 'door' });
+    expect(t.db.recentMessages('hicks', 50).some((m) => m.text.includes('Koji got hurt'))).toBe(true);
+  });
+
+  it('the harm line does nothing with the post empty', async () => {
+    const t = await go({ rolls: [6, 6, 2] });
+    await choose(t.relay, 'lobby', 'stairs');
+    await choose(t.relay, 'stairwell', 'force');
+    await choose(t.relay, 'out', 'run');
+    expect(run(t.db).take).toBe('none');
+    expect((run(t.db).calls ?? []).filter((c) => c.loss)).toEqual([]);
+  });
+
+  it('a job that never plays the harm line leaves them unharmed', async () => {
+    const t = await go({ rolls: [6, 6, 6] });
+    await choose(t.relay, 'lobby', 'stairs');
+    await choose(t.relay, 'stairwell', 'force', { post: 'koji' });
+    await choose(t.relay, 'out', 'run');
+    expect(run(t.db).done).toBe(true);
+    expect((run(t.db).calls ?? []).filter((c) => c.loss)).toEqual([]);
+  });
+
+  it('rewind over the send puts them back', async () => {
+    const t = await go({ rolls: [6, 6] });
+    await choose(t.relay, 'lobby', 'stairs');
+    const before = t.db.recentMessages('hicks', 50).filter((m) => m.mode === 'quest' && m.role === 'user').at(-1)!;
+    await choose(t.relay, 'stairwell', 'force', { post: 'koji' });
+    expect(run(t.db).posts).toEqual({ door: 'koji' });
+    await t.relay.rewind('hicks', before.id);
+    expect(run(t.db).posts).toBeUndefined();
+    expect(run(t.db).flags['post.door']).toBeUndefined();
+    expect(active(t.relay).hand!.people.find((p) => p.id === 'koji')).toMatchObject({ free: 1 });
+  });
+
+  it.each([
+    ['guest-noa', 'ONLY YOUR OWN CREW TAKE A POST'],
+    ['contact:ember', 'ONLY YOUR OWN CREW TAKE A POST'],
+    ['favour', 'ONLY YOUR OWN CREW TAKE A POST'],
+    ['ash', 'NOBODY TO SEND'],
+    ['nobody', 'NOBODY TO SEND'],
+  ])('refuses %s at a post', async (who, why) => {
+    const t = await go({ rolls: [6, 6] });
+    await choose(t.relay, 'lobby', 'stairs');
+    expect(await choose(t.relay, 'stairwell', 'force', { post: who })).toBe(why);
+    expect(run(t.db).posts).toBeUndefined();
+    expect(run(t.db).beat).toBe('stairwell');
+  });
+
+  it('refuses a send on a beat with no post', async () => {
+    const t = await go({ rolls: [6] });
+    expect(await choose(t.relay, 'lobby', 'stairs', { post: 'koji' })).toBe('NO POST HERE');
+    expect(run(t.db).beat).toBe('lobby');
+  });
+
+  // Final review fixes (2026-11-14).
+  it('a send on a roll that parks is kept while its costs wait, and after they settle', async () => {
+    const t = await go({ rolls: [6, 2] });
+    await choose(t.relay, 'lobby', 'stairs');
+    await t.relay.chooseQuest('hicks', { id: 'back-door', beat: 'stairwell', choice: 'force', post: 'koji' });
+    expect(run(t.db).pending).toBeTruthy();
+    expect(run(t.db).posts).toEqual({ door: 'koji' });
+    await settleLikeOld(t.relay, 'back-door', 'stairwell');
+    expect(run(t.db).beat).toBe('out');
+    expect(run(t.db).posts).toEqual({ door: 'koji' });
+    expect(run(t.db).flags['post.door']).toBe('fit');
+  });
+
+  it('sent and called on one pick: refused, and nothing is written', async () => {
+    const t = await go({ rolls: [6, 6] });
+    await choose(t.relay, 'lobby', 'stairs');
+    expect(await t.relay.chooseQuest('hicks', { id: 'back-door', beat: 'stairwell', choice: 'force', post: 'koji', card: 'koji' })).toBe('KOJI IS AT THE DOOR');
+    expect(run(t.db).posts).toBeUndefined();
+    expect(run(t.db).flags['post.door']).toBeUndefined();
+    expect(run(t.db).beat).toBe('stairwell');
+  });
+
+  it('the harm is said even when the same pick fills ALARM and the job goes to GET OUT', async () => {
+    const t = await go({ rolls: [6, 6, 2] });
+    await choose(t.relay, 'lobby', 'stairs');
+    await choose(t.relay, 'stairwell', 'force', { post: 'koji' });
+    t.db.setMeta(keyOn(d), JSON.stringify({ ...run(t.db), alarm: 3 }));
+    await choose(t.relay, 'out', 'loud');
+    expect(run(t.db).getaway).toBe(true);
+    expect(run(t.db).calls).toContainEqual(expect.objectContaining({ card: 'koji', loss: 'hurt', post: 'door' }));
+    expect(t.db.recentMessages('hicks', 50).some((m) => m.text.includes('Koji got hurt'))).toBe(true);
+  });
+
+  it("Talk Them Down has nothing to do on a miss the post already covers", () => {
+    const q = job(POSTS());
+    const p = { beat: 'out', choice: 'run', roll: { kind: 'miss' }, cost: { alarm: 0, heat: 0 } } as never;
+    const at = (flags: Record<string, string>) => afterRefusal('talk-down', q, { beat: 'out', variant: 0, wait: null, picks: [], flags, done: false, at: 1 } as never, p);
+    expect(at({})).toBeNull();
+    expect(at({ 'post.door': 'yes' })).toBe('NOT A BLOW-UP');
+  });
+
+  // SO FAR (the trace table, 2026-11-15): a job's pick keeps what it changed on TAKE and ALARM, and the view lists the rolled beats.
+  describe('SO FAR: what each rolled beat changed', () => {
+    const LINE = /^[A-Z]+ (\d|6 6) · (CRIT|CLEAN|THROUGH, AT A COST|MISS)$/;
+    const clocks = (db: Db) => ({ take: run(db).takeFill ?? 0, alarm: run(db).alarm ?? 0 });
+    /** What a pick must carry for a change of `take` and `alarm`: only what moved. */
+    const moved = (take: number, alarm: number) => ({ ...(take ? { take } : {}), ...(alarm ? { alarm } : {}) });
+
+    /** The job at tier 1 (no tier cut), its front way in the open: a 4–5 there fills TAKE and deals costs. */
+    const OPEN = POSTS().replace('tier: 2', 'tier: 1').replace('[check cool 55, set route=front]', '[check cool 50, set route=front]');
+
+    it('a roll that moved neither clock (a 4–5 in the dark at SMALL) has its row, with no change on it or on the pick', async () => {
+      const t = await go({ rolls: [5] });
+      await choose(t.relay, 'lobby', 'charm');
+      expect(clocks(t.db)).toEqual({ take: 0, alarm: 0 });
+      const last = run(t.db).picks.at(-1)!;
+      expect(last).not.toHaveProperty('take');
+      expect(last).not.toHaveProperty('alarm');
+      expect(active(t.relay).soFar).toEqual([{ beat: 'lobby', title: 'LOBBY', line: 'COOL 5 · THROUGH, AT A COST' }]);
+    });
+
+    it('no row before a beat is rolled', async () => {
+      const t = await go({ rolls: [6] });
+      expect(active(t.relay)).not.toHaveProperty('soFar');
+    });
+
+    it('a 4–5 whose ALARM cost is taken: the pick carries TAKE and ALARM as the run moved, and the view has its row', async () => {
+      const t = await go({ rolls: [5] }, undefined, OPEN);
+      const before = clocks(t.db);
+      await t.relay.chooseQuest('hicks', { id: 'back-door', beat: 'lobby', choice: 'charm' });
+      expect(active(t.relay).costs).toBeDefined();
+      dealAs(t.db, keyOn(d), ['alarm']);
+      await t.relay.chooseQuest('hicks', { id: 'back-door', beat: 'lobby', choice: '!cost', card: 'alarm' });
+      await t.relay.chooseQuest('hicks', { id: 'back-door', beat: 'lobby', choice: '!take' });
+      const after = clocks(t.db);
+      expect(run(t.db).beat).toBe('desk');
+      expect(after.alarm - before.alarm).toBe(1);
+      expect(after.take - before.take).toBeGreaterThan(0);
+      const last = run(t.db).picks.at(-1)!;
+      expect(last).toMatchObject({ beat: 'lobby', choice: 'charm' });
+      expect({ ...(last.take !== undefined ? { take: last.take } : {}), ...(last.alarm !== undefined ? { alarm: last.alarm } : {}) }).toEqual(moved(after.take - before.take, after.alarm - before.alarm));
+      const rows = active(t.relay).soFar!;
+      expect(rows).toEqual([{ beat: 'lobby', title: 'LOBBY', line: 'COOL 5 · THROUGH, AT A COST', take: after.take - before.take, alarm: 1 }]);
+      expect(rows[0].line).toMatch(LINE);
+    });
+
+    it('two rolled beats: two rows, oldest first, each with its own change; a clock that did not move is left off', async () => {
+      const t = await go({ rolls: [66, 6] });
+      const c0 = clocks(t.db);
+      await choose(t.relay, 'lobby', 'stairs');
+      const c1 = clocks(t.db);
+      await choose(t.relay, 'stairwell', 'force');
+      const c2 = clocks(t.db);
+      expect(run(t.db).beat).toBe('out');
+      const [a, b] = run(t.db).picks.slice(-2);
+      expect([a.take, a.alarm, b.take, b.alarm]).toEqual([c1.take - c0.take || undefined, c1.alarm - c0.alarm || undefined, c2.take - c1.take || undefined, c2.alarm - c1.alarm || undefined]);
+      expect(a.take).toBeGreaterThan(0);
+      expect(a).not.toHaveProperty('alarm');
+      const rows = active(t.relay).soFar!;
+      expect(rows).toEqual([
+        { beat: 'lobby', title: 'LOBBY', line: 'REFLEX 6 6 · CRIT', ...moved(c1.take - c0.take, 0) },
+        { beat: 'stairwell', title: 'THE STAIRWELL', line: 'BODY 6 · CLEAN', ...moved(c2.take - c1.take, 0) },
+      ]);
+      for (const r of rows) expect(r.line).toMatch(LINE);
+      expect([c0.take, c1.take, c2.take]).toEqual([0, 2, 3]);
+    });
+
+    it('a pick with no roll, an old d100 roll and a press-on beat have no row; a run from before keeps its rows without the changes', async () => {
+      const t = await go({ rolls: [6] });
+      await choose(t.relay, 'lobby', 'stairs');
+      const r = run(t.db);
+      const rolled = r.picks.at(-1)!;
+      const { take: _take, alarm: _alarm, ...bare } = rolled;
+      t.db.setMeta(keyOn(d), JSON.stringify({ ...r, picks: [{ beat: 'lobby', choice: 'look' }, { beat: 'lobby', choice: 'old', roll: { stat: 'COOL', chance: 60, rolls: [40], pass: true } }, { beat: '!push-1', choice: 'crack', roll: rolled.roll }, bare] }));
+      expect(active(t.relay).soFar).toEqual([{ beat: 'lobby', title: 'LOBBY', line: 'REFLEX 6 · CLEAN' }]);
+    });
   });
 });

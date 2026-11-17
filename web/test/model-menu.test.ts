@@ -42,6 +42,12 @@ describe('ModelMenu: the Anthropic key', () => {
     const { root } = setup({ ...ON, model: 'anthropic/claude-sonnet-5.5' });
     expect(root.querySelector('.mm-credit')!.textContent).toBe('ON YOUR ANTHROPIC KEY');
   });
+
+  it('a model on the NanoGPT key: its row and the header say so', () => {
+    const { root } = setup({ ...EVENT, model: EVENT.choices![0]!.id, choices: [{ ...EVENT.choices![0]!, via: 'nanogpt' }] });
+    expect(rows(root)[0]!.querySelector('.mm-via')!.textContent).toBe('YOUR NANOGPT KEY');
+    expect(root.querySelector('.mm-credit')!.textContent).toBe('ON YOUR NANOGPT KEY');
+  });
   it('search results through the Anthropic key say so too', async () => {
     document.body.innerHTML = '';
     const root = document.createElement('div');

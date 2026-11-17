@@ -2,6 +2,7 @@ import { her } from '../room/her-copy';
 import { foldArrow } from './chat-keys';
 import { keyButton } from './key-glyphs';
 import type { ChatMode } from '../../../shared/types';
+import { setTip } from './hover-tag';
 
 /** The RP/OOC toggle's own mode: end-of-scene is a separate send, not a toggle state. */
 type ToggleMode = Exclude<ChatMode, 'end' | 'greet' | 'travel' | 'scene' | 'encounter' | 'quest' | 'gig' | 'dice' | 'text'>;
@@ -53,6 +54,8 @@ export function mountInput(
   } = {},
 ): {
   setBusy(b: boolean, label?: string): void;
+  /** A ride-along job's contact has answered your move (2026-11-08): the hint at rest says you can answer them, or play on. Null: back to the keys. */
+  setRide(name: string | null): void;
   /** What's in the box now. */
   draft(): string;
   restoreDraft(text: string): void;
@@ -66,6 +69,8 @@ export function mountInput(
   suggestWhyNot(): string | null;
   /** Re-measures the draft (TEXT SIZE changed its line height). */
   refit(): void;
+  /** The player's name before the prompt line. */
+  setMe(name: string): void;
   setAgentName(name: string): void;
   /** Whether her mind can deal events (a direct link with a working key), and why not. */
   /** `why` may be read later (a function): words about her follow her pronoun, which can arrive after. */
@@ -86,6 +91,9 @@ export function mountInput(
   modeButton.type = 'button';
   modeButton.className = 'mode';
 
+  // Who types: the player's name before the line, in their colour (style.css `.me`).
+  const me = document.createElement('span');
+  me.className = 'me';
   const field = document.createElement('div');
   field.className = 'field';
   const ta = document.createElement('textarea');
@@ -115,13 +123,13 @@ export function mountInput(
   walkOutButton.type = 'button';
   walkOutButton.className = 'walk-out-btn';
   walkOutButton.textContent = 'WALK OUT';
-  walkOutButton.title = 'Walk out on your own (Enter)';
+  setTip(walkOutButton, 'Walk out on your own (Enter)');
   walkOutButton.hidden = true;
   const stayButton = document.createElement('button');
   stayButton.type = 'button';
   stayButton.className = 'walk-out-stay';
   stayButton.textContent = 'stay';
-  stayButton.title = 'Stay and keep talking';
+  setTip(stayButton, 'Stay and keep talking');
   stayButton.hidden = true;
 
   // ◆ DRAW (encounter cards): three events that could cut in now (Alt+D).
@@ -146,7 +154,7 @@ export function mountInput(
   sceneKeys.setAttribute('aria-label', 'Scene actions');
   sceneKeys.append(suggestButton, diceButton, drawButton, endButton, leaveButton, foldArrow(sceneKeys, 'scene'));
 
-  bar.append(modeButton, field, hint, walkOutButton, stayButton);
+  bar.append(modeButton, me, field, hint, walkOutButton, stayButton);
   root.append(bar, sceneKeys);
 
   let busy = false;
@@ -155,13 +163,15 @@ export function mountInput(
   let agentName = 'Nix';
   let mode: ToggleMode = opts.initialMode ?? 'rp';
   let drawState: { ok: true } | { ok: false; why: string | (() => string) } = { ok: true };
-  const idleHint = (): HintPart[] => (mode === 'ooc' ? OOC_HINT : RP_HINT);
+  /** Who answered your move on a ride-along job, until the next pick (null: nobody). */
+  let ride: string | null = null;
+  const idleHint = (): HintPart[] => (mode === 'ooc' ? OOC_HINT : ride ? [{ text: `ANSWER ${ride.toUpperCase()} · OR PLAY A CARD`, drop: 9 }, ...RP_HINT] : RP_HINT);
   /** Why DRAW can't deal now (null: it can): she's transmitting, out of character, or her mind can't. */
   const drawWhyNot = (): string | null => (busy ? her().waitToFinish : mode === 'ooc' ? 'Encounters are for roleplay.' : drawState.ok ? null : typeof drawState.why === 'function' ? drawState.why() : drawState.why);
   const applyDraw = () => {
     const why = drawWhyNot();
     drawButton.disabled = why !== null;
-    drawButton.title = why ?? 'Draw an encounter: three events that could cut in now (Alt+D)';
+    setTip(drawButton, why ?? 'Draw an encounter: three events that could cut in now (Alt+D)');
   };
   const draw = () => {
     if (drawWhyNot() === null) opts.onDraw?.();
@@ -173,7 +183,7 @@ export function mountInput(
   const applySuggest = () => {
     const why = suggestWhyNot();
     suggestButton.disabled = why !== null;
-    suggestButton.title = why ?? "Suggest your next line three ways, to send or edit. What you've typed steers them (Alt+G)";
+    setTip(suggestButton, why ?? "Suggest your next line three ways, to send or edit. What you've typed steers them (Alt+G)");
   };
   /** The hint at rest: the mode's keys. */
   const restHint = () => {
@@ -244,7 +254,14 @@ export function mountInput(
       ...parts.map((p) => {
         const s = document.createElement('span');
         s.className = 'hint-part';
-        s.textContent = p.text;
+        // A shortcut's key ([ENTER]) is lit apart from its word (style.css); the text reads the same.
+        const key = /^(\[[^\]]+\])( .*)$/.exec(p.text);
+        if (key) {
+          const k = document.createElement('span');
+          k.className = 'hk';
+          k.textContent = key[1];
+          s.append(k, key[2]);
+        } else s.textContent = p.text;
         s.dataset.drop = String(p.drop);
         return s;
       }),
@@ -256,7 +273,7 @@ export function mountInput(
 
   const applyMode = () => {
     modeButton.textContent = MODE_LABEL[mode];
-    modeButton.title = MODE_TITLE[mode];
+    setTip(modeButton, MODE_TITLE[mode]);
     modeButton.setAttribute('aria-label', mode === 'ooc' ? 'Mode: out of character' : 'Mode: roleplay');
     bar.classList.toggle('mode-rp', mode === 'rp');
     bar.classList.toggle('mode-ooc', mode === 'ooc');
@@ -383,12 +400,16 @@ export function mountInput(
   ta.focus();
 
   return {
+    setMe(name: string) {
+      me.textContent = name;
+      fitHint();
+    },
     setAgentName(name: string) {
       agentName = name;
       ta.setAttribute('aria-label', `Message ${name}`);
       // Her pronoun is set with her name (the portrait event): the buttons' titles follow it.
-      endButton.title = endTitle();
-      leaveButton.title = her().leaveTitle;
+      setTip(endButton, endTitle());
+      setTip(leaveButton, her().leaveTitle);
       applyDraw();
       applySuggest();
     },
@@ -402,6 +423,11 @@ export function mountInput(
       applyDraw();
       applySuggest();
     },
+    setRide(name) {
+      if (name === ride) return;
+      ride = name;
+      restHint();
+    },
     setDraw(state) {
       drawState = state;
       applyDraw();
@@ -409,7 +435,7 @@ export function mountInput(
     },
     setDiceBlock(reason) {
       diceButton.disabled = reason !== null;
-      diceButton.title = reason ?? "Liar's dice";
+      setTip(diceButton, reason ?? "Liar's dice");
     },
     drawWhyNot,
     setComms(on: boolean) {

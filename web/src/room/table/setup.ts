@@ -6,7 +6,7 @@
 import { APPROACHES, MAX_CONTACTS, MAX_PEOPLE, type Approach } from '../../../../shared/hand';
 import type { SetupOffer } from '../../../../shared/types';
 import { cardEl, trayHead, mountDeal, type TableCard } from './deal';
-import { el, type TableCue } from './el';
+import { el, isPhone, type TableCue } from './el';
 import { approachInfo, contactInfo, favourInfo, GOES_WRONG, mountCardInfo, programInfo, recruitInfo, slotInfo, type Info } from './card-info';
 import { mountTableShell } from './shell';
 import type { Tips } from './tips';
@@ -40,7 +40,9 @@ export function mountSetup(
   host: HTMLElement,
   o: { offer: SetupOffer; title: string; pitch: string | null; tier: number | null; reduced: boolean; onGo(setup: { approach: Approach; people: string[]; favour: boolean; contacts?: string[]; programs?: string[] }): void; onBack(): void; cue?(name: TableCue): void; tips?: Tips },
 ): SetupCard {
-  const shell = mountTableShell(host);
+  // Off a phone SETUP is the job's table (playtest 2026-11-11): the HUD's regions, the JOB column in the log, GO IN and
+  // BACK where the levers go. A phone keeps its scrolling card.
+  const shell = mountTableShell(host, { hud: !isPhone(host) });
   shell.root.classList.add('tb-setup');
   let offer = o.offer;
   let approach: Approach = 'quiet';
@@ -61,6 +63,18 @@ export function mountSetup(
   if (o.pitch) pitch.append(el('div', 'ts-line', o.pitch));
   const sub = el('div', 'tb-sub', setupLine(offer));
   pitch.append(sub);
+  // HUD: the job's name is on the JOB column's plate, so the pitch steps out and its line heads the top bar as the
+  // table's strip (TIER, the district, your tier there, its heat).
+  const strip = el('div', 'tb-strip ts-strip');
+  const showStrip = () => strip.replaceChildren(...(o.tier ? [el('span', 'ts-strip-tier', `TIER ${o.tier}`)] : []), el('span', '', setupLine(offer)));
+  showStrip();
+  // No clocks before the job: nothing runs yet.
+  shell.corners({});
+  if (shell.top) {
+    const lead = el('div', 'tb-top-l');
+    lead.append(strip);
+    shell.top.prepend(lead);
+  }
   const refusal = el('div', 'ts-refusal');
   const how = el('div', 'ts-approach');
   how.append(el('div', 'tb-group-label', 'HOW YOU GO IN'));
@@ -151,6 +165,8 @@ export function mountSetup(
       else if (id.startsWith('prog-pick:')) {
         loads.push(id.slice('prog-pick:'.length));
         fan = null;
+        o.cue?.('load');
+        return render();
       } else if (id.startsWith('prog:')) loads.splice(loads.indexOf(id.slice('prog:'.length)), 1);
       o.cue?.('move');
       render();
@@ -233,7 +249,7 @@ export function mountSetup(
       b.addEventListener('click', () => {
         if (people.length >= MAX_PEOPLE || people.includes(c.id)) return;
         people.push(c.id);
-        o.cue?.('move');
+        o.cue?.('crew');
         render();
       });
       strip.append(b);
@@ -260,7 +276,7 @@ export function mountSetup(
   go.addEventListener('click', () => {
     o.tips?.clear();
     refusal.textContent = '';
-    o.cue?.('confirm');
+    o.cue?.('go');
     o.onGo({ approach, people: [...people], favour, ...(contacts.length ? { contacts: [...contacts] } : {}), ...(loads.length ? { programs: [...loads] } : {}) });
   });
   back.addEventListener('click', () => {
@@ -270,7 +286,11 @@ export function mountSetup(
   shell.prose('');
   shell.root.querySelector('.tb-prose')!.replaceWith(pitch);
   const mid = el('div', 'ts-mid');
-  mid.append(how, buttons);
+  // HUD: GO IN and BACK stand in the levers column, as PUSH, SAFE and BOLD do at the table.
+  if (shell.levers) {
+    mid.append(how);
+    shell.levers.append(buttons);
+  } else mid.append(how, buttons);
   stage.append(mid, tray);
   shell.middle.append(stage, refusal);
   shell.bottom.append(hand, ready, ...(!decked && offer.contacts.length ? [contactRow] : []));
@@ -284,6 +304,7 @@ export function mountSetup(
     update(next) {
       offer = next;
       sub.textContent = setupLine(offer);
+      showStrip();
       // Who's still ready, and the loads the new deck still holds, first loaded first kept.
       people.splice(0, people.length, ...people.filter((id) => offer.crew.some((c) => c.id === id)));
       const kept = loads.filter((id) => offer.programs?.some((p) => p.id === id)).slice(0, offer.deck?.slots ?? 0);

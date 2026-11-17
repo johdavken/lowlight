@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ResidualAnswer } from '../../server/src/residual';
-import { applyAnswer, changeOf, exchangesFor, herReplies, isRecapRun, ledgerOf, withChange, type ChatMessage, type Ledger, type LedgerChange } from './ledger';
+import { applyAnswer, changeOf, exchangesFor, habitsDue, habitsInput, herReplies, isRecapRun, ledgerOf, withChange, type ChatMessage, type Ledger, type LedgerChange } from './ledger';
 
 const ok = { ok: true } as const;
 const change = (c: Partial<LedgerChange>): LedgerChange => ({ notes: [], lights: [], run: ok, ...c });
@@ -9,7 +9,7 @@ const add = (id: string, text: string, o: { pin?: boolean; keys?: string[]; abou
 const her = (mes: string, c?: LedgerChange) => (c ? withChange({ name: 'Nix', mes }, c) : { name: 'Nix', mes });
 const you = (mes: string) => ({ name: 'Hicks', mes, is_user: true });
 const answer = (a: Partial<ResidualAnswer>): ResidualAnswer => ({ notes: [], standing: null, lights: [], time: null, plan: null, recap: null, dossier: null, ...a });
-const empty: Ledger = { notes: [], recap: null, nextId: 1 };
+const empty: Ledger = { notes: [], recap: null, habits: [], nextId: 1 };
 
 describe('ledgerOf', () => {
   it('a chat from before the Residual folds to an empty ledger', () => {
@@ -19,7 +19,7 @@ describe('ledgerOf', () => {
   it('add, rewrite, forget: one note, then none', () => {
     const chat = [her('a', change({ notes: [add('n1', 'Owes Hae.')] })), her('b', change({ notes: [{ op: 'rewrite', id: 'n1', text: 'Paid Hae back.', pin: true }] }))];
     expect(ledgerOf(chat).notes).toMatchObject([{ id: 'n1', text: 'Paid Hae back.', pinned: true, about: 'you', editedBy: 'agent' }]);
-    expect(ledgerOf([...chat, her('c', change({ notes: [{ op: 'forget', id: 'n1' }] }))])).toEqual({ notes: [], recap: null, nextId: 2 });
+    expect(ledgerOf([...chat, her('c', change({ notes: [{ op: 'forget', id: 'n1' }] }))])).toEqual({ notes: [], recap: null, habits: [], nextId: 2 });
   });
 
   it('ids are stable across folds, and never reused after a forget', () => {
@@ -98,7 +98,7 @@ describe('applyAnswer', () => {
     const pins = Array.from({ length: 8 }, (_, i) => ({ id: `n${i + 1}`, text: 'P.', pinned: true, createdAt: 0, updatedAt: 0, editedBy: 'agent' as const, about: 'you' as const, keys: [] }));
     const long = `${'word '.repeat(60)}end`;
     const c = applyAnswer(
-      { notes: pins, recap: null, nextId: 9 },
+      { notes: pins, recap: null, habits: [], nextId: 9 },
       answer({
         notes: [
           { op: 'rewrite', id: 'n99', text: 'X.' },
@@ -122,7 +122,7 @@ describe('applyAnswer', () => {
 
   it('a rewrite that would pin past 8 keeps its text, unpinned', () => {
     const pins = Array.from({ length: 8 }, (_, i) => ({ id: `n${i + 1}`, text: 'P.', pinned: true, createdAt: 0, updatedAt: 0, editedBy: 'agent' as const, about: 'you' as const, keys: [] }));
-    const l = { notes: [...pins, { ...pins[0], id: 'n9', pinned: false }], recap: null, nextId: 10 };
+    const l = { notes: [...pins, { ...pins[0], id: 'n9', pinned: false }], recap: null, habits: [], nextId: 10 };
     expect(applyAnswer(l, answer({ notes: [{ op: 'rewrite', id: 'n9', text: 'New.', pin: true }] }), lights, names).notes).toEqual([{ op: 'rewrite', id: 'n9', text: 'New.' }]);
   });
 
@@ -182,5 +182,81 @@ describe('the recap run and exchanges', () => {
     const got = exchangesFor(chat, 19);
     expect(got).toHaveLength(12);
     expect(got.at(-1)).toEqual({ speaker: 'Nix', text: 'h19' });
+  });
+});
+
+describe('applyAnswer: a light group (light groups)', () => {
+  const roomLights = [
+    { id: 'lamp', label: 'lamp', color: '#fff', intensity: 0.6, base: 0.6, radius: 1, flicker: 0, pos: [0, 0] },
+    { id: 'tv', label: 'TV', color: '#fff', intensity: 0.4, base: 0.4, radius: 1, flicker: 0, pos: [0, 0] },
+    { id: 'window', label: 'window', color: '#fff', intensity: 0.8, base: 0.8, radius: 1, flicker: 0, pos: [0, 0], outside: true },
+  ] as unknown as import('../../shared/types').LightDef[];
+  const ids = new Set(roomLights.map((l) => l.id));
+
+  it('inside expands to every indoor light at that share of its base, saved light by light', () => {
+    const c = applyAnswer(empty, answer({ lights: [{ id: 'inside', intensity: 0 }] }), ids, ['Nix', 'Hicks'], { roomLights });
+    expect(c.lights).toEqual([{ id: 'lamp', intensity: 0 }, { id: 'tv', intensity: 0 }]);
+    expect(c.run).toEqual({ ok: true });
+  });
+
+  it('without the room lights (an older caller) a group is refused like an unknown id', () => {
+    const c = applyAnswer(empty, answer({ lights: [{ id: 'inside', intensity: 0 }] }), ids, ['Nix', 'Hicks']);
+    expect(c.lights).toEqual([]);
+    expect(c.run).toEqual({ ok: true, refused: 1 });
+  });
+});
+
+describe('habits', () => {
+  /** n of her replies, each after a line of yours. */
+  const night = (n: number): ChatMessage[] => Array.from({ length: n }, (_, i) => [you(`line ${i}`), her(`reply ${i}`)]).flat();
+  const last = (chat: ChatMessage[]) => chat.length - 1;
+
+  it('first runs on her 8th reply', () => {
+    expect(habitsDue(night(7), last(night(7)))).toBe(false);
+    expect(habitsDue(night(8), last(night(8)))).toBe(true);
+  });
+
+  it('runs again 12 replies after one that worked, 3 after one that failed', () => {
+    const after = (h: LedgerChange['habits'], more: number) => {
+      const chat = night(8);
+      chat[last(chat)] = her('reply 7', change({ habits: h }));
+      return [...chat, ...night(more)];
+    };
+    expect(habitsDue(after({ rules: ['No glasses'] }, 11), last(after({ rules: ['No glasses'] }, 11)))).toBe(false);
+    expect(habitsDue(after({ rules: ['No glasses'] }, 12), last(after({ rules: ['No glasses'] }, 12)))).toBe(true);
+    expect(habitsDue(after({ failed: 'not JSON' }, 2), last(after({ failed: 'not JSON' }, 2)))).toBe(false);
+    expect(habitsDue(after({ failed: 'not JSON' }, 3), last(after({ failed: 'not JSON' }, 3)))).toBe(true);
+  });
+
+  it("doesn't count tool-call messages, hidden ones, a narrator or anyone else as her replies", () => {
+    const others: ChatMessage[] = [
+      { name: 'Nix', mes: '', extra: { tool_invocations: [{ name: 'set_light' }] } },
+      { name: 'Nix', mes: 'pre-tool', is_system: true },
+      { name: 'Narrator', mes: 'Rain.', extra: { type: 'narrator' } },
+      { name: 'Hae', mes: 'Two bowls.' },
+    ];
+    const chat: ChatMessage[] = [...night(6), ...others, her('reply 6')];
+    expect(habitsDue(chat, last(chat))).toBe(false);
+    expect(habitsInput(chat, last(chat), 'Nix', 'Hicks', []).hers).not.toContain('Two bowls.');
+  });
+
+  it('the rules fold from the newest run that worked, and go with a swipe of the message carrying them', () => {
+    // A run stamps its take (its send_date); a new take carries a copy of the message's extra, as SillyTavern does.
+    const ran: ChatMessage = { ...her('a', change({ habits: { rules: ['No glasses'] }, take: 1 })), send_date: 1 };
+    const chat: ChatMessage[] = [ran, her('b', change({ habits: { failed: 'no answer' } }))];
+    expect(ledgerOf(chat).habits).toEqual(['No glasses']);
+    const swiped: ChatMessage = { ...ran, swipe_id: 1, swipe_info: [{ send_date: 1, extra: ran.extra }, { send_date: 2, extra: { ...ran.extra } }] };
+    expect(ledgerOf([swiped, chat[1]]).habits).toEqual([]);
+  });
+
+  it('reads her last 12 replies and your lines between', () => {
+    const chat = night(14);
+    const { input, hers } = habitsInput(chat, last(chat), 'Nix', 'Hicks', ['No glasses']);
+    expect(hers).toHaveLength(12);
+    expect(hers[0]).toBe('reply 2');
+    expect(input.lines[0]).toEqual({ speaker: 'her', text: 'reply 2' });
+    expect(input.lines[1]).toEqual({ speaker: 'them', text: 'line 3' });
+    expect(input.lines).toHaveLength(23);
+    expect(input.current).toEqual(['No glasses']);
   });
 });

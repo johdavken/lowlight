@@ -24,7 +24,6 @@ const mark = (cls: string, label: string, art: string): HTMLElement => {
   const m = el('span', `tbc-mark ${cls}`);
   m.setAttribute('role', 'img');
   m.setAttribute('aria-label', label);
-  m.title = label;
   m.innerHTML = art;
   return m;
 };

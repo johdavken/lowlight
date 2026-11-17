@@ -1,7 +1,7 @@
 /**
  * The title menu (spec 2026-10-09 front-end restyle §3), in the select screen's language: the
- * player and the contact as fighters with their files, and a tile band — CONTINUE the active
- * playthrough with a known contact (↑↓ picks which), NEW GAME (the select flow), LOAD, and REPORT A BUG
+ * player and the contact as fighters with their files, and a list on a rail (B TRACE, playtest 2026-11-14) — CONTINUE the active
+ * playthrough with a known contact (←→ picks which), NEW GAME (the select flow), LOAD, and REPORT A BUG
  * (spec 2026-10-11 bug report §3.1).
  */
 import type { AroundEntry, ContactEntry, PlaythroughInfo } from '../../../shared/types';
@@ -11,7 +11,7 @@ import { FighterStrip, liveFacts, type StripFile } from './fighter-strip';
 import { mountHelpCorner } from './help-corner';
 import type { LandingAgent } from './landing';
 import { canBeAi } from './select-flow';
-import { TileBand, type BandTile } from './tile-band';
+import { setHints } from './hint-line';
 import './title.css';
 
 export type TitleItem = 'continue' | 'new' | 'load' | 'report' | 'update';
@@ -47,10 +47,10 @@ export const JACK_MS = 900;
 
 const LABELS: Record<TitleItem, string> = { continue: 'CONTINUE', new: 'NEW GAME', load: 'LOAD', report: 'REPORT A BUG', update: 'UPDATE' };
 // Keys in brackets, so a key never reads as part of its action (ENTER JACK IN).
-const HINTS = '[←→] CHOOSE · [↑↓] CONTACT · [ENTER] JACK IN · [ESC] SPLASH';
-const HINTS_ONE = '[←→] CHOOSE · [ENTER] JACK IN · [ESC] SPLASH';
-const HINTS_UPDATE = '[←→] CHOOSE · [ENTER] UPDATE · [ESC] SPLASH';
-const HINTS_NO_ENTER = '[←→] CHOOSE · [ESC] SPLASH';
+const HINTS = '[↑↓] CHOOSE · [←→] CONTACT · [ENTER] JACK IN · [ESC] SPLASH';
+const HINTS_ONE = '[↑↓] CHOOSE · [ENTER] JACK IN · [ESC] SPLASH';
+const HINTS_UPDATE = '[↑↓] CHOOSE · [ENTER] UPDATE · [ESC] SPLASH';
+const HINTS_NO_ENTER = '[↑↓] CHOOSE · [ESC] SPLASH';
 
 /** Polling for the game to come back after UPDATE, and how long before giving up. */
 export const UPDATE_POLL_MS = 2000;
@@ -108,13 +108,15 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   const logo = el('div', 'title-logo');
   const p1 = new FighterStrip(box, 'p1', { reducedMotion: deps.reducedMotion });
   const p2 = new FighterStrip(box, 'p2', { reducedMotion: deps.reducedMotion });
-  // Room for all five (CONTINUE, NEW GAME, LOAD, REPORT A BUG, and UPDATE when there is one): none hides past the edge.
-  const band = new TileBand(box, { reducedMotion: deps.reducedMotion, visible: 5, tileW: 150, tileH: 160, onPick: (i) => pick(i), onHover: (i) => focus(i) });
-  const under = el('div', 'title-under');
+  // The menu: a list on a rail under 1P's file; the focused row carries the amber line (where, or what it does).
+  const menuEl = el('div', 'title-list');
+  const under = el('span', 'title-under');
+  // Inside the focused row, but clicking its ◀ ▶ line isn't Enter.
+  under.addEventListener('click', (e) => e.stopPropagation());
   const error = el('div', 'title-error');
   const jack = el('div', 'jack-in', 'JACK IN');
   const hints = el('div', 'title-hints');
-  box.append(logo, under, error, jack, hints);
+  box.append(logo, menuEl, error, jack, hints);
   root.append(box);
   const help = mountHelpCorner(box, window.lowlight);
 
@@ -212,29 +214,19 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
     }
   }
 
-  function tile(item: TitleItem): BandTile {
-    if (item === 'continue') {
-      const c = known[shown];
-      // Her select thumbnail (the grid's face), else her portrait, else her initial.
-      const thumb = c ? deps.agents().get(c.id)?.thumb : null;
-      return {
-        id: item,
-        name: LABELS[item],
-        art: thumb
-          ? { kind: 'room', src: thumb }
-          : c?.portrait
-            ? { kind: 'face', src: c.portrait }
-            : { kind: 'mark', text: (c?.name ?? '?').charAt(0).toUpperCase() },
-        tag: { text: '▶', now: true },
-      };
-    }
-    // NEW GAME, LOAD, REPORT A BUG and UPDATE: pixel glyphs (a prompt, stacked shards, a transmitter, a line coming in).
-    return { id: item, name: LABELS[item], art: { kind: 'glyph', glyph: item }, ...(item === 'update' ? { tag: { text: 'NEW' } } : {}) };
-  }
-
-  /** The band's tiles (when the items or the contact shown change). */
+  /** The list's rows (when the items change). */
   function rebuild(): void {
-    band.setTiles(items.map(tile), index);
+    menuEl.replaceChildren(
+      ...items.map((item, i) => {
+        const row = el('div', 'tm-item');
+        row.dataset.id = item;
+        row.append(el('span', 'tm-word', LABELS[item]));
+        if (item === 'update') row.append(el('span', 'tm-tag', 'NEW'));
+        row.addEventListener('click', () => pick(i));
+        row.addEventListener('mouseenter', () => focus(i));
+        return row;
+      }),
+    );
   }
 
   /** Shows `a`, or the waiting fighter when the roster doesn't have her. */
@@ -243,13 +235,17 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   }
 
   function render(): void {
-    band.move(index);
     const item = items[index];
+    const rows = [...menuEl.querySelectorAll<HTMLElement>('.tm-item')];
+    rows.forEach((r, i) => r.classList.toggle('on', i === index));
+    rows[index]?.append(under);
     logo.textContent = item ? LABELS[item] : '';
     p1.setTag('1P · YOU');
     p2.setTag('CPU · AI');
-    hints.textContent =
-      item === 'update' ? (update?.canApply ? HINTS_UPDATE : HINTS_NO_ENTER) : item === 'continue' && known.length > 1 ? HINTS : HINTS_ONE;
+    setHints(
+      hints,
+      item === 'update' ? (update?.canApply ? HINTS_UPDATE : HINTS_NO_ENTER) : item === 'continue' && known.length > 1 ? HINTS : HINTS_ONE,
+    );
     if (item === 'continue' && active) renderContinue(active);
     else if (item === 'update' && update) renderUpdate(update);
     else if (item === 'load') renderLoad();
@@ -408,7 +404,7 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   /** UPDATE pressed: the game closes and comes back updated; this tab waits for it, then reloads. */
   async function runUpdate(up: TitleUpdate): Promise<void> {
     busy = true;
-    band.setLive(false);
+    menuEl.classList.add('locked');
     error.textContent = '';
     error.classList.remove('ok');
     jack.textContent = 'UPDATING';
@@ -456,10 +452,10 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
   /** Back from a failed CONTINUE: keys work again. */
   function unlock(): void {
     busy = false;
-    band.setLive(true);
+    menuEl.classList.remove('locked');
     jack.classList.remove('on');
     jack.textContent = 'JACK IN';
-    // UPDATE's answer may have come while the band was locked.
+    // UPDATE's answer may have come while the list was locked.
     if (menu().length !== items.length) {
       const at = items[index];
       items = menu();
@@ -510,7 +506,7 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
     if (item === 'load') return deps.onLoad();
     if (item === 'report') return deps.onReport();
     busy = true;
-    band.setLive(false);
+    menuEl.classList.add('locked');
     // Lock in without redrawing: the files stay as they are under JACK IN.
     p1.lock();
     p2.lock();
@@ -537,13 +533,13 @@ export function mountTitle(root: HTMLElement, deps: TitleDeps): { destroy(): voi
 
   const onKey = (e: KeyboardEvent) => {
     if (items.length === 0 || isModified(e)) return;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       e.preventDefault();
-      focus(index + (e.key === 'ArrowLeft' ? -1 : 1));
-    } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      focus(index + (e.key === 'ArrowUp' ? -1 : 1));
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
       e.preventDefault();
       if (busy || items[index] !== 'continue' || known.length < 2) return;
-      shown = (shown + (e.key === 'ArrowUp' ? -1 : 1) + known.length) % known.length;
+      shown = (shown + (e.key === 'ArrowLeft' ? -1 : 1) + known.length) % known.length;
       deps.sound('move');
       rebuild();
       render();

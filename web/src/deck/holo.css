@@ -1,42 +1,59 @@
-/* The deck's holo look (in-game texts spec §2): the room's TEXTS pane, the crack terminal's holo skin (pink glass,
-   cyan for you, VT323, no scanlines). Everything sits under .dk-holo; the phone (deck.css) is untouched. */
+/* The deck's room look (in-game texts spec §2; on PEOPLE's trace panel since 2026-11-15, mockup people-trace.html):
+   the thread inside PEOPLE's TEXTS tab. No bubbles: each text is a row, their name in their colour, yours dim; the
+   dividers are heads on a hairline; the box is a caret on a hairline; what you can press is a cut key. The deck's own
+   list and header are hidden, since PEOPLE's list picks the thread and its head names it. Everything sits under
+   .dk-holo; the phone (deck.css) is untouched. --c is the contact's colour (PEOPLE sets it), --who their name. */
 .dk-holo {
-  --dk-pink: #ff4f8b;
-  --dk-cyan: #7fe9ff;
-  --dk-ink: #ffd9e6;
-  --dk-dim: rgba(255, 217, 230, 0.6);
+  --dk-c: var(--c, var(--dk-accent, #ff4d4d));
+  --dk-ink: var(--tp-text, #d9e4ea);
+  --dk-dim: var(--tp-dim, #8fa3ad);
+  --dk-amber: var(--tp-amber, #ffc56b);
   position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
   color: var(--dk-ink);
-  font: 20px 'VT323', monospace;
+  font: 13.5px/1.5 var(--mono, 'IBM Plex Mono', monospace);
 }
-
-/* One bar across the pane; the list's and the thread's own bars are the phone's. */
-.dk-holo > .dk-bar {
-  padding: 8px 14px 6px;
-  color: var(--dk-pink);
-  font: 18px 'VT323', monospace;
-  letter-spacing: 0.16em;
-}
+.dk-holo .dk-lcol,
+.dk-holo .dk-head,
 .dk-holo .dk-cols .dk-bar,
-.dk-holo .dk-title {
+.dk-holo .dk-title,
+.dk-holo .dk-net {
   display: none;
 }
+/* The bar is only the clock now: PASS TIME, as a small cut key at the thread's top right. */
+.dk-holo > .dk-bar {
+  position: absolute;
+  right: 0;
+  top: -34px;
+  z-index: 1;
+  padding: 0;
+}
 .dk-holo .dk-clock {
-  color: var(--dk-pink);
-  font: inherit;
+  padding: 5px 12px 3px;
+  border: 0;
+  background: rgba(5, 2, 10, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.45);
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  color: var(--dk-dim);
+  font: 15px/1 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.2em;
+  text-decoration: none;
+  cursor: pointer;
+}
+.dk-holo .dk-clock::after { content: ' · PASS TIME'; }
+.dk-holo .dk-clock:hover,
+.dk-holo .dk-clock:focus-visible {
+  outline: none;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px #fff;
 }
 
 .dk-holo .dk-cols {
   flex: 1;
   min-height: 0;
   display: flex;
-}
-.dk-holo .dk-lcol {
-  flex: 0 0 38%;
-  border-right: 1px solid rgba(255, 79, 139, 0.3);
 }
 .dk-holo .dk-tcol {
   flex: 1;
@@ -45,104 +62,201 @@
   flex-direction: column;
 }
 
-.dk-holo .dk-row {
-  gap: 10px;
-  padding: 7px 12px;
-  border-bottom: 0;
-  cursor: pointer;
+/* The thread: rows, newest at the foot. */
+.dk-holo .dk-msgs {
+  padding: 0 8px 12px 0;
+  gap: 9px;
+  scrollbar-width: none;
 }
-.dk-holo .dk-row:hover {
-  background: rgba(255, 79, 139, 0.08);
-}
-.dk-holo .dk-row.dk-on {
-  background: rgba(255, 79, 139, 0.2);
-}
-.dk-holo .dk-rname {
-  font-size: 20px;
-}
-.dk-holo .dk-rlast,
-.dk-holo .dk-rtime {
-  font-size: 17px;
-}
-
-.dk-holo .dk-face {
-  background: rgba(9, 4, 18, 0.4);
-}
-/* The pane is QUEST's size, so the faces can be read: the list's, and hers over the thread. */
-.dk-holo .dk-rface {
-  width: 56px;
-  height: 56px;
-}
-.dk-holo .dk-hface {
-  width: 88px;
-  height: 88px;
-}
-.dk-holo .dk-face-img {
-  opacity: 0.85;
-}
-
-.dk-holo .dk-head {
-  padding: 6px 14px 8px;
-  border-bottom-color: rgba(255, 79, 139, 0.25);
-  box-shadow: none;
-}
-.dk-holo .dk-name {
-  font-size: 22px;
-}
-.dk-holo .dk-where {
-  font-size: 16px;
-}
-
 .dk-holo .dk-msg {
-  max-width: 80%;
-  padding: 3px 10px;
-  font-size: 20px;
-  line-height: 1.15;
+  align-self: stretch;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  column-gap: 14px;
+  max-width: none;
+  padding: 0;
+  border: 0;
+  background: none;
   clip-path: none;
+  font-size: calc(13.5px * var(--text-scale, 1));
+  line-height: 1.5;
+  color: var(--dk-ink);
+  text-shadow: 0 1px 2px #000;
   cursor: pointer;
 }
-.dk-holo .dk-her {
-  background: rgba(255, 79, 139, 0.2);
-  border-left: 0;
+.dk-holo .dk-msg::before {
+  font: 15px/1.35 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.14em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.dk-holo .dk-me {
-  background: rgba(127, 233, 255, 0.16);
-  border-right: 0;
-  color: #dff9ff;
+.dk-holo .dk-her::before { content: var(--who, 'THEM'); color: var(--dk-c); }
+.dk-holo .dk-me::before { content: 'YOU'; color: var(--dk-dim); }
+.dk-holo .dk-me { color: #b6c4cc; }
+/* The same hand twice running names itself once. */
+.dk-holo .dk-her + .dk-her::before,
+.dk-holo .dk-me + .dk-me::before {
+  visibility: hidden;
 }
+.dk-holo .dk-msg:hover { color: #fff; }
+.dk-holo .dk-typing { color: var(--dk-c); font: 15px/1.35 var(--pixel, 'VT323', monospace); font-style: normal; letter-spacing: 0.18em; text-transform: uppercase; cursor: default; }
+.dk-holo .dk-typing::before { content: ''; }
+.dk-holo .dk-pending { opacity: 0.55; }
+.dk-holo .dk-photo-msg { padding: 0; max-width: none; }
+.dk-holo .dk-photo { grid-column: 2; max-width: 300px; }
+.dk-holo .dk-photo-img { clip-path: none; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.22); }
+/* A divider: a head on a hairline that fades. */
 .dk-holo .dk-divider {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Padding, not a top margin: the first row's auto margin keeps a short thread at the foot. */
+  margin-bottom: 2px;
+  padding-top: 8px;
   color: var(--dk-dim);
-  font: 16px 'VT323', monospace;
+  font: 17px/1 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.dk-holo .dk-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--dk-dim) 60%, transparent), transparent);
+}
+.dk-holo .dk-retry,
+.dk-holo .dk-resend {
+  align-self: flex-start;
+  margin-left: 110px;
+}
+.dk-holo .dk-failed,
+.dk-holo .dk-resend,
+.dk-holo .dk-error {
+  color: var(--dk-amber);
+  font: 15px/1.2 var(--pixel, 'VT323', monospace);
   letter-spacing: 0.14em;
 }
+.dk-holo .dk-error { align-self: flex-start; margin-left: 110px; }
+.dk-holo .dk-offline { position: absolute; top: -28px; left: 0; right: auto; padding: 0; color: var(--dk-amber); font: 15px/1 var(--pixel, 'VT323', monospace); letter-spacing: 0.18em; }
+.dk-holo .dk-nosave { color: var(--dk-dim); font: 15px/1 var(--pixel, 'VT323', monospace); letter-spacing: 0.18em; }
 
+/* The box: YOU ›, a caret, a hairline over it; SEND is the filled key. */
 .dk-holo .dk-input {
-  padding: 8px 14px 12px;
+  position: relative;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 13px 0 0 110px;
   border-top: 0;
+}
+.dk-holo .dk-input::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--dk-c), color-mix(in srgb, var(--dk-c) 10%, transparent));
+}
+.dk-holo .dk-input::after {
+  content: 'YOU ›';
+  position: absolute;
+  left: 0;
+  top: 15px;
+  font: 15px/1.35 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.14em;
+  color: var(--dk-c);
 }
 .dk-holo .dk-box {
   border: 0;
-  border-bottom: 1px solid rgba(255, 79, 139, 0.55);
-  padding: 4px 2px;
-  color: var(--dk-ink);
-  font: 20px 'VT323', monospace;
+  padding: 0 0 6px;
+  color: #fff;
+  caret-color: var(--dk-c);
+  font: calc(13.5px * var(--text-scale, 1)) / 1.5 var(--mono, 'IBM Plex Mono', monospace);
 }
-.dk-holo .dk-box:focus {
-  border-color: var(--dk-cyan);
+.dk-holo .dk-box::placeholder { color: var(--dk-dim); opacity: 0.8; }
+.dk-holo :is(.dk-send, .dk-stepout) {
+  flex: none;
+  padding: 8px 20px 5px;
+  border: 0;
+  clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px);
+  background: var(--dk-c);
+  color: var(--tp-ink, #05020a);
+  font: 20px/1 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.24em;
+  cursor: pointer;
 }
-.dk-holo .dk-send {
-  border: 1px solid rgba(127, 233, 255, 0.55);
-  background: none;
-  color: var(--dk-cyan);
-  font: 18px 'VT323', monospace;
+.dk-holo :is(.dk-send, .dk-stepout):hover,
+.dk-holo :is(.dk-send, .dk-stepout):focus-visible { outline: none; background: #fff; }
+.dk-holo .dk-stepout:disabled { opacity: 0.4; cursor: default; }
+.dk-holo .dk-readonly {
+  position: relative;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 18px;
+  padding: 13px 0 0;
+  border-top: 0;
+  color: var(--dk-dim);
+  font: 15px/1.35 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.16em;
+  text-align: left;
 }
+.dk-holo .dk-readonly::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--dk-c), color-mix(in srgb, var(--dk-c) 10%, transparent));
+}
+.dk-holo .dk-editing {
+  padding: 0 0 6px 110px;
+  border-top: 0;
+  color: var(--dk-amber);
+  font: 15px/1 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.16em;
+}
+.dk-holo .dk-editing button { color: var(--dk-ink); }
 
+/* PASS TIME and a text's controls: the only boxed things, since they sit over the thread. */
 .dk-holo .dk-sheet,
 .dk-holo .dk-menu {
-  background: rgba(20, 8, 26, 0.92);
-  border-color: rgba(255, 79, 139, 0.5);
+  background: rgba(5, 2, 10, 0.94);
+  border: 0;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dk-c) 55%, transparent), 0 8px 30px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
 }
-.dk-holo .dk-menu {
-  bottom: 70px;
-  left: calc(38% + 12px);
+.dk-holo .dk-sheet { left: auto; right: 0; top: 0; width: 420px; }
+.dk-holo .dk-menu { left: 110px; right: auto; bottom: 64px; }
+.dk-holo .dk-sheet-head,
+.dk-holo .dk-takes,
+.dk-holo .dk-confirm {
+  color: var(--dk-c);
+  font: 17px/1 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.2em;
 }
+.dk-holo :is(.dk-wait, .dk-until-go),
+.dk-holo .dk-menu button {
+  border: 0;
+  box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.45);
+  background: none;
+  color: var(--dk-ink);
+  padding: 7px 12px 5px;
+  font: 15px/1 var(--pixel, 'VT323', monospace);
+  letter-spacing: 0.2em;
+}
+.dk-holo :is(.dk-wait, .dk-until-go):hover,
+.dk-holo .dk-menu button:hover:not(:disabled),
+.dk-holo :is(.dk-wait, .dk-until-go, .dk-menu button):focus-visible {
+  outline: none;
+  color: var(--tp-ink, #05020a);
+  background: var(--dk-ink);
+}
+.dk-holo .dk-menu :is(.dk-m-delete, .dk-yes) { box-shadow: inset 0 0 0 1px var(--dk-amber); color: var(--dk-amber); }
+.dk-holo .dk-menu .dk-close,
+.dk-holo .dk-sheet .dk-close { box-shadow: none; color: var(--dk-dim); font-size: 22px; }
+.dk-holo .dk-until { border: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.3); font: 15px var(--mono, monospace); }

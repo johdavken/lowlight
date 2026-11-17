@@ -121,7 +121,7 @@ export const TOOLS: ToolSpec[] = [
   },
   {
     name: 'set_light',
-    description: ROOM_TOOL_TEXT.set_light,
+    description: ROOM_TOOL_TEXT.set_light_groups,
     args: z.object({
       light_id: z.string(),
       color: z.string().optional(),

@@ -13,6 +13,7 @@ import type { ExitPlace, SideRoom } from '../../../../shared/exits';
 import { el } from './band';
 import { districtFrame, type Frame } from './camera';
 import { buildFileStrip, buildGo, goBlocked } from './file-strip';
+import { clearLead, hostRect, leadPoints, traceVia, type Pt } from '../trace-lead';
 import { drawNames, NAMES_BOX } from './lettering';
 import { pathD } from './path';
 import { dot, PlaceList, type PlaceThread } from './place-list';
@@ -50,7 +51,8 @@ export interface WhoIsWhere {
   comms?: { on: boolean; can: boolean; /** Her scheduled room now: a plain GO there. */ herAt?: string | null };
 }
 
-export type MapCue = 'move' | 'confirm';
+/** `confirm`: in to a place or a district (the camera goes there). `go`: GO, you set off. `fold`: a district folded in the list. `zoom`, `sweep`, `dark`: the MAP panel's own (a wheel step, the camera's long ease, a district blacking out). */
+export type MapCue = 'move' | 'confirm' | 'fold' | 'zoom' | 'sweep' | 'dark' | 'go';
 
 export interface CityMapOpts {
   /** Where the band, heading and strip go (fixed on screen); the world host when absent. */
@@ -154,7 +156,7 @@ export class CityMap {
         },
         onHot: (id) => this.heat(id),
         onDistrict: (id) => this.lightDistrict(id),
-        onFold: () => this.opts.onCue?.('move'),
+        onFold: () => this.opts.onCue?.('fold'),
         onResize: () => this.fitFocus(),
       });
       this.over.append(this.list.el);
@@ -267,6 +269,7 @@ export class CityMap {
     this.layer.replaceChildren();
     this.over.querySelector('.map-strip')?.remove();
     if (!this.list) this.over.replaceChildren();
+    clearLead(this.over, 'pin');
     this.root.classList.remove('dimmed');
     this.list?.clear();
   }
@@ -456,7 +459,10 @@ export class CityMap {
 
   /** The picked pin's tag, with GO past its name, turns to the pin's left when it would run off the screen's right. */
   private fitFocus(): void {
-    if (this.list) return this.clearNames();
+    if (this.list) {
+      this.lead();
+      return this.clearNames();
+    }
     const pin = this.layer.querySelector<HTMLElement>('.pin.focus');
     for (const p of this.layer.querySelectorAll('.pin.flip')) if (p !== pin) p.classList.remove('flip');
     const tag = pin?.querySelector<HTMLElement>('.map-ntag');
@@ -467,6 +473,32 @@ export class CityMap {
     const go = tag.querySelector<HTMLElement>('.map-go')?.getBoundingClientRect();
     const right = Math.max(tag.getBoundingClientRect().right, go?.right ?? 0);
     pin.classList.toggle('flip', right > o.right - 12);
+  }
+
+  /**
+   * On a `listed` map, a leader from the picked pin to the top of its card's rail (the trace panels' rule: a line from
+   * the pick to what it opens). It starts clear of the pin's rings; none while the pin is off the screen or under the card.
+   */
+  private lead(): void {
+    const pin = this.layer.querySelector<HTMLElement>('.pin.focus');
+    const card = this.over.querySelector<HTMLElement>('.map-strip');
+    if (!pin || !card || !this.over.offsetWidth) return clearLead(this.over, 'pin');
+    const p = hostRect(this.over, pin);
+    const c = hostRect(this.over, card);
+    const from: Pt = [p.left, p.top];
+    const to: Pt = [c.right + 14, c.top];
+    const off = from[0] < 0 || from[1] < 0 || from[0] > this.over.offsetWidth || from[1] > this.over.offsetHeight;
+    const under = from[0] > c.left - LEAD_CLEAR && from[1] > c.top - LEAD_CLEAR;
+    if (off || under) return clearLead(this.over, 'pin');
+    // A pin lower than the card's top goes up first, then over, and comes down onto the rail: never through the card's lines.
+    const over = to[1] - LEAD_OVER;
+    const pts: Pt[] = from[1] <= over ? leadPoints(from, to) : [from, [from[0], over + LEAD_JOG], [from[0] + LEAD_JOG, over], [to[0] - LEAD_OVER, over], to];
+    // Out from the pin's rings along the first run.
+    const [a, b] = pts;
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    if (len <= LEAD_CLEAR) return clearLead(this.over, 'pin');
+    pts[0] = [a[0] + ((b[0] - a[0]) / len) * LEAD_CLEAR, a[1] + ((b[1] - a[1]) / len) * LEAD_CLEAR];
+    traceVia(this.over, 'pin', pts);
   }
 
   /** On a `listed` map, the printed names the list or the card would sit on step back. */
@@ -483,6 +515,7 @@ export class CityMap {
   private paintCard(): void {
     this.over.querySelector('.map-strip')?.remove();
     for (const g of this.layer.querySelectorAll('.map-go')) g.remove();
+    clearLead(this.over, 'pin');
     this.list?.pick(this._focus);
     if (!this.map || !this._focus) return;
     const place = this.map.places.find((p) => p.id === this._focus);
@@ -508,6 +541,12 @@ export class CityMap {
     this.over.append(strip);
   }
 }
+
+/** How far from the picked pin its leader starts, px: outside the diamond and its glow. */
+const LEAD_CLEAR = 16;
+/** How far over the card's top a leader from below runs, and its corner's cut, px. */
+const LEAD_OVER = 22;
+const LEAD_JOG = 10;
 
 function glowFilter(): SVGFilterElement {
   const f = svgEl('filter', { id: 'map-glow', x: '-50%', y: '-50%', width: '200%', height: '200%' });

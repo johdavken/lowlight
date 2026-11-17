@@ -1,13 +1,21 @@
 /**
- * The lore drawer (spec 2026-11-06): BOOK at the right of the room, with the scene still up. RIGHT NOW lists what
- * the conversation has touched, both files and the room's entries; ALL is the whole book, with search. It keeps
- * the cursor in the chat box, so a reply can go on being typed beside it: a click off closes it, as it does the other
- * panels, except on the chat itself. Text goes in through textContent.
+ * The lore drawer (spec 2026-11-06; dense, on the HUD trace 2026-11-15, mockup book-dense.html): BOOK at the right of
+ * the room, with the scene still up. No pane: a head line runs from a ring at its left, under its name and tabs, and
+ * climbs into the run the bar draws under BOOK; a rail stands down its left edge, in the UI's red. RIGHT NOW lists
+ * what the conversation has touched, both files and the room's entries; ALL is the whole book as an index (a category
+ * is one line naming its sections; open, each section's entries run in two columns), with search. A row is one line:
+ * the title, and at the right its section and the word that brought it up; the open entry reads under it on a thin
+ * rail. It keeps the cursor in the chat box, so a reply can go on being typed beside it: a click off closes it, as it
+ * does the other panels, except on the chat itself. Text goes in through textContent.
  */
+import { panelCue } from '../ui/panel-sound';
 import './book-drawer.css';
 import { bookNow, searchBook, type BookEntry, type BookHit, type BookNow, type BookPage, type LoreLine, type RecentLine } from '../../../shared/lore';
 import type { ChatMessage, Fact } from '../../../shared/types';
 import { onClickAway } from '../ui/click-away';
+import { setHints } from '../landing/hint-line';
+import { clearLead, hostRect, traceVia, type Pt } from '../ui/trace-lead';
+import { headLinePoints } from '../ui/trace-panel';
 import { el } from './table/el';
 
 export interface BookFile {
@@ -47,8 +55,8 @@ export interface BookDrawer {
 }
 
 export const BOOK_COPY = {
-  title: '◆ BOOK',
-  esc: 'ESC',
+  title: 'BOOK',
+  keys: '[ALT+↑↓] ENTRY · [ESC] CLOSE',
   now: 'RIGHT NOW',
   all: 'ALL',
   said: 'JUST SAID',
@@ -72,18 +80,23 @@ export function bookLines(messages: readonly ChatMessage[]): LoreLine[] {
 /** What the drawer is read beside: her lines, the box and the scene keys. A click there isn't a click off. */
 const BESIDE = '#feed, #input';
 
-const entrySub = (e: BookEntry, key?: string) => [(e.section ?? e.category)?.toUpperCase(), key ? `"${key}"` : null].filter(Boolean).join(' · ');
+/** A row's right end: its section (or category), then the word that brought it up, which is what needs your eye. */
+function entrySub(e: BookEntry, key?: string): (Node | string)[] {
+  const where = (e.section ?? e.category)?.toUpperCase();
+  const word = key ? el('b', '', `"${key}"`) : null;
+  return [...(where ? [where] : []), ...(where && word ? [' · '] : []), ...(word ? [word] : [])];
+}
 
 export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDrawer {
   const layer = el('div', 'lb-layer');
   const root = el('section', 'lb-root');
   root.hidden = true;
   root.setAttribute('aria-label', 'Book');
-  const head = el('div', 'lb-head', BOOK_COPY.title);
-  head.append(el('span', 'lb-esc', BOOK_COPY.esc));
-  const tabs = el('div', 'lb-tabs');
+  const head = el('div', 'lb-head');
+  const tabs = el('nav', 'lb-tabs');
+  head.append(el('span', 'lb-title', BOOK_COPY.title), tabs);
   const tabButton = (t: 'now' | 'all') => {
-    const b = el('button', 'lb-tab');
+    const b = el('button', 'lb-tab tp-tab');
     b.type = 'button';
     b.dataset.tab = t;
     keepCursor(b);
@@ -113,9 +126,37 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
   const note = el('div', 'lb-note', BOOK_COPY.failed);
   note.hidden = true;
   const list = el('div', 'lb-list');
-  root.append(head, tabs, find, note, list);
+  const keys = el('div', 'lb-keys');
+  setHints(keys, BOOK_COPY.keys);
+  root.append(head, find, note, list, keys);
   layer.append(root);
   host.append(layer);
+
+  /** The head line: from a ring at the drawer's left, under the head, then 45° up into the bar's run under BOOK. */
+  let drawn = '';
+  const headLine = () => {
+    if (!isOpen || root.offsetWidth === 0) return;
+    const h = hostRect(layer, head);
+    const r = hostRect(layer, root);
+    const y = Math.round(h.bottom + 6);
+    const kon = host.querySelector('.hud-trace .kon');
+    const k = kon ? hostRect(layer, kon) : null;
+    const run: Pt | null = k && k.width > 0 ? [k.left, (k.top + k.bottom) / 2] : null;
+    const pts = headLinePoints([r.left, y], run, r.right);
+    // Drawn again only when it moved: a new path would replay its run-in.
+    const key = pts.join(' ');
+    if (key !== drawn) traceVia(layer, 'head', pts);
+    drawn = key;
+  };
+  // The bar draws its run a tick after BOOK opens, and again when it reflows.
+  const hud = host.querySelector('.hud-trace');
+  const seen = hud && typeof MutationObserver === 'function' ? new MutationObserver(headLine) : null;
+  seen?.observe(hud!, { childList: true });
+  const hide = () => {
+    root.hidden = true;
+    drawn = '';
+    clearLead(layer, 'head');
+  };
 
   let page: BookPage | null = null;
   let failed = false;
@@ -144,13 +185,17 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
     o.onCount(now.count);
   };
 
-  const row = (key: string, title: string, sub: string, body: () => HTMLElement): HTMLElement[] => {
+  const row = (key: string, title: string, sub: (Node | string)[], body: () => HTMLElement): HTMLElement[] => {
     const b = el('button', 'lb-row');
     b.type = 'button';
     b.dataset.key = key;
     keepCursor(b);
     b.append(el('span', 'lb-row-title', title));
-    if (sub) b.append(el('span', 'lb-row-sub', sub));
+    if (sub.length > 0) {
+      const right = el('span', 'lb-row-sub');
+      right.append(...sub);
+      b.append(right);
+    }
     const open = openRow === key;
     b.setAttribute('aria-expanded', String(open));
     b.classList.toggle('on', open);
@@ -173,9 +218,9 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
   };
   const entryRow = (e: BookEntry, key?: string) => row(`e:${e.id}`, e.title, entrySub(e, key), () => entryBody(e));
   /** Inside a fold the fold's head already says what the row's sub would. */
-  const foldedRow = (e: BookEntry) => row(`e:${e.id}`, e.title, '', () => entryBody(e));
+  const foldedRow = (e: BookEntry) => row(`e:${e.id}`, e.title, [], () => entryBody(e));
   const fileRow = (f: BookFile) =>
-    row(`f:${f.id}`, f.name, f.tag, () => {
+    row(`f:${f.id}`, f.name, [f.tag], () => {
       const body = el('div', 'lb-body');
       body.append(...f.bio.map((p) => el('p', '', p)));
       if (f.facts.length > 0) {
@@ -186,7 +231,7 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
       if (f.secret) body.append(el('div', 'lb-secret-head', BOOK_COPY.secret), el('p', 'lb-secret', f.secret));
       return body;
     });
-  const group = (title: string, rows: HTMLElement[]) => (rows.length > 0 ? [el('div', 'lb-grp', title), ...rows] : []);
+  const group = (title: string, rows: HTMLElement[]) => (rows.length > 0 ? [el('div', 'lb-grp tp-head', title), ...rows] : []);
 
   const nowRows = (): HTMLElement[] => {
     const shown = new Set([...now.said, ...now.who].map((h) => h.entry.id).concat(now.here.map((e) => e.id)));
@@ -208,34 +253,46 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
     }
     const titled = (es: BookEntry[]) => [...es].sort((x, y) => x.title.localeCompare(y.title)).flatMap(foldedRow);
     /** A fold's head, with what's under it when it's open. `id` is `<category>` or `<category>/<section>`. */
-    const fold = (id: string, label: string, n: number, cls: string, under: () => HTMLElement[]) => {
+    /** `inside`: a shut fold's own line says what's in it (a category names its sections). `kids`: the folds a category opens with it. */
+    const fold = (id: string, label: string, n: number, cls: string, under: () => HTMLElement[], inside = '', kids: string[] = []) => {
       const b = el('button', cls, `${label} ${n}`);
       b.type = 'button';
       b.dataset.key = `c:${id}`;
       keepCursor(b);
       const open = openCats.has(id);
+      if (inside && !open) b.append(el('small', 'lb-cat-in', inside));
       b.setAttribute('aria-expanded', String(open));
       b.addEventListener('click', () => {
-        if (!openCats.delete(id)) openCats.add(id);
+        // A category opens as an index: its sections with it. A section still folds on its own.
+        if (!openCats.delete(id)) for (const k of [id, ...kids]) openCats.add(k);
         drawList();
       });
       return [b, ...(open ? under() : [])];
     };
     return [...cats.keys()].sort().flatMap((name) => {
       const inCat = cats.get(name)!;
-      return fold(name, name, inCat.length, 'lb-cat', () => {
-        const sections = new Map<string, BookEntry[]>();
-        for (const e of inCat) if (e.section) sections.set(e.section.toUpperCase(), [...(sections.get(e.section.toUpperCase()) ?? []), e]);
-        const folds = [...sections.keys()].sort().flatMap((s) => {
-          const inSection = sections.get(s)!;
-          return fold(`${name}/${s}`, s, inSection.length, 'lb-cat lb-sec', () => {
-            const rows = el('div', 'lb-in');
-            rows.append(...titled(inSection));
-            return [rows];
-          });
-        });
-        return [...titled(inCat.filter((e) => !e.section)), ...folds];
-      });
+      const sections = new Map<string, BookEntry[]>();
+      for (const e of inCat) if (e.section) sections.set(e.section.toUpperCase(), [...(sections.get(e.section.toUpperCase()) ?? []), e]);
+      const names = [...sections.keys()].sort();
+      /** Entries in two columns of one-line titles; the open one's text spans both. */
+      const cols = (es: BookEntry[]) => {
+        const rows = el('div', 'lb-in');
+        rows.append(...titled(es));
+        return rows;
+      };
+      return fold(
+        name,
+        name,
+        inCat.length,
+        'lb-cat',
+        () => {
+          const loose = inCat.filter((e) => !e.section);
+          const folds = names.flatMap((s) => fold(`${name}/${s}`, s, sections.get(s)!.length, 'lb-cat lb-sec', () => [cols(sections.get(s)!)]));
+          return [...(loose.length > 0 ? [cols(loose)] : []), ...folds];
+        },
+        names.map((s) => `${s} ${sections.get(s)!.length}`).join(' · '),
+        names.map((s) => `${name}/${s}`),
+      );
     });
   };
   const drawList = () => {
@@ -244,19 +301,22 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
     list.scrollTop = top;
   };
   const draw = () => {
-    nowTab.textContent = now.count > 0 ? `${BOOK_COPY.now} ${now.count}` : BOOK_COPY.now;
-    allTab.textContent = `${BOOK_COPY.all} ${page?.entries.length ?? 0}`;
+    const label = (b: HTMLElement, name: string, n: number | null) => b.replaceChildren(name, ...(n === null ? [] : [' ', el('span', 'tp-n', String(n))]));
+    label(nowTab, BOOK_COPY.now, now.count > 0 ? now.count : null);
+    label(allTab, BOOK_COPY.all, page?.entries.length ?? 0);
     nowTab.classList.toggle('on', tab === 'now');
     allTab.classList.toggle('on', tab === 'all');
     find.hidden = tab !== 'all' || failed;
     note.hidden = !failed;
     drawList();
+    headLine();
   };
 
   /** Opens `key`, or shuts it if it's the open one. */
   const pick = (key: string) => {
     cursor = key;
     openRow = openRow === key ? null : key;
+    if (openRow) panelCue('entry');
     held = [...now.said, ...now.who].find((h) => `e:${h.entry.id}` === openRow) ?? null;
     drawList();
     list.querySelector<HTMLElement>('.lb-row.on')?.scrollIntoView?.({ block: 'nearest' });
@@ -268,7 +328,10 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
     const at = items.findIndex((b) => b.dataset.key === cursor);
     const next = items[at < 0 ? (dir > 0 ? 0 : items.length - 1) : Math.max(0, Math.min(items.length - 1, at + dir))];
     if (next.dataset.key === cursor) return;
+    panelCue('row');
     cursor = next.dataset.key ?? null;
+    // A fold already open (a section, opened with its category) is walked past, not shut.
+    if (next.classList.contains('lb-cat') && next.getAttribute('aria-expanded') === 'true') return;
     next.click();
   };
 
@@ -333,10 +396,8 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
       if (isOpen) return;
       isOpen = true;
       root.hidden = false;
-      root.classList.remove('lb-flicker');
-      void root.offsetWidth;
-      root.classList.add('lb-flicker');
       draw();
+      requestAnimationFrame(headLine);
       offAway = onClickAway(
         (n) => root.contains(n) || (n instanceof Element && n.closest(BESIDE) !== null),
         () => {
@@ -350,7 +411,7 @@ export function mountBookDrawer(host: HTMLElement, o: BookDrawerOptions): BookDr
       if (!isOpen) return;
       if (document.activeElement === find) leaveFind();
       isOpen = false;
-      root.hidden = true;
+      hide();
       offAway?.();
       offAway = null;
       o.onOpenChange(false);

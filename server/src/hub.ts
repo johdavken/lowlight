@@ -204,6 +204,35 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
           return "quest_start 'setup.programs' must be at most 3 program ids";
         return { type: 'quest_start', id: v.id, setup: { approach: st.approach as Approach, people: st.people as string[], favour: st.favour, ...(st.contacts !== undefined ? { contacts: st.contacts as string[] } : {}), ...(st.programs !== undefined ? { programs: st.programs as string[] } : {}) } };
       }
+    case 'quest_board': {
+      // A deduction board move (spec 2026-11-09 §3): the server judges it against the case and the run.
+      if (typeof v.id !== 'string') return "quest_board needs string 'id'";
+      const m = v.move as Record<string, unknown> | null;
+      const id = (x: unknown) => typeof x === 'string' && x.length > 0 && x.length <= 80;
+      const blank = (x: unknown) => x === 'WHO' || x === 'HOW' || x === 'WHY';
+      if (!m || typeof m !== 'object') return "quest_board needs a 'move'";
+      if (m.kind === 'pair' && id(m.a) && id(m.b)) return { type: 'quest_board', id: v.id, move: { kind: 'pair', a: m.a as string, b: m.b as string } };
+      if (m.kind === 'file' && id(m.deduction) && blank(m.blank)) return { type: 'quest_board', id: v.id, move: { kind: 'file', deduction: m.deduction as string, blank: m.blank as 'WHO' } };
+      if (m.kind === 'unfile' && blank(m.blank)) return { type: 'quest_board', id: v.id, move: { kind: 'unfile', blank: m.blank as 'WHO' } };
+      if (m.kind === 'name' && (m.suspect === null || id(m.suspect))) return { type: 'quest_board', id: v.id, move: { kind: 'name', suspect: m.suspect as string | null } };
+      if (m.kind === 'accuse') return { type: 'quest_board', id: v.id, move: { kind: 'accuse' } };
+      return "quest_board 'move' isn't a pair, file, unfile, name or accuse";
+    }
+    case 'quest_accounts': {
+      // An accounts board move (Two Stories spec §3): the server judges it against the file and the run.
+      if (typeof v.id !== 'string') return "quest_accounts needs string 'id'";
+      const m = v.move as Record<string, unknown> | null;
+      if (!m || typeof m !== 'object') return "quest_accounts needs a 'move'";
+      const card = (x: unknown) => typeof x === 'string' && x.length > 0 && x.length <= 80;
+      const who = (x: unknown) => typeof x === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(x);
+      const blank = (x: unknown) => typeof x === 'string' && /^[A-Z][A-Z0-9_-]*$/.test(x) && x.length <= 40;
+      if (m.kind === 'place' && card(m.card) && who(m.listener) && blank(m.blank)) return { type: 'quest_accounts', id: v.id, move: { kind: 'place', card: m.card as string, listener: m.listener as string, blank: m.blank as string } };
+      if (m.kind === 'place') return "quest_accounts 'place' needs a card, a listener and a blank";
+      if (m.kind === 'take' && who(m.listener) && blank(m.blank)) return { type: 'quest_accounts', id: v.id, move: { kind: 'take', listener: m.listener as string, blank: m.blank as string } };
+      if (m.kind === 'take') return "quest_accounts 'take' needs a listener and a blank";
+      if (m.kind === 'tell') return { type: 'quest_accounts', id: v.id, move: { kind: 'tell' } };
+      return "quest_accounts 'move' isn't a place, take or tell";
+    }
     case 'quest_choose':
       if (typeof v.id !== 'string' || typeof v.beat !== 'string' || typeof v.choice !== 'string') return "quest_choose needs string 'id', 'beat' and 'choice'";
       if (v.said !== undefined && (typeof v.said !== 'string' || v.said.length > QUEST_SAID_MAX)) return `quest_choose 'said' must be a string of at most ${QUEST_SAID_MAX} characters`;
@@ -211,6 +240,7 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
       if (v.push !== undefined && v.push !== true) return "quest_choose 'push' must be true when sent";
       if (v.card !== undefined && (typeof v.card !== 'string' || v.card === '' || v.card.length > 80)) return "quest_choose 'card' must be a card id";
       if (v.press !== undefined && (typeof v.press !== 'string' || v.press === '' || v.press.length > 80)) return "quest_choose 'press' must be a card id";
+      if (v.post !== undefined && (typeof v.post !== 'string' || v.post === '' || v.post.length > 80)) return "quest_choose 'post' must be a recruit id";
       // Programs (programs spec §2.2): ids to load and to run, at most a deck's slots each.
       if (v.programs !== undefined && !validPrograms(v.programs)) return "quest_choose 'programs' must be { load, run }, each at most 3 ids of at most 40 characters";
       return {
@@ -224,6 +254,7 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
         ...(v.trade === 'safe' || v.trade === 'bold' ? { trade: v.trade } : {}),
         ...(typeof v.card === 'string' ? { card: v.card } : {}),
         ...(typeof v.press === 'string' ? { press: v.press } : {}),
+        ...(typeof v.post === 'string' ? { post: v.post } : {}),
         ...(v.programs !== undefined ? { programs: v.programs as { load: string[]; run: string[] } } : {}),
       };
     case 'quest_walk':
@@ -281,7 +312,8 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
     case 'greet':
       // The opening the arrival screen sets (spec 2026-10-27 §3); the relay keeps it only on a new game.
       if (v.opening !== undefined && (typeof v.opening !== 'string' || v.opening.length > SCENE_TEXT_MAX)) return `greet's 'opening' must be a string of at most ${SCENE_TEXT_MAX} characters`;
-      return { type: 'greet', ...(typeof v.opening === 'string' ? { opening: v.opening } : {}) };
+      if (v.story !== undefined && (typeof v.story !== 'string' || v.story.length > 64)) return "greet's 'story' must be a job id";
+      return { type: 'greet', ...(typeof v.opening === 'string' ? { opening: v.opening } : {}), ...(typeof v.story === 'string' ? { story: v.story } : {}) };
     case 'let_her_go':
       // Your typed last line rides with it, as with LEAVE: she answers it in her goodbye.
       if (v.text !== undefined && typeof v.text !== 'string') return "let_her_go's 'text' must be a string";
@@ -1003,8 +1035,24 @@ export function createHub(deps: HubDeps): Hub {
       case 'quest_choose': {
         const relay = deps.getRelay();
         if (pickChecking) return send(ws, { type: 'notice', text: 'wait for her to finish', for: 'quest' });
-        const done = event.type === 'quest_start' ? relay.startQuest(player, event.id, event.setup) : relay.chooseQuest(player, { id: event.id, beat: event.beat, choice: event.choice, ...(event.said !== undefined ? { said: event.said } : {}), ...(event.moves ? { moves: event.moves } : {}), ...(event.push ? { push: event.push } : {}), ...(event.trade ? { trade: event.trade } : {}), ...(event.card ? { card: event.card } : {}), ...(event.press ? { press: event.press } : {}), ...(event.programs ? { programs: event.programs } : {}) });
+        const done = event.type === 'quest_start' ? relay.startQuest(player, event.id, event.setup) : relay.chooseQuest(player, { id: event.id, beat: event.beat, choice: event.choice, ...(event.said !== undefined ? { said: event.said } : {}), ...(event.moves ? { moves: event.moves } : {}), ...(event.push ? { push: event.push } : {}), ...(event.trade ? { trade: event.trade } : {}), ...(event.card ? { card: event.card } : {}), ...(event.press ? { press: event.press } : {}), ...(event.post ? { post: event.post } : {}), ...(event.programs ? { programs: event.programs } : {}) });
         done.then((r) => (typeof r === 'string' ? send(ws, { type: 'notice', text: r, for: 'quest' }) : undefined)).catch(reportAsyncError(ws, event.type));
+        return;
+      }
+      case 'quest_board': {
+        deps
+          .getRelay()
+          .boardMove(player, { id: event.id, move: event.move })
+          .then((r) => (typeof r === 'string' ? send(ws, { type: 'notice', text: r, for: 'quest' }) : undefined))
+          .catch(reportAsyncError(ws, 'quest_board'));
+        return;
+      }
+      case 'quest_accounts': {
+        deps
+          .getRelay()
+          .accountsMove(player, { id: event.id, move: event.move })
+          .then((r) => (typeof r === 'string' ? send(ws, { type: 'notice', text: r, for: 'quest' }) : undefined))
+          .catch(reportAsyncError(ws, 'quest_accounts'));
         return;
       }
       case 'quest_walk': {
@@ -1046,7 +1094,7 @@ export function createHub(deps: HubDeps): Hub {
         return goWithHer(ws, player);
       case 'greet':
         // Busy, or no longer due (another tab, or they spoke first): no greeting, and nothing to say about it.
-        if (!deps.getRelay().busy) deps.getRelay().greet(player, event.opening).catch(reportAsyncError(ws, 'greet'));
+        if (!deps.getRelay().busy) deps.getRelay().greet(player, event.opening, event.story).catch(reportAsyncError(ws, 'greet'));
         break;
       case 'dossier_page_edit':
         warnIfRefused(ws, deps.journal.setPage(player, event.text, 'user'));

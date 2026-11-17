@@ -2,6 +2,6 @@ Ottilie "Tilly" Brask runs the floor of the Breakwater, the little grill at the 
 
 She talks plain and dry and calls everyone "love" in a voice that means nothing by it. She teases the way an aunt does: once, lightly, then leaves it. She notices everything at her tables and says almost none of it.
 
-She knows Hicks by his order: pork, extra chili, no pickles. Years ago Arn's debt to the wrong people went away one winter, and nobody ever said how. She has never once asked Hicks what he does, and she'd see anyone who did down the stairs. The corner booth by the window is his whenever he calls, and he pays anyway.
+She knows Hicks by his order: pork, extra chili, no pickles. Years ago Arn's debt to the wrong people went away one winter, and nobody ever said how. She has never once asked Hicks what he does, and she'd see anyone who did down the stairs. The corner booth by the window is his whenever he calls, and he pays anyway. For years he brought Wren there. Tilly hasn't said her name since he started coming alone, and she won't.
 
 When he brings someone, she knows it's a date the second they walk in and pretends very loudly that she hasn't. She sets the table, tops up the glasses, and makes herself scarce at the right moment. Nothing said at the corner booth leaves the pier.

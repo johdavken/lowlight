@@ -1,13 +1,15 @@
 /**
- * ROSTER (crew spec §4): recruits as SETUP's ready cards on the left (READY, OUT, HURT, HELD; open slots; GONE), and
- * the picked recruit's file on the right, scrolling inside the panel: specialty and grade, growth, traits, loyalty as a
- * word, wage, record, last runs, and the actions their state allows. No stat numbers (2026-10-19).
+ * ROSTER (crew spec §4): recruits as rows on the panel's rail (READY, OUT, HURT, HELD; dashed open slots; GONE), and
+ * the picked recruit's file on its own rail, scrolling inside the panel: the name, specialty and grade, growth, traits,
+ * loyalty as a word, the mug with wage and record, abilities as cut cards, last runs, and the actions their state
+ * allows as cut keys (ASSIGN filled: Enter does it). No stat numbers (2026-10-19).
  */
 import { BAIL, DOC } from '../../../shared/crew';
 import { GRADES } from '../../../shared/crew-book';
 import type { CrewAction, CrewRosterEntry, CrewView } from '../../../shared/types';
 import { errandLabel } from './crew-assign';
 import { cardPic, el, face, hhmm } from './crew-ui';
+import { setTip } from '../ui/hover-tag';
 
 /** What each specialty is good at (spec §1's table). */
 const GOOD_AT: Record<string, [string, string][]> = {
@@ -41,7 +43,7 @@ function stateOf(m: CrewRosterEntry): [string, string, string] {
 function tile(m: CrewRosterEntry, on: boolean, pick: (id: string) => void): HTMLElement {
   const [kind, word, small] = stateOf(m);
   // An open promotion pick lights the tile (crew abilities spec §4).
-  const b = el('button', `cr-tile s-${kind}${on ? ' on' : ''}${m.picks.length > 0 && m.state !== 'gone' ? ' pick' : ''}`);
+  const b = el('button', `cr-tile tp-row s-${kind}${on ? ' on' : ''}${m.picks.length > 0 && m.state !== 'gone' ? ' pick' : ''}`);
   b.type = 'button';
   b.dataset.id = m.recruit.id;
   const st = el('span', 'cr-state', word);
@@ -74,14 +76,14 @@ function status(m: CrewRosterEntry, v: CrewView): string {
 function actions(m: CrewRosterEntry, o: { act(a: CrewAction): void; assign(id: string): void }): HTMLElement[] {
   const id = m.recruit.id;
   const btn = (text: string, cls: string, fn: () => void) => {
-    const b = el('button', `cr-btn ${cls}`, text);
+    const b = el('button', `cr-btn tp-key ${cls}`, text);
     b.type = 'button';
     b.addEventListener('click', fn);
     return b;
   };
   // LET GO asks once more: it can't be taken back but by rewinding.
   const letGo = () => {
-    const b = btn('LET GO', 'warn', () => {
+    const b = btn('LET GO', 'soft warn', () => {
       if (b.dataset.sure) return o.act({ do: 'letgo', recruit: id });
       b.dataset.sure = '1';
       b.textContent = 'SURE? LET GO';
@@ -98,15 +100,15 @@ function actions(m: CrewRosterEntry, o: { act(a: CrewAction): void; assign(id: s
       const spring = btn('SPRING THEM', 'soft', () => o.act({ do: 'spring', recruit: id }));
       if (!m.canSpring) {
         spring.disabled = true;
-        if (m.springWhy) spring.title = m.springWhy;
+        if (m.springWhy) setTip(spring, m.springWhy);
       }
-      return [btn(`PAY BAIL · ${BAIL[m.recruit.grade]}`, '', () => o.act({ do: 'bail', recruit: id })), spring, btn('LEAVE THEM', 'warn', () => o.act({ do: 'leave', recruit: id }))];
+      return [btn(`PAY BAIL · ${BAIL[m.recruit.grade]}`, '', () => o.act({ do: 'bail', recruit: id })), spring, btn('LEAVE THEM', 'soft warn', () => o.act({ do: 'leave', recruit: id }))];
     }
     case 'gone':
     case 'job':
       return [];
     default:
-      return [btn('ASSIGN', '', () => o.assign(id)), letGo()];
+      return [btn('ASSIGN', 'go cr-go', () => o.assign(id)), letGo()];
   }
 }
 
@@ -115,7 +117,7 @@ const TIMING_WORD = { roll: 'ON A ROLL', after: 'AFTER A ROLL', end: 'AT THE END
 /** An ability's card (crew abilities spec §4): its label, when it plays, what it does on a job and on errands, its line. */
 function abilityCard(id: string, v: CrewView, cls = ''): HTMLElement {
   const a = v.abilities[id];
-  const c = el('div', `cr-ab${cls ? ` ${cls}` : ''}`);
+  const c = el('div', `cr-ab tp-card${cls ? ` ${cls}` : ''}`);
   c.dataset.id = id;
   if (!a) return c;
   const head = el('div', 'cr-ab-head');
@@ -132,11 +134,11 @@ function chooseCard(m: CrewRosterEntry, v: CrewView, act: (a: CrewAction) => voi
   const p = m.picks[0];
   const box = el('div', 'cr-choose');
   const before = GRADES[Math.max(0, p.grade - 1)];
-  box.append(el('div', 'cr-dh', 'PROMOTED · CHOOSE'), el('div', 'cr-choose-head', `${m.recruit.name.split(' ')[0].toUpperCase()} · ${before} → ${GRADES[p.grade]}`));
+  box.append(el('div', 'cr-dh tp-head hot', 'PROMOTED · CHOOSE'), el('div', 'cr-choose-head', `${m.recruit.name.split(' ')[0].toUpperCase()} · ${before} → ${GRADES[p.grade]}`));
   const row = el('div', 'cr-choose-row');
   for (const id of p.offer) {
     const c = abilityCard(id, v);
-    const keep = el('button', 'cr-btn cr-keep', 'KEEP');
+    const keep = el('button', 'cr-btn tp-key sm cr-keep', 'KEEP');
     keep.type = 'button';
     keep.addEventListener('click', () => act({ do: 'learn', recruit: m.recruit.id, ability: id, grade: p.grade }));
     c.append(keep);
@@ -152,15 +154,16 @@ function chooseCard(m: CrewRosterEntry, v: CrewView, act: (a: CrewAction) => voi
  */
 function abilitiesBlock(m: CrewRosterEntry, v: CrewView, act: (a: CrewAction) => void): HTMLElement {
   const box = el('div', 'cr-abilities');
-  box.append(el('div', 'cr-dh', 'ABILITIES'), el('div', 'cr-ab-slots', `SLOTS ${m.slotted.length}/${m.slots}`));
+  const head = el('div', 'cr-dh tp-head', 'ABILITIES');
+  box.append(head, el('div', 'cr-ab-slots', `SLOTS ${m.slotted.length}/${m.slots}`));
   const ready = m.state === 'ready';
   const why = ready ? '' : status(m, v);
   const rid = m.recruit.id;
   const btn = (text: string, fn: () => void) => {
-    const b = el('button', 'cr-btn soft cr-ab-btn', text);
+    const b = el('button', 'cr-btn tp-key sm soft cr-ab-btn', text);
     b.type = 'button';
     b.disabled = !ready;
-    if (why) b.title = why;
+    if (why) setTip(b, why);
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       fn();
@@ -188,16 +191,20 @@ function abilitiesBlock(m: CrewRosterEntry, v: CrewView, act: (a: CrewAction) =>
       );
       return c;
     });
-  box.append(...slotted, ...known);
+  // A free slot shows as a dashed place for a card.
+  const free = Array.from({ length: Math.max(0, m.slots - m.slotted.length) }, () => el('div', 'cr-ab-empty tp-slot', 'EMPTY SLOT'));
+  box.append(...slotted, ...free, ...known);
   return box;
 }
 
 function file(m: CrewRosterEntry, v: CrewView, o: { act(a: CrewAction): void; assign(id: string): void }): HTMLElement {
   const r = m.recruit;
-  const f = el('div', `cr-file s-${stateOf(m)[0]}`);
+  const f = el('div', `cr-file tp-file s-${stateOf(m)[0]}`);
   f.dataset.keep = `file:${r.id}`;
   const mug = el('div', 'cr-mug');
-  mug.append(face(r, 'cr-mug-face'));
+  const pic = el('span', 'cr-mug-pic tp-face');
+  pic.append(face(r, 'cr-mug-face'));
+  mug.append(pic);
   if (m.state === 'hurt' || m.state === 'held' || m.state === 'gone') mug.append(el('span', 'cr-stamp', m.state.toUpperCase()));
   const under = el('div', 'cr-mug-under');
   const runs = m.runs.clean + m.runs.messy + m.runs.blown;
@@ -211,9 +218,10 @@ function file(m: CrewRosterEntry, v: CrewView, o: { act(a: CrewAction): void; as
   const id = el('div', 'cr-id');
   const line = el('div', 'cr-line');
   line.append(el('span', 'cr-rank', GRADES[r.grade]), el('span', '', r.spec.toUpperCase()), el('span', 'cr-from', r.origin.toUpperCase()));
-  id.append(el('div', 'cr-name', r.name.toUpperCase()), line);
+  id.append(el('div', 'cr-name tp-name', r.name.toUpperCase()), line);
   if (m.vouchedBy) id.append(el('div', 'cr-vouched', `Vouched for by ${m.vouchedBy}`));
-  id.append(el('div', 'cr-status', status(m, v)), under);
+  id.append(el('div', 'cr-status', status(m, v)));
+  mug.append(under);
   const top = el('div', 'cr-top');
   top.append(mug, id);
   f.append(top);
@@ -221,7 +229,7 @@ function file(m: CrewRosterEntry, v: CrewView, o: { act(a: CrewAction): void; as
 
   const cols = el('div', 'cr-cols');
   const spec = el('div', '');
-  spec.append(el('div', 'cr-dh', 'SPECIALTY'), el('div', 'cr-spec', r.spec.toUpperCase()));
+  spec.append(el('div', 'cr-dh tp-head', 'SPECIALTY'), el('div', 'cr-spec', r.spec.toUpperCase()));
   const ladder = el('div', 'cr-ladder');
   for (const [i, g] of GRADES.entries()) ladder.append(el('span', i === r.grade ? 'on' : i < r.grade ? 'f' : '', g));
   const good = el('ul', 'cr-goodat');
@@ -231,9 +239,9 @@ function file(m: CrewRosterEntry, v: CrewView, o: { act(a: CrewAction): void; as
     good.append(li);
   }
   spec.append(ladder, good);
-  if (m.next) spec.append(el('div', 'cr-dh', 'GROWTH'), el('div', 'cr-growth', `${Math.ceil(m.toNext)} more clean run${Math.ceil(m.toNext) === 1 ? '' : 's'}: ${GRADES[r.grade]} → ${m.next}. A job below their grade counts half.`));
+  if (m.next) spec.append(el('div', 'cr-dh tp-head', 'GROWTH'), el('div', 'cr-growth', `${Math.ceil(m.toNext)} more clean run${Math.ceil(m.toNext) === 1 ? '' : 's'}: ${GRADES[r.grade]} → ${m.next}. A job below their grade counts half.`));
   const traits = el('div', '');
-  traits.append(el('div', 'cr-dh', 'TRAITS'));
+  traits.append(el('div', 'cr-dh tp-head', 'TRAITS'));
   for (const t of m.traitsShown) {
     const row = el('div', 'cr-trait');
     row.dataset.kind = t.good ? 'good' : 'bad';
@@ -246,7 +254,7 @@ function file(m: CrewRosterEntry, v: CrewView, o: { act(a: CrewAction): void; as
     row.append(el('span', 'cr-ico', '?'), el('span', 'cr-t', 'UNKNOWN'), el('span', 'cr-d', 'Shows itself after three runs.'));
     traits.append(row);
   }
-  if (m.state !== 'gone') traits.append(el('div', 'cr-dh', 'LOYALTY'), el('div', 'cr-loyal-word', m.word), el('div', 'cr-loyal-line', m.line));
+  if (m.state !== 'gone') traits.append(el('div', 'cr-dh tp-head', 'LOYALTY'), el('div', 'cr-loyal-word', m.word), el('div', 'cr-loyal-line', m.line));
   cols.append(spec, traits);
   f.append(cols);
   if (m.state !== 'gone' && (m.abilities.length > 0 || m.slots > 0)) f.append(abilitiesBlock(m, v, o.act));
@@ -258,7 +266,7 @@ function file(m: CrewRosterEntry, v: CrewView, o: { act(a: CrewAction): void; as
       li.append(el('span', 'cr-when', hhmm(res.at)), el('span', 'cr-what', res.line), el('span', 'cr-eff', res.effects));
       log.append(li);
     }
-    f.append(el('div', 'cr-dh', 'LAST RUNS'), log);
+    f.append(el('div', 'cr-dh tp-head', 'LAST RUNS'), log);
   }
   const acts = el('div', 'cr-acts');
   acts.append(...actions(m, o));
@@ -268,15 +276,15 @@ function file(m: CrewRosterEntry, v: CrewView, o: { act(a: CrewAction): void; as
 
 export function rosterTab(v: CrewView, o: { picked: string | null; pick(id: string): void; act(a: CrewAction): void; assign(id: string): void }): HTMLElement {
   const root = el('div', 'cr-roster');
-  const tiles = el('div', 'cr-tiles');
+  const tiles = el('div', 'cr-tiles tp-list');
   tiles.dataset.keep = 'tiles';
   const live = v.roster.filter((m) => m.state !== 'gone');
   const gone = v.roster.filter((m) => m.state === 'gone');
   tiles.append(...live.map((m) => tile(m, m.recruit.id === o.picked, o.pick)));
-  for (let i = live.length; i < v.slots; i++) tiles.append(el('div', 'cr-tile cr-slot', '+ OPEN SLOT · HIRE AT A PLACE'));
+  for (let i = live.length; i < v.slots; i++) tiles.append(el('div', 'cr-tile cr-slot tp-row', '+ OPEN SLOT · HIRE AT A PLACE'));
   if (gone.length > 0) {
     const g = el('div', 'cr-gone');
-    g.append(el('div', 'cr-sub', `GONE · ${gone.length}`), ...gone.map((m) => tile(m, m.recruit.id === o.picked, o.pick)));
+    g.append(el('div', 'cr-sub tp-head quiet', `GONE · ${gone.length}`), ...gone.map((m) => tile(m, m.recruit.id === o.picked, o.pick)));
     tiles.append(g);
   }
   root.append(tiles);

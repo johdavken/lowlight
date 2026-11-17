@@ -20,6 +20,14 @@ describe('sixesBetween', () => {
 
 describe('foldKit', () => {
   const start = { deck: 'stall-build', nerveMax: 2, from: at(1, 20) };
+  it('clues fold into kit.clues once each, in the order earned (deduction board spec §2)', () => {
+    const k = foldKit(start, [
+      { at: at(1, 21), clue: ['the-fourteenth/HAND', 'the-fourteenth/BOWL'] },
+      { at: at(1, 22), clue: ['the-fourteenth/HAND'] },
+    ], at(1, 23));
+    expect(k.clues).toEqual(['the-fourteenth/HAND', 'the-fourteenth/BOWL']);
+    expect(foldKit(start, [], at(1, 21)).clues).toEqual([]);
+  });
   it('programs: the starter owned, a buy adds one, foils count up and down (owned programs plan)', () => {
     const k = foldKit({ ...start, programs: ['firewall', 'solvent'] }, [
       { at: at(1, 21), sol: 500 },
@@ -113,5 +121,13 @@ describe('the pocket deck everyone owns', () => {
   it('CARRY swaps to it, and losing the other deck leaves it', () => {
     expect(foldKit({ ...start, deck: 'field-deck' }, [{ at: 0, deck: 'pocket-deck', carry: true }], 0).deck).toBe('pocket-deck');
     expect(foldKit({ ...start, deck: 'field-deck' }, [{ at: 0, deck: null }], 0)).toMatchObject({ deck: null, owned: ['pocket-deck'] });
+  });
+});
+
+// Two Stories (spec 2026-11-10 §3): accounts cards ride the clue path.
+describe('accounts cards in the kit', () => {
+  it('an accounts card folds into kit.clues like a clue', () => {
+    const k = foldKit({ deck: null, nerveMax: 3, from: at(1, 20) }, [{ at: at(1, 21), clue: ['mini-story/DESK'] }, { at: at(1, 22), clue: ['mini-story/DESK'] }], at(1, 23));
+    expect(k.clues).toEqual(['mini-story/DESK']);
   });
 });

@@ -97,8 +97,9 @@ describe('Graft tips', () => {
     mount().offer(['roll', 'job'], root);
     vi.advanceTimersByTime(SETTLE_MS);
     expect(title()).toBe('TWO VOICES');
-    // Beside the column, not over the job's title above it.
+    // Beside the column, not over the job's title above it, a leader from it to the tip.
     expect(shown()!.dataset.side).toBe('right');
+    expect(game.querySelector('svg[data-lead="tip"] path')).not.toBeNull();
     ok();
     expect(title()).toBe('THE ROLL');
   });
@@ -293,7 +294,7 @@ describe('Graft tips', () => {
     // Owned programs: what you start with, where more come from, and foils.
     expect(tipText('program')).toContain('Fixers sell the rest');
     expect(tipText('program')).toContain('FOIL');
-    expect(tipText('armour')).toBe('FIREWALL cancels one cost, then burns out. Its slot stays full.');
+    expect(tipText('armour')).toBe('FIREWALL cancels one cost, then burns out. Its slot stays full. Not on the wire: nothing shields you there.');
     expect(TIP_ORDER.indexOf('program')).toBe(TIP_ORDER.indexOf('call') + 1);
   });
 

@@ -12,6 +12,7 @@ import { DIRECT_ALREADY_SHOWN, DIRECT_CONTINUE_NUDGE, DIRECT_SPEAK_NUDGE, create
 import { TurnError } from '../src/turn';
 import type { SseFrame } from '../src/sse';
 import { chunk, startStubOpenRouter, type StubOpenRouter, type StubOpenRouterStep } from './fixtures/stub-openrouter';
+import { startStubNanoGpt, type StubNanoGpt } from './fixtures/stub-nanogpt';
 
 const KEY = 'sk-or-test';
 let stub: StubOpenRouter | null = null;
@@ -175,6 +176,19 @@ describe('createDirectBackend: streaming', () => {
     expect(posts[1].body.reasoning).toEqual({ effort: 'low' });
     expect(posts[1].body.max_tokens).toBeGreaterThan(posts[0].body.max_tokens);
     expect(notices).toEqual([]);
+  });
+
+  it('REPLY THINKING: LOW / MEDIUM ask OpenRouter for that effort with the retry\'s room; AUTO sends none', async () => {
+    let t: 'auto' | 'low' | 'medium' = 'medium';
+    const { backend, stub } = await backendWith([ok('One.'), ok('Two.')], {}, { chatThinking: () => t });
+    await turn(backend);
+    t = 'auto';
+    await turn(backend);
+    const posts = stub.requests.filter((r) => r.method === 'POST');
+    expect(posts[0].body.reasoning).toEqual({ effort: 'medium' });
+    expect(posts[0].body).not.toHaveProperty('playerEffort');
+    expect(posts[0].body.max_tokens).toBeGreaterThan(posts[1].body.max_tokens);
+    expect(posts[1].body.reasoning).toBeUndefined();
   });
 
   it('only once: a retry that runs out too says the reply was cut off, with no third call', async () => {
@@ -805,5 +819,109 @@ describe('createDirectBackend: on the Anthropic route', () => {
     const { backend } = anthropicWith([{ status: 500, message: `boom ${AKEY}` }]);
     const e = await thrown(turn(backend));
     expect(e.message).not.toContain(AKEY);
+  });
+});
+
+describe('createDirectBackend: on the NanoGPT route', () => {
+  const NKEY = 'sk-nano-direct-key-9876';
+  let nano: StubNanoGpt | null = null;
+  afterEach(async () => {
+    await nano?.close();
+    nano = null;
+  });
+
+  async function nanoWith(o: { keys?: string[]; openrouter?: StubOpenRouter } = {}) {
+    nano = await startStubNanoGpt({ keys: o.keys ?? [NKEY], reply: 'From the plan.' });
+    const notices: string[] = [];
+    const sleeps: number[] = [];
+    const marks: number[] = [];
+    const n = nano;
+    // The plan pause as the NanoGPT catalog keeps it; with an OpenRouter stand-in, a paused plan model routes there.
+    let paused = false;
+    const allowance = { spent: () => paused, markSpent: (s: number) => (marks.push(s), (paused = true)) };
+    const backend = createDirectBackend({
+      setup: setupFor('http://openrouter.invalid'),
+      tools: { room: undefined as never, journal: undefined as never, player: () => 'hicks', expressions: null },
+      model: { get: () => 'z-ai/glm-5.2', set: () => {} },
+      apiKey: () => null,
+      route: (m) =>
+        paused && o.openrouter ? { provider: 'openrouter', baseUrl: o.openrouter.url, key: KEY, model: m } : { provider: 'nanogpt', baseUrl: `${n.url}/api/v1`, key: NKEY, model: m },
+      nanoAllowance: allowance,
+      onNotice: (t) => notices.push(t),
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    return { backend, notices, sleeps, marks, nano: n, unpause: () => (paused = false) };
+  }
+
+  it('a turn goes to <host>/api/v1/chat/completions with the NanoGPT key, model id as stored', async () => {
+    const { backend, nano } = await nanoWith();
+    expect(text(await turn(backend))).toBe('From the plan.');
+    const post = nano.requests.find((r) => r.method === 'POST')!;
+    expect(post.url).toBe('/api/v1/chat/completions');
+    expect(post.headers.authorization).toBe(`Bearer ${NKEY}`);
+    expect(post.body.model).toBe('z-ai/glm-5.2');
+  });
+
+  it("the plan's allowance running out (429 …_subscription_token_limit) is spent credit, named NanoGPT, never waited out; it pauses the plan", async () => {
+    const { backend, sleeps, nano, marks, unpause } = await nanoWith();
+    nano.chatError = { status: 429, json: { error: { message: 'Weekly subscription token limit reached', code: 'api_key_weekly_subscription_token_limit' } } };
+    const err = await thrown(turn(backend));
+    expect([err.kind, err.provider, err.status]).toEqual(['credit', 'nanogpt', 429]);
+    expect(sleeps).toEqual([]);
+    expect(marks).toHaveLength(1);
+    // While the plan is paused (and nothing else can take her model), the probe says no credit.
+    expect(await backend.probe()).toBe('no-credit');
+    unpause();
+    backend.resetProbe();
+    expect(await backend.probe()).toBe('ok');
+  });
+
+  it('with OpenRouter linked, the spent allowance moves the turn there at once, with a notice', async () => {
+    const or = await startStubOpenRouter([ok('From OpenRouter.')]);
+    try {
+      const { backend, notices, nano } = await nanoWith({ openrouter: or });
+      nano.chatError = { status: 429, headers: { 'Retry-After': '3600' }, json: { error: { message: 'limit', code: 'api_key_weekly_subscription_token_limit' } } } as never;
+      expect(text(await turn(backend))).toBe('From OpenRouter.');
+      expect(notices).toEqual(['// NANOGPT ALLOWANCE IS OUT — ON OPENROUTER UNTIL IT RESETS']);
+    } finally {
+      await or.close();
+    }
+  });
+
+  it('a spent balance (402) reads no-credit until a relink, for NanoGPT only', async () => {
+    const { backend, nano, marks } = await nanoWith();
+    nano.chatError = { status: 402, json: { error: { message: 'Insufficient balance' } } };
+    expect((await thrown(turn(backend))).kind).toBe('credit');
+    expect(marks).toEqual([]);
+    expect(await backend.probe()).toBe('no-credit');
+    backend.resetProbe();
+    expect(await backend.probe()).toBe('ok');
+  });
+
+  it('a plain 429 is still busy and retried once', async () => {
+    const { backend, sleeps, nano } = await nanoWith();
+    nano.chatError = { status: 429, json: { error: { message: 'slow down' } } };
+    const err = await thrown(turn(backend));
+    expect([err.kind, err.provider]).toEqual(['busy', 'nanogpt']);
+    expect(sleeps).toEqual([2000]);
+  });
+
+  it('probe: the plan and the balance; a bad key → key-rejected', async () => {
+    const { backend } = await nanoWith();
+    expect(await backend.probe()).toBe('ok');
+    expect(backend.credit()).toBe(3.1);
+    const other = await nanoWith({ keys: ['sk-nano-someone-else'] });
+    expect(await other.backend.probe()).toBe('key-rejected');
+  });
+
+  it('a NanoGPT key echoed in an error is redacted', async () => {
+    const { backend, nano } = await nanoWith();
+    nano.chatError = { status: 400, json: { error: { message: `bad request for ${NKEY} and sk-nano-abc-123` } } };
+    const err = await thrown(turn(backend));
+    expect(err.message).not.toContain(NKEY);
+    expect(err.message).not.toContain('sk-nano-abc-123');
+    expect(err.message).toContain('sk-nano-…');
   });
 });

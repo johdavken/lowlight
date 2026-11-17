@@ -26,6 +26,7 @@ describe('onClickAway', () => {
     down(inner);
     down(word);
     down(div('sys-menu'));
+    down(div('pause-menu'));
     down(div('model-menu'));
     down(div('devpanel'));
     expect(away).not.toHaveBeenCalled();

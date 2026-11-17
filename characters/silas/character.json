@@ -96,8 +96,14 @@
     },
     {
       "from": "22:00",
-      "to": "06:00",
+      "to": "23:00",
       "room": "karasu/zhou-flat"
+    },
+    {
+      "from": "23:00",
+      "to": "06:00",
+      "room": "karasu/zhou-flat",
+      "sleeps": true
     }
   ],
   "knows": {

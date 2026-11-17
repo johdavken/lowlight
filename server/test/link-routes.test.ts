@@ -1,21 +1,26 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import Fastify from 'fastify';
-import { registerLinkRoutes } from '../src/link-routes';
-import { createAnthropicCatalog, createModelCatalog, createRoutedCatalog } from '../src/model-catalog';
+import { combinedState, registerLinkRoutes } from '../src/link-routes';
+import { createAnthropicCatalog, createModelCatalog, createNanoGptCatalog, createRoutedCatalog } from '../src/model-catalog';
 import { startStubAnthropic, type StubAnthropic } from './fixtures/stub-anthropic';
+import { PLAN_OFF, startStubNanoGpt, type StubNanoGpt } from './fixtures/stub-nanogpt';
 import { openSettings, type Settings } from '../src/settings';
 import { startStubOpenRouter, type StubOpenRouter } from './fixtures/stub-openrouter';
 import { tempDir } from './fixtures/temp-dir';
 
 let stub: StubOpenRouter | null = null;
 let an: StubAnthropic | null = null;
+let nano: StubNanoGpt | null = null;
 afterEach(async () => {
   await stub?.close();
   await an?.close();
+  await nano?.close();
   stub = null;
   an = null;
+  nano = null;
 });
 const GOOD_ANT = 'sk-ant-api03-good-key-wxyz';
+const GOOD_NANO = 'sk-nano-good-key-n4n0';
 
 const MODELS = {
   data: [
@@ -28,32 +33,38 @@ const MODELS = {
   ],
 };
 
-async function start(opts: { key?: string | null; anthropicKey?: string; fetchImpl?: typeof fetch; settings?: Settings } = {}) {
+async function start(opts: { key?: string | null; anthropicKey?: string; nanoKey?: string; fetchImpl?: typeof fetch; settings?: Settings } = {}) {
   stub = await startStubOpenRouter([]);
   an = await startStubAnthropic({ keys: [GOOD_ANT] });
+  nano = await startStubNanoGpt({ keys: [GOOD_NANO] });
   stub.models = { status: 200, json: MODELS };
   const settings = opts.settings ?? openSettings(tempDir('nix-link-'));
   if (opts.key) settings.setKey('openrouter', opts.key);
   if (opts.anthropicKey) settings.setKey('anthropic', opts.anthropicKey);
+  if (opts.nanoKey) settings.setKey('nanogpt', opts.nanoKey);
   const resets: string[] = [];
   const runtimes = [{ id: 'a', resetProbe: async () => void resets.push('a') }, { id: 'b', resetProbe: async () => void resets.push('b') }];
   const app = Fastify();
+  const nanoCatalog = createNanoGptCatalog({ host: nano.url });
   const catalog = createRoutedCatalog({
     openrouter: createModelCatalog({ baseUrl: stub.url, apiKey: () => settings.key('openrouter') }),
     anthropic: createAnthropicCatalog({ apiKey: () => settings.key('anthropic'), baseUrl: an.url }),
-    keys: () => ({ openrouter: settings.key('openrouter'), anthropic: settings.key('anthropic') }),
+    nanogpt: nanoCatalog,
+    keys: () => ({ openrouter: settings.key('openrouter'), anthropic: settings.key('anthropic'), nanogpt: settings.key('nanogpt') }),
   });
   registerLinkRoutes(app, {
     settings,
     baseUrl: stub.url,
     anthropicBaseUrl: an.url,
+    nanogptHost: nano.url,
+    nanogpt: nanoCatalog,
     ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
     catalog,
     runtimes: () => runtimes as never,
     originAllowed: (o) => o === undefined || o === 'http://localhost:5173',
   });
   await app.ready();
-  return { app, settings, resets, stub: stub!, an: an! };
+  return { app, settings, resets, stub: stub!, an: an!, nano: nano!, nanoCatalog };
 }
 
 const put = (app: Awaited<ReturnType<typeof start>>['app'], body: unknown, origin?: string) =>
@@ -63,7 +74,7 @@ describe('/api/link', () => {
   it('GET with no key → no-link', async () => {
     const { app } = await start();
     const res = await app.inject({ method: 'GET', url: '/api/link' });
-    expect(res.json()).toEqual({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' } });
+    expect(res.json()).toEqual({ state: 'no-link', openrouter: { linked: false, last4: null, credit: null, state: 'no-link' }, anthropic: { linked: false, last4: null, credit: null, state: 'no-link' }, nanogpt: { linked: false, last4: null, credit: null, state: 'no-link' } });
   });
 
   it('PUT a good key saves it and returns last4 and credit, never the key', async () => {
@@ -338,6 +349,33 @@ describe('/api/models', () => {
   });
 });
 
+describe('/api/reply-prefs', () => {
+  const put = (app: Awaited<ReturnType<typeof start>>['app'], body: unknown, origin?: string) =>
+    app.inject({ method: 'PUT', url: '/api/reply-prefs', payload: body as object, headers: origin ? { origin } : {} });
+
+  it('GET is normal and auto until set; a PUT may carry either and answers with both', async () => {
+    const { app, settings } = await start();
+    expect((await app.inject({ method: 'GET', url: '/api/reply-prefs' })).json()).toEqual({ length: 'normal', thinking: 'auto' });
+    expect((await put(app, { length: 'long' })).json()).toEqual({ length: 'long', thinking: 'auto' });
+    expect((await put(app, { thinking: 'low' })).json()).toEqual({ length: 'long', thinking: 'low' });
+    expect(settings.replyLength()).toBe('long');
+    expect(settings.chatThinking()).toBe('low');
+  });
+
+  it.each([{ length: 'epic' }, { thinking: 'high' }, { length: 'short', thinking: 'off' }, {}, null])('PUT %j → 400, nothing written', async (body) => {
+    const { app, settings } = await start();
+    const res = await put(app, body);
+    expect(res.statusCode).toBe(400);
+    expect(settings.replyLength()).toBe('normal');
+    expect(settings.chatThinking()).toBe('auto');
+  });
+
+  it('PUT from a foreign Origin → 403', async () => {
+    const { app } = await start();
+    expect((await put(app, { length: 'short' }, 'https://evil.example')).statusCode).toBe(403);
+  });
+});
+
 describe('/api/narrator-thinking', () => {
   const putThinking = (app: Awaited<ReturnType<typeof start>>['app'], body: unknown, origin?: string) =>
     app.inject({ method: 'PUT', url: '/api/narrator-thinking', payload: body as object, headers: origin ? { origin } : {} });
@@ -368,5 +406,109 @@ describe('/api/narrator-thinking', () => {
     const { app, settings } = await start();
     expect((await putThinking(app, { thinking: 'low' }, 'https://evil.example')).statusCode).toBe(403);
     expect(settings.narratorThinking()).toBe('auto');
+  });
+});
+
+describe('/api/link/nanogpt', () => {
+  const putNano = (app: Awaited<ReturnType<typeof start>>['app'], apiKey: string) => app.inject({ method: 'PUT', url: '/api/link/nanogpt', payload: { apiKey } });
+
+  it('PUT a good key with a plan: saved; the plan and the balance come back; GET shows it beside the others', async () => {
+    const { app, settings } = await start();
+    const res = await putNano(app, GOOD_NANO);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ linked: true, last4: 'n4n0', credit: 3.1, state: 'ok', plan: { active: true, weekLeft: 0.75 } });
+    expect(settings.key('nanogpt')).toBe(GOOD_NANO);
+    const all = (await app.inject({ method: 'GET', url: '/api/link' })).json();
+    expect(all.state).toBe('ok');
+    expect(all.nanogpt).toMatchObject({ linked: true, last4: 'n4n0', state: 'ok' });
+    expect([all.openrouter.state, all.anthropic.state]).toEqual(['no-link', 'no-link']);
+    expect(JSON.stringify(all)).not.toContain('good-key');
+  });
+
+  it('no plan and a spent balance: linked, but no-credit', async () => {
+    const { app, nano } = await start();
+    nano.usage = PLAN_OFF;
+    nano.balance = 0;
+    const res = await putNano(app, GOOD_NANO);
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ state: 'no-credit', credit: 0, plan: { active: false } });
+  });
+
+  it('no plan but money on it: ok', async () => {
+    const { app, nano } = await start();
+    nano.usage = PLAN_OFF;
+    expect((await putNano(app, GOOD_NANO)).json()).toMatchObject({ state: 'ok', credit: 3.1 });
+  });
+
+  it("a key the plan call won't answer (no plan): its balance decides", async () => {
+    const { app, nano } = await start();
+    nano.usageStatus = 403;
+    expect((await putNano(app, GOOD_NANO)).json()).toMatchObject({ state: 'ok', credit: 3.1 });
+    expect((await putNano(app, 'sk-nano-wrong-key-0000')).json().error).toBe('key-rejected');
+  });
+
+  it('a relink starts the plan afresh after its allowance ran out', async () => {
+    const { app, nanoCatalog } = await start();
+    nanoCatalog.markSpent(3600);
+    await putNano(app, GOOD_NANO);
+    expect(nanoCatalog.spent()).toBe(false);
+  });
+
+  it('PUT a rejected key → 400 key-rejected, nothing written', async () => {
+    const { app, settings } = await start();
+    const res = await putNano(app, 'sk-nano-wrong-key-0000');
+    expect([res.statusCode, res.json().error]).toEqual([400, 'key-rejected']);
+    expect(settings.key('nanogpt')).toBeNull();
+  });
+
+  it('linking loads the plan list, so the next turn routes on it', async () => {
+    const { app, nano, nanoCatalog } = await start();
+    expect(nanoCatalog.included('z-ai/glm-5.2')).toBe(false);
+    await putNano(app, GOOD_NANO);
+    await vi.waitFor(() => expect(nanoCatalog.included('z-ai/glm-5.2')).toBe(true));
+    expect(nanoCatalog.included('anthropic/claude-sonnet-5.5')).toBe(false);
+    expect(nano.requests.some((r) => r.url.startsWith('/api/v1/models'))).toBe(true);
+  });
+
+  it('DELETE removes only that key', async () => {
+    const { app, settings } = await start({ key: 'sk-or-v1-abcdef3f9a', nanoKey: GOOD_NANO });
+    expect((await app.inject({ method: 'DELETE', url: '/api/link/nanogpt' })).statusCode).toBe(204);
+    expect(settings.key('nanogpt')).toBeNull();
+    expect(settings.key('openrouter')).toBe('sk-or-v1-abcdef3f9a');
+  });
+
+  it('the combined state over three: ok when any is ok, else the first linked one', async () => {
+    const { app, stub, nano } = await start({ key: 'sk-or-v1-abcdef3f9a', nanoKey: GOOD_NANO });
+    stub.key = { status: 401, json: {} };
+    let all = (await app.inject({ method: 'GET', url: '/api/link' })).json();
+    expect([all.openrouter.state, all.nanogpt.state, all.state]).toEqual(['key-rejected', 'ok', 'ok']);
+    expect(combinedState({ linked: false, last4: null, credit: null, state: 'no-link' }, { linked: true, last4: 'x', credit: 0, state: 'no-credit' }, { linked: true, last4: 'y', credit: null, state: 'key-rejected' })).toBe('no-credit');
+    void nano;
+  });
+});
+
+describe('/api/models with a NanoGPT key', () => {
+  it("only that key: NanoGPT's list, every pick it has marked via nanogpt", async () => {
+    const { app } = await start({ nanoKey: GOOD_NANO });
+    const body = (await app.inject({ method: 'GET', url: '/api/models' })).json() as { picks: { id: string; via?: string }[] };
+    expect(body.picks.map((p) => [p.id, p.via])).toEqual([
+      ['z-ai/glm-5.2', 'nanogpt'],
+      ['deepseek/deepseek-v4-pro-0813', 'nanogpt'],
+      ['anthropic/claude-sonnet-5.5', 'nanogpt'],
+    ]);
+  });
+
+  it('with OpenRouter too: the plan models go via nanogpt once its list is in; Claude stays on OpenRouter', async () => {
+    const { app, nanoCatalog } = await start({ key: 'sk-or-k-123456', nanoKey: GOOD_NANO });
+    await nanoCatalog.list();
+    const body = (await app.inject({ method: 'GET', url: '/api/models' })).json() as { picks: { id: string; via?: string }[] };
+    expect(body.picks.map((p) => [p.id, p.via])).toEqual([['z-ai/glm-5.2', 'nanogpt'], ['anthropic/claude-sonnet-5.5', undefined]]);
+  });
+
+  it('all three keys: Claude via anthropic, GLM via nanogpt', async () => {
+    const { app, nanoCatalog } = await start({ key: 'sk-or-k-123456', anthropicKey: GOOD_ANT, nanoKey: GOOD_NANO });
+    await nanoCatalog.list();
+    const body = (await app.inject({ method: 'GET', url: '/api/models' })).json() as { picks: { id: string; via?: string }[] };
+    expect(body.picks.map((p) => [p.id, p.via])).toEqual([['z-ai/glm-5.2', 'nanogpt'], ['anthropic/claude-sonnet-5.5', 'anthropic']]);
   });
 });

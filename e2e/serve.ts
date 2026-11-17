@@ -7,10 +7,11 @@ import path from 'node:path';
 import { buildApp } from '../server/src/app';
 import type { Config } from '../server/src/config';
 import { buildWeb } from './build-once';
-import { DIRECT, GOOD_KEY, SECOND, ANT_KEY, ANT_REPLY } from './fixtures';
+import { dataDirMarker, DIRECT, GOOD_KEY, SECOND, ANT_KEY, ANT_REPLY, NANO_KEY, NANO_REPLY } from './fixtures';
 import { BUG_RELAY_PORT, STUB_OR_LOG_PORT, gamePort } from './ports';
 import { startFakeOpenRouter } from './fake-openrouter';
 import { startStubAnthropic } from '../server/test/fixtures/stub-anthropic';
+import { startStubNanoGpt } from '../server/test/fixtures/stub-nanogpt';
 import { PNG } from 'pngjs';
 import { CHAIR, JOB, MISSION, READY, WAITS } from '../shared/quests.fixture';
 import { CONTRACT } from '../shared/quests.contract.fixture';
@@ -113,6 +114,8 @@ async function main(): Promise<void> {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nix-room-e2e-'));
   const dataDir = path.join(tmpDir, 'data');
   fs.mkdirSync(dataDir, { recursive: true });
+  // Where this slot's saves are, for specs that put files in a playthrough (persona figure).
+  fs.writeFileSync(dataDirMarker(), dataDir);
 
   // The real cast, copied, plus SECOND: a direct contact with no rooms of her own (so the neutral
   // default rooms) and no look (a monogram), on the fake OpenRouter like everyone else.
@@ -158,6 +161,8 @@ async function main(): Promise<void> {
   const openrouterBaseUrl = await startFakeOpenRouter({ logPort: STUB_OR_LOG_PORT });
   // Anthropic (link.spec): a stand-in that takes only ANT_KEY and answers every turn with ANT_REPLY.
   const anthropic = await startStubAnthropic({ keys: [ANT_KEY], reply: ANT_REPLY, completion: '{}' });
+  // NanoGPT (link.spec): the same, for NANO_KEY and NANO_REPLY; its plan covers GLM.
+  const nanogpt = await startStubNanoGpt({ keys: [NANO_KEY], reply: NANO_REPLY, completion: '{}' });
 
   // No persona.json: the default player stays 'you' (who you are is chosen per playthrough at NEW GAME).
   const personaDir = path.join(tmpDir, 'persona');
@@ -232,6 +237,236 @@ async function main(): Promise<void> {
     JSON.stringify([...['sdg-01', 'sdg-02'].map((id) => ({ id, file: `${id}.png`, tags: ['sdg'] })), { id: 'local-01', file: 'local-01.png', tags: ['local', 'man', 'young'] }]),
   );
   fs.writeFileSync(path.join(questsDir, 'ready-test.md'), READY);
+  // The deduction board (e2e/deduction.spec.ts): a small case and a job only a Rue playthrough sees, so no other spec's
+  // board counts change. Its first beat gives two clashing cards and a decoy; its second beat is the board.
+  const casesDir = path.join(tmpDir, 'cases');
+  fs.mkdirSync(casesDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(casesDir, 'e2e-case.md'),
+    `---
+title: E2E Case
+patience: 1
+suspects:
+  - ROOK | sdg-01 | The one who did it.
+  - WREN | sdg-02 | The one who didn't.
+answer: "ROOK | WHO: SEEN | HOW: TOOL | WHY: DEBT"
+---
+
+# cards
+- STOOD [street] THE STALL: Rook was at the stall at nine. | from: free
+- CLAIM [said] ROOK SAYS: "I was home all night." | from: free
+- RAIN [street] THE STREET: It rained at nine. | from: free
+- TOOLKIT [grid] THE KIT: A tool. | from: roll:kit | missed: The roll on the kit failed.
+- LEDGER [grid] THE LEDGER: A debt. | from: roll:book | missed: The crack on the book failed.
+
+# deductions
+- SEEN → WHO: Rook lied about being home.
+- TOOL → HOW: The tool did it.
+- DEBT → WHY: The debt was why.
+
+# clashes
+- STOOD × CLAIM → SEEN
+- STOOD × TOOLKIT → TOOL
+- STOOD × LEDGER → DEBT
+
+# near misses
+- RAIN × CLAIM: Rain keeps nobody home.
+`,
+  );
+  // One bark (The Fourteenth voice script): its patience is one box, so the near miss plays `gone`.
+  fs.mkdirSync(path.join(casesDir, 'voice', 'e2e-case'), { recursive: true });
+  fs.copyFileSync('./world/cases/voice/the-fourteenth/gone-a.ogg', path.join(casesDir, 'voice', 'e2e-case', 'gone-a.ogg'));
+  fs.writeFileSync(
+    path.join(questsDir, 'board-test.md'),
+    `---
+title: Board Test
+kind: mission
+tier: 1
+with: [${DIRECT.id}]
+for: rue
+starts: lowlight-intake
+pay: 100
+pitch: A test of the deduction board.
+---
+
+# look
+*You pin it all up.*
+
+- look: Pin it all up. → found
+- stare: Stare at it. → found
+
+## found
+*Three cards on the wall.*
+gives: clue e2e-case STOOD
+gives: clue e2e-case CLAIM
+gives: clue e2e-case RAIN
+→ wall
+
+# wall
+board: e2e-case
+
+*The wall.*
+
+## holds
+*BOARD-HOLDS.*
+take: full
+→ end
+
+## thin
+*BOARD-THIN.*
+take: part
+→ end
+
+## hunch
+*BOARD-HUNCH.*
+take: part
+→ end
+
+## wrong-wren
+*BOARD-WRONG.*
+take: none
+→ end
+`,
+  );
+  // The accounts board (e2e/accounts.spec.ts): two listeners on fixture contacts and a job only a Rue playthrough sees.
+  // Its first beat gives the camera card the first listener holds; its second beat is the board.
+  const accountsDir = path.join(tmpDir, 'accounts');
+  fs.mkdirSync(accountsDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(accountsDir, 'e2e-story.md'),
+    `---
+title: E2E Story
+quest: story-test
+patience: ${DIRECT.id} 2, hicks 2
+leaks: hicks → ${DIRECT.id}
+---
+
+# cards
+- DESK [cover] THE DESK: I was at the desk all night. | fills: WHERE | from: free
+- ROOF [street] THE ROOF: I was on the roof. | fills: WHERE | from: free
+- CAM [grid] THE CAMERA: You, on the roof at two. | from: given
+- SOLO [cover] ALONE: Nobody helped. | fills: HELP | from: free
+- CREW [street] THE CREW: Two friends. | fills: HELP | from: free
+- NONE [cover] NOTHING: I took nothing. | fills: TAKE | from: free
+- BOX [street] THE BOX: A box of tapes. | fills: TAKE | from: free
+- NAME [said] MY NAME: Rue, off the boards. | fills: WHO | from: free
+- PAY [said] THE PAY: For the money. | fills: WHY | from: free
+- TWO [said] AT TWO: At two, when the rain came. | fills: WHEN | from: free
+
+# ${DIRECT.id}
+asks: WHERE | WHERE WERE YOU · HELP | WHO HELPED · TAKE | WHAT DID YOU TAKE
+- knows CAM
+
+# hicks
+asks: WHO | WHO YOU ARE · WHY | WHY YOU WENT · WHEN | WHEN YOU WENT
+
+# clashes
+- DESK × CAM: "The camera had you on the roof at two."
+`,
+  );
+  fs.writeFileSync(
+    path.join(questsDir, 'story-test.md'),
+    `---
+title: Story Test
+kind: mission
+tier: 1
+with: [${DIRECT.id}]
+for: rue
+starts: lowlight-intake
+pay: 100
+pitch: A test of the accounts board.
+---
+
+# night
+*The night.*
+
+- go: Go up. → seen
+- wait: Wait for it. → seen
+
+## seen
+*A camera catches you on the roof.*
+gives: clue e2e-story CAM
+→ after
+
+# after
+accounts: e2e-story
+
+*Two of them want to know.*
+
+## told
+*STORY-TOLD.*
+take: full
+→ end
+`,
+  );
+  // Her reply over the line in the JOB column (e2e/job-line.spec.ts): a comms beat she rides along on, for: ember only.
+  fs.writeFileSync(
+    path.join(questsDir, 'line-test.md'),
+    `---
+title: Line Test
+kind: mission
+tier: 1
+with: [${DIRECT.id}]
+for: ember
+starts: lowlight-intake
+pay: 100
+pitch: A test of her line in the JOB column.
+---
+
+# yard
+comms: yes
+
+*The yard, rain in the floodlights. {{"Two men by the gate,"}} she says in your ear.*
+
+view ${DIRECT.id}: You're on her ear, watching the yard's cameras.
+
+- left: Go left, past the rigs. → through
+- right: Go right, by the wash bay. → through
+
+## through
+*You're past them.*
+→ hut
+
+# hut
+
+*The hut, one lit window.*
+
+- grab: Take the sheet. → done
+- leave: Leave it in the press. → done
+
+## done
+*LINE-DONE.*
+take: full
+→ end
+`,
+  );
+  // A STORY opening (e2e/arrival.spec.ts): Soren's job with Rue at her hab, which a new game for the pair opens on.
+  fs.writeFileSync(
+    path.join(questsDir, 'run-sheet.md'),
+    `---
+title: Run Sheet
+kind: mission
+tier: 1
+with: [rue]
+for: soren
+starts: rue-hab
+pay: 100
+pitch: A test of the STORY opening.
+opening: 'Her message came at six: three words, "Come up tonight."'
+opening-view: You asked Soren up tonight, the first time he's been inside.
+---
+
+# ask
+*The heater ticks.*
+
+- go: Take it. → done
+- stay: Leave it. → done
+
+## done
+*Done.*
+→ end
+`,
+  );
   // A stranger with a face at the Ferry Stairs (e2e/comms.spec.ts): met on comms, for the speaker slot.
   fs.writeFileSync(
     path.join(questsDir, 'dock-clerk.md'),
@@ -254,7 +489,10 @@ async function main(): Promise<void> {
       .replace('- grab: Take it all. → paid / part [check reflex 50]', '- grab: Crack the ledger terminal. → paid / part [crack 6 corp]'),
   );
   // A tier 2 job at the Intake (e2e/tier-cut.spec.ts): only Cass's Trusted rep sees it, so Nobody's boards keep their count.
-  fs.writeFileSync(path.join(questsDir, 'two-step.md'), JOB.replace('title: Back Door', 'title: Two Step').replace('starts: haes-noodles', 'starts: lowlight-intake'));
+  // `for: cass` holds it to her tier rather than the nightly draw: with Back Door and Night Shift the board drew 2 of 3,
+  // seeded by the random playthrough id, and left Two Step off about one night in ten. Her drawn pool is then those two,
+  // so both post every night too (contracts.spec plays Night Shift).
+  fs.writeFileSync(path.join(questsDir, 'two-step.md'), JOB.replace('title: Back Door', 'title: Two Step').replace('tier: 2', 'tier: 2\nfor: cass').replace('starts: haes-noodles', 'starts: lowlight-intake'));
   // A contract at the Intake (e2e/contracts.spec.ts): the same rep, with her.
   fs.writeFileSync(path.join(questsDir, 'test-contract.md'), CONTRACT.replace('kind: contract', 'kind: contract\nart: test-contract.webp').replace('with: [mother-rot]', `with: [${DIRECT.id}]`).replace('starts: haes-noodles', 'starts: lowlight-intake'));
   process.env.NIX_TEST_REP = 'cass@karasu:50';
@@ -436,6 +674,8 @@ async function main(): Promise<void> {
     districtsDir,
     gigsDir,
     questsDir,
+    casesDir,
+    accountsDir,
     gearDir,
     extrasDir,
     crewDir,
@@ -443,6 +683,7 @@ async function main(): Promise<void> {
     webDist: 'dist/web',
     openrouterBaseUrl,
     anthropicBaseUrl: anthropic.url,
+    nanogptBaseUrl: nanogpt.url,
     playthroughsDir: path.join(dataDir, 'playthroughs'),
     autoPlaythrough: true,
     bugRelayUrl: `http://127.0.0.1:${BUG_RELAY_PORT}/`,

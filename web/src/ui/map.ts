@@ -10,18 +10,27 @@ import type { LitWindow } from './map/ambience';
 import { BlackoutLayer } from './map/blackout-layer';
 import { TileLayer } from './map/tile-layer';
 import { ScreenFx } from './map/screen-fx';
+import { setHints } from '../landing/hint-line';
 import type { Weather } from '../../../shared/types';
 
 export const MAP_URL = '/map/lowlight.webp';
-/** The panel cue: MAP, QUEST, PEOPLE, CREW, TEXTS, YOU and the save prompt open on it. */
-export const MAP_CUE_URL = '/sound/ui/panel.ogg';
-/** PAUSED opening, and closing back to the room. */
-export const PAUSE_IN_CUE_URL = '/sound/ui/pause-in.ogg';
-export const PAUSE_OUT_CUE_URL = '/sound/ui/pause-out.ogg';
+/** The panel cue: MAP, PEOPLE, CREW, TEXTS, YOU, the lore book and the save prompt open on the job board's sound (playtest, 2026-11-16; was `ui/panel.ogg`). */
+export const MAP_CUE_URL = '/sound/board/open.ogg';
+/** PAUSED opening, and closing back to the room (picked 2026-11-16 on the Pause Sounds audition; were the tape machine's
+ * `ui/pause-in` and `pause-out`). A row picked and TITLE have their own. */
+export const PAUSE_IN_CUE_URL = '/sound/ui/paused.ogg';
+export const PAUSE_OUT_CUE_URL = '/sound/ui/resume.ogg';
+export const PAUSE_PICK_CUE_URL = '/sound/ui/pause-pick.ogg';
+export const PAUSE_TITLE_CUE_URL = '/sound/ui/pause-title.ogg';
 /** As auditioned on the Transition Mix (straight out, over scene music at 0.3); the old 0.25 landing scale made it inaudible. */
 export const MAP_CUE_LEVEL = 0.9;
 /** The glitch-out's length (`map-glitch-out` in style.css); the overlay hides when it ends. */
+/** The key line along the map's foot, as the room's panels write theirs. */
+const MAP_HINTS = '[SCROLL] ZOOM · [DRAG] MOVE · [↑↓] PLACE · [ENTER] GO · [ESC] CLOSE';
 const GLITCH_OUT_MS = 600;
+/** The least time between two zoom cues on a spinning wheel, and how far the camera goes before its move is a sweep. */
+const ZOOM_CUE_MS = 140;
+const SWEEP_CUE_PX = 240;
 /** The camera's ease to a place and back out to the city. */
 const CAMERA_MS = 700;
 /** The picture's shape (w / h) until it has loaded. */
@@ -133,6 +142,7 @@ export class MapPanel {
   private readonly onMove = (e: PointerEvent) => this.pointerMove(e);
   private readonly onUp = (e: PointerEvent) => this.pointerUp(e);
   private readonly onWheel = (e: WheelEvent) => this.wheel(e);
+  private zoomCueAt = 0;
   /** Set while the glitch-out plays; the overlay is still shown but counts as closed. */
   private closing: ReturnType<typeof setTimeout> | null = null;
 
@@ -171,6 +181,7 @@ export class MapPanel {
       reducedMotion: opts.reducedMotion,
       onTravel: onTravel
         ? (placeId, comms) => {
+            opts.onCue?.('go');
             if (comms) onTravel(placeId, true);
             else onTravel(placeId);
             this.close();
@@ -180,7 +191,9 @@ export class MapPanel {
     });
     this.screen.append(this.notice, el('div', 'map-fuzz'), el('div', 'map-scan'), el('div', 'map-roll'), el('div', 'map-vignette'));
     const head = el('header', 'map-head');
-    head.append(el('span', 'map-hint', 'SCROLL ZOOM · DRAG MOVE · [ESC] CLOSE'));
+    const hint = el('span', 'map-hint');
+    setHints(hint, MAP_HINTS);
+    head.append(hint);
     this.devStrip = el('div', 'map-dev');
     this.devStrip.hidden = true;
     head.append(this.devStrip);
@@ -383,6 +396,8 @@ export class MapPanel {
   /** Blacks out exactly these districts on the rendered map, animating the change. The Spine and the Ribbon have their
    * own power (the player's default, 2026-10-27) and ids the render doesn't know are ignored. */
   setBlackout(ids: string[]): void {
+    // A district going dark while you're looking at the map.
+    if (this.isOpen && this.blackout && ids.some((id) => !this.darkIds.includes(id))) this.opts.onCue?.('dark');
     this.darkIds = [...ids];
     this.blackout?.set(this.blackoutFor(ids), !!this.opts.reducedMotion);
   }
@@ -493,8 +508,15 @@ export class MapPanel {
     this.stopEase();
     const px = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
     const factor = Math.exp(-Math.max(-200, Math.min(200, px)) * 0.0015);
+    const was = this.view.scale;
     this.paceView(zoomAt(this.view, factor, this.screenPoint(e), this.mapSize(), this.screenSize(), this.maxScale()));
     this.keepLimit();
+    // A step of the lens, not one a wheel event: a spin sounds a few times, and nothing at the zoom's ends.
+    const now = performance.now();
+    if (this.view.scale !== was && now - this.zoomCueAt > ZOOM_CUE_MS) {
+      this.zoomCueAt = now;
+      this.opts.onCue?.('zoom');
+    }
   }
 
   private pointerDown(e: PointerEvent): void {
@@ -653,6 +675,8 @@ export class MapPanel {
       return this.keepLimit();
     }
     this.target = to;
+    // A long move of the camera (into a place, out to the city), not a nudge to keep a pin clear.
+    if (to.scale !== from.scale || Math.hypot(to.tx - from.tx, to.ty - from.ty) > SWEEP_CUE_PX) this.opts.onCue?.('sweep');
     const t0 = performance.now();
     let shown: number | null = null;
     const step = (now: number) => {

@@ -193,7 +193,7 @@ const PAGE_KEY_RE = /^page\.(.+)\.(?:text|at|by)$/;
 
 /** The meta keys that are story state (logged and rebuilt): each pair's recap and dossier page, the leads they followed, and contact-card burns applied. `scribe.` is the Residual's old name, kept for saves. */
 const isStoryMeta = (k: string) =>
-  k.startsWith('recap.') || k.startsWith('witness.') || k.startsWith('page.') || k.startsWith('lead.') || k.startsWith('standing.') || k.startsWith('scribe.') || k.startsWith('summary.') || k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('storyMood.') || k.startsWith('cityWeather.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('cipher.') || k.startsWith('habits.') || k.startsWith('cardBurn.');
+  k.startsWith('recap.') || k.startsWith('witness.') || k.startsWith('page.') || k.startsWith('lead.') || k.startsWith('standing.') || k.startsWith('scribe.') || k.startsWith('summary.') || k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('storyMood.') || k.startsWith('cityWeather.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('told.') || k.startsWith('cipher.') || k.startsWith('habits.') || k.startsWith('cardBurn.');
 /** A shared_contacts row's log key. */
 const shareKey = (contactId: string, player: string) => `${contactId}\u0000${player}`;
 /** A leads row's log key. */
@@ -238,6 +238,7 @@ interface MessageRow {
   dice: string | null;
   leave: number | null;
   clock: number | null;
+  job_text: string | null;
 }
 
 /**
@@ -279,6 +280,7 @@ function rowToMessage(row: MessageRow): ChatMessage {
   // A promised text's hidden line (promised texts spec §5) reuses the column: leave means nothing on a text row.
   if (row.leave === 3) message.promised = true;
   if (row.clock !== null) message.clock = row.clock;
+  if (row.job_text) message.jobText = row.job_text;
   if (row.takes) message.takes = { index: row.take_index, count: (JSON.parse(row.takes) as Take[]).length };
   if (row.model) message.model = row.model;
   if (row.expression) message.expression = row.expression;
@@ -345,6 +347,8 @@ function migrate(sqlite: DatabaseSync, defaultPlayer: string): void {
   if (!columns.some((c) => c.name === 'leave')) sqlite.exec('ALTER TABLE messages ADD COLUMN leave INTEGER');
   // The story clock after each row.
   if (!columns.some((c) => c.name === 'clock')) sqlite.exec('ALTER TABLE messages ADD COLUMN clock INTEGER');
+  // A job text's hidden line names its job (job texts spec §3).
+  if (!columns.some((c) => c.name === 'job_text')) sqlite.exec('ALTER TABLE messages ADD COLUMN job_text TEXT');
   // Which model wrote a reply came with direct characters.
   if (!columns.some((c) => c.name === 'model')) {
     sqlite.exec('ALTER TABLE messages ADD COLUMN model TEXT');
@@ -538,9 +542,9 @@ function createDb(sqlite: DatabaseSync): Db {
   const deleteMetaStmt = sqlite.prepare('DELETE FROM meta WHERE k = ?');
 
   const insertMessageStmt = sqlite.prepare(
-    'INSERT INTO messages (id, player, role, text, tool_lines, ts, status, reply_to, mode, model, expression, others_expressions, scene, encounter, quest, gig, dice, leave, clock) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO messages (id, player, role, text, tool_lines, ts, status, reply_to, mode, model, expression, others_expressions, scene, encounter, quest, gig, dice, leave, clock, job_text) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
   );
-  const MSG_COLS = 'id, role, text, tool_lines, ts, status, reply_to, mode, takes, take_index, model, expression, resident_expression, others_expressions, scene, encounter, quest, gig, dice, leave, clock';
+  const MSG_COLS = 'id, role, text, tool_lines, ts, status, reply_to, mode, takes, take_index, model, expression, resident_expression, others_expressions, scene, encounter, quest, gig, dice, leave, clock, job_text';
   const getMessageStmt = sqlite.prepare(`SELECT ${MSG_COLS} FROM messages WHERE id = ? AND player = ?`);
   const recentMessagesStmt = sqlite.prepare(
     `SELECT ${MSG_COLS} FROM messages WHERE player = ? ORDER BY ts DESC, rowid DESC LIMIT ?`,
@@ -591,7 +595,7 @@ function createDb(sqlite: DatabaseSync): Db {
   const metaPrefixStmt = sqlite.prepare("SELECT k, v FROM meta WHERE substr(k, 1, length(?)) = ? ORDER BY k");
   const setMetaStmt = sqlite.prepare('INSERT INTO meta (k, v) VALUES (?, ?) ON CONFLICT(k) DO UPDATE SET v = ?');
   const updateMessageStmt = sqlite.prepare(
-    'UPDATE messages SET role = ?, text = ?, tool_lines = ?, ts = ?, status = ?, reply_to = ?, mode = ?, model = ?, expression = ?, resident_expression = NULL, others_expressions = ?, scene = ?, encounter = ?, quest = ?, gig = ?, dice = ?, leave = ?, clock = ? WHERE id = ? AND player = ?',
+    'UPDATE messages SET role = ?, text = ?, tool_lines = ?, ts = ?, status = ?, reply_to = ?, mode = ?, model = ?, expression = ?, resident_expression = NULL, others_expressions = ?, scene = ?, encounter = ?, quest = ?, gig = ?, dice = ?, leave = ?, clock = ?, job_text = ? WHERE id = ? AND player = ?',
   );
   const noteRowStmt = sqlite.prepare(`SELECT ${NOTE_COLS} FROM notes WHERE id = ?`);
   const shareRowStmt = sqlite.prepare('SELECT contact_id, player, message_id, how, at FROM shared_contacts WHERE contact_id = ? AND player = ?');
@@ -676,7 +680,7 @@ function createDb(sqlite: DatabaseSync): Db {
     ORDER BY w.seq`);
   const allNoteRowsStmt = sqlite.prepare(`SELECT ${NOTE_COLS} FROM notes`);
   const storyMetaStmt = sqlite.prepare(
-    "SELECT k, v FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'witness.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%' OR k LIKE 'habits.%' OR k LIKE 'cardBurn.%'",
+    "SELECT k, v FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'witness.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'told.%' OR k LIKE 'cipher.%' OR k LIKE 'habits.%' OR k LIKE 'cardBurn.%'",
   );
   const allLeadsStmt = sqlite.prepare('SELECT id, player, details, message_id, at FROM leads');
   const replaceLeadStmt = sqlite.prepare('INSERT OR REPLACE INTO leads (id, player, details, message_id, at) VALUES (?, ?, ?, ?, ?)');
@@ -739,7 +743,7 @@ function createDb(sqlite: DatabaseSync): Db {
   const rebuild = (show: { messageId: string; take: number } | null): RebuildResult => {
     const before = snapshot();
     sqlite.exec(
-      "DELETE FROM notes; DELETE FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'witness.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'cipher.%' OR k LIKE 'habits.%' OR k LIKE 'cardBurn.%'; DELETE FROM room_state; DELETE FROM shared_contacts; DELETE FROM leads",
+      "DELETE FROM notes; DELETE FROM meta WHERE k LIKE 'recap.%' OR k LIKE 'witness.%' OR k LIKE 'page.%' OR k LIKE 'lead.%' OR k LIKE 'standing.%' OR k LIKE 'scribe.%' OR k LIKE 'summary.%' OR k LIKE 'quest.%' OR k LIKE 'fixer.%' OR k LIKE 'crew.%' OR k LIKE 'arrangement.%' OR k LIKE 'comms.%' OR k LIKE 'storyMood.%' OR k LIKE 'cityWeather.%' OR k LIKE 'plan.%' OR k LIKE 'promise.%' OR k LIKE 'told.%' OR k LIKE 'cipher.%' OR k LIKE 'habits.%' OR k LIKE 'cardBurn.%'; DELETE FROM room_state; DELETE FROM shared_contacts; DELETE FROM leads",
     );
     const rows = keptWritesStmt.all(show?.messageId ?? null, show?.take ?? null) as { kind: WriteKind; key: string; value: string | null }[];
     for (const r of rows) apply(r.kind, r.key, r.value);
@@ -758,7 +762,7 @@ function createDb(sqlite: DatabaseSync): Db {
     let quests = false;
     for (const k of new Set([...before.meta.keys(), ...after.meta.keys()])) {
       if (before.meta.get(k) === after.meta.get(k)) continue;
-      if (k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('cipher.')) quests = true;
+      if (k.startsWith('quest.') || k.startsWith('fixer.') || k.startsWith('crew.') || k.startsWith('arrangement.') || k.startsWith('comms.') || k.startsWith('plan.') || k.startsWith('promise.') || k.startsWith('told.') || k.startsWith('cipher.')) quests = true;
       const r = RECAP_KEY_RE.exec(k);
       if (r) recap.add(r[1]);
       const p = PAGE_KEY_RE.exec(k);
@@ -799,6 +803,7 @@ function createDb(sqlite: DatabaseSync): Db {
         m.dice ? JSON.stringify(m.dice) : null,
         m.promised ? 3 : m.leave ? (m.parting === 'her' ? 2 : 1) : null,
         m.clock ?? null,
+        m.jobText ?? null,
       );
     },
 
@@ -824,6 +829,7 @@ function createDb(sqlite: DatabaseSync): Db {
         next.dice ? JSON.stringify(next.dice) : null,
         next.promised ? 3 : next.leave ? (next.parting === 'her' ? 2 : 1) : null,
         next.clock ?? null,
+        next.jobText ?? null,
         id,
         player,
       );

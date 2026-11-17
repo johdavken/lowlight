@@ -29,6 +29,15 @@ describe('checkRoomTool', () => {
     expect(r).toEqual({ ok: true, action: { kind: 'light', id: 'monitor', patch: { intensity: 0.2 }, seconds: 1.5 } });
   });
 
+  it('a light group (light groups): every member at that share of its base, one action; colour only light by light', () => {
+    const lights = scene.lights.map((l) => ({ ...l, base: l.intensity }));
+    const r = checkRoomTool('set_light', { light_id: 'Inside', intensity: 0.5 }, { ...room, lights });
+    expect(r).toEqual({ ok: true, action: { kind: 'lights', set: [{ id: 'monitor', patch: { intensity: 0.25 } }, { id: 'desk_lamp', patch: { intensity: 0.3 } }], seconds: 1.5 } });
+    expect(checkRoomTool('set_light', { light_id: 'inside', color: '#ff0000' }, { ...room, lights })).toEqual({ ok: false, result: 'set colour light by light, not on a group' });
+    expect(checkRoomTool('set_light', { light_id: 'outside', intensity: 0 }, { ...room, lights })).toEqual({ ok: false, result: 'no outside lights here' });
+    expect(ROOM_TOOLS.find((t) => t.name === 'set_light')!.description).toContain('`inside`');
+  });
+
   it('go_to her place, by full or bare id', () => {
     for (const id of ['karasu/the-tilt', 'the-tilt']) expect(checkRoomTool('go_to', { id }, room)).toEqual({ ok: true, action: { kind: 'go', folder: 'the-tilt', transition: 'fade' } });
   });

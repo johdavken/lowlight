@@ -132,6 +132,18 @@ describe('playthroughs', () => {
     expect(pts.get(b.id)).toBeNull();
   });
 
+  it('setPersona sets, replaces and clears', () => {
+    const { pts, root } = make();
+    const a = pts.create({ player: 'hicks', startContact: 'nix' });
+    pts.setPersona(a.id, { name: 'Vee', background: 'x', kind: 'custom' });
+    expect(pts.get(a.id)?.persona).toEqual({ name: 'Vee', background: 'x', kind: 'custom' });
+    pts.setPersona(a.id, { name: 'Kit', background: '' });
+    expect(pts.get(a.id)?.persona).toEqual({ name: 'Kit', background: '' });
+    pts.setPersona(a.id, null);
+    expect(pts.get(a.id)?.persona).toBeUndefined();
+    expect('persona' in JSON.parse(fs.readFileSync(path.join(root, a.id, 'playthrough.json'), 'utf8'))).toBe(false);
+  });
+
   it('rejects ids that are not playthrough or save ids, and deletes nothing', () => {
     const { root, pts } = make();
     const pt = pts.create({ player: 'hicks', startContact: 'nix' });
@@ -292,6 +304,20 @@ describe('playthroughs', () => {
     const f = pts.fork(s.id, 'Main — branch 2');
     expect(f.name).toBe('Main — branch 2');
     expect(f.forkedFrom).toMatchObject({ playthrough: pt.id, save: s.id, name: 'Keep' });
+  });
+
+  it('LOAD and B keep who the playthrough is now: a persona set or cleared after the save stays (Studio PERSONA, spec 2026-11-13)', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix', persona: { name: 'Vee', background: '', kind: 'custom' } });
+    const s = pts.save(pt.id, req({ name: 'Before' }), fakeDbs({ nix: [1, 0] })) as SaveInfo;
+    pts.setPersona(pt.id, { name: 'Kit', background: 'b', kind: 'custom' });
+    pts.restore(s.id);
+    expect(pts.get(pt.id)?.persona).toEqual({ name: 'Kit', background: 'b', kind: 'custom' });
+    expect(pts.fork(s.id).persona).toEqual({ name: 'Kit', background: 'b', kind: 'custom' });
+    pts.setPersona(pt.id, null);
+    pts.restore(s.id);
+    expect(pts.get(pt.id)?.persona).toBeUndefined();
+    expect(pts.fork(s.id).persona).toBeUndefined();
   });
 
   describe('restore (load in place)', () => {

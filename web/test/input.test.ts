@@ -22,6 +22,16 @@ function setup() {
 }
 
 describe('mountInput', () => {
+  it("the player's name stands before the line, between the mode switch and the field; empty until it's set", () => {
+    const { root, handle } = setup();
+    const me = root.querySelector<HTMLElement>('.input > .me')!;
+    expect(me.textContent).toBe('');
+    expect(me.previousElementSibling?.classList.contains('mode')).toBe(true);
+    expect(me.nextElementSibling?.classList.contains('field')).toBe(true);
+    handle.setMe('Alpha');
+    expect(me.textContent).toBe('Alpha');
+  });
+
   it('Enter sends trimmed text and clears the field', () => {
     const { send, ta, key } = setup();
     ta.value = '  it is quiet tonight \n';
@@ -261,6 +271,13 @@ describe('mountInput END SCENE', () => {
     expect(root.querySelector('.input .hint')!.textContent).toContain('[ALT+M] ROLEPLAY');
   });
 
+  it("each hint's key is its own span (lit in the box's colour), and the hint reads the same", () => {
+    const { root } = setup();
+    const part = root.querySelector<HTMLElement>('.input .hint-part')!;
+    expect(part.textContent).toBe('[ENTER] SEND');
+    expect(part.querySelector('.hk')!.textContent).toBe('[ENTER]');
+  });
+
   it('ending a scene leaves the RP/OOC mode as it was', () => {
     const { root, send, ta, key } = setup();
     const bar = root.querySelector('.input')!;
@@ -346,7 +363,7 @@ describe('DICE in the scene stack', () => {
     const keys = [...root.querySelectorAll<HTMLElement>('.scene-keys button.key')];
     expect(keys.map((b) => b.dataset.key)).toEqual(['suggest', 'dice', 'draw', 'end', 'leave']);
     expect(btn.querySelector('svg.glyph rect')).not.toBeNull();
-    expect(btn.title).toBe("Liar's dice");
+    expect(btn.dataset.tip).toBe("Liar's dice");
     btn.click();
     expect(onDice).toHaveBeenCalledTimes(1);
   });
@@ -355,7 +372,7 @@ describe('DICE in the scene stack', () => {
     const { onDice, handle, btn } = diceSetup();
     handle.setDiceBlock('wait for her');
     expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe('wait for her');
+    expect(btn.dataset.tip).toBe('wait for her');
     btn.click();
     expect(onDice).not.toHaveBeenCalled();
     handle.setDiceBlock(null);
@@ -380,7 +397,7 @@ describe('SUGGEST', () => {
 
   it('Alt+G opens the drafts with no steer; nothing is sent or typed', () => {
     const { ta, send, suggest, btn } = suggestSetup();
-    expect(btn.title).toContain('Alt+G');
+    expect(btn.dataset.tip).toContain('Alt+G');
     const e = new KeyboardEvent('keydown', { key: 'g', code: 'KeyG', altKey: true, bubbles: true, cancelable: true });
     window.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(true);
@@ -417,13 +434,13 @@ describe('SUGGEST', () => {
   it('waits while she transmits, in OOC, or without her link', () => {
     const { root, handle, btn, suggest } = suggestSetup();
     handle.setBusy(true);
-    expect([btn.disabled, btn.title]).toEqual([true, 'Wait for her to finish.']);
+    expect([btn.disabled, btn.dataset.tip]).toEqual([true, 'Wait for her to finish.']);
     handle.setBusy(false);
     (root.querySelector('button.mode') as HTMLButtonElement).click();
-    expect([btn.disabled, btn.title]).toEqual([true, 'Suggestions are for roleplay.']);
+    expect([btn.disabled, btn.dataset.tip]).toEqual([true, 'Suggestions are for roleplay.']);
     (root.querySelector('button.mode') as HTMLButtonElement).click();
     handle.setDraw({ ok: false, why: 'No key.' });
-    expect([btn.disabled, btn.title]).toEqual([true, 'No key.']);
+    expect([btn.disabled, btn.dataset.tip]).toEqual([true, 'No key.']);
     btn.click();
     expect(suggest).not.toHaveBeenCalled();
   });
@@ -449,7 +466,7 @@ describe('◆ DRAW', () => {
     const { root, onDraw, btn, altD } = drawSetup();
     expect(btn.textContent).toBe('◆ DRAW');
     expect([...root.querySelectorAll('.scene-keys button.key')].map((b) => b.textContent)).toEqual(['SUGGEST', 'DICE', '◆ DRAW', 'END SCENE', 'LEAVE']);
-    expect(btn.title).toContain('Alt+D');
+    expect(btn.dataset.tip).toContain('Alt+D');
     btn.click();
     expect(altD().defaultPrevented).toBe(true);
     expect(onDraw).toHaveBeenCalledTimes(2);
@@ -459,7 +476,7 @@ describe('◆ DRAW', () => {
     const { onDraw, handle, btn, altD } = drawSetup();
     handle.setDraw({ ok: false, why: 'Encounters need her direct link.' });
     expect(btn.disabled).toBe(true);
-    expect(btn.title).toBe('Encounters need her direct link.');
+    expect(btn.dataset.tip).toBe('Encounters need her direct link.');
     btn.click();
     altD();
     expect(onDraw).not.toHaveBeenCalled();
@@ -473,7 +490,7 @@ describe('◆ DRAW', () => {
     handle.setDraw({ ok: false, why: () => her().encounters.noCredit });
     setHerPronoun('he');
     handle.setAgentName('Hicks');
-    expect(btn.title).toBe('No credit on his key: top it up to have events dealt.');
+    expect(btn.dataset.tip).toBe('No credit on his key: top it up to have events dealt.');
     expect(handle.drawWhyNot()).toBe('No credit on his key: top it up to have events dealt.');
     setHerPronoun('she');
   });
@@ -481,11 +498,11 @@ describe('◆ DRAW', () => {
   it('while she transmits, or in OOC, it does nothing and says why (Review Focus 5)', () => {
     const { root, onDraw, handle, btn, altD } = drawSetup();
     handle.setBusy(true);
-    expect([btn.disabled, btn.title]).toEqual([true, 'Wait for her to finish.']);
+    expect([btn.disabled, btn.dataset.tip]).toEqual([true, 'Wait for her to finish.']);
     altD();
     handle.setBusy(false);
     (root.querySelector('button.mode') as HTMLButtonElement).click();
-    expect([btn.disabled, btn.title]).toEqual([true, 'Encounters are for roleplay.']);
+    expect([btn.disabled, btn.dataset.tip]).toEqual([true, 'Encounters are for roleplay.']);
     altD();
     expect(onDraw).not.toHaveBeenCalled();
   });
@@ -560,7 +577,7 @@ describe('the scene stack (spec 2026-10-16 subtitle chat box §6)', () => {
       expect(root.querySelector(`.input button.${cls}`)).toBeNull();
     }
     expect(stack.lastElementChild!.classList.contains('fold')).toBe(true);
-    expect(root.querySelector<HTMLButtonElement>('button.end-scene')!.title).toContain('Alt+E');
+    expect(root.querySelector<HTMLButtonElement>('button.end-scene')!.dataset.tip).toContain('Alt+E');
   });
 
   it('Alt+D and Alt+E still work with the stack folded', () => {

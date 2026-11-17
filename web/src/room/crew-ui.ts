@@ -27,7 +27,7 @@ export function face(r: { face: string | null; name: string }, cls: string): HTM
 
 /** A recruit's card picture, the size of SETUP's ready strip (`.cr-card84`). */
 export function cardPic(r: { face: string | null; name: string }): HTMLElement {
-  const pic = el('span', 'cr-card84');
+  const pic = el('span', 'cr-card84 tp-face');
   pic.append(face(r, 'cr-card84-face'));
   return pic;
 }

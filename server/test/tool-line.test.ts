@@ -32,6 +32,11 @@ describe('formatToolLine', () => {
     expect(formatToolLine(op, room)).toBe('// SET_LIGHT · DESK LAMP · #FFB347 · 40%');
   });
 
+  it('formats a light group', () => {
+    const op: RoomOp = { tool: 'set_light', args: { light_id: 'inside', intensity: 0.3 } };
+    expect(formatToolLine(op, room)).toBe('// SET_LIGHT · INSIDE · 30%');
+  });
+
   it('formats go_to', () => {
     const op: RoomOp = { tool: 'go_to', args: { id: 'noodle-stall', transition: 'glitch' } };
     expect(formatToolLine(op, room)).toBe('// GO_TO · NOODLE STALL · GLITCH');

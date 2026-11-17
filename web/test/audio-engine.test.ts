@@ -267,7 +267,7 @@ describe('AudioEngine: state', () => {
     engine.unlock();
     const mix = rainMix(0.4, { wind: { level: 0.15, gust: 0.3, crackle: 0, indoor: false } });
     engine.apply(mix, 0);
-    expect(engine.state()).toEqual({ available: true, unlocked: true, context: 'running', voices: ['rain', 'wind'], mix, rain: 'synth', music: null, musicUrl: null, musicStarts: 0, thunders: 0 });
+    expect(engine.state()).toEqual({ available: true, unlocked: true, context: 'running', voices: ['rain', 'wind'], mix, rain: 'synth', music: null, musicUrl: null, musicStarts: 0, thunders: 0, speaking: null });
   });
 });
 
@@ -344,8 +344,12 @@ describe('AudioEngine: oneShot', () => {
     const reaches = (n: any, target: any, seen = new Set()): boolean =>
       n === target || (!seen.has(n) && (seen.add(n), (n.connections ?? []).some((c: any) => reaches(c, target, seen))));
     expect(reaches(sources[0], ctx.destination)).toBe(true);
+    // Through the UI channel (SYS → UI) and out at the master level.
     const out = (sources[0] as any).connections[0];
-    expect(p(out.gain).value).toBeCloseTo(0.6); // default volume 0.6, scale 1, unmuted
+    expect(p(out.gain).value).toBe(1);
+    const ui = out.connections[0];
+    expect(ui.gain).toBe(engine.debug().channel.ui);
+    expect(p(ui.connections[0].gain).value).toBeCloseTo(0.6); // default volume 0.6, scale 1, unmuted
   });
 
   it("oneShot with a channel goes through that channel's gain, at the sample's own level", async () => {
@@ -464,8 +468,8 @@ describe('AudioEngine: oneShot', () => {
     engine.oneShot('/x.ogg');
     await flush();
     const source = ctx.of('buffer-source').slice(sourcesBefore)[0] as any;
-    const out = source.connections[0];
-    expect(p(out.gain).value).toBe(0);
+    const uiOut = source.connections[0].connections[0].connections[0];
+    expect(p(uiOut.gain).value).toBe(0);
   });
 });
 
@@ -764,5 +768,130 @@ describe('AudioEngine: sounds that aren\'t on disk', () => {
     expect(fetchBuffer).not.toHaveBeenCalled();
     expect(warn).not.toHaveBeenCalled();
     expect(p(engine.debug().voice('hum')).last).toBe(0.3);
+  });
+});
+
+describe('AudioEngine: speech (voiced job beats)', () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const clip = (name: string) => ({ name }) as unknown as AudioBuffer;
+  const reaches = (n: any, target: any, seen = new Set()): boolean =>
+    n === target || (!seen.has(n) && (seen.add(n), (n.connections ?? []).some((c: any) => reaches(c, target, seen))));
+
+  it('plays clips one after another through the voice channel, which follows volume and mute but not the landing scale', async () => {
+    const fetchBuffer = vi.fn((_ctx: AudioContext, url: string) => Promise.resolve(clip(url)));
+    const { engine, ctx, p } = setup({ fetchBuffer });
+    engine.unlock();
+    const before = ctx.of('buffer-source').length;
+    engine.speak(['/a.ogg', '/b.ogg']);
+    await flush();
+    const first = ctx.of('buffer-source').slice(before);
+    expect(first).toHaveLength(1);
+    expect((first[0] as any).buffer).toEqual(clip('/a.ogg'));
+    const voice = ctx.of('gain').find((g: any) => g.gain === engine.debug().channel.voice);
+    expect(reaches(first[0], voice)).toBe(true);
+    expect(reaches(first[0], ctx.destination)).toBe(true);
+    expect(engine.speaking()).toBe(true);
+    expect(engine.state().speaking).toBe('/a.ogg');
+    (first[0] as any).onended();
+    await flush();
+    const second = ctx.of('buffer-source').slice(before + 1);
+    expect(second).toHaveLength(1);
+    expect((second[0] as any).buffer).toEqual(clip('/b.ogg'));
+    (second[0] as any).onended();
+    await flush();
+    expect(engine.speaking()).toBe(false);
+    engine.setScale(0.25);
+    engine.setMaster(0.6, false);
+    expect(p(engine.debug().voiceOut).last).toBeCloseTo(0.6);
+    engine.setMaster(0.6, true);
+    expect(p(engine.debug().voiceOut).last).toBe(0);
+  });
+
+  it('ducks the room and the music while it speaks, and lets them back after', async () => {
+    const { engine, ctx, p } = setup({ fetchBuffer: vi.fn(() => Promise.resolve(clip('x'))) });
+    engine.unlock();
+    engine.speak(['/a.ogg']);
+    await flush();
+    expect(p(engine.debug().duckRoom).last).toBeCloseTo(0.6);
+    expect(p(engine.debug().duckMusic).last).toBeCloseTo(0.6);
+    (ctx.of('buffer-source').at(-1) as any).onended();
+    await flush();
+    expect(p(engine.debug().duckRoom).last).toBe(1);
+    expect(p(engine.debug().duckMusic).last).toBe(1);
+  });
+
+  it('hush stops the clip with a short fade and drops the rest; a new speak replaces the old', async () => {
+    const { engine, ctx, p } = setup({ fetchBuffer: vi.fn((_c: AudioContext, url: string) => Promise.resolve(clip(url))) });
+    engine.unlock();
+    engine.speak(['/a.ogg', '/b.ogg']);
+    await flush();
+    const a = ctx.of('buffer-source').at(-1) as any;
+    const aOut = a.connections[0];
+    engine.speak(['/c.ogg']);
+    await flush();
+    expect(a.stopped).toBe(true);
+    expect(p(aOut.gain).last).toBe(0);
+    const c = ctx.of('buffer-source').at(-1) as any;
+    expect(c.buffer).toEqual(clip('/c.ogg'));
+    engine.hush();
+    await flush();
+    expect(c.stopped).toBe(true);
+    expect(ctx.of('buffer-source').map((s: any) => s.buffer)).not.toContainEqual(clip('/b.ogg'));
+    expect(engine.speaking()).toBe(false);
+    expect(p(engine.debug().duckRoom).last).toBe(1);
+  });
+
+  it('speak after: follows the reading still going, or starts one once it has finished (ride-along beats, 2026-11-08)', async () => {
+    const { engine, ctx } = setup({ fetchBuffer: vi.fn((_c: AudioContext, url: string) => Promise.resolve(clip(url))) });
+    engine.unlock();
+    engine.speak(['/a.ogg']);
+    await flush();
+    const a = ctx.of('buffer-source').at(-1) as any;
+    engine.speak(['/b.ogg'], { after: true });
+    await flush();
+    expect(a.stopped).toBeFalsy();
+    expect(engine.state().speaking).toBe('/a.ogg');
+    a.onended();
+    await flush();
+    const b = ctx.of('buffer-source').at(-1) as any;
+    expect(b.buffer).toEqual(clip('/b.ogg'));
+    b.onended();
+    await flush();
+    expect(engine.speaking()).toBe(false);
+    engine.speak(['/c.ogg'], { after: true });
+    await flush();
+    expect((ctx.of('buffer-source').at(-1) as any).buffer).toEqual(clip('/c.ogg'));
+  });
+
+  it('a clip that throws as it starts leaves nothing speaking and the room un-ducked', async () => {
+    const { engine, ctx, p, warn } = setup({ fetchBuffer: vi.fn(() => Promise.resolve(clip('x'))) });
+    engine.unlock();
+    const make = ctx.createBufferSource.bind(ctx);
+    (ctx as any).createBufferSource = () => {
+      const s = make() as any;
+      s.start = () => {
+        throw new Error('closed');
+      };
+      return s;
+    };
+    engine.speak(['/a.ogg']);
+    await flush();
+    expect(engine.speaking()).toBe(false);
+    expect(p(engine.debug().duckRoom).last).toBe(1);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('failed to play'));
+  });
+
+  it('a clip that fails to load warns and the next one plays; nothing before unlock', async () => {
+    const fetchBuffer = vi.fn((_c: AudioContext, url: string) => (url === '/bad.ogg' ? Promise.reject(new Error('404')) : Promise.resolve(clip(url))));
+    const { engine, ctx, warn } = setup({ fetchBuffer });
+    engine.speak(['/a.ogg']);
+    expect(fetchBuffer).not.toHaveBeenCalled();
+    engine.unlock();
+    const before = ctx.of('buffer-source').length;
+    engine.speak(['/bad.ogg', '/b.ogg']);
+    await flush();
+    await flush();
+    expect(ctx.of('buffer-source').slice(before).map((s: any) => s.buffer)).toEqual([clip('/b.ogg')]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('/bad.ogg'));
   });
 });

@@ -4,7 +4,9 @@ import { openPeople, type PeopleOpts, type PeopleHandle } from '../src/room/peop
 import { contactsTab } from '../src/room/people-contacts';
 import type { JournalView } from '../src/ui/journal';
 import { closeBugReport, openBugReport } from '../src/ui/bug-report';
-import { SCREEN_GLITCH_OUT_MS } from '../src/ui/screen';
+import { TRACE_OUT_MS } from '../src/ui/screen';
+import { newDeckMemory, type DeckHandle, type DeckMemory } from '../src/deck/deck-client';
+import type { TextsDeck } from '../src/room/people-texts';
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector<T>(sel);
 const $$ = (sel: string, root: ParentNode = document) => [...root.querySelectorAll<HTMLElement>(sel)];
@@ -13,7 +15,7 @@ const key = (k: string, init: KeyboardEventInit = {}, target: EventTarget = docu
   target.dispatchEvent(e);
   return e;
 };
-const alt = (letter: 'C' | 'L' | 'J' | 'O') => key(letter.toLowerCase(), { altKey: true, code: `Key${letter}` });
+const alt = (letter: 'C' | 'L' | 'J' | 'O' | 'X') => key(letter.toLowerCase(), { altKey: true, code: `Key${letter}` });
 
 function fakeJournal() {
   const element = document.createElement('div');
@@ -21,8 +23,31 @@ function fakeJournal() {
   return { element, busy: false, flashSave: vi.fn() } as unknown as JournalView & { busy: boolean; flashSave: ReturnType<typeof vi.fn> };
 }
 
+/** A deck that only records what it's told: which thread to open, away and back, and what Esc closes. */
+function fakeDeck(memory: DeckMemory, withBox = true) {
+  const mount = document.createElement('div');
+  mount.className = 'tx-deck';
+  if (withBox) mount.append(Object.assign(document.createElement('textarea'), { className: 'dk-box' }));
+  const calls: string[] = [];
+  let top = 0;
+  const deck: DeckHandle = {
+    open: (c) => {
+      calls.push(`open:${c}`);
+      memory.open = c;
+    },
+    escape: () => (top > 0 ? (top--, calls.push('escape'), true) : false),
+    away: () => void calls.push('away'),
+    back: () => void calls.push('back'),
+    destroy: () => {},
+    onTyping: () => {},
+  };
+  return { deck: { mount, deck } as TextsDeck, calls, stack: (n: number) => (top = n) };
+}
+
 let handle: PeopleHandle | null = null;
 function open(o: Partial<PeopleOpts> = {}) {
+  const memory = o.memory ?? newDeckMemory();
+  const fake = fakeDeck(memory);
   const journal = (o.journal ?? fakeJournal()) as ReturnType<typeof fakeJournal>;
   const opts: PeopleOpts = {
     tab: 'file',
@@ -30,7 +55,9 @@ function open(o: Partial<PeopleOpts> = {}) {
     leads: async () => [] as LeadView[],
     journal,
     current: 'nix',
-    persona: 'Hicks',
+    deck: () => fake.deck,
+    memory,
+    unread: () => [],
     dev: false,
     pick: vi.fn(),
     reducedMotion: true,
@@ -38,7 +65,7 @@ function open(o: Partial<PeopleOpts> = {}) {
     ...o,
   };
   handle = openPeople(document.body, opts);
-  return { handle, opts, journal };
+  return { handle, opts, journal, fake, memory };
 }
 const lit = () => $$('.pe-tab.on').map((t) => t.dataset.tab);
 
@@ -50,11 +77,14 @@ afterEach(() => {
 });
 
 describe('PEOPLE', () => {
-  it('opens on the asked page, the holo pane with PEOPLE and who you are in the head, the tab lit', () => {
+  it('opens on the asked page, the trace panel in the one red with PEOPLE and its three tabs on the head line, the tab lit', () => {
     const { handle } = open({ tab: 'journal' });
-    expect($('.people-screen')!.classList.contains('scr-holo')).toBe(true);
-    expect($('.people-screen .scr-head')!.textContent).toBe('◆ PEOPLEAS HICKSESC');
-    expect($$('.pe-tab').map((t) => t.textContent)).toEqual(['FILE', 'JOURNAL']);
+    expect($('.people-screen')!.classList.contains('scr-trace')).toBe(true);
+    expect($('.people-screen .hf')).toBeNull();
+    expect($('.people-screen')!.style.getPropertyValue('--screen-accent')).toBe('#ff4d4d');
+    expect($('.people-screen .tp-title')!.textContent).toBe('PEOPLE');
+    expect($$('.pe-tab').map((t) => t.textContent)).toEqual(['FILE', 'TEXTS', 'JOURNAL']);
+    expect($('.people-screen .tp-keys')!.textContent).toContain('CLOSE');
     expect(lit()).toEqual(['journal']);
     expect(handle.tab).toBe('journal');
     expect($('.pe-pane')!.dataset.tab).toBe('journal');
@@ -135,7 +165,7 @@ describe('PEOPLE', () => {
     key('Escape');
     key('Escape');
     expect(room).not.toHaveBeenCalled();
-    vi.advanceTimersByTime(SCREEN_GLITCH_OUT_MS);
+    vi.advanceTimersByTime(TRACE_OUT_MS);
     key('Escape');
     expect(room).toHaveBeenCalledTimes(1);
     window.removeEventListener('keydown', room);
@@ -178,6 +208,9 @@ describe('PEOPLE', () => {
     expect(handle.tab).toBe('file');
     expect(tab.disabled).toBe(true);
     expect($('.pe-right')!.contains(journal.element)).toBe(false);
+    // The cycle's Tab goes to their TEXTS, and no further: their JOURNAL isn't yours to read.
+    expect(handle.turnPage(1)).toBe(true);
+    expect(handle.tab).toBe('texts');
     expect(handle.turnPage(1)).toBe(false);
     alt('J');
     expect(handle.tab).toBe('journal');
@@ -192,16 +225,36 @@ describe('PEOPLE', () => {
     expect($<HTMLButtonElement>('.pe-tab[data-tab="journal"]')!.disabled).toBe(false);
     key('ArrowDown');
     expect(handle.turnPage(1)).toBe(true);
+    expect(handle.tab).toBe('texts');
+    expect(handle.turnPage(1)).toBe(true);
     expect($('.pe-right')!.contains(journal.element)).toBe(true);
   });
 
-  it('turnPage: FILE to JOURNAL and back; past either end it says no (the cycle goes on)', async () => {
+  it("the head's numbers: how many you know, who has texted unseen, who you're with; the unread count on TEXTS", async () => {
+    let from = [{ id: 'cass', name: 'Cass' }];
+    const { handle } = open({ contacts: async () => CONTACTS, unread: () => from });
+    await new Promise((r) => setTimeout(r, 0));
+    expect($('.people-screen .tp-nums')!.textContent).toBe(`${CONTACTS.length} KNOWN · NEW FROM CASS · WITH NIX`);
+    expect($('.pe-tab[data-tab="texts"] .tp-n')!.textContent).toBe('1 NEW');
+    expect($$('.pe-tile .pe-new').map((n) => n.closest<HTMLElement>('.pe-tile')!.dataset.id)).toEqual(['cass']);
+    // Read: the tag, the count and the head's line go.
+    from = [];
+    handle.setUnread();
+    expect($('.people-screen .tp-nums')!.textContent).toBe(`${CONTACTS.length} KNOWN · WITH NIX`);
+    expect($('.pe-tab[data-tab="texts"] .tp-n')).toBeNull();
+    expect($$('.pe-tile .pe-new')).toEqual([]);
+  });
+
+  it('turnPage: FILE to TEXTS to JOURNAL and back; past either end it says no (the cycle goes on)', async () => {
     const { handle } = open({ contacts: async () => CONTACTS });
     await new Promise((r) => setTimeout(r, 0));
     expect(handle.turnPage(-1)).toBe(false);
     expect(handle.turnPage(1)).toBe(true);
+    expect(handle.tab).toBe('texts');
+    expect(handle.turnPage(1)).toBe(true);
     expect(handle.tab).toBe('journal');
     expect(handle.turnPage(1)).toBe(false);
+    expect(handle.turnPage(-1)).toBe(true);
     expect(handle.turnPage(-1)).toBe(true);
     expect(handle.tab).toBe('file');
   });
@@ -328,7 +381,7 @@ describe('CONTACTS', () => {
     const { tab } = mount({}, [lead({ id: 'a', to: 'cass' }), lead({ id: 'b', to: 'cass', followed: true }), lead({ id: 'c', to: 'hae' })]);
     press(tab, 'ArrowUp');
     expect(file().querySelector('.pe-standing')!.textContent).toBe('warm');
-    expect($$('.pe-leads li', file()).map((l) => [l.textContent, l.classList.contains('followed')])).toEqual([
+    expect($$('.pe-leads li', file()).map((l) => [l.firstElementChild!.textContent, l.classList.contains('followed')])).toEqual([
       ['Lead a', false],
       ['Lead b', true],
     ]);
@@ -341,7 +394,7 @@ describe('CONTACTS', () => {
     expect(file().querySelector('.pe-facts dt')!.textContent).toBe('TELL');
     expect(file().querySelector('.pe-facts dd')!.textContent).toBe('Slides a drink.');
     const sub = file().querySelector('.pe-info')!.nextElementSibling!.firstElementChild!;
-    expect(sub.className).toBe('pe-sub');
+    expect(sub.className).toBe('pe-sub tp-head');
     expect(sub.textContent).toBe('FILE');
   });
 
@@ -368,7 +421,7 @@ describe('CONTACTS', () => {
     const { tab, pick } = mount();
     const go = () => file().querySelector<HTMLButtonElement>('.pe-go')!;
     expect(go().disabled).toBe(true);
-    expect(go().title).toBe("you're here");
+    expect(go().dataset.tip).toBe("you're here");
     press(tab, 'Enter');
     expect(pick).not.toHaveBeenCalled();
     press(tab, 'ArrowUp');
@@ -388,7 +441,7 @@ describe('CONTACTS', () => {
   it('with the dev panel open the standing word carries the values', () => {
     const { tab } = mount({ dev: true });
     press(tab, 'ArrowUp');
-    expect(file().querySelector<HTMLElement>('.pe-standing')!.title).toBe('T+2 W+3 · last: "paid on time"');
+    expect(file().querySelector<HTMLElement>('.pe-standing')!.dataset.tip).toBe('T+2 W+3 · last: "paid on time"');
   });
 
   it('a sprite that fails shows her portrait, then her initial', () => {
@@ -612,5 +665,72 @@ describe('her arrangement line (spec 2026-10-20 §3)', () => {
     expect(one({ cut: 20, nights: 3, tier: 2, active: true })).toBe('YOUR OPERATOR · 20% A JOB · THREE JOBS A NIGHT');
     expect(one({ cut: 25, nights: 1, tier: 1, active: false })).toBe('STEPPED BACK');
     expect(one(null)).toBeNull();
+  });
+});
+
+describe('PEOPLE, ADJUST FIGURE (dev checkouts)', () => {
+  const nix = () => contact({ id: 'nix', name: 'Nix', outfits: ['indoors', 'home'] });
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const button = () => $<HTMLButtonElement>('.pe-adjust');
+  const bar = () => $('.fa-bar')!;
+  function fetchFit(waist: number | null = 0.4) {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      calls.push({ url, init });
+      if (init?.method === 'PUT') return new Response(init.body as string, { status: 200 });
+      return new Response(JSON.stringify({ own: true, waist, face: { x: 0.5, y: 0.1 }, sprite: '/api/agents/nix/sprite' }), { status: 200 });
+    });
+    return calls;
+  }
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('only offered when the checkout may write figures', () => {
+    document.body.replaceChildren(contactsTab([nix()], [], { current: 'nix', dev: false, pick: vi.fn() }));
+    expect(button()).toBeNull();
+    document.body.replaceChildren(contactsTab([nix()], [], { current: 'nix', dev: false, pick: vi.fn(), figureEdits: true }));
+    expect(button()!.textContent).toBe('ADJUST FIGURE');
+  });
+
+  it('opens on her plain sprite with the wardrobe hidden; ↓ nudges the waist, Enter saves it and tells the room', async () => {
+    const calls = fetchFit();
+    const onFit = vi.fn();
+    const tab = contactsTab([nix()], [], { current: 'nix', dev: false, pick: vi.fn(), figureEdits: true, onFit });
+    document.body.replaceChildren(tab);
+    button()!.click();
+    await flush();
+    expect($('.pe-wardrobe')!.hidden).toBe(true);
+    expect(bar().hidden).toBe(false);
+    expect($<HTMLImageElement>('.pe-figure')!.getAttribute('src')).toBe('/api/agents/nix/sprite');
+    expect($('.fa-waist')).not.toBeNull();
+    expect($('.fa-frame')).not.toBeNull();
+    expect($<HTMLButtonElement>('.fa-save')!.disabled).toBe(true);
+    tab.handleKey!(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+    expect($('.fa-read')!.textContent).toContain('WAIST 0.402');
+    tab.handleKey!(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await flush();
+    await flush();
+    const put = calls.find((c) => c.init?.method === 'PUT')!;
+    expect(put.url).toBe('/api/agents/nix/figure');
+    expect(JSON.parse(put.init!.body as string)).toEqual({ waist: 0.402, face: { x: 0.5, y: 0.1 } });
+    expect(onFit).toHaveBeenCalledWith('nix', { waist: 0.402, face: { x: 0.5, y: 0.1 } });
+    expect(bar().hidden).toBe(true);
+    expect($('.fa-layer')).toBeNull();
+    expect($('.pe-wardrobe')!.hidden).toBe(false);
+  });
+
+  it('Esc closes it unsaved before it closes PEOPLE, her outfit back on', async () => {
+    const calls = fetchFit();
+    const onClose = vi.fn();
+    open({ tab: 'file', contacts: async () => [nix()], figureEdits: () => true, onClose });
+    await flush();
+    const before = $<HTMLImageElement>('.pe-figure')!.getAttribute('src');
+    button()!.click();
+    await flush();
+    key('Escape');
+    expect($('.people-screen')).not.toBeNull();
+    expect(bar().hidden).toBe(true);
+    expect($<HTMLImageElement>('.pe-figure')!.getAttribute('src')).toBe(before);
+    expect(calls.some((c) => c.init?.method === 'PUT')).toBe(false);
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

@@ -237,6 +237,42 @@ async function runAccepted() {
       return { mood: (window as any).lowlightRoom.moodName(), room: (window as any).lowlightRoom.renderer.current?.sceneId };
     });
     check('the saved room comes back after a reload', after.mood === 'storm' && after.room === 'lowlight-intake', JSON.stringify(after));
+    // Light groups: set_light inside moves every indoor light in one call, the outside kept, and the line shows the group.
+    const group = await inPage<any>(page, async () => {
+      const w = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      const c = SillyTavern.getContext();
+      const before = (window as any).lowlightRoom.state().lights.map((l: any) => ({ id: l.id, i: l.intensity, out: !!l.outside }));
+      const res = String(await c.ToolManager.invokeFunctionTool('set_light', { light_id: 'inside', intensity: 0 }));
+      await w(1500);
+      const after = (window as any).lowlightRoom.state().lights.map((l: any) => ({ id: l.id, i: l.intensity, out: !!l.outside }));
+      return { res: res.slice(0, 8), before, after, line: (window as any).lowlightRoomTools.line() };
+    });
+    const indoorOff = group.after.filter((l: any) => !l.out).every((l: any) => l.i === 0);
+    const outsideKept = group.after.filter((l: any) => l.out).every((l: any) => group.before.find((b: any) => b.id === l.id)?.i === l.i);
+    check('set_light inside turns every indoor light off in one call, the outside kept, the line by group', group.res === 'applied:' && indoorOff && outsideKept && /lights: inside 0% \(/.test(group.line), JSON.stringify({ res: group.res, line: group.line.slice(0, 300) }));
+    // Her per-turn lines: after a line of yours eight hours on, the beat line and how long you were away; on an
+    // impersonate (your line written for you) neither.
+    const turn = await inPage<any>(page, async () => {
+      const c = SillyTavern.getContext();
+      const prompt = (k: string) => c.extensionPrompts?.[k]?.value ?? '';
+      c.setExtensionPrompt('lowlight-travel', '', 1, 0, false, 0);
+      const now = Date.now();
+      c.chat.push({ name: 'Nix', is_user: false, mes: 'See you.', extra: {}, send_date: now - 8 * 3600_000 }, { name: c.name1, is_user: true, mes: 'Back.', extra: {}, send_date: now });
+      await c.eventSource.emit(c.eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+      const hers = { beat: prompt('lowlight-beat'), arrival: prompt('lowlight-arrival') };
+      await c.eventSource.emit(c.eventTypes.GENERATION_AFTER_COMMANDS, 'impersonate', {}, false);
+      const yours = { beat: prompt('lowlight-beat'), arrival: prompt('lowlight-arrival') };
+      // A new take of her arrival reply: the travel note again, and no beat or gap.
+      c.chat.push({ name: 'Nix', is_user: false, mes: 'Here we are.', extra: { lowlight_note: '[travel: test]' }, send_date: now });
+      await c.eventSource.emit(c.eventTypes.GENERATION_AFTER_COMMANDS, 'swipe', {}, false);
+      const travel = { note: prompt('lowlight-travel'), beat: prompt('lowlight-beat'), arrival: prompt('lowlight-arrival') };
+      c.setExtensionPrompt('lowlight-travel', '', 1, 0, false, 0);
+      c.chat.splice(c.chat.length - 3, 3);
+      return { hers, yours, travel, name: c.name1 };
+    });
+    check('her turn gets the beat line and how long you were away', turn.hers.beat.startsWith('[your reply: one beat') && turn.hers.arrival === `[arrival: ${turn.name} back after 8 hours]`, JSON.stringify(turn.hers));
+    check('an impersonate gets neither', turn.yours.beat === '' && turn.yours.arrival === '', JSON.stringify(turn.yours));
+    check('a new take of her travel reply gets its travel note again, and no beat or gap', turn.travel.note === '[travel: test]' && turn.travel.beat === '' && turn.travel.arrival === '', JSON.stringify(turn.travel));
 
     // An update: an 11th character and a changed sprite.
     const castPath = path.join(st.ext, 'cast', 'cast.json');
@@ -247,6 +283,13 @@ async function runAccepted() {
     fs.writeFileSync(path.join(st.ext, 'cast', 'cards', 'Testa.png'), pngWithCard(fs.readFileSync(path.join(st.ext, 'cast', cass.card)), card));
     c2.characters.push({ ...cass, id: 'testa', name: 'Testa', card: 'cards/Testa.png', persona: null, since: '9.9.9', hash: { ...cass.hash, persona: null } });
     cass.hash.sprites = 'changed';
+    // A card whose text changed: offered under SYS → CAST, applied by UPDATE CARDS.
+    const other = c2.characters.find((x: { id: string; card?: string }) => x.id !== 'cass' && x.card);
+    const otherPng = path.join(st.ext, 'cast', other.card);
+    const otherCard = JSON.parse(Buffer.from(/chara\0([A-Za-z0-9+/=]+)/.exec(fs.readFileSync(otherPng).toString('latin1'))![1], 'base64').toString('utf8'));
+    otherCard.data.description += '\n\nUPDATED-CARD-MARK';
+    fs.writeFileSync(otherPng, pngWithCard(fs.readFileSync(otherPng), otherCard));
+    other.hash.card = 'changed';
     c2.version = '9.9.9';
     fs.writeFileSync(castPath, JSON.stringify(c2));
     fs.writeFileSync(path.join(st.ext, 'CHANGELOG.md'), '# Changelog\n\n## 9.9.9 · test\n- Testa arrives\n');
@@ -262,6 +305,15 @@ async function runAccepted() {
     check('the update installs the new character', await until(page, "SillyTavern.getContext().characters.some((c) => c.name === 'Testa')"));
     check('NEW IN LOWLIGHT names them, with the changelog line', notice.includes('NEW IN LOWLIGHT: TESTA') && notice.includes('Testa arrives'), notice);
     check('the changed sprites are uploaded again', fs.statSync(cassSprite).mtimeMs > spriteBefore);
+    const updated = await page.evaluate<{ err: string | null; waiting: number; mark: boolean }>(`(async () => {
+      const waiting = window.lowlightCast.status().cardUpdates;
+      let err = null;
+      try { await window.lowlightCast.updateCards(); } catch (e) { err = String(e); }
+      const c = SillyTavern.getContext();
+      await c.getCharacters?.();
+      return { err, waiting, mark: c.characters.some((x) => /UPDATED-CARD-MARK/.test(x.description ?? '')) };
+    })()`);
+    check('UPDATE CARDS writes a changed card over its own', updated.err === null && updated.waiting >= 1 && updated.mark, JSON.stringify(updated));
   } finally {
     await browser.close();
     await stopST(st);
@@ -369,8 +421,10 @@ async function runResidual() {
     await page.evaluate(`(() => {
       window.__calls = 0;
       window.__answers = [];
-      window.lowlightResidual.setComplete(async () => {
+      window.lowlightResidual.setComplete(async (messages) => {
         window.__calls++;
+        // Her habits run takes its own answer, so the Residual's scripted ones stay in order.
+        if (String(messages?.[0]?.content ?? '').includes('name what they keep doing')) return window.__habits ?? '{"rules":[]}';
         const a = window.__answers.shift() ?? '{"notes":[],"lights":[],"recap":null}';
         if (a.startsWith('!wait')) { await new Promise((r) => setTimeout(r, 3000)); return a.slice(5); }
         return a;
@@ -490,6 +544,26 @@ async function runResidual() {
     })()`);
     check('her reply runs when the generation ends', await until(page, saved, 15_000));
 
+    // Habits: once she has written enough replies, a second call names what she keeps writing, and it's in her prompt.
+    await page.evaluate(`window.__habits = '{"rules":["No business with the lamp"]}';`);
+    for (let i = 0; i < 14 && !(await page.evaluate<number>('window.lowlightResidual.ledger().habits.length')); i++) {
+      await say(`Reply ${i}.`, '{"notes":[],"lights":[],"recap":null}');
+      await until(page, saved, 15_000);
+    }
+    // It rides her ordinary turns (a line of yours, then her generation), not an impersonate.
+    const habits = await page.evaluate<{ hers: string; yours: string }>(`(async () => {
+      const c = SillyTavern.getContext();
+      const prompt = () => c.extensionPrompts?.['lowlight-habits']?.value ?? '';
+      c.chat.push({ name: c.name1, is_user: true, mes: 'Go on.', extra: {}, send_date: Date.now() });
+      await c.eventSource.emit(c.eventTypes.GENERATION_AFTER_COMMANDS, 'normal', {}, false);
+      const hers = prompt();
+      await c.eventSource.emit(c.eventTypes.GENERATION_AFTER_COMMANDS, 'impersonate', {}, false);
+      const yours = prompt();
+      c.chat.pop();
+      return { hers, yours };
+    })()`);
+    check('her habits run puts what she keeps writing in her prompt, not in an impersonate', habits.hers === '[worn thin — leave out: no business with the lamp]' && habits.yours === '', JSON.stringify(habits));
+
     await page.evaluate('window.lowlightResidual.set(false); window.__calls = 0;');
     await say('Off now.', '{"notes":[],"lights":[],"recap":null}');
     await page.waitForTimeout(2500);
@@ -548,7 +622,7 @@ async function runPersonas() {
         return Object.values(all).map((x) => ({ id: x.file_id, persona: x.chat_metadata?.persona ? c.powerUserSettings.personas[x.chat_metadata.persona] : null }));
       })()`);
 
-    const first = await jackAs('Adebayo');
+    const first = await jackAs('Kroll');
     await page.evaluate("SillyTavern.getContext().executeSlashCommandsWithOptions('/sendas name=Nix First of the night.')");
     await page.waitForTimeout(1500);
     const afterFirst = await nixChats();
@@ -562,7 +636,7 @@ async function runPersonas() {
       JSON.stringify({ second, afterSecond }),
     );
 
-    const again = await jackAs('Adebayo');
+    const again = await jackAs('Kroll');
     check('JACK IN as the first persona again opens their chat', again.chat === first.chat && again.name === first.name, JSON.stringify(again));
   } finally {
     await browser.close();

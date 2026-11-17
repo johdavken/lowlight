@@ -21,7 +21,8 @@ export interface Box {
   /** Picks which of its windows are lit. */
   seed: number;
   district: string;
-  kind: 'building' | 'wall' | 'stack' | 'tier' | 'shack' | 'bridge' | 'tower' | 'car' | 'pylon';
+  /** `infill`: a low block between districts (joins.ts): on no generator, never a roof fire's or roof light's pick. */
+  kind: 'building' | 'wall' | 'stack' | 'tier' | 'shack' | 'bridge' | 'tower' | 'car' | 'pylon' | 'infill';
   /** 1: a glass curtain wall (the core's towers): dark glass, close-set lit panes, a faint glow in its tint. */
   glass?: 1;
   /** 1: raw concrete (the Shelf's brutalism): pale, mottled, matte. */

@@ -44,7 +44,7 @@ describe('bug report panel', () => {
     expect($('.bug-tip')!.textContent).toBe('Tip: press F8 in a scene to report from there, with a screenshot.');
     expect($('.bug-turns')!.textContent).toContain('The last 10 turns of Hicks — Oct 11 — your story text');
     expect($('.bug-fine')!.textContent).toBe(
-      "Always included: build version, OS, room, who's here, model, and the last 200 lines of the game's log. Your OpenRouter key is never sent.",
+      "Always included: build version, OS, room, who's here, model, and the last 200 lines of the game's log. Your keys are never sent.",
     );
   });
 

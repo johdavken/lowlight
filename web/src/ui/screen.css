@@ -1,6 +1,5 @@
-/* The shared screen frame (PEOPLE spec §1): a backdrop under the keys bar (z 30), a framed CRT screen glitching
-   in and out on the map's keyframes (map-glitch-in/out, map-split, map-flicker, map-roll, map-backdrop-out).
-   Its colour is --screen-accent. */
+/* The shared screen frame (PEOPLE spec §1): a backdrop under the keys bar (z 30) and a framed screen; every screen
+   on it is the holo pane below, drawn on and off by holo-frame.ts. Its colour is --screen-accent. */
 .scr-root {
   /* The screen's height: the window less the bar, the bottom gap and the heading (as the map's frame). */
   --scr-h: calc(900px - 21.6px - 60px - 36px - 34px);
@@ -15,7 +14,7 @@
   font-family: var(--mono);
   background: rgba(2, 1, 6, 0.82);
 }
-.scr-root.scr-closing { animation: map-backdrop-out 0.6s ease-in forwards; }
+.scr-root.scr-closing { animation: map-backdrop-out 0.36s ease-in forwards; pointer-events: none; }
 .scr-root.scr-closing .scr-head { opacity: 0; transition: opacity 0.2s; }
 .scr-frame { display: flex; flex-direction: column; width: min(100%, 1500px); }
 .scr-head {
@@ -52,32 +51,17 @@
   animation: map-roll 7s linear infinite;
 }
 .scr-vignette { background: radial-gradient(ellipse at center, transparent 62%, rgba(0, 0, 0, 0.5) 100%); box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.6); }
-.scr-screen.scr-glitch-in { animation: map-glitch-in 0.7s steps(1, end) backwards, map-flicker 5s steps(1, end) 0.7s infinite; }
-.scr-screen.scr-glitch-out { animation: map-glitch-out 0.6s steps(1, end) forwards; }
-.scr-screen.scr-glitch-in::before,
-.scr-screen.scr-glitch-out::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 5;
-  pointer-events: none;
-  border-left: 4px solid rgba(255, 43, 214, 0.8);
-  border-right: 4px solid rgba(127, 233, 255, 0.8);
-  transform: translateX(-6px);
-  opacity: 0;
-  animation: map-split 0.7s steps(1, end) both;
-}
-.scr-screen.scr-glitch-out::before { animation-duration: 0.6s; }
 @media (prefers-reduced-motion: reduce) {
   .scr-screen, .scr-roll { animation: none !important; }
 }
 
-/* The holo pane (CREW, YOU): .ql-host and .ql-pane's box in --screen-accent, so the panels are one size and one look. */
+/* The holo pane (YOU, PEOPLE, CREW): .ql-host and .ql-pane's box, its frame the flat holo frame (holo-frame.ts) in
+   --screen-accent; the title sits in the frame's tab. */
 .scr-root.scr-holo {
   display: block;
   padding: 0;
   background: rgba(2, 1, 6, 0.35);
-  backdrop-filter: blur(3px) brightness(0.45) saturate(0.8);
+  backdrop-filter: blur(calc(3px * var(--ui-blur, 1))) brightness(0.45) saturate(0.8);
 }
 .scr-holo .scr-frame {
   position: absolute;
@@ -85,18 +69,42 @@
   top: 9%;
   width: 72%;
   height: 84%;
-  background: linear-gradient(135deg, color-mix(in srgb, var(--screen-accent) 13%, transparent), rgba(255, 79, 139, 0.05) 60%, rgba(9, 4, 18, 0.72));
-  border: 1px solid color-mix(in srgb, var(--screen-accent) 55%, transparent);
-  box-shadow: 0 0 34px color-mix(in srgb, var(--screen-accent) 12%, transparent) inset;
-  clip-path: polygon(0 0, 96% 0, 100% 4%, 100% 100%, 4% 100%, 0 96%);
-  backdrop-filter: blur(3px);
-  animation: ql-flicker-in 0.32s steps(1, end);
 }
-.scr-holo.scr-closing .scr-frame { animation: map-glitch-out 0.6s steps(1, end) forwards; }
-.scr-holo .scr-head { gap: 0; padding: 16px 25px 6px; font: 27px var(--pixel); letter-spacing: 0.3em; color: var(--screen-accent); }
+.scr-holo { --hf-c: var(--screen-accent); }
+.scr-holo .scr-head { position: relative; gap: 0; padding: 32px 25px 2px; font: 27px var(--pixel); letter-spacing: 0.3em; color: var(--screen-accent); }
 .scr-holo .scr-screen { flex: 1; min-height: 0; height: auto; border: 0; box-shadow: none; clip-path: none; background: none; animation: none; }
 .scr-holo .scr-screen::before, .scr-holo .scr-scan, .scr-holo .scr-roll, .scr-holo .scr-vignette { display: none; }
 .scr-holo .scr-scroll { display: flex; flex-direction: column; overflow: hidden; }
+
+/* The trace panel (CREW; mockup crew-trace.html, 2026-11-14): no pane and no frame. The room stays behind, dimmed and
+   blurred, darker on the list's side; the panel fills the stage under the keys bar. Its parts are in trace-panel.css. */
+.scr-root.scr-trace {
+  display: block;
+  padding: 0;
+  color: #d9e4ea;
+  background:
+    linear-gradient(90deg, rgba(5, 2, 10, 0.72), rgba(5, 2, 10, 0.5) 30%, rgba(5, 2, 10, 0.34) 75%, rgba(5, 2, 10, 0.5)),
+    linear-gradient(rgba(5, 2, 10, 0.5), transparent 16%, transparent 84%, rgba(5, 2, 10, 0.6));
+  backdrop-filter: blur(calc(4px * var(--ui-blur, 1))) brightness(0.62) saturate(0.85);
+}
+.scr-trace .scr-frame { position: absolute; left: 64px; right: 64px; top: 88px; bottom: 22px; width: auto; }
+.scr-trace .scr-head { flex: none; gap: 0; padding: 0 0 0 20px; height: 36px; align-items: flex-end; font: 20px/1 var(--pixel); letter-spacing: 0.24em; white-space: nowrap; }
+.scr-trace .scr-screen { flex: 1; min-height: 0; height: auto; margin-top: 26px; border: 0; box-shadow: none; clip-path: none; background: none; animation: none; overflow: visible; }
+.scr-trace .scr-screen::before, .scr-trace .scr-scan, .scr-trace .scr-roll, .scr-trace .scr-vignette { display: none; }
+.scr-trace .scr-scroll { display: flex; flex-direction: column; overflow: visible; }
+/* On: the head line runs out from the bar's word, then the panel steps on. Off: it steps away. */
+.scr-trace:not(.scr-still) { animation: scr-trace-dim 0.2s ease-out; }
+.scr-trace:not(.scr-still) .scr-frame { animation: scr-trace-on 0.3s steps(4, end) backwards; }
+.scr-trace:not(.scr-still) > svg.hv-lead[data-lead='head'] path { animation: scr-trace-line 0.24s linear backwards; }
+.scr-root.scr-trace.scr-closing { animation: scr-trace-dim 0.2s ease-in reverse forwards; }
+.scr-trace.scr-closing .scr-frame { animation: scr-trace-on 0.16s steps(3, end) reverse forwards; }
+.scr-trace.scr-closing .scr-head { opacity: 1; }
+/* The lines go at once: the bar's run they climb to is already gone. */
+.scr-trace.scr-closing > svg.hv-lead { display: none; }
+@keyframes scr-trace-dim { from { opacity: 0; } }
+@keyframes scr-trace-on { 0%, 35% { opacity: 0; } 60% { opacity: 0.5; } 100% { opacity: 1; } }
+/* From the bar's end back to the ring: the path is drawn ring-first, so the dash slides in from its far end. */
+@keyframes scr-trace-line { from { stroke-dasharray: 2400; stroke-dashoffset: -2400; } to { stroke-dasharray: 2400; stroke-dashoffset: 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .scr-holo .scr-frame { animation: none; }
+  .scr-trace, .scr-trace .scr-frame, .scr-trace > svg.hv-lead path { animation: none !important; }
 }

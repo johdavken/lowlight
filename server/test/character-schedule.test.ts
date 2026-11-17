@@ -73,3 +73,11 @@ describe('resolveSchedule', () => {
     ]);
   });
 });
+
+describe('sleeps on a block (job texts spec §5)', () => {
+  it('keeps sleeps: true and ignores anything else', () => {
+    const block = { from: '05:00', to: '13:00', room: 'ribbon/noodle-stall' };
+    expect(resolveSchedule([{ ...block, sleeps: true }], has, () => {})).toEqual([{ from: 300, to: 780, room: 'ribbon/noodle-stall', sleeps: true }]);
+    expect(resolveSchedule([{ ...block, sleeps: 'yes' }], has, () => {})).toEqual([{ from: 300, to: 780, room: 'ribbon/noodle-stall' }]);
+  });
+});

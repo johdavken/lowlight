@@ -52,7 +52,7 @@ describe('Room', () => {
   it('summary() formats the scene, atmosphere and lights', () => {
     const room = new Room(registry);
     expect(room.summary()).toBe(
-      '[room: lowlight-intake "Lowlight Intake" · ambient #1a1030 35% · rain 70% · fog 20% · lights: desk_lamp "desk lamp" #ffb347 60%, window_neon "pink neon through the window" #ff3c8a 80% outside, monitor "intake terminal glow" #7fe9ff 35% · moods: after-hours, storm, closing, late, quiet, tense · places: noodle-stall "Noodle Stall", ribbon-rooftop "Ribbon Rooftop"]',
+      '[room: lowlight-intake "Lowlight Intake" · ambient #1a1030 35% · rain 70% · fog 20% · lights: inside 100% (desk lamp, intake terminal glow); outside 100% (pink neon through the window) · moods: after-hours, storm, closing, late, quiet, tense · places: noodle-stall "Noodle Stall", ribbon-rooftop "Ribbon Rooftop"]',
     );
   });
 
@@ -97,11 +97,56 @@ describe('Room', () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toBe(
-        `unknown light 'lamp'; available: desk_lamp ("desk lamp"), window_neon ("pink neon through the window"), monitor ("intake terminal glow")`,
+        `unknown light 'lamp'; available: inside, outside, desk_lamp ("desk lamp"), window_neon ("pink neon through the window"), monitor ("intake terminal glow")`,
       );
     }
     expect(changes).toHaveLength(0);
     expect(room.state).toBe(before);
+  });
+
+  describe('light groups', () => {
+    it('inside moves every indoor light to a share of its base in one change, the outside and the ambient as before', () => {
+      const room = new Room(registry);
+      const changes = listen(room);
+      const before = room.state.lights;
+      const result = room.setLight({ light_id: 'inside', intensity: 0.5 }, 'agent');
+      expect(result.ok && result.text).toContain('applied: inside (desk lamp, intake terminal glow) · 50%');
+      expect(changes).toHaveLength(1);
+      expect(changes[0].op).toEqual({ tool: 'set_light', args: { light_id: 'inside', intensity: 0.5 } });
+      for (const l of room.state.lights) {
+        const was = before.find((b) => b.id === l.id)!;
+        expect(l.intensity).toBeCloseTo(l.outside ? was.intensity : was.intensity * 0.5);
+      }
+      expect(room.summary()).toContain('lights: inside 50% (desk lamp, intake terminal glow); outside 100%');
+    });
+
+    it('a light set apart from its group shows its own level; 0 is off and 1 brings it back as painted', () => {
+      const room = new Room(registry);
+      room.setLight({ light_id: 'desk_lamp', intensity: 0 }, 'agent');
+      expect(room.summary()).toContain('lights: inside 100% (desk lamp 0%, intake terminal glow);');
+      room.setLight({ light_id: 'INSIDE', intensity: 0 }, 'agent');
+      expect(room.state.lights.filter((l) => !l.outside).every((l) => l.intensity === 0)).toBe(true);
+      expect(room.summary()).toContain('inside 0% (desk lamp, intake terminal glow)');
+      room.setLight({ light_id: 'inside', intensity: 1 }, 'agent');
+      expect(room.summary()).toContain('inside 100% (desk lamp, intake terminal glow)');
+    });
+
+    it('a dark mood recorded as the base still lets the group come back to the painted levels', () => {
+      const room = new Room(registry);
+      const dark = room.state.lights.map((l) => (l.outside ? l : { ...l, intensity: 0, base: 0 }));
+      (room as unknown as { current: { lights: unknown } }).current = { ...room.state, lights: dark };
+      room.setLight({ light_id: 'inside', intensity: 1 }, 'agent');
+      const painted = registry.first().lights;
+      for (const l of room.state.lights.filter((x) => !x.outside)) expect(l.intensity).toBe(painted.find((p) => p.id === l.id)!.intensity);
+    });
+
+    it('flicker on a group; colour only light by light; nothing to change is an error', () => {
+      const room = new Room(registry);
+      room.setLight({ light_id: 'outside', flicker: 0.3 }, 'agent');
+      expect(room.state.lights.filter((l) => l.outside).every((l) => l.flicker === 0.3)).toBe(true);
+      expect(room.setLight({ light_id: 'inside', color: '#ff0000' }, 'agent')).toEqual({ ok: false, error: 'set colour light by light, not on a group' });
+      expect(room.setLight({ light_id: 'inside' }, 'agent')).toEqual({ ok: false, error: 'give intensity or flicker' });
+    });
   });
 
   it('setLight rejects a non-hex color', () => {

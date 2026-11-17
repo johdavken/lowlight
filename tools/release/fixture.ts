@@ -34,6 +34,8 @@ export function contentFixture(root: string): void {
     'characters/b/character.json': JSON.stringify({ name: 'B', extends: 'a', rooms: ['p/two'] }),
     'characters/c/character.json': JSON.stringify({ name: 'C', rooms: ['q/x'] }),
     'characters/player/character.json': JSON.stringify({ name: 'Player' }),
+    'characters/stand/character.json': JSON.stringify({ name: 'Stand', standIn: true }),
+    'shared/cast-palette.json': '{"block":2,"colours":["#000000"]}',
     'map/lowlight.json': '{}',
     'map/history/old.json': '{}',
     'map/city/districts/marsh.json': '{"blackout":{"outage":0.25}}',

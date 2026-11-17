@@ -1,4 +1,10 @@
 /** The playthrough and save routes (spec §4): the title screen's Continue, New Game, Load and the save list. */
+import fs from 'node:fs';
+import path from 'node:path';
+import { FIGURE_JSON, FIGURE_PNG, parseFigureMeta, readFigure } from './persona-figure';
+import type { People } from './people';
+import type { PlaythroughPersona } from '../../shared/persona';
+import type { PersonRow } from '../../shared/person';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { parsePersona } from '../../shared/persona';
 import type { Playthroughs } from './playthroughs';
@@ -29,7 +35,29 @@ function notFoundOn<T>(reply: FastifyReply, fn: () => T): T | undefined {
   }
 }
 
-export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pts: Playthroughs, originAllowed: (origin: string | undefined) => boolean): void {
+/** What a made person plays as (character creator spec 2026-11-14): CUSTOM, their pronoun only when it isn't the stand-in's `they`. */
+export function personaOf(p: PersonRow): PlaythroughPersona {
+  return { name: p.name, background: p.background, kind: 'custom', ...(p.pronoun !== 'they' ? { pronoun: p.pronoun } : {}) };
+}
+
+/** Copies a made person's kept figure into a save's persona/ folder, with their WEARS line as it is now. */
+function copyPersonFigure(fromDir: string, toPersonaDir: string, wears: string): void {
+  const fig = readFigure(fromDir);
+  if (!fig) return;
+  const meta = parseFigureMeta({ ...fig.meta, wears: wears || fig.meta.wears }) ?? fig.meta;
+  fs.mkdirSync(toPersonaDir, { recursive: true });
+  fs.copyFileSync(fig.file, path.join(toPersonaDir, FIGURE_PNG));
+  fs.writeFileSync(path.join(toPersonaDir, FIGURE_JSON), JSON.stringify(meta, null, 2));
+}
+
+export function registerPlaythroughRoutes(
+  app: FastifyInstance,
+  world: World,
+  pts: Playthroughs,
+  originAllowed: (origin: string | undefined) => boolean,
+  more: { isStandIn?: (id: string) => boolean; standIn?: string; people?: People } = {},
+): void {
+  const isStandIn = more.isStandIn ?? (() => false);
   // A change from another site's page (a cross-origin "simple" request) is refused, as the socket is;
   // a request without an Origin (curl, tests) passes.
   const sameOrigin = {
@@ -44,13 +72,27 @@ export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pt
   // and whether its player has a sprite (the load screen asks for a portrait only then).
   app.get('/api/playthroughs', async () => ({
     active: pts.active()?.id ?? null,
-    playthroughs: pts.list().map((pt) => ({ ...pt, contacts: world.contactCount(pt), sprite: world.hasSprite(pt.player) })),
+    playthroughs: pts.list().map((pt) => ({ ...pt, contacts: world.contactCount(pt), sprite: world.hasSprite(pt.player), figure: readFigure(pts.personaDir(pt.id)) !== null })),
   }));
 
   app.post('/api/playthroughs', sameOrigin, async (req, reply) => {
+    // A made person (character creator spec 2026-11-14): no player or persona with it; they play on the stand-in.
+    const personId = field(req.body, 'person');
+    if (personId !== undefined) {
+      const startContact = field(req.body, 'startContact');
+      if (typeof personId !== 'string' || field(req.body, 'player') !== undefined || field(req.body, 'persona') !== undefined || field(req.body, 'scene') !== undefined) return reply.code(400).send({ error: 'bad-request' });
+      if (typeof startContact !== 'string' || !world.inRoster(startContact) || !more.people || !more.standIn) return reply.code(400).send({ error: 'bad-request' });
+      const person = more.people.get(personId);
+      if (!person || person.draft) return reply.code(404).send({ error: 'no-person' });
+      const made = world.create(more.standIn, startContact, undefined, personaOf(person));
+      if ('busy' in made) return busy(reply, made.busy);
+      copyPersonFigure(more.people.dir(person.id), pts.personaDir(made.id), person.wears);
+      return made;
+    }
     const player = field(req.body, 'player');
     const startContact = field(req.body, 'startContact');
-    if (typeof player !== 'string' || player === '' || typeof startContact !== 'string' || !world.inRoster(startContact)) {
+    // The stand-in is played only as a made person (character creator spec 2026-11-14), never picked by id.
+    if (typeof player !== 'string' || player === '' || isStandIn(player) || typeof startContact !== 'string' || !world.inRoster(startContact)) {
       return reply.code(400).send({ error: 'bad-request' });
     }
     const rawName = field(req.body, 'name');
@@ -83,6 +125,17 @@ export function registerPlaythroughRoutes(app: FastifyInstance, world: World, pt
     if (!pts.get(req.params.id)) return notFound(reply);
     if (name !== undefined) pts.rename(req.params.id, name);
     if (starred !== undefined) pts.setStarred(req.params.id, starred);
+    return pts.get(req.params.id);
+  });
+
+  // Who you are in a save, set or cleared from Studio's PERSONA page (spec 2026-11-13): the game stays the only writer.
+  // The next turn reads it from disk; null plays as the character again.
+  app.put<{ Params: { id: string } }>('/api/playthroughs/:id/persona', sameOrigin, async (req, reply) => {
+    const raw = field(req.body, 'persona');
+    const persona = raw === null ? null : raw === undefined ? undefined : parsePersona(raw);
+    if (persona === undefined || (raw !== null && persona === null)) return reply.code(400).send({ error: 'bad-persona' });
+    if (!pts.get(req.params.id)) return notFound(reply);
+    pts.setPersona(req.params.id, persona);
     return pts.get(req.params.id);
   });
 

@@ -13,6 +13,8 @@ export interface ScenarioDeps {
   target(ai: string): { kind: 'direct'; ready(): boolean; narrate(messages: CompletionMessage[]): Promise<string> } | null;
   /** The narrator's request for the playthrough's player and `ai`'s room, with the steer, and the pair for the panel's head; null when either is unknown. */
   promptFor(ai: string, steer: string | null): Promise<{ messages: CompletionMessage[]; pair: OpeningPair } | null>;
+  /** The STORY a new game with `ai` opens on for the playthrough's player: her job's id and its authored scene (null: none). */
+  story(ai: string): Promise<{ job: string; text: string } | null>;
 }
 
 /** Who the openings are for: the player (their id, for their face) and the tie line between them (null: they haven't met). */
@@ -26,6 +28,9 @@ export function registerScenarioRoutes(app: FastifyInstance, deps: ScenarioDeps)
       if (!deps.originAllowed(req.headers.origin)) return reply.code(403).send({ error: 'origin' });
     },
   };
+
+  // The arrival screen's STORY (2026-11-11): the default opening when the pair has one, on a new game only.
+  app.get<{ Params: { ai: string } }>('/api/scenario/story/:ai', async (req) => ({ story: await deps.story(req.params.ai) }));
 
   app.post('/api/scenario/draft', sameOrigin, async (req, reply) => {
     const ai = field(req.body, 'ai');

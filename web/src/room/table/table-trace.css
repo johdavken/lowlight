@@ -1,0 +1,656 @@
+/* The Graft table in the HUD trace (mockup docs/mockups/graft-trace.html, playtest pick 2026-11-15). No felt and no
+   panes: the room stays, dimmed. The job hangs off the bar's JOBS word by its head line, and the clocks sit on that
+   line. The JOB column stands on the left rail with the route over it. The choices are the only boxes (things you hold
+   are cut outlines), each in its position's colour, and each says what it rolls, the odds, and what a 6, a 4–5 and a
+   miss do. The hand is rows on its own rail; a leader runs from whatever you lift to every card it changes. Costs are a
+   list on a rail; answers are cut keys. The desktop job table and its two boards (the last section: mockup
+   boards-trace.html, 2026-11-15); SETUP, the papers desk and a phone keep table.css. */
+
+/* The JOB column at the job table: no glass and no plate (the job's name is on the head line); its words stand on the
+   left rail under the route, and scroll there. */
+:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .hf, :has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .hf-gb, :has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .jc-top { display: none; }
+:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .jc { top: var(--hud-log-y); padding: 0; background: none; border: 0; box-shadow: none; clip-path: none; -webkit-mask-image: none; mask-image: none; backdrop-filter: none; }
+:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .jc-layer .jc-body { padding: 0 8px 0 0; }
+
+/* The box's settings key stands on the column's top edge at its right end (style.css), which is the region's own top here. */
+#game:has(> .tb.hud.tb-job:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { left: calc(var(--hud-log-x) + var(--hud-log-w) - 30px); top: calc(var(--hud-log-y) - 14px); }
+
+/* What a phone and SETUP never show of the trace's parts. */
+.tb.phone .tb-oddsbar, .tb.phone .tb-res, .tb.phone .tb-go, .tb.phone .tb-pos, .tb.phone .tb-statname, .tb.phone .tb-of, .tb.phone .tb-leads-post, .tb.phone .tb-route, .tb.phone .tb-keys { display: none; }
+.tb:not(.tb-job) .tb-of, .tb.tb-deduction .tb-of, .tb.tb-accounting .tb-of { display: none; }
+/* A board (deduction, accounts) takes the table whole: the trace's own parts step out. */
+.tb.tb-deduction :is(.tb-route, .tb-keys, .tb-onroll), .tb.tb-accounting :is(.tb-route, .tb-keys, .tb-onroll) { display: none; }
+.tb.phone.tb-deduction .tb-log-at, .tb.phone.tb-accounting .tb-log-at { display: none; }
+
+.tb.hud.tb-job:not(.phone) {
+  /* The one red (2026-11-15): --ui is the UI's own (the head line, the job's name, section heads, cut keys, the key line), so red can't mean
+     trouble here. ALARM and a cost are amber (they need you); the worst position and a miss are magenta; NERVE is yours, so cyan with your
+     own stat's dice; the crew are lilac; green is the take. --c stays the cream of the job's own words (the beat's name, the route). */
+  --c: #efe6cf; --ui: var(--ui-red, #ff4d4d); --t-hud: var(--ui); --t-amber: #ffc56b; --t-ok: #3dff7a; --t-alarm: #ffc56b; --t-miss: #ff4fa3; --t-nerve: #7fe9ff; --t-text: #d9e4ea; --t-dim: #8fa3ad; --t-ink: #05020a;
+  --t-dark: #4f9dff; --t-open: #ffb347; --t-wire: #ff4fa3;
+  --k-stat: #7fe9ff; --k-people: #b89cff; --k-pocket: #ffc56b; --k-setup: #a8ff60;
+  --teko: var(--cs-teko, 'Teko', var(--pixel));
+  --hv-c: var(--ui);
+  padding: 84px 24px 30px 92px;
+  color: var(--t-text);
+}
+/* The layout: the head line's row, then the JOB column and the moment, then the hand's rail. The right fifth is the
+   contact's (her figure, her line under it). */
+.tb.hud.tb-job:not(.phone) {
+  grid-template-columns: 340px minmax(0, 760px) minmax(0, 1fr);
+  grid-template-rows: 46px minmax(0, 1fr) auto;
+  grid-template-areas: 'top top top' 'log middle .' 'bottom bottom .';
+  column-gap: 40px;
+  row-gap: 0;
+}
+
+.tb.hud.tb-job:not(.phone) {
+  /* ---------- the head line: the job's name, then the clocks ---------- */
+  & > .tb-top { align-items: flex-start; gap: 44px; padding-top: 4px; }
+  & .tb-top-l { flex: none; flex-direction: row; align-items: baseline; gap: 18px; margin: 0; transform: none; }
+  & .tb-top-l .tb-head { display: flex; align-items: baseline; gap: 14px; font-size: 17px; }
+  & .tb-top-l .tb-title { display: inline; font: 34px/1 var(--pixel); letter-spacing: 0.42em; color: var(--ui); text-shadow: 0 0 14px color-mix(in srgb, var(--ui) 45%, transparent), 0 1px 2px #000; white-space: nowrap; }
+  & .tb-top-l .tb-strip { display: none; }
+  & .tb-head .tb-flag { font: 17px/1 var(--pixel); letter-spacing: 0.2em; padding: 3px 8px 1px; color: var(--t-ink); background: var(--t-amber); border: 0; box-shadow: none; text-shadow: none; }
+  & .tb-head .tb-flag.red { background: var(--t-miss); color: #fff; }
+  & .tb-right { margin: 0; gap: 40px; align-self: flex-start; padding-top: 6px; display: flex; flex-direction: row; }
+  & .tb-take, & .tb-alarm, & .tb-nerve { display: flex; flex-direction: row; align-items: center; gap: 10px; white-space: nowrap; --k: var(--t-ok); }
+  & .tb-take[hidden], & .tb-alarm[hidden], & .tb-nerve[hidden] { display: none; }
+  & .tb-alarm { --k: var(--t-alarm); position: relative; }
+  /* What ALARM does, under its clock; the steps where it does it are ticked. */
+  & .tb-clock-note { display: block; position: absolute; left: 0; top: calc(100% + 7px); font: 13px/1 var(--pixel); letter-spacing: 0.14em; color: color-mix(in srgb, var(--k) 75%, transparent); white-space: nowrap; text-shadow: 0 1px 2px #000; }
+  & .tb-stack i.mark { position: relative; }
+  & .tb-stack i.mark::after { content: ''; position: absolute; left: 50%; bottom: -5px; width: 1px; height: 4px; background: var(--k); }
+  /* A pip about to change blinks: one about to fill at half strength, one about to be spent as it is. */
+  & .tb-stack i.g { animation: tt-blink 0.9s steps(2) infinite; }
+  & .tb-stack i.g:not(.f) { background: color-mix(in srgb, var(--k) 50%, transparent); }
+  & .tb-nerve { --k: var(--t-nerve); }
+  & .tb-word { order: 0; grid-area: auto; font: 20px/1 var(--pixel); letter-spacing: 0.2em; color: var(--k); writing-mode: horizontal-tb; transform: none; text-shadow: 0 1px 2px #000; }
+  & .tb-stack { order: 1; grid-area: auto; display: inline-flex; flex-direction: row; gap: 4px; padding: 0; }
+  & .tb-stack::before, & .tb-stack::after { content: none; }
+  & .tb-stack i { width: 24px; height: 13px; transform: skewX(-24deg); border: 0; border-radius: 0; background: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 70%, transparent); }
+  & .tb-stack i.f { background: var(--k); box-shadow: 0 0 8px color-mix(in srgb, var(--k) 50%, transparent); }
+  & .tb-num { order: 2; grid-area: auto; font: 600 34px/0.7 var(--teko); letter-spacing: 0.02em; color: #fff; text-shadow: 0 1px 2px #000; }
+  & .tb-of { order: 3; margin-left: -8px; font: 17px/1 var(--pixel); letter-spacing: 0.1em; color: var(--t-dim); }
+
+  /* ---------- the JOB column's place: the route and the beat's name over it ---------- */
+  & > .tb-log { overflow: visible; gap: 0; padding-top: 12px; }
+  & .tb-route { flex: none; }
+  & .tb-role { font: 15px/1.35 var(--pixel); letter-spacing: 0.16em; color: var(--t-dim); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+  & .tb-role b { font-weight: normal; color: var(--t-text); }
+  & .tb-beat { margin-top: 6px; font: 600 58px/0.82 var(--teko); letter-spacing: 0.02em; color: var(--c); text-transform: uppercase; text-shadow: 0 0 18px color-mix(in srgb, var(--c) 35%, transparent), 0 2px 3px #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  & .tb-log-at { flex: 1 1 0; min-height: 0; margin-top: 10px; }
+  /* SO FAR: what each beat already played came to, under the column. */
+  & .tb-sofar { display: block; flex: none; margin-top: 10px; }
+  & .tb-sofar[hidden] { display: none; }
+  & .tb-sofar-head { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-dim); }
+  & .tb-sofar-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--t-dim) 60%, transparent), transparent); }
+  & .tb-sofar-row { display: grid; grid-template-columns: 84px minmax(0, 1fr) auto; align-items: baseline; gap: 0 10px; margin-top: 4px; font: 15px/1.2 var(--pixel); letter-spacing: 0.12em; text-shadow: 0 1px 2px #000; }
+  & .tb-sofar-beat { color: var(--t-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  & .tb-sofar-line { color: var(--t-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  & .tb-sofar-moved { display: flex; gap: 8px; white-space: nowrap; }
+  & .tb-sofar-costs { grid-column: 2 / -1; font-size: 13px; color: var(--t-alarm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  & .tb-sofar-moved b { font-weight: normal; }
+  & .tb-sofar-moved .take { color: var(--t-ok); }
+  & .tb-sofar-moved .take.loss { color: var(--t-miss); }
+  & .tb-sofar-moved .alarm { color: var(--t-alarm); }
+  & .tb-sofar-moved .alarm.off { color: var(--t-dim); }
+  /* The route: the ways through the job, the one you're on lit, the one you left struck. A diamond is a post. */
+  & .rt { display: block; margin: 12px 0 2px; overflow: visible; }
+  & .rt .lit { color: var(--c); }
+  & .rt .dim { color: rgba(230, 238, 247, 0.4); }
+  & .rt .gone { color: rgba(230, 238, 247, 0.17); }
+  & .rt .hot { color: var(--k-people); }
+  & .rt path { fill: none; stroke: currentColor; stroke-width: 1; }
+  & .rt path.lit { stroke-width: 2; filter: drop-shadow(0 0 3px currentColor); }
+  & .rt path.gone { stroke-dasharray: 3 4; }
+  & .rt text { font: 13px var(--pixel); letter-spacing: 0.1em; fill: currentColor; }
+  & .rt .cur text { fill: #fff; }
+  & .rt .tick { fill: currentColor; }
+  & .rt .now { fill: var(--t-ink); stroke: currentColor; }
+  & .rt .pst { fill: var(--t-ink); stroke: var(--k-people); }
+  & .rt .gone .pst { stroke: currentColor; }
+  & .rt-note { min-height: 16px; font: 13px/1.35 var(--pixel); letter-spacing: 0.12em; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .rt-note b { font-weight: normal; color: var(--k-people); }
+  & .rt-note i { display: inline-block; width: 6px; height: 6px; margin: 0 7px 1px 2px; transform: rotate(45deg); box-shadow: inset 0 0 0 1px var(--k-people); }
+  /* A job with one way: the ladder. */
+  & .rt-ladder { display: flex; margin: 16px 0 6px; font: 13px/1 var(--pixel); letter-spacing: 0.1em; color: rgba(230, 238, 247, 0.35); }
+  & .rt-ladder span { position: relative; flex: 1 1 0; min-width: 0; padding-top: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  & .rt-ladder span::before { content: ''; position: absolute; left: 0; right: 0; top: 4px; height: 1px; background: rgba(230, 238, 247, 0.3); }
+  & .rt-ladder span::after { content: ''; position: absolute; left: 0; top: 1px; width: 1px; height: 7px; background: rgba(230, 238, 247, 0.5); }
+  & .rt-ladder span.f { color: var(--t-dim); }
+  & .rt-ladder span.f::before { background: var(--c); }
+  & .rt-ladder span.on { color: #fff; overflow: visible; }
+  & .rt-ladder span.on::after { left: 0; top: 0; width: 7px; height: 7px; border: 1px solid var(--c); border-radius: 50%; background: var(--t-ink); }
+
+  /* ---------- the moment ---------- */
+  & > .tb-middle { padding: 14px 0 0; justify-content: flex-start; align-items: stretch; }
+  & .tb-deal { display: flex; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; gap: 30px; row-gap: 14px; width: 100%; min-height: 0; }
+
+  /* A choice: the one box on the table, cut, in its position's colour. */
+  & .tb-deal > .tb-card:not(.tb-debrief) {
+    --pc: rgba(230, 238, 247, 0.5);
+    position: relative; flex: 1 1 0; min-width: 0; max-width: 365px; width: auto; height: auto; min-height: 430px; max-height: 100%; padding: 0; margin: 0;
+    border: 0; border-radius: 0; text-align: left; color: var(--t-text); overflow: hidden; transform: none; filter: none;
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--pc) 60%, transparent);
+    background: linear-gradient(to bottom right, transparent calc(50% - 0.6px), color-mix(in srgb, var(--pc) 60%, transparent) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 13px 13px no-repeat,
+      linear-gradient(to bottom right, transparent calc(50% - 0.6px), color-mix(in srgb, var(--pc) 60%, transparent) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 13px 13px no-repeat, rgba(5, 2, 10, 0.58);
+    transition: box-shadow 120ms;
+  }
+  & .tb-deal > .tb-card[data-pos='dark'] { --pc: var(--t-dark); }
+  & .tb-deal > .tb-card[data-pos='open'] { --pc: var(--t-open); }
+  & .tb-deal > .tb-card[data-pos='wire'] { --pc: var(--t-wire); }
+  & .tb-deal > .tb-card.sel:not(.tb-debrief), & .tb-deal > .tb-card:not(.tb-debrief):hover {
+    box-shadow: inset 0 0 0 1px var(--pc), inset 0 0 40px color-mix(in srgb, var(--pc) 14%, transparent);
+    background: linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--pc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 13px 13px no-repeat,
+      linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--pc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 13px 13px no-repeat, rgba(5, 2, 10, 0.66);
+  }
+  & .tb-card > .tb-face { position: static; display: flex; flex-direction: column; width: 100%; height: 100%; min-height: inherit; padding: 0; margin: 0; background: none; border: 0; box-shadow: none; font: 13px/1.5 var(--mono); color: var(--t-text); text-align: left; }
+  & .tb-card > .tb-face.none { opacity: 0.55; }
+  /* The stat's picture fades into the card; the position's words and piece over it, the stat's name on it. */
+  & .tb-card .tb-side { position: relative; flex: none; display: block; width: auto; height: 132px; margin: 1px 1px 0; border: 0; background: none; overflow: hidden; }
+  & .tb-card .tb-side .tb-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 38%; opacity: 0.6; filter: saturate(0.7); -webkit-mask-image: linear-gradient(#000 35%, transparent); mask-image: linear-gradient(#000 35%, transparent); border: 0; border-radius: 0; }
+  & .tb-card.sel .tb-side .tb-art, & .tb-card:hover .tb-side .tb-art { opacity: 0.9; filter: none; }
+  & .tb-card .tb-side .tbc-mark { display: none; }
+  & .tb-pos { position: absolute; right: 12px; top: 10px; display: flex; align-items: center; gap: 8px; font: 17px/1 var(--pixel); letter-spacing: 0.2em; color: var(--pc); text-shadow: 0 1px 3px #000, 0 0 8px #000; white-space: nowrap; }
+  & .tb-pos-piece { width: 38px; height: 38px; }
+  & .tb-statname { position: absolute; left: 17px; bottom: -4px; font: 600 76px/0.8 var(--teko); letter-spacing: 0.02em; color: #fff; text-shadow: 0 2px 3px #000, 0 0 18px color-mix(in srgb, var(--pc) 40%, transparent); white-space: nowrap; }
+  & .tb-card .tb-main { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; padding: 10px 17px 14px; gap: 0; background: none; border: 0; }
+  & .tb-card.tb-plain .tb-main, & .tb-card > .tb-face.tb-plain .tb-main { padding-top: 18px; }
+  & .tb-card .tb-line { display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; font: 13px/1.5 var(--mono); color: var(--t-text); text-shadow: 0 1px 2px #000; text-align: left; margin: 0; padding: 0; }
+  & .tb-plain .tb-line { -webkit-line-clamp: 9; line-clamp: 9; font-size: 14px; }
+  /* Where a fork's card leads: the loudest line on it. */
+  & .tb-leads { display: block; margin-top: 8px; font: 600 34px/0.85 var(--teko); letter-spacing: 0.03em; color: var(--t-dim); text-transform: uppercase; }
+  & .tb-card.sel .tb-leads, & .tb-card:hover .tb-leads { color: #fff; text-shadow: 0 0 14px color-mix(in srgb, var(--c) 50%, transparent); }
+  & .tb-leads-post { display: block; margin-top: 3px; font: 14px/1.1 var(--pixel); letter-spacing: 0.12em; color: var(--k-people); }
+  & .tb-leads-post::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 8px 1px 2px; transform: rotate(45deg); box-shadow: inset 0 0 0 1px var(--k-people); }
+  & .tb-card .tb-foot { flex: 1 1 auto; display: flex; flex-direction: column; align-items: stretch; gap: 0; margin: 0; padding: 0; border: 0; background: none; }
+  & .tb-card .tb-flags { display: flex; flex-wrap: wrap; gap: 5px; margin: 7px 0 0; padding: 0; }
+  & .tb-card .tb-tag, & .tb-card .tb-flag { display: inline-block; padding: 1px 6px 0; font: 13px/1.15 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); background: none; border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.3); text-shadow: none; }
+  & .tb-card .tb-tag.move, & .tb-card .tb-tag.lifted { color: var(--t-ink); background: var(--k-people); box-shadow: none; }
+  & .tb-card .tb-tag.route, & .tb-card .tb-tag.lacquer, & .tb-card .tb-flag.red { color: #fff; background: var(--t-miss); box-shadow: none; }
+  & .tb-card .tb-tag.hot { color: var(--t-ink); background: var(--k-pocket); box-shadow: none; }
+  /* The dice by where they come from, the count after them. */
+  & .tb-card .tb-tray { display: flex; align-items: flex-end; gap: 6px; margin: 9px 0 0; padding: 0; background: none; border: 0; min-height: 40px; }
+  & .tb-card .tb-tray .tb-stat { display: none; }
+  & .tb-cells { display: inline-flex; gap: 3px; }
+  & .tb-cells i { width: 20px; height: 20px; border: 0; border-radius: 0; --k: var(--t-dim); background: color-mix(in srgb, var(--k) 82%, #000); box-shadow: inset 0 0 0 1px var(--k), 0 0 8px color-mix(in srgb, var(--k) 35%, transparent); clip-path: polygon(4px 0, 100% 0, 100% calc(100% - 4px), calc(100% - 4px) 100%, 0 100%, 0 4px); }
+  & .tb-cells i.k-stat { --k: var(--k-stat); }
+  & .tb-cells i.k-people { --k: var(--k-people); }
+  & .tb-cells i.k-pocket { --k: var(--k-pocket); }
+  & .tb-cells i.k-setup { --k: var(--k-setup); }
+  & .tb-cells i.k-push { --k: var(--t-nerve); }
+  & .tb-cells i.k-mod { --k: var(--t-text); }
+  & .tb-cells i.minus { background: none; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.4); opacity: 0.7; }
+  & .tb-cells i.lift { animation: tt-blink 0.9s steps(2) infinite; }
+  & .tb-card .tb-sum { margin-left: auto; font: 600 58px/0.66 var(--teko); color: #fff; text-shadow: 0 2px 3px #000; }
+  & .tb-card .tb-sum small { font: 20px var(--pixel); color: var(--t-dim); margin-left: 2px; }
+  & .tb-card .tb-say { display: flex; align-items: baseline; gap: 7px; order: 8; margin: auto 0 0; padding-top: 12px; font: 14px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); white-space: nowrap; }
+  & .tb-card .tb-say::before { content: 'EFFECT'; }
+  & .tb-card .tb-side-word { display: none; }
+  & .tb-card .tb-eff { font: inherit; letter-spacing: inherit; padding: 0; background: none; border: 0; box-shadow: none; color: var(--t-text); }
+  & .tb-card .tb-eff.small { color: var(--t-dim); }
+  & .tb-card .tb-eff.big { color: var(--t-ok); }
+  & .tb-card .tb-say:not(:has(.tb-eff)) { visibility: hidden; }
+  /* The sources' names under the dice, each in its colour. */
+  & .tb-card .tb-srcs { position: static; display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 0; padding: 0 17px; order: 0; transform: none; }
+  & .tb-card .tb-src { padding: 0; font: 13px/1.1 var(--pixel); letter-spacing: 0.12em; background: none; border: 0; box-shadow: none; color: var(--t-text); }
+  & .tb-card .tb-src.k-people { color: var(--k-people); }
+  & .tb-card .tb-src.k-push { color: var(--t-nerve); }
+  & .tb-card .tb-src.k-pocket { color: var(--k-pocket); }
+  & .tb-card .tb-src.k-setup { color: var(--k-setup); }
+  & .tb-card .tb-src.minus { color: var(--t-dim); }
+  & .tb-card .tb-srcs { display: none; }
+  /* The offer box: what a recruit can play on the waiting roll, under it and over its costs. A cut outline in the crew's colour. */
+  & .tb-deal > .tb-offers { grid-column: 1; grid-row: 2; align-self: start; margin: 16px 0 0; min-width: 0; }
+  & .tb-deal:has(> .tb-offers) > .tb-costs, & .tb-deal:has(> .tb-offers) > .tb-costs-leaving { grid-row: 1 / span 2; }
+  & .tb-offers-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--k-people); }
+  & .tb-offers-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--k-people) 60%, transparent), transparent); }
+  & .tb-offer { position: relative; margin-top: 8px; padding: 9px 12px 10px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-people) 60%, transparent); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); background: rgba(5, 2, 10, 0.45); }
+  & .tb-offer-who { float: right; font: 14px/1.4 var(--pixel); letter-spacing: 0.14em; color: var(--k-people); }
+  & .tb-offer-name { font: 20px/1.1 var(--pixel); letter-spacing: 0.2em; color: #fff; text-transform: uppercase; }
+  & .tb-offer-words { margin: 5px 96px 0 0; font: 12.5px/1.45 var(--mono); color: var(--t-text); text-shadow: 0 1px 2px #000; }
+  & .tb-offer-play { position: absolute; right: 10px; bottom: 9px; padding: 5px 14px 3px; font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: var(--ui); background: rgba(5, 2, 10, 0.4); border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px var(--ui); clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); cursor: pointer; }
+  & .tb-offer-play:hover, & .tb-offer-play:focus-visible { outline: none; color: var(--t-ink); background: var(--ui); }
+  /* The dice's names under them, each in its die's colour; what a lifted card or PUSH would add blinks with its die. */
+  & .tb-card .tb-names { display: flex; flex-wrap: wrap; gap: 2px 10px; margin: 5px 0 0; min-height: 14px; }
+  & .tb-card .tb-names .tb-src.k-stat { color: var(--k-stat); }
+  & .tb-card .tb-names .tb-src.lift { animation: tt-blink 0.9s steps(2) infinite; }
+  /* The odds: a 6, a 4–5, a miss. */
+  & .tb-oddsbar { display: flex; gap: 3px; height: 20px; margin: 11px 4px 0; }
+  & .tb-oddsbar i { flex: 1 1 0; min-width: 16px; transform: skewX(-24deg); display: grid; place-items: center; font: 15px/1 var(--pixel); font-style: normal; letter-spacing: 0.1em; color: var(--t-ink); overflow: hidden; }
+  & .tb-oddsbar i span { transform: skewX(24deg); white-space: nowrap; }
+  & .tb-oddsbar .clean { background: var(--t-ok); }
+  & .tb-oddsbar .cost { background: var(--t-amber); }
+  & .tb-oddsbar .miss { background: var(--t-miss); }
+  /* What each result does here. */
+  & .tb-res { display: grid; gap: 4px; margin-top: 10px; }
+  & .tb-res-row { display: grid; grid-template-columns: 42px 1fr; column-gap: 9px; align-items: baseline; font: 12.5px/1.4 var(--mono); color: var(--t-text); text-shadow: 0 1px 2px #000; }
+  & .tb-res-k { font: 600 24px/0.85 var(--teko); letter-spacing: 0.02em; white-space: nowrap; }
+  & .tb-res-row.r6 .tb-res-k { color: var(--t-ok); }
+  & .tb-res-row.r4 .tb-res-k { color: var(--t-amber); }
+  & .tb-res-row.r1 .tb-res-k { color: var(--t-miss); }
+  & .tb-res-text b { font-weight: 600; color: #fff; }
+  /* The key at the card's foot: filled on the card Enter rolls. */
+  & .tb-go { order: 9; display: flex; justify-content: flex-end; margin-top: -22px; pointer-events: none; }
+  & .tb-plain .tb-go { margin-top: auto; }
+  & .tb-key {
+    --kc: var(--pc, var(--c));
+    position: relative; display: inline-block; padding: 7px 12px 4px; font: 18px/1 var(--pixel); letter-spacing: 0.18em; color: var(--kc); white-space: nowrap;
+    clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); box-shadow: inset 0 0 0 1px var(--kc);
+    background: linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 8px 8px no-repeat,
+      linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 8px 8px no-repeat, rgba(5, 2, 10, 0.35);
+  }
+  & .tb-card.sel .tb-key, & .tb-card:hover .tb-key { color: var(--t-ink); background: var(--kc); box-shadow: none; }
+  & .tb-card.sel .tb-key::after { content: '⏎'; margin-left: 10px; opacity: 0.6; }
+  /* A card that rolls nothing, said as large as a rolled card's stat; under it, in the odds' place, what it does for certain. */
+  & .tb-sure .tb-noroll { margin-top: 14px; font: 600 58px/0.8 var(--teko); letter-spacing: 0.02em; color: color-mix(in srgb, var(--t-text) 55%, transparent); text-shadow: 0 2px 3px #000; }
+  & .tb-sure .tb-oddsbar { margin-top: 14px; }
+  & .tb-sure .tb-oddsbar .clean { flex: 1; }
+  & .tb-sure .tb-res-row { grid-template-columns: 58px 1fr; }
+  & .tb-sure .tb-res-k { min-width: 58px; font: 15px/1.5 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); }
+  & .tb-sure .tb-res-row.r6 .tb-res-k { color: var(--t-ok); }
+  & .tb-sure .tb-res-row.r4 .tb-res-k { color: var(--t-alarm); }
+  & .tb-sure .tb-res-row.r1 .tb-res-k { color: var(--t-miss); }
+  & .tb-noroll { margin-top: 10px; font: 15px/1 var(--pixel); letter-spacing: 0.18em; color: var(--t-dim); background: none; border: 0; padding: 0; }
+  /* WALK and PRESS ON, and the answers to a blown job: the same cut card, its word large. */
+  & .tb-card.art-panel > .tb-face, & .tb-card.pic > .tb-face, & .tb-card.cover > .tb-face { justify-content: flex-end; padding: 18px 17px 16px; }
+  & .tb-card.art-panel { --pc: var(--c); }
+  & .tb-card[data-choice='!press'] { --pc: var(--k-people); }
+  & .tb-panel-word { display: block; font: 600 64px/0.82 var(--teko); letter-spacing: 0.02em; color: #fff; text-shadow: 0 2px 3px #000, 0 0 18px color-mix(in srgb, var(--pc) 40%, transparent); }
+  & .tb-panel-sub { display: block; margin-top: 8px; font: 15px/1.3 var(--pixel); letter-spacing: 0.16em; color: var(--t-dim); }
+  & .tb-deal > .tb-card .tbc { background: none; border: 0; box-shadow: none; }
+  /* THAT'S MY CHOICE, asked on the card. */
+  & .tb-card .tb-said { margin-top: 8px; font: italic 13px/1.4 var(--mono); color: #bff3ff; }
+  & .tb-card .tb-sub { font: 13px/1.3 var(--pixel); letter-spacing: 0.1em; color: var(--t-dim); }
+  & .tb-card .tb-actions { display: flex; gap: 8px; margin-top: 6px; }
+  & .tb-card .tb-actions button { padding: 6px 12px 4px; font: 17px/1 var(--pixel); letter-spacing: 0.18em; color: var(--ui); background: rgba(5, 2, 10, 0.5); border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px var(--ui); cursor: pointer; }
+  & .tb-card .tb-actions .tb-confirm { color: var(--t-ink); background: var(--ui); }
+
+  /* ---------- a roll waiting, and its costs ---------- */
+  & .tb-deal:has(> .tb-parked) { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); align-items: start; justify-content: start; column-gap: 50px; row-gap: 0; }
+  & > .tb-middle:has(.tb-parked) { padding-top: 14px; }
+  & .tb-deal > .tb-parked { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; align-items: stretch; gap: 0; min-width: 0; margin: 0; padding: 0; align-self: start; }
+  & .tb-deal > .tb-costs, & .tb-deal > .tb-costs-leaving { grid-column: 2; grid-row: 1; align-self: start; }
+  & .tb-deal:not(:has(> .tb-parked)) > .tb-costs { grid-column: 1 / -1; max-width: 420px; }
+  /* The card that rolled: its picture, its stat and what you did, no box. */
+  & .tb-parked > .tb-card { width: 100%; max-width: none; height: auto; min-height: 0; flex: none; padding: 0; margin: 0; border: 0; border-radius: 0; clip-path: none; box-shadow: none; background: none; overflow: visible; text-align: left; cursor: default; scale: none; translate: none; opacity: 1; }
+  & .tb-parked > .tb-card > .tb-face { position: static; display: block; inset: auto; width: 100%; min-height: 0; background: none; box-shadow: none; }
+  & .tb-parked .tb-card .tb-side { position: relative; inset: auto; height: 104px; margin: 0; }
+  & .tb-parked .tb-card .tb-side .tb-art { opacity: 0.8; filter: none; -webkit-mask-image: linear-gradient(90deg, #000 40%, transparent), linear-gradient(#000 30%, transparent); -webkit-mask-composite: source-in; mask-image: linear-gradient(90deg, #000 40%, transparent), linear-gradient(#000 30%, transparent); mask-composite: intersect; }
+  & .tb-parked .tb-card .tb-statname { left: 0; bottom: 0; font-size: 64px; }
+  & .tb-parked .tb-card .tb-pos { right: 0; top: 4px; }
+  & .tb-parked .tb-card .tb-main { display: block; padding: 6px 0 0; }
+  & .tb-parked .tb-card .tb-line { -webkit-line-clamp: 2; line-clamp: 2; color: var(--t-dim); font-size: 12.5px; }
+  & .tb-parked .tb-card .tb-foot, & .tb-parked .tb-card .tb-leads, & .tb-parked .tb-card .tb-leads-post, & .tb-parked .tb-card .tb-said, & .tb-parked .tb-card .tb-sub, & .tb-parked .tb-card .tb-actions { display: none; }
+  & .tb-parked.many > .tb-card { display: block; }
+  /* The dice, then the number and the verdict. */
+  & .tb-parked .tb-roll { position: relative; display: flex; flex-direction: column; align-items: flex-start; width: auto; max-width: calc(100% + 60px); margin: 4px 0 0 -60px; zoom: 1; }
+  & .tb-parked .tb-roll .tb-roll-dice { max-width: 100%; height: auto; }
+  & .tb-parked .tb-roll .qc-stamp { position: static; margin: 2px 0 0 60px; font: 600 68px/0.8 var(--teko); letter-spacing: 0.02em; text-transform: uppercase; transform: none; rotate: none; text-shadow: 0 0 26px color-mix(in srgb, currentColor 45%, transparent), 0 2px 3px #000; }
+  & .tb-parked .tb-roll.is-pass .qc-stamp, & .tb-parked .tb-roll.is-cost .qc-stamp, & .tb-parked .tb-roll.is-fail .qc-stamp { transform: none; }
+  & .tb-parked .tb-roll.is-pass .qc-stamp { color: var(--t-ok); }
+  & .tb-parked .tb-roll.is-cost .qc-stamp { color: var(--t-open); }
+  & .tb-parked .tb-roll.is-fail .qc-stamp { color: var(--t-miss); }
+  & .tb-parked .tb-roll .qc-says { position: static; margin: 8px 0 0 60px; font: 17px/1.3 var(--pixel); letter-spacing: 0.16em; color: var(--t-dim); white-space: normal; text-shadow: 0 1px 2px #000; }
+  /* The costs: a list on a rail, the one you pick ringed. */
+  & .tb-costs, & .tb-costs-leaving { position: relative; display: block; width: auto; min-width: 0; margin: 0; padding: 0; --k: var(--t-open); }
+  & .tb-costs::before { content: ''; position: absolute; left: -26px; top: 8px; bottom: 6px; width: 1px; background: linear-gradient(var(--t-open), color-mix(in srgb, var(--t-open) 8%, transparent)); }
+  & .tb-costs-head { position: relative; display: flex; align-items: center; gap: 10px; margin: 0; padding: 0; font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-open); white-space: nowrap; text-align: left; background: none; border: 0; text-shadow: 0 1px 2px #000; }
+  & .tb-costs-head::before { content: ''; position: absolute; left: -26px; top: 50%; width: 9px; height: 1px; background: var(--t-open); opacity: 0.6; }
+  & .tb-costs-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--t-open) 60%, transparent), transparent); }
+  & .tb-costs-row, & .tb-costs-row.focus { display: flex; flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: flex-start; gap: 0; margin: 0; padding: 0; height: auto; min-height: 0; }
+  & .tb-cost { --k: var(--t-open); position: relative; display: block; width: auto; height: auto; min-height: 0; margin: 14px 0 0; padding: 0; text-align: left; background: none; border: 0; border-radius: 0; box-shadow: none; clip-path: none; opacity: 0.8; transform: none; outline: none; }
+  & .tb-cost[data-cost='alarm'] { --k: var(--t-alarm); }
+  & .tb-cost[data-cost='take'] { --k: var(--t-ok); }
+  & .tb-cost::before { content: ''; position: absolute; left: -26px; top: 15px; width: 9px; height: 1px; background: var(--k); opacity: 0.6; }
+  & .tb-cost.pickable { cursor: pointer; }
+  & .tb-cost.pickable:hover, & .tb-cost.pickable:focus-visible, & .tb-cost.picked, & .tb-cost.kb { opacity: 1; }
+  & .tb-cost.pickable:hover::before, & .tb-cost.pickable:focus-visible::before, & .tb-cost.picked::before, & .tb-cost.kb::before { left: -31px; top: 10px; width: 9px; height: 9px; border: 1px solid var(--k); border-radius: 50%; background: var(--t-ink); opacity: 1; }
+  & .tb-cost.waits { opacity: 0.4; }
+  & .tb-cost-tag { display: block; margin: 0; padding: 0; font: 600 38px/0.82 var(--teko); letter-spacing: 0.03em; color: var(--t-text); background: none; border: 0; text-shadow: 0 2px 3px #000; }
+  & .tb-cost.pickable:hover .tb-cost-tag, & .tb-cost.picked .tb-cost-tag, & .tb-cost.kb .tb-cost-tag { color: #fff; text-shadow: 0 0 14px color-mix(in srgb, var(--k) 60%, transparent), 0 2px 3px #000; }
+  & .tb-cost-line { display: block; margin: 4px 0 0; padding: 0; font: 12.5px/1.45 var(--mono); font-style: normal; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .tb-cost.pickable:hover .tb-cost-line, & .tb-cost.picked .tb-cost-line, & .tb-cost.kb .tb-cost-line { color: var(--t-text); }
+  & .tb-cost-take { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 5px 0 0; font: 14px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); }
+  & .tb-cost-take .gain { color: var(--t-ok); }
+  & .tb-cost-take .loss { color: var(--t-miss); }
+  & .tb-cost-take .after { color: var(--t-text); }
+  & .tb-cost-first { display: inline-block; margin: 5px 0 0; padding: 1px 6px 0; font: 13px/1.15 var(--pixel); letter-spacing: 0.14em; color: var(--t-ink); background: var(--k-setup); }
+  & .tb-cost-how { display: inline-block; margin: 5px 0 0; padding: 1px 6px 0; font: 14px/1.15 var(--pixel); letter-spacing: 0.14em; color: var(--t-ink); background: var(--t-dim); }
+  & .tb-cost-dice { margin-left: 8px; }
+  & .tb-cost.settled { opacity: 0.5; }
+  & .tb-cost.settled .tb-cost-tag { font-size: 28px; }
+  & .tb-cost.settled .tb-cost-line { display: none; }
+  /* The answers: cut keys, each with what it does. */
+  & .tb-costs-row.focus::after { content: 'ANSWER IT'; order: 1; display: block; margin: 18px 0 2px; font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--ui); }
+  & .tb-costs-row.focus > .tb-cost { order: 0; }
+  & .tb-cost-btn.tb-cost-panel {
+    --kc: var(--ui);
+    order: 2; display: grid; grid-template-columns: 132px minmax(0, 1fr); column-gap: 14px; align-items: center; width: auto; height: auto; min-height: 0; margin: 10px 0 0; padding: 0; text-align: left; cursor: pointer;
+    background: none; border: 0; border-radius: 0; box-shadow: none; clip-path: none; color: var(--t-text); animation: none; transform: none; aspect-ratio: auto; opacity: 1; filter: none; translate: none;
+  }
+  & .tb-cost-btn.tb-cost-panel::before, & .tb-cost-btn.tb-cost-panel::after { content: none; }
+  & .tb-cost-btn.resist { --kc: var(--ui); }
+  & .tb-cost-btn.armour { --kc: var(--k-pocket); }
+  & .tb-cost-panel-word {
+    display: block; padding: 8px 10px 5px; font: 20px/1 var(--pixel); letter-spacing: 0.2em; text-align: center; color: var(--kc); white-space: nowrap; text-shadow: none;
+    clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); box-shadow: inset 0 0 0 1px var(--kc);
+    background: linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 8px 8px no-repeat,
+      linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kc) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 8px 8px no-repeat, rgba(5, 2, 10, 0.35);
+  }
+  & .tb-cost-btn.take .tb-cost-panel-word, & .tb-cost-btn:hover:not(:disabled) .tb-cost-panel-word, & .tb-cost-btn:focus-visible .tb-cost-panel-word { color: var(--t-ink); background: var(--kc); box-shadow: none; }
+  & .tb-cost-btn.tb-cost-panel small { display: block; font: 12.5px/1.4 var(--mono); letter-spacing: 0; color: var(--t-text); text-shadow: 0 1px 2px #000; }
+  & .tb-cost-btn:disabled { opacity: 0.4; cursor: default; }
+  & .tb-costs-branching .tb-cost-btn { animation: none; }
+
+  /* ---------- the hand: rows on its own rail ---------- */
+  & > .tb-bottom { display: flex; align-items: flex-start; justify-content: flex-start; gap: 26px; padding: 14px 0 0; margin: 0; min-height: 124px; max-width: 1124px; }
+  & .tb-hand { display: flex; flex: 0 1 auto; min-width: 0; align-items: flex-start; justify-content: flex-start; gap: 26px; padding: 0; margin: 0; zoom: 1; overflow: visible; }
+  & .tb-hand[hidden] { display: none; }
+  & .tb-group { display: block; min-width: 0; margin: 0; padding: 0; }
+  & .tb-group-label, & .tb-onroll-head { position: relative; display: flex; align-items: center; gap: 10px; height: 24px; margin: 0 0 8px; padding: 0; font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--hc, var(--ui)); white-space: nowrap; text-shadow: 0 1px 2px #000; background: none; border: 0; }
+  & .tb-group-label::after, & .tb-onroll-head::after { content: ''; flex: 1 1 20px; min-width: 20px; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--hc, var(--ui)) 60%, transparent), transparent); }
+  & .tb-group .tb-group-label { opacity: 1; }
+  & .g-people { --hc: var(--k-people); }
+  & .g-deck, & .g-pockets { --hc: var(--k-pocket); }
+  & .tb-slots { display: flex; flex-wrap: nowrap; align-items: flex-start; gap: 14px; margin: 0; padding: 0; transform: none; zoom: 1; }
+  & .tb-crew-stack { display: flex; flex-direction: column; align-items: stretch; gap: 3px; flex: 0 1 204px; width: 204px; min-width: 150px; margin: 0; padding: 0; transform: none; }
+  & .tb-crew-stack::before, & .tb-crew-stack::after, & .tb-abil::before, & .tb-abil::after { content: none; }
+  /* A row: the face, then the name, what they are and how they stand. */
+  & .tb-hand .tb-slot, & .tb-load-tray .tb-slot {
+    position: relative; display: block; width: 100%; max-width: 204px; height: auto; min-height: 0; margin: 0; padding: 0; text-align: left; color: var(--t-text);
+    background: none; border: 0; border-radius: 0; box-shadow: none; transform: none; rotate: none; translate: none; filter: none; overflow: visible; animation: none; transition: translate 120ms;
+  }
+  & .tb-hand .tb-slot .tbc, & .tb-load-tray .tb-slot .tbc { position: static; display: grid; grid-template-columns: 58px minmax(0, 1fr); column-gap: 11px; align-items: start; width: 100%; height: auto; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; font: 14px/1.1 var(--pixel); color: var(--t-text); overflow: visible; }
+  & .tb-hand .tbc::before, & .tb-hand .tbc::after, & .tb-load-tray .tbc::before, & .tb-load-tray .tbc::after { content: none; }
+  & .tb-hand .tbc-pic, & .tb-load-tray .tbc-pic { position: relative; display: block; width: 58px; height: 74px; margin: 0; padding: 0; overflow: hidden; background: #0b0614; border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.22); }
+  & .tb-hand .tbc-pic img.tbc-face, & .tb-hand .tbc-pic img.tbc-art, & .tb-load-tray .tbc-pic img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center top; image-rendering: pixelated; border: 0; border-radius: 0; opacity: 1; -webkit-mask-image: none; mask-image: none; }
+  & .tb-hand .tbc-pic::after, & .tb-load-tray .tbc-pic::after { content: ''; position: absolute; inset: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.22); }
+  & .tb-hand .tbc-mark, & .tb-load-tray .tbc-mark { display: none; }
+  & .tb-hand .tbc-spec, & .tb-hand .tbc-grade, & .tb-load-tray .tbc-spec, & .tb-load-tray .tbc-grade { display: none; }
+  & .tb-hand .tbc-body, & .tb-load-tray .tbc-body { position: static; display: block; min-width: 0; margin: 0; padding: 1px 0 0; background: none; text-align: left; }
+  & .tb-hand .tbc-name, & .tb-load-tray .tbc-name { display: block; margin: 0; font: 24px/0.95 var(--pixel); letter-spacing: 0.14em; color: var(--t-text); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; }
+  & .tb-hand .tbc-note, & .tb-hand .tbc-tr, & .tb-hand .tbc-ab, & .tb-load-tray .tbc-note { display: block; margin: 4px 0 0; padding: 0; font: 15px/1.1 var(--pixel); letter-spacing: 0.1em; color: var(--t-dim); text-align: left; white-space: normal; overflow: hidden; background: none; border: 0; text-shadow: 0 1px 2px #000; }
+  & .tb-hand .tb-slot[data-state='up'] .tbc-note:first-of-type { color: var(--t-ok); }
+  & .tb-hand .tbc-tr { color: color-mix(in srgb, var(--t-ok) 60%, var(--t-dim)); }
+  & .tb-hand .tbc-tr.bad { color: color-mix(in srgb, var(--t-miss) 70%, var(--t-dim)); }
+  & .tb-hand .tb-slot[data-state='up'], & .tb-load-tray .tb-slot[data-state='up'] { cursor: pointer; }
+  & .tb-hand .tb-slot[data-state='up']:hover .tbc-name { color: #fff; }
+  & .tb-hand .tb-slot.lifted { translate: 0 -6px; }
+  & .tb-hand .tb-slot.lifted .tbc-name { color: #fff; text-shadow: 0 0 10px var(--hc, var(--k-people)); }
+  & .tb-hand .tb-slot.lifted .tbc-pic { box-shadow: 0 0 0 3px rgba(5, 2, 10, 0.8), 0 0 0 4px color-mix(in srgb, var(--hc, var(--k-people)) 45%, transparent); overflow: visible; }
+  & .tb-hand .tb-slot.lifted .tbc-pic::after { box-shadow: inset 0 0 0 1px var(--hc, var(--k-people)); }
+  & .tb-hand .tb-slot.on .tbc-pic::after { box-shadow: inset 0 0 0 1px var(--hc); }
+  & .tb-hand .tb-slot.on .tbc-name { color: #fff; }
+  & .tb-crew-stack > .tb-slot .tbc { min-height: 0; }
+  & .tb-crew-stack > .tb-slot .tbc-pic { margin-bottom: -30px; }
+  & .tb-hand .tb-slot.locked, & .tb-hand .tb-slot[data-state='locked'] { opacity: 0.72; cursor: default; }
+  & .tb-hand .tb-slot[data-state='down'], & .tb-hand .tb-slot.away, & .tb-hand .tb-slot.off { opacity: 0.45; }
+  & .tb-hand .tb-slot[data-state='empty'] { opacity: 0.4; }
+  & .tb-hand .tb-lock { display: none; }
+  /* A card that's out: its name and why, no back. */
+  & .tb-hand .tbc-back { display: block; padding-left: 69px; min-height: 74px; }
+  & .tb-hand .tbc-back > img { display: none; }
+  & .tb-hand .tbc-back::before { content: ''; position: absolute; left: 0; top: 0; width: 58px; height: 74px; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.22); background: repeating-linear-gradient(135deg, transparent 0 5px, rgba(230, 238, 247, 0.12) 5px 6px); }
+  & .tb-hand .tbc-strip { position: static; display: block; padding: 1px 0 0; background: none; text-align: left; transform: none; }
+  /* Their abilities: chips under the row. */
+  & .tb-abil { display: flex; flex-direction: column; gap: 3px; margin: 0 0 0 69px; padding: 0; position: static; width: auto; height: auto; }
+  & .tb-abil > * { flex: none; width: auto; }
+  & .tb-mini-empty { display: none; }
+  & .tb-hand .tb-slot.tb-mini { width: auto; max-width: 135px; align-self: flex-start; zoom: 1; }
+  & .tb-hand .tb-slot.tb-mini .tbc { display: block; padding: 2px 7px 1px; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k-people) 60%, transparent); }
+  & .tb-hand .tb-slot.tb-mini .tbc-pic { display: none; }
+  & .tb-hand .tb-slot.tb-mini .tbc-body { padding: 0; }
+  & .tb-hand .tb-slot.tb-mini .tbc-name { font: 14px/1.1 var(--pixel); letter-spacing: 0.12em; color: var(--k-people); }
+  & .tb-hand .tb-slot.tb-mini .tbc-note { display: none; }
+  & .tb-hand .tb-slot.tb-mini.lifted { translate: none; }
+  & .tb-hand .tb-slot.tb-mini.lifted .tbc, & .tb-hand .tb-slot.tb-mini.tb-after .tbc { background: var(--k-people); box-shadow: none; }
+  & .tb-hand .tb-slot.tb-mini.lifted .tbc-name, & .tb-hand .tb-slot.tb-mini.tb-after .tbc-name { color: var(--t-ink); text-shadow: none; }
+  & .tb-hand .tb-slot.tb-mini.tb-after .tbc { animation: tt-blink 0.9s steps(2) infinite; }
+  & .tb-hand .tb-slot.tb-mini .tbc-back { padding: 2px 7px 1px; min-height: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.25); }
+  & .tb-hand .tb-slot.tb-mini .tbc-back::before { content: none; }
+  & .tb-hand .tb-slot.tb-mini .tbc-back .tbc-name { color: var(--t-dim); }
+  /* The deck and its slots: smaller rows, two up. */
+  & .g-deck .tb-slots { display: grid; grid-template-rows: repeat(2, auto); grid-auto-flow: column; grid-auto-columns: 176px; gap: 9px 14px; }
+  & .g-deck .tb-slot { width: 176px; max-width: 176px; }
+  & .g-deck .tb-slot .tbc { grid-template-columns: 54px minmax(0, 1fr); }
+  & .g-deck .tbc-pic { width: 54px; height: 40px; }
+  & .g-deck .tbc-pic img { object-position: center 30% !important; }
+  & .g-deck .tbc-name { font-size: 20px; }
+  & .g-deck .tbc-back { padding-left: 65px; min-height: 40px; }
+  & .g-deck .tbc-back::before { width: 54px; height: 40px; }
+  & .g-pockets .tb-slot { width: 150px; }
+  & .tb-hand .tb-slot.dealt-down, & .tb-hand .tb-slot.dealt-down > * { animation: none; }
+
+  /* The post: a slot at the head of the crew's rail. */
+  & .tb-post { order: 1; display: inline-flex; align-items: center; gap: 10px; margin: -3px 0; padding: 5px 12px 3px; font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: var(--k-people); text-align: left; white-space: nowrap; cursor: pointer;
+    border: 0; border-radius: 0; background: rgba(5, 2, 10, 0.35); box-shadow: inset 0 0 0 1px var(--k-people); clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); }
+  & .tb-post.armed, & .tb-post.marked { color: var(--t-ink); background: var(--k-people); box-shadow: none; }
+  & .tb-post.armed { animation: tt-blink 0.9s steps(2) infinite; }
+  & .tb-post.held { color: var(--t-dim); box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.3); cursor: default; }
+  & .tb-post .tb-post-line, & .tb-post .tb-post-gives, & .tb-post .tb-post-cost { display: none; }
+  & .tb-post .tb-post-state { opacity: 0.8; }
+  & .tb-post-note { order: 2; font: 14px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  & .tb-group-label:has(.tb-post)::after { order: 3; }
+
+  /* ON THE ROLL: the levers as cut keys. */
+  & .tb-onroll { flex: none; --hc: var(--ui); }
+  & .tb-onroll[hidden] { display: none; }
+  & .tb-onroll-keys { display: grid; grid-template-columns: repeat(3, auto); gap: 8px; justify-content: start; align-items: center; }
+  & .tb-onroll .tb-push, & .tb-onroll .tb-trade button {
+    --kc: var(--ui);
+    display: inline-flex; align-items: center; gap: 8px; width: auto; height: auto; margin: 0; padding: 5px 12px 3px; font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: var(--kc); white-space: nowrap; cursor: pointer; text-shadow: none;
+    border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px var(--kc); background: rgba(5, 2, 10, 0.35); clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); filter: none;
+  }
+  & .tb-onroll .tb-push[hidden] { display: none; }
+  & .tb-onroll .tb-push .tb-chip { display: none; }
+  & .tb-onroll .tb-push::before, & .tb-onroll .tb-trade button::before, & .tb-onroll .tb-push .tb-push-word::before { content: none; }
+  & .tb-onroll .tb-push.on, & .tb-onroll .tb-trade button.on { color: var(--t-ink); background: var(--kc); box-shadow: none; }
+  & .tb-onroll .tb-trade { display: contents; }
+  & .tb-onroll .tb-trade[hidden] { display: none; }
+  & .tb-onroll .tb-trade::before { content: none; }
+  & .tb-onroll .tb-trade button { --kc: rgba(230, 238, 247, 0.55); color: var(--t-dim); }
+  & .tb-onroll .tb-trade .tb-safe.on { --kc: var(--t-hud); }
+  & .tb-onroll .tb-trade .tb-bold.on { --kc: var(--t-amber); }
+  & .tb-onroll .tb-trade button:disabled { opacity: 0.4; cursor: default; }
+  & .tb-onroll-note { grid-column: 1 / -1; font: 13px/1.15 var(--pixel); letter-spacing: 0.12em; color: var(--t-dim); }
+  /* CLOSE at the debrief: at the head line's far end, clear of the outcome. */
+  & > .tb-levers { grid-area: top; justify-self: end; align-self: start; z-index: 2; margin: 2px 0 0; padding: 0; }
+  & .tb-close { padding: 8px 18px 5px; font: 20px/1 var(--pixel); letter-spacing: 0.24em; color: var(--t-ink); background: var(--ui); border: 0; border-radius: 0; clip-path: polygon(7px 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 0 100%, 0 7px); cursor: pointer; }
+
+  /* The table's own key line, over the input's. */
+  & .tb-keys { position: absolute; left: 92px; right: 24%; bottom: 8px; font: 14px/1 var(--pixel); letter-spacing: 0.16em; color: var(--t-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  & .tb-keys b { font-weight: normal; color: var(--t-hud); }
+  & .tb-keys i { font-style: normal; color: rgba(230, 238, 247, 0.3); margin: 0 9px; }
+
+  /* The contact on the line. */
+  & .tb-held-note { font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-hud); }
+}
+@keyframes tt-blink { 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) {
+  .tb.hud.tb-job:not(.phone) .tb-cells i.lift, .tb.hud.tb-job:not(.phone) .tb-post.armed, .tb.hud.tb-job:not(.phone) .tb-slot.tb-after .tbc { animation: none; }
+}
+
+
+/* ── The two boards on the trace (mockup docs/mockups/boards-trace.html, playtest go-ahead 2026-11-15) ──
+   The deduction board and the accounts board take the job table's frame above (the head line, the JOB column on the left
+   rail, the one red) and lose their panes and cut plates. Red is the UI's own here too, so a bounce and a cover are
+   magenta (--t-miss); what waits on you is amber; the glass and a pinned card are cyan (yours). The clue and account
+   cards and the two AGAINST slots are the only outlines: things you hold. A leader runs from each filed deduction to
+   its blank and from each pinned card to its slot (deduction.ts drawTrace). table.css keeps what a phone shows. */
+.tb.hud.tb-job:is(.tb-deduction, .tb-accounting):not(.phone) {
+  --dd-alert: var(--t-miss); --dd-gold: var(--t-amber); --dd-text: var(--t-text); --dd-dim: var(--t-dim);
+  --ac-alert: var(--t-miss); --ac-gold: var(--t-amber); --ac-text: var(--t-text); --ac-dim: var(--t-dim); --ac-glass: var(--t-nerve); --ac-q: var(--t-dim);
+  --bd-head: 17px/1 var(--pixel);
+  & .tb-dboard, & .tb-accounts { --dd-alert: var(--t-miss); --dd-gold: var(--t-amber); --dd-text: var(--t-text); --dd-dim: var(--t-dim); --ac-alert: var(--t-miss); --ac-gold: var(--t-amber); --ac-text: var(--t-text); --ac-dim: var(--t-dim); --ac-glass: var(--t-nerve); --ac-q: var(--t-dim); }
+  /* The job's own moment, levers and hand step out (table.css says so; the trace's rules above outrank it). */
+  & > :is(.tb-middle, .tb-levers, .tb-bottom) { display: none; }
+  /* SO FAR is the job's rolled beats: a board shows its own list there (this outranks the trace's rule above). */
+  & .tb-log > .tb-sofar { display: none; }
+  /* The JOB column keeps the top of its region; what a board stands under it (DEDUCTIONS) takes the rest. */
+  & .tb-log { display: flex; flex-direction: column; min-height: 0; }
+  & .tb-log-at { flex: 1 1 0; min-height: 90px; margin-top: 0; }
+  /* The hand: on its own rail under a head that counts it. */
+  & :is(.dd-hand, .ac-hand) { width: 1140px; margin-top: 30px; }
+  & .ac-fan { width: 1140px; }
+  & :is(.dd-hand, .ac-hand)::before { content: 'CLUES ' attr(data-n); position: absolute; left: 0; top: -22px; width: 760px; font: var(--bd-head); letter-spacing: 0.22em; color: var(--ui); white-space: nowrap; text-shadow: 0 1px 2px #000; background: linear-gradient(90deg, color-mix(in srgb, var(--ui) 60%, transparent), transparent) 150px 50% / calc(100% - 150px) 1px no-repeat; }
+  & .ac-hand::before { content: 'YOUR ACCOUNTS ' attr(data-n); background-position: 250px 50%; background-size: calc(100% - 250px) 1px; }
+  /* A card's kind: body in lilac and a cover in magenta, so neither reads as the UI's red; hers in her own colour. */
+  & :is(.dd-card, .ac-card)[data-k='body'] { --pc: #c9a0ff; }
+  & .dd-card[data-k='nix'] { --pc: var(--agent, #e3dcc8); }
+  & .ac-card[data-k='cover'] { --pc: var(--t-miss); }
+  & .ac-card.cover .ac-tf { color: var(--t-miss); }
+  & :is(.dd-card, .ac-card) { background: rgba(5, 2, 10, 0.72); }
+}
+
+.tb.hud.tb-job.tb-deduction:not(.phone) {
+  /* ---------- section heads: the trace's, red on a hairline ---------- */
+  & .dd-h { font: var(--bd-head); letter-spacing: 0.22em; color: var(--ui); }
+  & .dd-h::after { background: linear-gradient(90deg, color-mix(in srgb, var(--ui) 60%, transparent), transparent); }
+  & .dd-missing .dd-h { color: var(--t-dim); }
+  & .dd-main { gap: 14px; }
+
+  /* ---------- AGAINST: the two slots hold a pinned card's words; the word, the key and the verdict between ---------- */
+  & .dd-against { left: 0; width: 100%; gap: 16px; align-items: stretch; }
+  & .dd-sw { position: relative; flex: 0 0 214px; width: 214px; min-height: 108px; padding: 10px 14px; gap: 0; align-items: stretch; justify-content: center; cursor: pointer; --sc: rgba(230, 238, 247, 0.28); background: rgba(5, 2, 10, 0.45); box-shadow: inset 0 0 0 1px var(--sc); clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+  & .dd-sw[data-k] { --sc: color-mix(in srgb, var(--t-nerve) 75%, transparent); }
+  & .dd-slot { width: auto; height: auto; display: block; background: none; box-shadow: none; clip-path: none; }
+  & .dd-slot > .dd-card { display: none; }
+  & .dd-empty { display: block; text-align: center; font: 20px/1 var(--pixel); letter-spacing: 0.3em; color: rgba(230, 238, 247, 0.3); }
+  & .dd-cap { height: auto; }
+  & .dd-cap:empty { display: none; }
+  & .dd-cap-src { margin-bottom: 6px; font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--t-nerve); }
+  & .dd-cap-line { font: 13px/1.45 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #fff; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+  & .dd-against > .dd-vs { flex: 1 1 0; width: auto; min-width: 0; margin-top: 0; justify-content: center; gap: 9px; }
+  & .dd-vs b { font: 20px/1 var(--pixel); letter-spacing: 0.3em; color: var(--ui); text-shadow: 0 1px 2px #000; }
+  & .dd-verdict { max-width: none; min-height: 0; }
+  & .dd-verdict.hit { color: var(--t-amber); text-shadow: 0 0 10px color-mix(in srgb, var(--t-amber) 45%, transparent), 0 1px 2px #000; }
+  & .dd-verdict.miss { color: var(--t-miss); text-shadow: 0 0 10px color-mix(in srgb, var(--t-miss) 45%, transparent), 0 1px 2px #000; }
+  & .dd-count { text-shadow: 0 0 18px color-mix(in srgb, var(--ui) 75%, transparent), 0 0 40px color-mix(in srgb, var(--ui) 40%, transparent), 0 3px 4px #000; }
+
+  /* ---------- the board's two keys: the UI's red, cut; filled when they're Enter's ---------- */
+  & :is(.dd-press, .dd-accuse) { --kc: var(--ui); padding: 8px 14px 5px; font: 17px/1 var(--pixel); letter-spacing: 0.14em; }
+  & :is(.dd-press, .dd-accuse):not(:disabled) { color: var(--t-ink); text-shadow: none; }
+  & :is(.dd-press, .dd-accuse):not(:disabled)::before { background: var(--ui); box-shadow: none; }
+  & :is(.dd-press, .dd-accuse):hover:not(:disabled) { color: var(--t-ink); filter: drop-shadow(0 0 5px var(--ui)); }
+  & :is(.dd-press, .dd-accuse):disabled { --kl: rgba(230, 238, 247, 0.28); color: var(--t-dim); }
+  & :is(.dd-press, .dd-accuse):focus-visible { box-shadow: inset 0 0 0 2px #fff; }
+
+  /* ---------- WHO: the suspects in one row, no frames; the named one's blanks on a rail under the row ---------- */
+  & .dd-field { display: block; flex: 0 1 auto; }
+  & .dd-left { gap: 10px; }
+  & .dd-left::before { content: 'WHO'; font: var(--bd-head); letter-spacing: 0.22em; color: var(--ui); text-shadow: 0 1px 2px #000; background: linear-gradient(90deg, color-mix(in srgb, var(--ui) 60%, transparent), transparent) 54px 50% / calc(100% - 54px) 1px no-repeat; }
+  & .dd-sus { display: flex; flex-wrap: wrap; gap: 0 18px; align-items: flex-start; }
+  & .dd-suspect { flex: 1 1 0; border: 0; background: none; box-shadow: none; clip-path: none; opacity: 0.62; transition: opacity 160ms; }
+  & .dd-suspect:hover { opacity: 0.9; }
+  & .dd-suspect.on { display: contents; }
+  & .dd-suspect.on::after { content: none; }
+  & .dd-pcol { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; border: 0; }
+  & .dd-pcol > .dd-pick { flex: none; align-self: stretch; }
+  & .dd-pick { display: grid; grid-template-columns: 70px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); column-gap: 12px; width: 100%; }
+  & .dd-pick img, & .dd-suspect.on .dd-pick img { grid-row: 1 / 3; width: 70px; height: 86px; outline: 1px solid rgba(230, 238, 247, 0.22); outline-offset: -1px; }
+  & .dd-suspect.on .dd-pick img { outline-color: var(--t-amber); }
+  & .dd-suspect .dd-nm { position: static; transform: none; margin-top: 4px; font: 600 40px/0.8 var(--teko); letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--t-text); text-shadow: 0 2px 3px #000; }
+  & .dd-suspect.on .dd-nm { color: #fff; text-shadow: 0 0 14px color-mix(in srgb, var(--t-amber) 55%, transparent), 0 2px 3px #000; }
+  & .dd-suspect .dd-rl, & .dd-sus:has(.dd-suspect.on) .dd-suspect:not(.on) .dd-rl { display: block; position: static; padding: 0; margin-top: 6px; background: none; font: 14px/1.25 var(--pixel); letter-spacing: 0.1em; text-transform: uppercase; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .dd-pcol > .dd-accuse { width: auto; margin: 8px 0 0 82px; padding: 7px 16px 4px; font: 18px/1 var(--pixel); }
+  & .dd-pcol > .dd-accuse::before { clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); background: rgba(5, 2, 10, 0.35); box-shadow: inset 0 0 0 1px var(--kl); }
+  & .dd-pcol > .dd-accuse:not(:disabled)::before { background: var(--ui); box-shadow: none; }
+  & .dd-hint { font: 15px/1.3 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); }
+  & .dd-blanks { order: 9; flex: 0 0 calc(100% - 82px); position: relative; margin: 12px 0 0 82px; padding: 0 0 0 18px; justify-content: flex-start; gap: 3px; }
+  & .dd-blanks::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 6px; width: 1px; background: color-mix(in srgb, var(--t-amber) 55%, transparent); }
+  & .dd-blank { position: relative; grid-template-columns: 46px minmax(0, 1fr); gap: 12px; align-items: baseline; min-height: 26px; }
+  & .dd-blank::before { content: ''; position: absolute; left: -18px; top: 11px; width: 10px; height: 1px; background: color-mix(in srgb, var(--t-amber) 55%, transparent); }
+  & .dd-q { font: 17px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); }
+  & .dd-blank:has(.dd-bslot.full) .dd-q { color: var(--t-amber); }
+  & .dd-bslot { padding: 3px 0; background: none; box-shadow: none; clip-path: none; font: 15px/1.4 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .dd-bslot.hot { color: var(--t-amber); box-shadow: none; }
+  & .dd-bslot.hot::after { content: ' ←'; }
+  & .dd-bslot.full { padding: 3px 0; background: none; box-shadow: none; font: 13px/1.4 var(--chat-font, 'Libre Baskerville', Georgia, serif); letter-spacing: 0; color: #fff; }
+  & .dd-bslot .dd-k { font: 14px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-amber); }
+  & .dd-t { -webkit-line-clamp: 1; line-clamp: 1; }
+
+  /* ---------- DEDUCTIONS and NOT IN YOUR HAND, in the JOB column's region under the beat's words ---------- */
+  & .tb-log > .dd-dcol { flex: 0 1 auto; max-height: 58%; margin-top: 14px; padding-right: 8px; gap: 2px; }
+  & .dd-dcol > .dd-accuse { align-self: flex-start; margin: 6px 0; }
+  /* Out of the board's own box, the column still dims and takes no clicks while she speaks or a count runs. */
+  &:has(.tb-dboard:is(.held, .counting)) .tb-log > .dd-dcol { opacity: 0.45; pointer-events: none; transition: opacity 200ms; }
+  & .dd-deds { gap: 2px; }
+  & .dd-ded { padding: 5px 0 5px 12px; border-left: 1px solid color-mix(in srgb, var(--t-amber) 45%, transparent); background: none; box-shadow: none; clip-path: none; font: 12.5px/1.4 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: var(--t-text); text-shadow: 0 1px 2px #000; }
+  & .dd-ded .dd-k { display: inline; margin: 0 8px 0 0; font: 15px/1 var(--pixel); letter-spacing: 0.12em; color: var(--t-amber); }
+  & .dd-ded:hover:not(.dim) { box-shadow: none; color: #fff; border-left-color: var(--t-amber); }
+  & .dd-ded.sel { box-shadow: none; color: #fff; border-left: 3px solid var(--t-amber); padding-left: 10px; }
+  & .dd-ded.placed { opacity: 1; color: var(--t-dim); border-left-color: rgba(230, 238, 247, 0.2); }
+  & .dd-ded.placed .dd-k { color: var(--t-dim); }
+  & .dd-ded.dim { border-left-color: transparent; padding-left: 0; box-shadow: none; }
+  & .dd-ded:focus-visible { box-shadow: inset 2px 0 0 #fff; }
+  & .dd-missing { gap: 4px; margin-top: 12px; }
+  & .dd-mc { display: block; padding: 0; box-shadow: none; clip-path: none; }
+  & .dd-back { display: none; }
+  & .dd-w { font: 14px/1.2 var(--pixel); color: var(--t-dim); }
+  & .dd-w small { font: italic 11.5px/1.35 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: var(--t-dim); }
+
+  /* ---------- PATIENCE: hers, on her, in her colour; no plate ---------- */
+  & .dd-patience { color: var(--agent, #e3dcc8); }
+  & .dd-patience i { width: 24px; height: 12px; transform: skewX(-24deg); }
+  & .dd-patience.on-fig { padding: 0; background: none; box-shadow: none; clip-path: none; text-shadow: 0 1px 3px #000, 0 0 8px #000; filter: drop-shadow(0 0 4px #000); }
+
+  /* ---------- the hand: a pinned card stays lifted, in cyan ---------- */
+  & .dd-fs > .dd-card.used { opacity: 1; transform: translateY(-22px); box-shadow: inset 0 0 0 1px var(--t-nerve), 0 0 14px color-mix(in srgb, var(--t-nerve) 35%, transparent); }
+  & .dd-badge.filed { color: var(--t-amber); }
+  & .dd-held { color: var(--agent, var(--t-nerve)); }
+}
+
+.tb.hud.tb-job.tb-accounting:not(.phone) {
+  & .ac-hand::before { content: 'YOUR ACCOUNTS ' attr(data-n); }
+  & .ac-main { gap: 8px; }
+  & .ac-field { grid-template-columns: minmax(0, 1fr) 60px minmax(0, 1fr); }
+  & .ac-heldby { color: var(--agent, var(--t-nerve)); }
+  /* ---------- a listener: a rail in their own colour ---------- */
+  & .ac-col { gap: 8px; }
+  & .ac-who { align-items: flex-start; }
+  & .ac-bust { width: 78px; height: 96px; clip-path: none; box-shadow: none; outline: 1px solid var(--ac-who); outline-offset: -1px; background: #0b0614; }
+  & span.ac-bust { font: 600 64px/96px var(--teko); text-align: center; display: block; }
+  & .ac-nmb { gap: 8px; margin-top: 4px; }
+  & .ac-name { font: 600 56px/0.78 var(--teko); letter-spacing: 0.02em; color: var(--ac-who); text-shadow: 0 0 16px color-mix(in srgb, var(--ac-who) 35%, transparent), 0 2px 3px #000; }
+  & .ac-pat { color: var(--ac-who); }
+  & .ac-pat.gone { color: var(--t-miss); }
+  & .ac-pat i { width: 17px; height: 9px; transform: skewX(-24deg); }
+  & .ac-patw { order: -1; margin: 0 6px 0 0; font: 14px/1 var(--pixel); letter-spacing: 0.18em; color: inherit; }
+  & .ac-h, & .ac-h.dim { font: var(--bd-head); letter-spacing: 0.22em; color: var(--ac-who); }
+  & .ac-h::after, & .ac-h.dim::after { background: linear-gradient(90deg, color-mix(in srgb, var(--ac-who) 60%, transparent), transparent); }
+  /* THEY'VE GOT as tags: face down an outline in their colour, the unmarked a ?, turned up against you in magenta. */
+  & .ac-held { padding: 2px 6px 0; font: 13px/1.15 var(--pixel); letter-spacing: 0.14em; color: var(--ac-who); background: none; clip-path: none; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-who) 70%, transparent); }
+  & .ac-held.unmarked { color: var(--t-dim); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-dim) 60%, transparent); }
+  & .ac-held.glass { color: var(--t-nerve); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t-nerve) 60%, transparent); }
+  & .ac-held.up { padding: 4px 8px; color: var(--t-text); background: none; box-shadow: inset 0 0 0 1px var(--t-miss); }
+  & .ac-held.up b { color: var(--t-miss); }
+  & .ac-held.up.glass { box-shadow: inset 0 0 0 1px var(--t-nerve); }
+  & .ac-held.up.glass b { color: var(--t-nerve); }
+  /* What they ask: a line on a rail; the question until a card stands there, then TRUE in amber or COVER in magenta. */
+  & .ac-blanks { gap: 8px; }
+  & .ac-blank { min-height: 50px; padding: 1px 0 1px 14px; background: none; box-shadow: none; clip-path: none; border-left: 1px solid rgba(230, 238, 247, 0.28); }
+  & .ac-blank.hot { box-shadow: none; border-left: 3px solid var(--t-amber); padding-left: 12px; }
+  & .ac-blank.hot .ac-q { color: var(--t-amber); }
+  & .ac-blank.full { background: none; box-shadow: none; border-left-color: var(--t-amber); }
+  & .ac-blank.full:has(.ac-in.cover) { background: none; box-shadow: none; border-left-color: var(--t-miss); }
+  & .ac-q { font: 15px/1.3 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .ac-pin { right: 0; top: 2px; color: var(--t-amber); }
+  & .ac-k { justify-content: flex-start; align-items: center; gap: 10px; }
+  & .ac-in .ac-src { font: 15px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); }
+  & .ac-in.cover .ac-src { color: var(--t-dim); }
+  & .ac-in .ac-tf { padding: 2px 6px 0; font: 13px/1.1 var(--pixel); letter-spacing: 0.14em; color: var(--t-ink); background: var(--t-amber); }
+  & .ac-in.cover .ac-tf { color: var(--t-ink); background: var(--t-miss); }
+  & .ac-in .ac-ln { font: 12.5px/1.4 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #fff; text-shadow: 0 1px 2px #000; }
+  /* TELL: the UI's red key, filled once both accounts are. */
+  & .ac-tell { --kc: var(--ui); left: 0; width: auto; padding: 8px 20px 5px; font: 20px/1 var(--pixel); letter-spacing: 0.24em; display: flex; align-items: baseline; gap: 14px; }
+  & .ac-tell small { display: inline; margin: 0; font: 15px/1 var(--pixel); letter-spacing: 0.14em; color: inherit; opacity: 0.75; }
+  & .ac-tell:not(:disabled) { color: var(--t-ink); text-shadow: none; }
+  & .ac-tell:not(:disabled)::before { background: var(--ui); box-shadow: none; }
+  & .ac-tell:disabled { --kl: rgba(230, 238, 247, 0.28); color: var(--t-dim); }
+  & .ac-tell:focus-visible { box-shadow: inset 0 0 0 2px #fff; }
+  & .ac-card.sel { box-shadow: inset 0 0 0 1px var(--t-nerve), 0 0 14px color-mix(in srgb, var(--t-nerve) 35%, transparent); }
+  & .ac-card.pressed::after { color: var(--t-miss); }
+}

@@ -10,7 +10,7 @@ import { openDb, type Db } from '../src/db';
 import { ChatRelay, type ChatRelayDeps } from '../src/chat-relay';
 import { fakePlayers } from './fixtures/players';
 import { Journal } from '../src/journal';
-import { LIGHTS_LINE, SCENE_GREET_INSTRUCTIONS } from '../src/instructions';
+import { LIGHTS_LINE, SCENE_GREET_INSTRUCTIONS, jobTextLine } from '../src/instructions';
 import { writeSummary } from '../src/summary';
 import type { Backend, TurnRequest } from '../src/backend';
 import type { ChatMessage, ServerEvent } from '../../shared/types';
@@ -514,5 +514,44 @@ describe('photos by text (photos spec §3, §4)', () => {
     const last = reqs[1].messages.at(-1)!.content;
     expect(last).toContain('desk "the desk at 2am"');
     expect(last).not.toContain('roof-cranes');
+  });
+});
+
+// Job texts (spec 2026-11-09 §3): she texts you first about a job, from its text: line.
+describe('a job text (job texts spec §3)', () => {
+  const send = (relay: ChatRelay) => relay.sendJobText('hicks', { job: 'arrears', text: 'You need him back on a job.', due: 960 });
+  it('writes a hidden row stamped due, and her reply tells the job', async () => {
+    const { relay, db, reqs } = relayWith(['need you. come by.']);
+    expect(await send(relay)).toMatchObject({ ok: true });
+    const rows = texts(db);
+    expect(rows[0]).toMatchObject({ role: 'user', mode: 'text', promised: true, jobText: 'arrears', clock: 960, text: jobTextLine({ you: 'hicks', text: 'You need him back on a job.' }) });
+    expect(rows[0].text).toBe("[you're texting hicks first, about something you need from them: You need him back on a job. Text them now.]");
+    expect(reqs[0].messages.at(-1)!.content).toContain('about something you need from them');
+    expect(JSON.parse(db.getMeta('told.hicks.arrears')!)).toEqual({ how: 'text', at: 960 });
+    expect(db.writes().filter((w) => w.key === 'told.hicks.arrears').at(-1)?.messageId).toBe(rows[1].id);
+  });
+  it('a REGEN of her job text keeps the job told (Review Focus 2)', async () => {
+    const { relay, db } = relayWith(['need you.', 'come by tonight.']);
+    await send(relay);
+    const reply = texts(db).at(-1)!;
+    expect(await relay.regenerate('hicks', reply.id)).toMatchObject({ ok: true });
+    db.rebuild();
+    expect(db.getMeta('told.hicks.arrears')).not.toBeNull();
+  });
+  it("a job text doesn't spend a standing promise (Review Focus 3)", async () => {
+    const { relay, db } = relayWith(['need you.']);
+    const kept = JSON.stringify({ when: { at: 2000 }, about: 'x', from: 'p1', since: 900 });
+    db.setMeta('promise.hicks', kept);
+    await send(relay);
+    expect(db.getMeta('promise.hicks')).toBe(kept);
+    expect(await relay.deleteTexts('hicks', texts(db).at(-1)!.id)).toMatchObject({ ok: true });
+    expect(db.getMeta('promisespent.hicks')).toBeNull();
+    expect(db.getMeta('told.hicks.arrears')).toBeNull();
+  });
+  it('a failed job text leaves nothing behind', async () => {
+    const { relay, db } = relayWith(['*sighs*']);
+    expect(await send(relay)).toMatchObject({ ok: false });
+    expect(texts(db)).toEqual([]);
+    expect(db.getMeta('told.hicks.arrears')).toBeNull();
   });
 });

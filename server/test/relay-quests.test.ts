@@ -42,7 +42,7 @@ if (!parsed.ok) throw new Error('fixture');
 const QUEST = parsed.entry;
 const KEY = questKey('hicks', 'paper-trail');
 
-function relayWith(o: { extras?: Extra[]; book?: QuestEntry[]; trust?: Band; place?: string | null; clock?: number; backend?: Backend; contact?: string; others?: () => QuestStatus[] } = {}) {
+function relayWith(o: { extras?: Extra[]; book?: QuestEntry[]; trust?: Band; place?: string | null; clock?: number; backend?: Backend; contact?: string; others?: () => QuestStatus[]; clips?: NonNullable<ChatRelayDeps['quests']>['clips'] } = {}) {
   const db = openDb(':memory:', { defaultPlayer: 'hicks' });
   dbs.push(db);
   const events: ServerEvent[] = [];
@@ -67,6 +67,7 @@ function relayWith(o: { extras?: Extra[]; book?: QuestEntry[]; trust?: Band; pla
     placeName: (id) => (id === 'lowlight-intake' ? 'Lowlight Intake' : id),
     ctx: (p) => ({ flags: flagsOf(status(p)), trust: o.trust ?? 'mid', warmth: 'mid', with: 'hicks' }),
     extras: () => o.extras ?? LIBRARY,
+    ...(o.clips ? { clips: o.clips } : {}),
   };
   const relay = new ChatRelay({
     players: fakePlayers(),
@@ -120,6 +121,31 @@ describe('starting a quest', () => {
         { id: 'deny', line: "Say there's no ledger." },
       ],
     });
+  });
+
+  it('puts the recorded clips for its sections on a row, in reading order (voiced job beats)', async () => {
+    const voiced = new Map([
+      ['*Boots on the stairs.*\n\n"Evening," he says.', '/api/quests/voice/paper-trail/sentinel.ogg'],
+      ['*He thanks you like he means it.*', '/api/quests/voice/paper-trail/given.ogg'],
+    ]);
+    const asked: string[][] = [];
+    const clips = (quest: string, texts: readonly string[]) => {
+      asked.push([quest, ...texts]);
+      return texts.flatMap((t) => (voiced.has(t) ? [voiced.get(t)!] : []));
+    };
+    const { relay, db } = relayWith({ clips });
+    await relay.startQuest('hicks', 'paper-trail');
+    expect(rows(db).find((m) => m.mode === 'quest')!.quest!.clips).toEqual(['/api/quests/voice/paper-trail/sentinel.ogg']);
+    expect(asked[0][0]).toBe('paper-trail');
+    await relay.chooseQuest('hicks', { id: 'paper-trail', beat: 'sentinel', choice: 'hand' });
+    const pick = rows(db).find((m) => m.role === 'user' && m.quest?.pick?.choice === 'hand')!;
+    expect(pick.quest!.clips).toEqual(['/api/quests/voice/paper-trail/given.ogg']);
+  });
+
+  it('leaves clips off a row with nothing recorded', async () => {
+    const { relay, db } = relayWith({ clips: () => [] });
+    await relay.startQuest('hicks', 'paper-trail');
+    expect(rows(db).find((m) => m.mode === 'quest')!.quest).not.toHaveProperty('clips');
   });
 
   it("refuses a quest that isn't open here", async () => {

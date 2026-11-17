@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blocksOverlap, fixedBlockDuring, blockStartedBetween, DAY, formatClock, nextBlockStart, parseDays, weekdayOf, WEEKDAYS, minuteOfDay, nextBlock, nextOccurrence, parseHhmm, promptClock, scheduledRoom, START, TURN_COST, type Block } from './clock';
+import { awakeAt, blocksOverlap, fixedBlockDuring, blockStartedBetween, DAY, formatClock, nextBlockStart, parseDays, weekdayOf, WEEKDAYS, minuteOfDay, nextBlock, nextOccurrence, parseHhmm, promptClock, scheduledRoom, START, TURN_COST, type Block } from './clock';
 
 describe('the story clock', () => {
   it('formats as Day N · Ddd HH:MM, and as her prompt line', () => {
@@ -126,5 +126,33 @@ describe('fixedBlockDuring', () => {
     expect(fixedBlockDuring([{ ...shift, days: [(today + 1) % 7] }], day + 19 * 60, day + 20 * 60)).toBeNull();
     const night = { from: 22 * 60, to: 2 * 60, room: 'socket', fixed: true };
     expect(fixedBlockDuring([night], day + 60, day + 120)).toBe(night);
+  });
+});
+
+// Job texts (spec 2026-11-09 §5): she only texts you when she's awake.
+describe('sleeps on a block', () => {
+  const b: Block[] = [
+    { from: 300, to: 780, room: 'a', sleeps: true },
+    { from: 780, to: 1080, room: 'a' },
+  ];
+  it('awakeAt: asleep inside a sleeps block, awake outside, awake with no schedule', () => {
+    expect(awakeAt(b, DAY + 400)).toBe(false);
+    expect(awakeAt(b, DAY + 800)).toBe(true);
+    expect(awakeAt(b, DAY + 1200)).toBe(true);
+    expect(awakeAt([], 0)).toBe(true);
+  });
+  it('awakeAt across midnight', () => {
+    const night: Block[] = [{ from: 1380, to: 300, room: 'a', sleeps: true }];
+    expect(awakeAt(night, DAY + 60)).toBe(false);
+    expect(awakeAt(night, DAY + 1400)).toBe(false);
+    expect(awakeAt(night, DAY + 400)).toBe(true);
+  });
+  // A split home block isn't a new block: whoever you left somewhere stays there (job texts plan, Review Focus 1).
+  it('blockStartedBetween ignores a block that carries on the same room', () => {
+    expect(blockStartedBetween(b, DAY + 400, DAY + 800)).toBe(false);
+    const moved: Block[] = [b[0], { from: 780, to: 1080, room: 'b' }];
+    expect(blockStartedBetween(moved, DAY + 400, DAY + 800)).toBe(true);
+    // The first block's own start still counts.
+    expect(blockStartedBetween(b, DAY + 200, DAY + 400)).toBe(true);
   });
 });

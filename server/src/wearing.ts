@@ -50,6 +50,8 @@ interface Wearer {
   id: string;
   name: string;
   pronoun: Pronoun;
+  /** The player's own figure's line (persona figure spec 2026-11-12), over any wardrobe. */
+  wears?: string;
 }
 
 /**
@@ -74,7 +76,7 @@ export function wearingEntries(o: {
   const entries: WearEntry[] = [];
   const mine = inScene(o.self.id);
   if (mine) entries.push({ name: o.self.name, pronoun: o.self.pronoun, self: true, text: mine });
-  const theirs = wearsOf(o.wardrobe(o.player.id), o.playerOutfit);
+  const theirs = o.player.wears ?? wearsOf(o.wardrobe(o.player.id), o.playerOutfit);
   if (theirs) entries.push({ name: o.player.name, pronoun: o.player.pronoun, text: theirs });
   for (const w of o.others) {
     const text = inScene(w.id);

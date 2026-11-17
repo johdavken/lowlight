@@ -5,7 +5,7 @@
  * Without that file the store is `<root>/art`, the old layout, so a fresh clone, a worktree or a test's
  * throwaway root work unchanged. Its layout mirrors `art/`: `<store>/<character>/<file>.kra`, `<store>/work/<room>/`.
  *
- * The text under `art/` (art/scenes/*.md, style.md, cast-palette.json, studio-character.json) and its SVGs
+ * The text under `art/` (art/scenes/*.md, style.md, studio-character.json) and its SVGs
  * (make-portrait's source) stay in the repo.
  */
 import fs from 'node:fs';

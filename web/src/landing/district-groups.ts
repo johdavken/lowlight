@@ -3,8 +3,14 @@
  * the label over each group, and which tile ↑/↓ reaches. Pure: the flow and the grid both read it.
  */
 
-/** The RANDOM tile's id: always first, at row 0, column 0. */
-export const RANDOM = '?random';
+/** The + tile (character creator spec 2026-11-14): make someone. First on the 1P grid, at row 0, column 0. */
+export const NEW_PERSON = '+new';
+/** The group your made people stand in on the 1P grid. */
+export const YOURS = 'yours';
+/** A made person's tile id. */
+export const personTile = (id: string) => `@${id}`;
+/** The person a tile stands for; null when it isn't a made person's. */
+export const personOf = (tile: string): string | null => (tile.startsWith('@') ? tile.slice(1) : null);
 
 export interface GroupEntry {
   id: string;
@@ -25,7 +31,7 @@ function byNameThenId(a: GroupEntry, b: GroupEntry): number {
   return a.name.localeCompare(b.name) || a.id.localeCompare(b.id);
 }
 
-/** RANDOM, then the groups largest first (ties by district id), then those with no group; connected first, then by name, inside each. */
+/** The groups largest first (ties by district id), then those with no group; connected first, then by name, inside each. */
 export function orderTiles(entries: GroupEntry[]): string[] {
   const groups = new Map<string, GroupEntry[]>();
   const loose: GroupEntry[] = [];
@@ -35,11 +41,11 @@ export function orderTiles(entries: GroupEntry[]): string[] {
   }
   const inside = (list: GroupEntry[]) => [...list.filter((e) => e.connected).sort(byNameThenId), ...list.filter((e) => !e.connected).sort(byNameThenId)];
   const ordered = [...groups.entries()].sort(([ga, a], [gb, b]) => b.length - a.length || ga.localeCompare(gb));
-  return [RANDOM, ...ordered.flatMap(([, list]) => inside(list).map((e) => e.id)), ...inside(loose).map((e) => e.id)];
+  return [...ordered.flatMap(([, list]) => inside(list).map((e) => e.id)), ...inside(loose).map((e) => e.id)];
 }
 
 /**
- * Places `ids` (orderTiles' order) in rows of `columns`: RANDOM at 0,0; each group runs left to right
+ * Places `ids` (orderTiles' order) in rows of `columns`: + (when first) at 0,0; each group runs left to right
  * and starts the next row only when it doesn't fit what's left (a group wider than a row fills whole
  * rows, labelled on its first).
  */
@@ -49,7 +55,7 @@ export function layoutTiles(ids: string[], groupOf: (id: string) => string | nul
   let row = 0;
   let col = 0;
   let i = 0;
-  if (ids[0] === RANDOM) {
+  if (ids[0] === NEW_PERSON) {
     pos.push({ col: 0, row: 0 });
     col = 1;
     i = 1;

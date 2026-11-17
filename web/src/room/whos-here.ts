@@ -131,6 +131,8 @@ export class WhosHere {
       }
     }
     this.root.hidden = list.length === 0;
+    // HERE · n over the rail (whos-here.css).
+    this.root.dataset.count = String(list.length);
     if (this.speaker !== null && !ids.has(this.speaker)) this.speaker = null;
     this.speaking(this.speaker);
   }

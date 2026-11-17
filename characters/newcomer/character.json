@@ -1,0 +1,42 @@
+{
+  "name": "Newcomer",
+  "pronoun": "they",
+  "standIn": true,
+  "description": "Someone new to Lowlight, with no past here anyone knows.",
+  "tagline": "New in the city. Nobody's heard of you yet.",
+  "sprite": {
+    "src": "newcomer-outfit-plain.png",
+    "pixel": true,
+    "waist": 0.4
+  },
+  "face": {
+    "x": 0.49,
+    "y": 0.065
+  },
+  "outfits": {
+    "plain": "newcomer-outfit-plain.png"
+  },
+  "outfitWears": {
+    "plain": "dark street layers, a jacket against the rain, trousers and boots, nothing that marks where they came from"
+  },
+  "stats": {
+    "body": 5,
+    "reflex": 5,
+    "tech": 5,
+    "cool": 5,
+    "wits": 5,
+    "edge": 4
+  },
+  "dice": {
+    "bluff": 0.6,
+    "nerve": 0.56,
+    "suspicion": 0.51
+  },
+  "standing": {
+    "start": {
+      "trust": 0,
+      "warmth": 0
+    }
+  },
+  "identity": "identity.md"
+}

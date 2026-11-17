@@ -3,12 +3,20 @@
  * given. Two shells use it: the phone page at /deck (deck.ts) and the room's TEXTS screen. How a thread is opened and
  * left (browser history, or nothing) is the shell's `DeckNav`.
  */
+import { photoIdOf } from '../../../shared/photos';
 import './deck.css';
 import './holo.css';
 import { connectDeck, type ConnectDeck } from './deck-socket';
 import { formatClock } from '../../../shared/clock';
 import { deckErrorText, laterCount, menuItems, patchThread, renderBar, renderMenu, renderPassTime, renderThread, renderThreads } from './deck-view';
 import type { ChatMessage, DeckHeader, DeckReadOnly, DeckServerEvent, DeckThread } from '../../../shared/types';
+
+/** The thread's sounds (picked 2026-11-16 on the Comms Sounds audition): the room's page sets what plays them; the phone deck sets nothing and is silent. */
+export type DeckCue = 'text-reply' | 'photo';
+let deckCue: (n: DeckCue) => void = () => {};
+export function setDeckCue(fn: (n: DeckCue) => void): void {
+  deckCue = fn;
+}
 
 export interface DeckNav {
   /** The thread to open first (phone: ?c=). */
@@ -74,6 +82,8 @@ export interface DeckHandle {
   back(): void;
   /** The socket closed, every listener gone. */
   destroy(): void;
+  /** Told whenever someone starts or stops typing (the room's TEXTS frame runs its lines); null: no one listening. */
+  onTyping(cb: ((on: boolean) => void) | null): void;
 }
 
 interface State {
@@ -93,10 +103,20 @@ interface State {
 let seq = 0;
 const newId = () => `l${Date.now().toString(36)}${(seq++).toString(36)}`;
 
-export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: DeckNav; memory?: DeckMemory; connect?: ConnectDeck }): DeckHandle {
+/**
+ * `picks: false` (holo, PEOPLE's TEXTS tab): the shell's own list picks the thread, so an unknown contact opens nothing
+ * rather than the list's first (which would read someone else's texts).
+ */
+export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: DeckNav; memory?: DeckMemory; connect?: ConnectDeck; picks?: boolean }): DeckHandle {
   const nav = o.nav;
   const holo = o.look === 'holo';
+  /** Holo with its own list always has a thread open; without one (`picks: false`) it shows only what it's told to. */
+  const fallback = holo && o.picks !== false;
   const mem = o.memory;
+  let typingListener: ((on: boolean) => void) | null = null;
+  /** Replies already sounded (a row comes again as it's edited or re-sent). */
+  const cued = new Set<string>();
+  let typingWas = false;
   const s: State = { threads: mem?.threads ?? [], open: null, header: null, rows: [], readOnly: null, typing: new Set(), nosave: false, online: false, error: null, pending: mem?.pending ?? new Map() };
   if (holo) root.classList.add('dk-holo');
   // The thread on screen, patched in place so its text box (draft, focus, keyboard) survives updates (final review I1).
@@ -172,7 +192,8 @@ export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: D
     closeSheet();
     // The clock moved: where everyone is, and the header's time.
     deck.send({ type: 'deck_open' });
-    if (s.open) deck.send({ type: 'deck_thread', contact: s.open });
+    // Put away meanwhile: nothing is asked for, so nothing gets read.
+    if (s.open && !hidden) deck.send({ type: 'deck_thread', contact: s.open });
     render();
   }
   const pendingOf = (id: string) => s.pending.get(id) ?? [];
@@ -237,7 +258,15 @@ export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: D
     else if (e.type === 'deck_threads') {
       s.nosave = false;
       s.threads = e.threads;
-      if (holo && !known(s.open) && s.threads.length > 0) return openThread(s.threads[0].id);
+      if (fallback && !known(s.open) && s.threads.length > 0) return openThread(s.threads[0].id);
+      // No list of its own: someone with no thread has nothing to show, and nobody else's is opened for them.
+      if (holo && !fallback && s.open !== null && !known(s.open)) {
+        s.open = null;
+        s.rows = [];
+        s.header = null;
+        nav.went(null);
+        deck.send({ type: 'deck_open' });
+      }
     } else if (e.type === 'deck_thread' && e.contact === s.open) {
       // Her new reply to your edit is in: the edit went through.
       if (editSent && e.rows.some((r) => r.id === editSent!.id && r.text === editSent!.text)) editSent = null;
@@ -256,6 +285,11 @@ export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: D
         if (at >= 0) s.pending.set(e.contact, list.filter((_, i) => i !== at));
       }
       if (e.contact === s.open) for (const r of e.rows) {
+        // Their answer landing in the thread on screen sounds once, as a photo when it carries one.
+        if (r.role === 'agent' && r.status === 'ok' && !hidden && !cued.has(r.id)) {
+          cued.add(r.id);
+          deckCue(r.text.split('\n').some((line) => photoIdOf(line) !== null) ? 'photo' : 'text-reply');
+        }
         const at = s.rows.findIndex((x) => x.id === r.id);
         if (at >= 0) s.rows[at] = r;
         else s.rows.push(r);
@@ -267,7 +301,7 @@ export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: D
       // A text that couldn't go stays as yours, NOT SENT · RETRY, whichever screen you're on.
       const why = deckErrorText(e.error, s.threads.find((t) => t.id === e.contact)?.pronoun ?? 'she');
       s.pending.set(e.contact, pendingOf(e.contact).map((p) => (p.localId === e.localId ? { ...p, failed: why } : p)));
-      if (e.error === 'with-them') deck.send({ type: 'deck_thread', contact: e.contact });
+      if (e.error === 'with-them' && !hidden) deck.send({ type: 'deck_thread', contact: e.contact });
     } else if (e.type === 'deck_error' && editSent && e.contact === editSent.contact && e.contact === s.open) {
       editing = { id: editSent.id, text: editSent.text };
       editSent = null;
@@ -275,7 +309,7 @@ export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: D
       s.error = deckErrorText(e.error, s.threads.find((t) => t.id === e.contact)?.pronoun ?? 'she');
     } else if (e.type === 'deck_error' && e.contact === s.open) {
       s.error = deckErrorText(e.error, s.threads.find((t) => t.id === e.contact)?.pronoun ?? 'she');
-      if (e.error === 'with-them') deck.send({ type: 'deck_thread', contact: e.contact });
+      if (e.error === 'with-them' && !hidden) deck.send({ type: 'deck_thread', contact: e.contact });
     }
     render();
   }
@@ -299,6 +333,11 @@ export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: D
   function render() {
     if (destroyed) return;
     remember();
+    const typingNow = s.typing.size > 0;
+    if (typingNow !== typingWas) {
+      typingWas = typingNow;
+      typingListener?.(typingNow);
+    }
     const contact = s.open ? s.threads.find((t) => t.id === s.open) : undefined;
     if (!s.nosave && s.open && contact && s.header && shown?.contact === contact.id && root.contains(shown.view)) {
       const msgs = shown.view.querySelector('.dk-msgs');
@@ -400,9 +439,13 @@ export function mountDeck(root: HTMLElement, o: { look: 'phone' | 'holo'; nav: D
 
   render();
   return {
+    onTyping(cb) {
+      typingListener = cb;
+      cb?.(s.typing.size > 0);
+    },
     open(contact) {
       hidden = false;
-      if (holo && !known(contact)) contact = s.threads[0]?.id ?? null;
+      if (holo && !known(contact)) contact = fallback ? (s.threads[0]?.id ?? null) : null;
       if (contact) openThread(contact);
       else closeThread();
     },

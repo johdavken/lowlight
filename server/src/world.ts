@@ -19,7 +19,7 @@ import { readHeldLeads } from './leads-held';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
-import { blockStartedBetween, DAY, fixedBlockDuring, hhmmOf, minuteOfDay, nextBlock, nextBlockStart, nextOccurrence, parseHhmm, scheduledRoom, START, weekdayName, weekdayOf, type Block } from '../../shared/clock';
+import { awakeAt, blockStartedBetween, DAY, fixedBlockDuring, hhmmOf, minuteOfDay, nextBlock, nextBlockStart, nextOccurrence, parseHhmm, scheduledRoom, START, weekdayName, weekdayOf, type Block } from '../../shared/clock';
 import type { AroundEntry, ChatMessage, ChatMode, ContactEntry, HeldLead, LeadView, Location, PlaythroughInfo, Present, SaveInfo, SaveTrigger } from '../../shared/types';
 import { strangerAt } from '../../shared/encounter';
 import { speakerBeats } from '../../shared/beats';
@@ -30,6 +30,7 @@ import { whoIsHere } from './others';
 import { openDb, type Db } from './db';
 import { storedStanding } from './standing';
 import { withPersona, type createPlayers, type Player } from './players';
+import { FIGURE_JSON, readFigure, type PersonaFigure } from './persona-figure';
 import type { LiveDbs, Playthroughs, SaveRequest } from './playthroughs';
 import type { AgentRuntime } from './runtime';
 import { addNarrated, darkNow, dropUndone, powerOf, type PowerPlace } from './power';
@@ -135,6 +136,8 @@ export interface CheckpointPort {
   promisePlaces(contactId: string, map: readonly { id: string; name: string }[]): { id: string; name: string }[];
   /** Her schedule in words for the Residual (deck controls spec §1); null without one. */
   dayLine(contactId: string): string | null;
+  /** Whether she's awake at `clock` (job texts spec §5): asleep only inside a `sleeps` block; no schedule, awake. */
+  awakeAt(contactId: string, clock: number): boolean;
   /** Where the world places her at `clock` (plan, left-behind, schedule); null while you're with her or with no playthrough. */
   placeAt(contactId: string, clock: number): string | null;
   /** Where she is now as the world places her (plan, left-behind, schedule); null while you're with her or with no playthrough (deck spec §2). */
@@ -365,6 +368,32 @@ export function createWorld(deps: {
     return p.id === id ? p : { id, name: id.charAt(0).toUpperCase() + id.slice(1), pronoun: 'they', line: null, whosHere: null, sprite: null };
   }
 
+  /** Playthroughs already warned about for a bad figure: once each per process. */
+  const badFigure = new Set<string>();
+  /** The persona's own figure in `pt` (spec 2026-11-12), read per call so a figure kept in Studio shows at once. */
+  const figureCache = new Map<string, { key: string; fig: PersonaFigure | null }>();
+  function figureOf(pt: string): PersonaFigure | null {
+    const dir = playthroughs.personaDir(pt);
+    // Resolved many times a turn: read again only when either file changed.
+    const stamp = (f: string) => {
+      try {
+        return String(fs.statSync(path.join(dir, f)).mtimeMs);
+      } catch {
+        return '-';
+      }
+    };
+    const key = `${stamp(FIGURE_JSON)}|${stamp('figure.png')}`;
+    const hit = figureCache.get(pt);
+    if (hit?.key === key) return hit.fig;
+    const fig = readFigure(dir);
+    figureCache.set(pt, { key, fig });
+    if (!fig && fs.existsSync(path.join(dir, FIGURE_JSON)) && !badFigure.has(pt)) {
+      badFigure.add(pt);
+      console.warn(`[persona] playthrough ${pt}: bad figure; playing in the character's body`);
+    }
+    return fig;
+  }
+
   const players: Players = {
     get defaultId() {
       return playthroughs.active()?.player ?? basePlayers.defaultId;
@@ -372,7 +401,7 @@ export function createWorld(deps: {
     resolve(asParam) {
       const pt = playthroughs.active();
       if (!pt) return basePlayers.resolve(asParam);
-      return pt.persona ? withPersona(playerOf(pt.player), pt.persona) : playerOf(pt.player);
+      return pt.persona ? withPersona(playerOf(pt.player), pt.persona, figureOf(pt.id)) : playerOf(pt.player);
     },
   };
 
@@ -1485,6 +1514,9 @@ export function createWorld(deps: {
     },
     dayLine(contactId) {
       return dayWords(deps.schedule?.(contactId) ?? [], (room) => deps.placeName(room));
+    },
+    awakeAt(contactId, clock) {
+      return awakeAt(deps.schedule?.(contactId) ?? [], clock);
     },
     placeAt(contactId, clock) {
       const pt = playthroughs.active();

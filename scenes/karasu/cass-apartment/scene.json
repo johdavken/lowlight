@@ -410,6 +410,10 @@
       "songs": [
         "No Light in Lowlight.ogg"
       ]
+    },
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
     }
   },
   "effects": [

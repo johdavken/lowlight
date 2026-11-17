@@ -12,6 +12,7 @@ starts: zhou-flat
 after: passenger_one=yes
 trust: 1 / 2
 guest: noa GREEN
+people: [Pell, Lusk]
 pitch: The thing in her head is bleeding her out. A month of script would buy her time, if it isn't poison.
 posted-by: Pell, by hand, through the dead-blocks kid.
 brief: "Noa's off script and the hum is winning. The Lazarus Net has a military-slot edit for sale at the deck market under the Spine. Ember's on Hicks's ear."
@@ -20,12 +21,16 @@ loot: a cracked MiraGen edit, keyed to a military slot
 ---
 
 # ask
+title: The Seed Packet
 
 *Pell's note comes by the dead-blocks kid, on the back of a seed packet. The girl lost most of yesterday. She bled through two towels and didn't know it was happening. Under Pell's writing, in a different hand, very neat: script. a military edit. not the Open Hand, they log names.*
 
 *It's right about the Open Hand. MiraGen sells its logs to whoever asks politely, and Aegis is very polite.*
 
 *Ember's already on the Lazarus Net with her boots on the bench. "There's a seller with a military-slot edit," she says. "Deck market, under the Spine, tonight. It could be a perfect copy. It could be poison. The Net's like that." She holds up the bead.*
+
+[ember_ear=yes] *It's the one from the bowl on the bench, kept on its own.*
+[ember_ear=no] *She had to dig for it. It went back in the junk bowl, last time.*
 
 [guest.noa=yes] *Noa is at the twins' table in Pell's coat, holding a mug of Silas's tea she hasn't drunk. "We're coming," she says, in the flat voice. Then, in her own: "It knows what the edit should look like. I don't."*
 
@@ -45,6 +50,7 @@ view ember if ear1=allowed: Last time he only let you in because you didn't ask.
 → stalls
 
 # stalls
+title: The Stalls
 room: spine/deck-market
 
 *The deck market, in the shadow between Pylon Forty and the next one, under the Spine's road. Bulbs strung between the pylons, a wok spitting, a pirate radio stall playing something nobody's licensed. The Net's sellers rotate. Tonight it's one of these stalls, and not the one with the sign.*
@@ -69,6 +75,7 @@ view ember if guest.noa=yes: The girl is there with him. Sometimes the thing in 
 → edit
 
 # edit
+title: The Radio Stall
 room: spine/deck-market
 
 *The chip is a cracked MiraGen edit, keyed to a military slot. The seller says it's a perfect copy. Everyone on the Net says that.*
@@ -94,6 +101,7 @@ view ember if guest.noa=yes: The thing in the girl's head could read the chip fr
 → out
 
 # out
+title: The Coat Rail
 room: spine/deck-market
 
 *The two from the shrine aren't at the noodle stall any more. They're either side of the radio stall, and neither of them is pretending to shop. Capers. MiraGen pays them to hunt the Net, and tonight the Net is you.*
@@ -121,6 +129,7 @@ take: none
 → burned
 
 # home
+title: The Line
 
 *The ripper at the Open Hand puts the edit in without writing anything down, for what you pay her. Noa sleeps at Pell's that night without bleeding.*
 
@@ -144,6 +153,7 @@ view ember if ear1=allowed and ear2=allowed: Twice now he's only let you in. Ton
 → end
 
 # burned
+title: The Couch
 
 *No edit. Noa will bleed again tomorrow, and the Capers have Hicks's face in a market MiraGen watches. You sit on the twins' couch with Lusk's second retainer in your pocket and the taste of it in your mouth.*
 
@@ -165,6 +175,7 @@ view ember: It went wrong. No edit, and the Capers saw him. He took Lusk's money
 → end
 
 # getaway
+title: The Market
 room: spine/deck-market
 
 *The market's turned over. Somebody's shouting about the wok. The Capers are behind you and the crowd is in front.*

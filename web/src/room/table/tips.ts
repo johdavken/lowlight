@@ -10,10 +10,11 @@ import { ABILITY_NERVE, APPROACH_STATS, MAX_PEOPLE, FAVOUR_HEAT, type Approach }
 import { WARY_HEAT } from '../../../../shared/heat';
 import { HEAT_MAX } from '../../../../shared/mission';
 import { HOT_LOAD_NERVE, SLOTS } from '../../../../shared/programs';
-import { el, isPhone } from './el';
+import { clearLead, traceLead } from '../../ui/trace-lead';
+import { el, isPhone, graftCue } from './el';
 
-export type TipId = 'approach' | 'people' | 'favour' | 'contact' | 'job' | 'roll' | 'position' | 'blows' | 'effect' | 'take' | 'alarm' | 'nerve' | 'call' | 'program' | 'tier' | 'heat' | 'costs' | 'resist' | 'armour' | 'getaway' | 'press' | 'debrief';
-export const TIP_ORDER: readonly TipId[] = ['approach', 'people', 'favour', 'contact', 'job', 'roll', 'position', 'blows', 'effect', 'take', 'alarm', 'nerve', 'call', 'program', 'tier', 'heat', 'costs', 'resist', 'armour', 'getaway', 'press', 'debrief'];
+export type TipId = 'approach' | 'people' | 'favour' | 'contact' | 'job' | 'roll' | 'position' | 'blows' | 'effect' | 'take' | 'alarm' | 'nerve' | 'call' | 'program' | 'post' | 'tier' | 'heat' | 'costs' | 'resist' | 'armour' | 'getaway' | 'press' | 'debrief';
+export const TIP_ORDER: readonly TipId[] = ['approach', 'people', 'favour', 'contact', 'job', 'roll', 'position', 'blows', 'effect', 'take', 'alarm', 'nerve', 'call', 'program', 'post', 'tier', 'heat', 'costs', 'resist', 'armour', 'getaway', 'press', 'debrief'];
 export const TIPS_KEY = 'nix-room.graft-tips';
 /** How long a deal takes to settle before a callout points into it (0 with reduced motion). */
 export const SETTLE_MS = 600;
@@ -45,9 +46,9 @@ export const TIPS: Record<TipId, Tip> = {
     title: 'HOW YOU GO IN',
     gist: 'Pick from the pitch, before you see the checks. Each way rolls +1d on its own stats.',
     rows: [
-      ['QUIET', `+1d ${stats('quiet')}. Never dealt TAKE −1; picks ALARM +1 first.`],
-      ['SMOOTH', `+1d ${stats('smooth')}. Never dealt NEXT ROLL SMALL; picks NEXT ROLL WORSE first.`],
-      ['HARD', `+1d ${stats('hard')}. Starts at ALARM 1, and TAKE 1 on a job of tier 2 or more. Never dealt ALARM +1; picks TAKE −1 first.`],
+      ['QUIET', `+1d ${stats('quiet')}. Never dealt TAKE −1${FORCED_FIRST ? '; picks ALARM +1 first' : ''}.`],
+      ['SMOOTH', `+1d ${stats('smooth')}. Never dealt NEXT ROLL SMALL${FORCED_FIRST ? '; picks NEXT ROLL WORSE first' : ''}.`],
+      ['HARD', `+1d ${stats('hard')}. Starts at ALARM 1, and TAKE 1 on a job of tier 2 or more. Never dealt ALARM +1${FORCED_FIRST ? '; picks TAKE −1 first' : ''}.`],
     ],
     target: '.ts-approach',
   },
@@ -162,6 +163,16 @@ export const TIPS: Record<TipId, Tip> = {
     ],
     target: '.g-people .tb-slot[data-state="up"]',
   },
+  post: {
+    title: 'A POST',
+    gist: 'Send one of your crew and they’re gone for the job. The line says what you get for it.',
+    rows: [
+      ['SEND', 'Press the post, then their card. They go with your pick.'],
+      ['AWAY', 'No call and no ability from them until it’s over.'],
+      ['SUITS', 'Someone whose trade suits the post does it better.'],
+    ],
+    target: '.tb-post',
+  },
   heat: {
     title: 'HEAT',
     gist: 'The ALARM you leave with becomes HEAT in the district.',
@@ -196,6 +207,7 @@ export const TIPS: Record<TipId, Tip> = {
     gist: 'A costly roll deals what can go wrong. Pick the cost you can live with.',
     rows: [
       ['HOW MANY', 'The more dangerous the spot, the more you pick.'],
+      ['TAKE −1', "Comes off after this roll's own gain: at TAKE 0 it takes back what the roll just earned."],
       ...(FORCED_FIRST ? [['FIRST PICK', 'How you went in decides it, if that cost was dealt.'] as [string, string]] : []),
     ],
     target: '.tb-costs',
@@ -210,7 +222,7 @@ export const TIPS: Record<TipId, Tip> = {
     ],
     target: '.tb-cost-btn.resist',
   },
-  armour: { title: 'FIREWALL', gist: 'FIREWALL cancels one cost, then burns out. Its slot stays full.', target: '.tb-cost-btn.armour' },
+  armour: { title: 'FIREWALL', gist: 'FIREWALL cancels one cost, then burns out. Its slot stays full. Not on the wire: nothing shields you there.', target: '.tb-cost-btn.armour' },
   getaway: {
     title: 'GET OUT',
     gist: 'ALARM is full. One roll to get clear.',
@@ -252,14 +264,14 @@ export function litNodes(text: string): Node[] {
 
 /** The box's words: the gist, and the rows as a list of labels and lines. */
 export function tipBody(tip: Tip): HTMLElement[] {
-  const gist = el('p', 'gt-gist');
+  const gist = el('p', 'gt-gist hv-gist');
   gist.append(...litNodes(tip.gist));
   if (!tip.rows?.length) return [gist];
-  const dl = el('dl', 'gt-rows');
+  const dl = el('dl', 'gt-rows hv-rows');
   for (const [k, v] of tip.rows) {
-    const dd = el('dd', 'gt-row-text');
+    const dd = el('dd', 'gt-row-text hv-t');
     dd.append(...litNodes(v));
-    dl.append(el('dt', 'gt-label', k), dd);
+    dl.append(el('dt', 'gt-label hv-k', k), dd);
   }
   return [gist, dl];
 }
@@ -296,7 +308,8 @@ function save(s: Stored): void {
   }
 }
 
-const GAP = 12;
+/** Between the piece and its tip: room for the leader (overlay-hud.html B TRACE). */
+const GAP = 30;
 const MARGIN = 8;
 
 export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
@@ -323,6 +336,7 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
     box.classList.toggle('strip', phone);
     if (phone) {
       box.style.left = box.style.top = '';
+      clearLead(host, 'tip');
       return;
     }
     const k = scale();
@@ -349,6 +363,14 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
     box.style.left = `${Math.round(x)}px`;
     box.style.top = `${Math.round(y)}px`;
     box.dataset.side = side;
+    // The leader: from the piece's near edge, square to the box's edge facing it, kept in from the cut corners.
+    const along = (lo: number, hi: number, at: number) => Math.min(Math.max(at, lo + 14), hi - 14);
+    const tx = (r.left + r.right) / 2;
+    const ty = (r.top + r.bottom) / 2;
+    if (side === 'above') traceLead(host, 'tip', [tx, r.top - 2], [along(x, x + bw, tx), y + bh]);
+    else if (side === 'below') traceLead(host, 'tip', [tx, r.bottom + 1], [along(x, x + bw, tx), y - 1]);
+    else if (side === 'right') traceLead(host, 'tip', [r.right + 1, ty], [x - 1, along(y, y + bh, ty)]);
+    else traceLead(host, 'tip', [r.left - 2, ty], [x + bw, along(y, y + bh, ty)]);
   };
 
   const hide = () => {
@@ -356,6 +378,7 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
     timer = null;
     current?.box.remove();
     current = null;
+    clearLead(host, 'tip');
   };
   const show = () => {
     hide();
@@ -367,12 +390,13 @@ export function mountTips(host: HTMLElement, o: { reduced(): boolean }): Tips {
       if (target) next = { id: q.id, target };
     }
     if (!next) return;
+    graftCue('tip');
     const tip = TIPS[next.id];
-    const box = el('div', 'gt-tip');
+    const box = el('div', 'gt-tip hv-frame');
     const ok = el('button', 'gt-ok', 'GOT IT');
     const skip = el('button', 'gt-skip', 'SKIP TIPS');
     ok.type = skip.type = 'button';
-    box.append(el('i', 'gt-arrow'), el('b', 'gt-title', tip.title), ...tipBody(tip), el('div', 'gt-row'));
+    box.append(el('b', 'gt-title hv-head', tip.title), ...tipBody(tip), el('div', 'gt-row'));
     box.lastElementChild!.append(skip, ok);
     ok.addEventListener('click', () => {
       if (!state.seen.includes(next.id)) state.seen.push(next.id);

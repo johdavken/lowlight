@@ -46,6 +46,8 @@ const characterSchema = z.object({
   playable: z.unknown().optional(),
   /** Found in play: never on select, off Around Lowlight until known (select leads spec §1, §3); only `true` counts. */
   discover: z.unknown().optional(),
+  /** The player stand-in a made person plays on (character creator spec 2026-11-14): on no grid and no list; only `true` counts. */
+  standIn: z.unknown().optional(),
   /** Her rooms (`<district>/<folder>`), in order; the first is where she starts. */
   rooms: z.array(z.string().min(1)).optional(),
   /** Before rooms: one district, read as all of its rooms (with a warning). */
@@ -67,6 +69,8 @@ const characterSchema = z.object({
   outfitByScene: z.unknown().optional(),
   outfitWears: z.unknown().optional(),
   outfitUnlocks: z.unknown().optional(),
+  /** Her figure while she's on the line (2026-11-08): a file in her folder, standing in for her figure on comms. Checked on its own (resolveCommsFigure). */
+  commsFigure: z.unknown().optional(),
   // The following four are checked on their own (resolveProfile), so a bad value costs only that field.
   tagline: z.unknown().optional(),
   bio: z.unknown().optional(),
@@ -286,6 +290,7 @@ export function resolveSchedule(raw: unknown, hasRoom: (id: string) => boolean, 
     if (why.length > BLOCK_WHY_MAX || /[[\]]/.test(why)) warn(`schedule[${i}]: why is at most ${BLOCK_WHY_MAX} characters, no [ or ]; ignored`);
     else if (why) block.why = why;
     if (o.fixed === true) block.fixed = true;
+    if (o.sleeps === true) block.sleeps = true;
     kept.push(block);
   });
   return kept;
@@ -327,6 +332,18 @@ export function resolveSprite(dir: string, raw: unknown, warn: (msg: string) => 
     ...(typeof waist === 'number' ? { waist } : {}),
     ...(parsed.data.pixel === true ? { pixel: true as const } : {}),
   };
+}
+
+/** Her comms figure's file (`commsFigure`), confined to `dir`; a bad or missing one warns and she keeps today's comms look. */
+export function resolveCommsFigure(dir: string, raw: unknown, warn: (msg: string) => void): string | null {
+  if (raw === undefined) return null;
+  if (typeof raw !== 'string' || raw === '') {
+    warn('commsFigure must be a file name; no comms figure');
+    return null;
+  }
+  const file = characterFile(dir, raw);
+  if (!file) warn(`commsFigure '${raw}' is missing or outside its folder; no comms figure`);
+  return file;
 }
 
 const EXPRESSION_NAME_RE = /^[a-z0-9-]{1,24}$/;

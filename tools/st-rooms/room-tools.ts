@@ -1,12 +1,15 @@
 // Her four room tools in SillyTavern: their definitions (Lowlight's own text, shared/room-tool-text.ts) and the check
 // of what she asked for. Pure: the extension (extension/room-tools.js) registers them and carries out the action.
-import type { Atmosphere, SceneDef, Weather } from '../../shared/types';
+import type { Atmosphere, LightDef, SceneDef, Weather } from '../../shared/types';
 import { ROOM_TOOL_TEXT } from '../../shared/room-tool-text';
+import { asGroup, groupOf, setGroup } from '../../shared/light-share';
 
 export type RoomAction =
   | { kind: 'mood'; name: string; seconds: number }
   | { kind: 'atmosphere'; patch: Partial<Atmosphere>; seconds: number }
   | { kind: 'light'; id: string; patch: { intensity?: number; flicker?: number }; seconds: number }
+  /** A light group (`inside`/`outside`, light groups): every member's new level, one change. */
+  | { kind: 'lights'; set: { id: string; patch: { intensity?: number; flicker?: number } }[]; seconds: number }
   | { kind: 'go'; folder: string; transition: 'fade' | 'glitch' };
 
 export interface RoomView {
@@ -17,6 +20,8 @@ export interface RoomView {
   exits: string[];
   /** The rooms the package carries (folders). */
   rooms: string[];
+  /** The room's lights as they are now, with their bases (a group moves each as a share of its base). */
+  lights?: LightDef[];
 }
 
 const DEFAULT_SECONDS = 1.5;
@@ -53,7 +58,7 @@ export const ROOM_TOOLS = [
   },
   {
     name: 'set_light',
-    description: ROOM_TOOL_TEXT.set_light,
+    description: ROOM_TOOL_TEXT.set_light_groups,
     parameters: {
       type: 'object',
       properties: { light_id: { type: 'string' }, intensity: { type: 'number' }, flicker: { type: 'number' }, duration: { type: 'number' } },
@@ -95,8 +100,24 @@ export function checkRoomTool(name: string, args: unknown, room: RoomView): { ok
     }
     case 'set_light': {
       const want = typeof a.light_id === 'string' ? a.light_id.trim().replace(/^"|"$/g, '') : '';
-      const light = room.scene.lights.find((l) => l.id === want || l.label === want);
-      if (!light) return fail(`no light "${want}" here; lights: ${room.scene.lights.map((l) => `${l.id} "${l.label}"`).join(', ')}`);
+      const group = asGroup(want);
+      if (group) {
+        const now = room.lights ?? room.scene.lights;
+        if (!now.some((l) => groupOf(l) === group)) return fail(`no ${group} lights here`);
+        if (a.color !== undefined) return fail('set colour light by light, not on a group');
+        const share = typeof a.intensity === 'number' && Number.isFinite(a.intensity) ? Math.max(0, a.intensity) : undefined;
+        const flicker = unit(a.flicker);
+        if (share === undefined && flicker === undefined) return fail('give intensity or flicker');
+        const painted = new Map(room.scene.lights.map((l) => [l.id, l.intensity]));
+        const next = share === undefined ? now : setGroup(now, group, share, { painted });
+        const set = next
+          .filter((l) => groupOf(l) === group)
+          .map((l) => ({ id: l.id, patch: { ...(share !== undefined ? { intensity: l.intensity } : {}), ...(flicker !== undefined ? { flicker } : {}) } }));
+        return { ok: true, action: { kind: 'lights', set, seconds: seconds(a.duration) } };
+      }
+      const lower = want.toLowerCase();
+      const light = room.scene.lights.find((l) => l.id === want || l.label.toLowerCase() === lower);
+      if (!light) return fail(`no light "${want}" here; inside, outside, or one of: ${room.scene.lights.map((l) => `${l.id} "${l.label}"`).join(', ')}`);
       const patch: { intensity?: number; flicker?: number } = {};
       const intensity = unit(a.intensity);
       if (intensity !== undefined) patch.intensity = intensity;

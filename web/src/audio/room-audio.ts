@@ -16,7 +16,7 @@ const AMBIENT: Channel[] = ['weather', 'room', 'lights'];
 const UNLOCK_FADE_SECONDS = 0.6;
 
 export type EngineLike = Pick<AudioEngine, 'unlock' | 'apply' | 'music' | 'tick' | 'setMaster' | 'setChannel' | 'setScale' | 'suspend' | 'resume' | 'state' | 'burst' | 'oneShot' | 'preload' | 'thunder' | 'cancelThunder'> &
-  Partial<Pick<AudioEngine, 'onStateChange' | 'onMusicEnded' | 'clock'>>;
+  Partial<Pick<AudioEngine, 'onStateChange' | 'onMusicEnded' | 'clock' | 'speak' | 'hush' | 'hold' | 'release' | 'setSignalCues'>>;
 
 /** The engine's state plus the room's playlist (what plays, or the pause until when). */
 export type RoomAudioState = EngineState & { playlist: PlaylistState; scene: string | null };
@@ -83,7 +83,7 @@ export function createRoomAudio(deps: {
   const show = (v: SoundView) => deps.view?.(v);
   /** AMBIENT reads as the loudest of its channels (the dev panel can set them apart). */
   const ambient = () => Math.max(...AMBIENT.map((ch) => s.channels[ch]));
-  const showOn = () => show({ kind: 'on', volume: s.master, muted: s.muted, music: s.channels.music, ambient: ambient() });
+  const showOn = () => show({ kind: 'on', volume: s.master, muted: s.muted, music: s.channels.music, voice: s.channels.voice, ui: s.channels.ui, ambient: ambient(), muteInBackground: s.muteInBackground });
   const persist = () => store.save(s);
   const step = (v: number, steps: number) => Math.min(1, Math.max(0, Math.round((v + WHEEL_STEP * steps) * 100) / 100));
   const setChannels = (chs: Channel[], v: number) => {
@@ -209,6 +209,19 @@ export function createRoomAudio(deps: {
       entryDeadline = null;
     },
 
+    /** A room move's own sounds, in the synth static's place (the room page sets them; the select screen doesn't). */
+    signalCues(off: string, on: string, level?: number): void {
+      engine.setSignalCues?.(off, on, level);
+    },
+
+    /** A cue that loops until `release` (her reply on its way); silent while locked. */
+    hold(url: string, level?: number): void {
+      if (unlocked) engine.hold?.(url, level);
+    },
+    release(url: string): void {
+      engine.release?.(url);
+    },
+
     /** Warms a cue's buffer so its first play isn't the one paying for the fetch+decode. Runs once
      * unlocked; a request made before that is remembered and issued on unlock. */
     preloadCue(url: string): void {
@@ -308,6 +321,37 @@ export function createRoomAudio(deps: {
       if (!unlocked) return;
       setChannels(['music'], step(s.channels.music, steps));
       refresh();
+    },
+
+    /** SYS's VOICE: the recorded narration's channel (voiced job beats), in 5% steps. */
+    voiceStep(steps: number): void {
+      if (!unlocked) return;
+      setChannels(['voice'], step(s.channels.voice, steps));
+      refresh();
+    },
+
+    /** SYS's UI: the menus', panels' and table's own cues, in 5% steps. */
+    uiStep(steps: number): void {
+      if (!unlocked) return;
+      setChannels(['ui'], step(s.channels.ui, steps));
+      refresh();
+    },
+
+    /** SYS's IN BACKGROUND: MUTE stops the sound while the window isn't focused, too (main.ts asks `visibility`). */
+    setMuteInBackground(on: boolean): void {
+      s.muteInBackground = on;
+      persist();
+      if (unlocked) refresh();
+    },
+
+    /** Voiced job beats: reads `urls` aloud in order, replacing whatever was being read (`after`: following it). Silent until unlocked. */
+    speak(urls: readonly string[], o?: { after?: boolean }): void {
+      if (unlocked) engine.speak?.(urls, o);
+    },
+
+    /** Stops the reading (new text replaced it, or the table closed). */
+    hush(): void {
+      if (unlocked) engine.hush?.();
     },
 
     /** SYS's AMBIENT: weather, room and lights to one level, in 5% steps from the loudest. */

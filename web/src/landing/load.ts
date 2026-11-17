@@ -4,6 +4,7 @@
  * newest first, then the automatic ones. Each strip is the room with your face and theirs and the save's
  * name. RENAME and DELETE (or R and Del) act on the playthrough at NOW, else on the save. Over the skyline.
  */
+import { frontCue } from './front-sound';
 import type { PlaythroughInfo, SaveInfo } from '../../../shared/types';
 import { ApiError, type PlaythroughApi, type PlaythroughListing } from '../net/playthroughs';
 import type { LandingAgent } from './landing';
@@ -16,6 +17,8 @@ import { groupGames, stops, type Stop } from './load-groups';
 import { openSavePrompt } from '../room/save-prompt';
 import { branchName } from '../../../shared/branch-name';
 import './load.css';
+import { setHints } from './hint-line';
+import { clearLead, hostRect, leadPoints, traceVia } from '../ui/trace-lead';
 
 export interface LoadDeps {
   api: PlaythroughApi;
@@ -99,10 +102,13 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
   const under = el('div', 'load-under');
   const error = el('div', 'load-error');
   const jack = el('div', 'jack-in', 'JACK IN');
-  const hints = el('div', 'load-hints', HINTS);
+  const hints = el('div', 'load-hints');
+  setHints(hints, HINTS);
   const tip = el('div', 'load-tip');
   box.append(title, left, right, under, error, jack, tip, hints);
   root.append(box);
+  // The leader follows the picked save when the list is scrolled by hand.
+  right.addEventListener('scroll', () => lead(), { passive: true });
 
   let list: PlaythroughListing[] = [];
   let activeId: string | null = null;
@@ -155,7 +161,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
   };
 
   function setHint(text: string | null): void {
-    hints.textContent = text ?? HINTS;
+    setHints(hints, text ?? HINTS);
   }
 
   /** A face thumbnail for an agent id, or null. */
@@ -283,7 +289,8 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     const meta = [where, s ? (storyTime ?? s.timeOfDay) : null, ago(s ? s.at : pt.updatedAt)].filter((x): x is string => !!x).join(' · ');
     const strip = saveStrip({
       scene: (s ? s.location?.sceneId : pt.location?.sceneId) ?? null,
-      you: faceOf(pt.player),
+      // Their own figure's face (persona figure spec 2026-11-12), else the character's.
+      you: pt.figure ? `/api/persona/thumb?pt=${encodeURIComponent(pt.id)}` : faceOf(pt.player),
       them: faceOf(withWhom(pt, s)),
       name: s ? s.name : '▶ NOW',
       meta,
@@ -321,7 +328,28 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     right.querySelector<HTMLElement>('.ss.on')?.scrollIntoView?.({ block: 'nearest' });
   }
 
+  /** The HUD trace's leader (B TRACE, playtest 2026-11-14): from the picked game to the picked save, in 1P green. */
+  function lead(): void {
+    const from = left.querySelector('.pt.on');
+    const to = right.querySelector('.ss.on');
+    if (!from || !to) {
+      clearLead(box, 'load');
+      return;
+    }
+    const a = hostRect(box, from);
+    const b = hostRect(box, right);
+    const c = hostRect(box, to);
+    // To the strip's edge, held inside the list's window when the strip is scrolled half out of it.
+    const y = Math.min(Math.max(c.top + c.height / 2, b.top + 6), b.bottom - 6);
+    traceVia(box, 'load', leadPoints([a.right + 6, a.top + a.height / 2], [c.left - 4, y]), 'var(--p1, #3dff7a)');
+  }
+
   function render(): void {
+    draw();
+    lead();
+  }
+
+  function draw(): void {
     if (destroyed) return;
     tip.textContent = loaded && list.length > 0 && !list.some((p) => p.starred) && !starTipDone() ? STAR_TIP : '';
     const pt = selected();
@@ -405,6 +433,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
       save: async (name) => {
         try {
           const made = await deps.api.branchSave(s.id, name);
+          frontCue('branch');
           busy = true;
           box.classList.add('locked');
           if (!destroyed) deps.nav(playPath(made));
@@ -469,6 +498,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
   function toggleStar(pt: PlaythroughListing): void {
     void attempt('STAR', async () => {
       const updated = await deps.api.star(pt.id, !pt.starred);
+      if (updated.starred) frontCue('star');
       list = list.map((p) => (p.id === pt.id ? { ...updated, contacts: p.contacts, sprite: p.sprite } : p));
       if (updated.starred) setStarTipDone();
       const i = stopOf(pt.id);
@@ -508,7 +538,9 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     if (!pt || busy) return;
     const s = saveAt(pt, row);
     if (row !== 0 && !s) return;
-    deps.sound('confirm');
+    // A save loaded takes the story back: its own sound; JACK IN keeps the menu's.
+    if (s) frontCue('rewind');
+    else deps.sound('confirm');
     busy = true;
     box.classList.add('locked');
     jack.textContent = s ? 'LOAD' : 'JACK IN';
@@ -540,6 +572,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     if (t.kind === 'pt') {
       void attempt('DELETE', async () => {
         await deps.api.removePlaythrough(pt.id);
+        frontCue('delete');
         list = list.filter((p) => p.id !== pt.id);
         savesBy.delete(pt.id);
         selectPlaythrough(Math.min(ptIndex, Math.max(0, view().length - 1)));
@@ -548,6 +581,7 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
     }
     void attempt('DELETE', async () => {
       await deps.api.removeSave(t.save.id);
+      frontCue('delete');
       const rest = byTime(pt).filter((x) => x.id !== t.save.id);
       savesBy.set(pt.id, rest);
       row = Math.min(row, rest.length);
@@ -587,9 +621,11 @@ export function mountLoad(root: HTMLElement, deps: LoadDeps): { destroy(): void;
         void attempt('RENAME', async () => {
           if (t.kind === 'pt') {
             const updated = await deps.api.rename(t.pt.id, next);
+            frontCue('rename');
             list = list.map((p) => (p.id === t.pt.id ? { ...updated, contacts: p.contacts } : p));
           } else {
             const updated = await deps.api.renameSave(t.save.id, next);
+            frontCue('rename');
             savesBy.set(t.pt.id, byTime(t.pt).map((x) => (x.id === updated.id ? updated : x)));
           }
         });

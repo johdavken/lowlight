@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { NARRATOR_THINKING, type NarratorThinking } from '../../shared/types';
+import { CHAT_THINKING, NARRATOR_THINKING, REPLY_LENGTHS, type ChatThinking, type NarratorThinking, type ReplyLength } from '../../shared/types';
 
 export const SETTINGS_FILE = 'settings.json';
 export const RECENT_CAP = 8;
@@ -19,6 +19,10 @@ interface SettingsData {
   characterModels: Record<string, string>;
   /** Absent: auto. */
   narratorThinking?: NarratorThinking;
+  /** SYS → REPLY LENGTH; absent: normal. */
+  replyLength?: ReplyLength;
+  /** SYS → REPLY THINKING; absent: auto. */
+  chatThinking?: ChatThinking;
 }
 
 export interface Settings {
@@ -34,6 +38,10 @@ export interface Settings {
   setCharacterModel(id: string, model: string | null): void;
   narratorThinking(): NarratorThinking;
   setNarratorThinking(t: NarratorThinking): void;
+  replyLength(): ReplyLength;
+  setReplyLength(l: ReplyLength): void;
+  chatThinking(): ChatThinking;
+  setChatThinking(t: ChatThinking): void;
   /** The browser token; generated and saved the first time it's asked for. */
   roomToken(): string;
   /** First boot: everything from the old files, in one write. */
@@ -67,6 +75,8 @@ function read(file: string): SettingsData | null | 'bad' {
     recentModels: Array.isArray(o.recentModels) ? o.recentModels.filter((m): m is string => typeof m === 'string' && m.length > 0).slice(0, RECENT_CAP) : [],
     characterModels: strings(o.characterModels),
     ...((NARRATOR_THINKING as readonly unknown[]).includes(o.narratorThinking) && o.narratorThinking !== 'auto' ? { narratorThinking: o.narratorThinking as NarratorThinking } : {}),
+    ...((REPLY_LENGTHS as readonly unknown[]).includes(o.replyLength) && o.replyLength !== 'normal' ? { replyLength: o.replyLength as ReplyLength } : {}),
+    ...((CHAT_THINKING as readonly unknown[]).includes(o.chatThinking) && o.chatThinking !== 'auto' ? { chatThinking: o.chatThinking as ChatThinking } : {}),
   };
 }
 
@@ -121,6 +131,18 @@ export function openSettings(dataDir: string, log: (m: string) => void = (m) => 
       else data.narratorThinking = t;
       write();
     },
+    replyLength: () => data.replyLength ?? 'normal',
+    setReplyLength(l) {
+      if (l === 'normal') delete data.replyLength;
+      else data.replyLength = l;
+      write();
+    },
+    chatThinking: () => data.chatThinking ?? 'auto',
+    setChatThinking(t) {
+      if (t === 'auto') delete data.chatThinking;
+      else data.chatThinking = t;
+      write();
+    },
     roomToken() {
       if (!data.roomToken) {
         data.roomToken = crypto.randomBytes(32).toString('base64url');
@@ -141,6 +163,12 @@ export function openSettings(dataDir: string, log: (m: string) => void = (m) => 
 export function readSettingsKeys(dataDir: string): Record<string, boolean> {
   const d = read(path.join(dataDir, SETTINGS_FILE));
   return d && d !== 'bad' ? Object.fromEntries(Object.keys(d.keys).map((k) => [k, true])) : {};
+}
+
+/** One provider key, read-only (Studio's persona figure uses the game's OpenRouter key); null without one. */
+export function readSettingsKey(dataDir: string, name: string): string | null {
+  const d = read(path.join(dataDir, SETTINGS_FILE));
+  return d && d !== 'bad' ? (d.keys[name] ?? null) : null;
 }
 
 /** The recent model picks. Read-only, like readSettingsKeys. */

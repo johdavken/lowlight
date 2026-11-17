@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import WebSocket from 'ws';
+import { PNG } from 'pngjs';
 import { buildApp } from '../src/app';
 import type { Config } from '../src/config';
 import { makeFixture } from './fixtures/agents';
@@ -279,6 +280,88 @@ describe('playthrough routes', () => {
     expect(built.world.active()!.persona).toEqual({ name: 'Vee', background: 'b' });
   });
 
+  describe('a new game as a made person (character creator spec 2026-11-14)', () => {
+    const KEPT = 'p-1794679903079-abcdef';
+    const BARE = 'p-1794679903080-abcdef';
+    const DRAFT = 'p-1794679903081-abcdef';
+    const meta = { face: { x: 0.5, y: 0.2 }, waist: 0.4, wears: 'an old line', model: 'openai/gpt-image-2', made: '2026-11-14T00:00:00.000Z', fields: {} };
+    const picture = () => {
+      const p = new PNG({ width: 8, height: 12 });
+      p.data.fill(200);
+      return PNG.sync.write(p);
+    };
+    const setUp = (cfg: Config) => {
+      fs.mkdirSync(path.join(cfg.charactersDir, 'newcomer'), { recursive: true });
+      fs.writeFileSync(path.join(cfg.charactersDir, 'newcomer', 'character.json'), JSON.stringify({ name: 'Newcomer', pronoun: 'they', standIn: true }));
+      const person = (id: string, more: object) => {
+        fs.mkdirSync(path.join(cfg.dataDir, 'people', id), { recursive: true });
+        fs.writeFileSync(path.join(cfg.dataDir, 'people', id, 'person.json'), JSON.stringify({ id, pronoun: 'they', background: '', wears: '', made: '2026-11-14T00:00:00.000Z', ...more }));
+      };
+      person(KEPT, { name: 'Vee', pronoun: 'she', background: 'From the Spine.', wears: 'a grey quilted jacket' });
+      fs.writeFileSync(path.join(cfg.dataDir, 'people', KEPT, 'figure.png'), picture());
+      fs.writeFileSync(path.join(cfg.dataDir, 'people', KEPT, 'figure.json'), JSON.stringify(meta));
+      person(BARE, { name: 'Ash' });
+      person(DRAFT, { name: '', draft: true });
+    };
+
+    it('plays on the stand-in as a CUSTOM persona, with their figure and their wears copied into the save', async () => {
+      const { api, built } = await start({ prepare: setUp });
+      const r = await api('POST', '/api/playthroughs', { person: KEPT, startContact: 'nix' });
+      expect(r.status).toBe(200);
+      expect(r.body).toMatchObject({ player: 'newcomer', persona: { name: 'Vee', background: 'From the Spine.', kind: 'custom', pronoun: 'she' } });
+      const dir = built.playthroughs.personaDir(r.body.id);
+      expect(JSON.parse(fs.readFileSync(path.join(dir, 'figure.json'), 'utf8'))).toMatchObject({ wears: 'a grey quilted jacket', face: meta.face });
+      expect(fs.existsSync(path.join(dir, 'figure.png'))).toBe(true);
+      const { persona } = (await api('GET', '/api/persona')).body;
+      expect(persona).toMatchObject({ id: 'newcomer', name: 'Vee', figure: true, sprite: { waist: 0.4 } });
+      // Deleting them from the library leaves the game's own copy playing.
+      expect((await api('DELETE', `/api/people/${KEPT}`)).status).toBe(200);
+      expect(fs.existsSync(path.join(dir, 'figure.png'))).toBe(true);
+      expect(built.world.active()!.persona?.name).toBe('Vee');
+    });
+
+    it('a person with no figure plays the stand-in plain; they is no pronoun of their own', async () => {
+      const { api, built } = await start({ prepare: setUp });
+      const r = await api('POST', '/api/playthroughs', { person: BARE, startContact: 'nix' });
+      expect(r.body.persona).toEqual({ name: 'Ash', background: '', kind: 'custom' });
+      expect(fs.existsSync(path.join(built.playthroughs.personaDir(r.body.id), 'figure.png'))).toBe(false);
+    });
+
+    it('a draft or unknown person is 404 no-person; person with player or persona is 400', async () => {
+      const { api, built } = await start({ prepare: setUp });
+      const before = built.playthroughs.list().length;
+      expect(await api('POST', '/api/playthroughs', { person: DRAFT, startContact: 'nix' })).toEqual({ status: 404, body: { error: 'no-person' } });
+      expect(await api('POST', '/api/playthroughs', { person: 'p-1794679903099-abcdef', startContact: 'nix' })).toEqual({ status: 404, body: { error: 'no-person' } });
+      expect(await api('POST', '/api/playthroughs', { person: KEPT, player: 'nix', startContact: 'nix' })).toEqual({ status: 400, body: { error: 'bad-request' } });
+      expect(await api('POST', '/api/playthroughs', { person: KEPT, startContact: 'nix', persona: { name: 'X' } })).toEqual({ status: 400, body: { error: 'bad-request' } });
+      expect(built.playthroughs.list().length).toBe(before);
+    });
+  });
+
+  it('the app serves the people library and sweeps a draft a closed creator left behind', async () => {
+    const draft = 'p-1794679903078-abcdef';
+    const kept = 'p-1794679903079-abcdef';
+    const person = (cfg: Config, id: string, more: object) => {
+      fs.mkdirSync(path.join(cfg.dataDir, 'people', id), { recursive: true });
+      fs.writeFileSync(path.join(cfg.dataDir, 'people', id, 'person.json'), JSON.stringify({ id, pronoun: 'they', background: '', wears: '', made: '2026-11-14T00:00:00.000Z', ...more }));
+    };
+    const { api, cfg } = await start({ prepare: (c) => { person(c, draft, { name: '', draft: true }); person(c, kept, { name: 'Vee' }); } });
+    expect(fs.existsSync(path.join(cfg.dataDir, 'people', draft))).toBe(false);
+    expect((await api('GET', '/api/people')).body.people.map((p: { id: string }) => p.id)).toEqual([kept]);
+  });
+
+  it('the stand-in (standIn) is neither a player to pick nor a contact to start with', async () => {
+    const standIn = (cfg: Config) => {
+      fs.mkdirSync(path.join(cfg.charactersDir, 'newcomer'), { recursive: true });
+      fs.writeFileSync(path.join(cfg.charactersDir, 'newcomer', 'character.json'), JSON.stringify({ name: 'Newcomer', standIn: true }));
+    };
+    const { api, built } = await start({ prepare: standIn });
+    const before = built.playthroughs.list().length;
+    expect(await api('POST', '/api/playthroughs', { player: 'newcomer', startContact: 'nix' })).toEqual({ status: 400, body: { error: 'bad-request' } });
+    expect(await api('POST', '/api/playthroughs', { player: built.world.active()!.player, startContact: 'newcomer' })).toEqual({ status: 400, body: { error: 'bad-request' } });
+    expect(built.playthroughs.list().length).toBe(before);
+  });
+
   it('create with a bad persona is a 400 bad-persona and makes nothing', async () => {
     const { api, built } = await start();
     const player = built.world.active()!.player;
@@ -287,6 +370,22 @@ describe('playthrough routes', () => {
       expect(await api('POST', '/api/playthroughs', { player, startContact: 'nix', persona })).toEqual({ status: 400, body: { error: 'bad-persona' } });
     }
     expect(built.playthroughs.list().length).toBe(before);
+  });
+
+  it('PUT persona sets, clears, and refuses a bad one or an unknown save', async () => {
+    const { api, built } = await start();
+    const id = built.world.active()!.id;
+    const set = await api('PUT', `/api/playthroughs/${id}/persona`, { persona: { name: ' Vee ', background: 'b', kind: 'custom' } });
+    expect(set.status).toBe(200);
+    expect(set.body.persona).toEqual({ name: 'Vee', background: 'b', kind: 'custom' });
+    expect(built.world.active()!.persona?.name).toBe('Vee');
+    expect(await api('PUT', `/api/playthroughs/${id}/persona`, { persona: { name: '' } })).toEqual({ status: 400, body: { error: 'bad-persona' } });
+    expect(await api('PUT', `/api/playthroughs/${id}/persona`, {})).toEqual({ status: 400, body: { error: 'bad-persona' } });
+    expect((await api('PUT', '/api/playthroughs/pt-20990101-zzzz/persona', { persona: null })).status).toBe(404);
+    const cleared = await api('PUT', `/api/playthroughs/${id}/persona`, { persona: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.persona).toBeUndefined();
+    expect(built.world.active()!.persona).toBeUndefined();
   });
 
   it('create no longer takes a scene: the opening comes with the greeting (arrival screen spec §3)', async () => {

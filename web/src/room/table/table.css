@@ -214,6 +214,11 @@
 .tb-cost.settled .tb-cost-line { text-decoration: line-through; }
 .tb-cost-tag { font: 500 26px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.06em; color: #fff; }
 .tb-cost-first { font: 500 15px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.08em; color: var(--amber, #ffc56b); }
+/* TAKE −1's sums: what the roll earns, what goes, what's left (2026-11-08, playtest). */
+.tb-cost-take { display: flex; flex-wrap: wrap; gap: 2px 8px; margin-top: auto; font: 15px/1.1 var(--pixel); letter-spacing: 0.08em; }
+.tb-cost-take .gain { color: var(--tool); }
+.tb-cost-take .loss { color: #ff3b5c; }
+.tb-cost-take .after { flex-basis: 100%; color: #fff; }
 .tb-cost-line { font: 13px/1.45 var(--mono, 'IBM Plex Mono', monospace); opacity: 0.6; font-style: italic; }
 /* The GM's line fades in over the written one. */
 .tb-cost-line.gm { opacity: 0.95; font-style: normal; animation: tb-cost-in 450ms ease-out; }
@@ -453,33 +458,26 @@
 .tb-slot.s-empty .tbc-note { color: rgba(255, 225, 200, 0.6); }
 .tb.phone .tb-right { order: -3; align-self: center; }
 
-/* Graft tips (tips.ts): one callout at a time, pointing at the piece it explains. Only it takes the pointer. Over the
-   table (24), under the full screens (29) and the HUD with SYS (30). */
-.gt-tip { position: absolute; z-index: 26; width: 330px; max-width: calc(100% - 16px); padding: 12px 14px 10px; background: rgba(10, 5, 20, 0.97); border: 1px solid var(--user); border-left-width: 3px; box-shadow: 0 0 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(127, 233, 255, 0.25); color: #cfeff7; pointer-events: auto; animation: tb-deal 200ms ease-out both; }
+/* Graft tips (tips.ts): one callout at a time, a leader from the piece it explains, in the HUD trace's frame (style.css
+   .hv-*). Only it takes the pointer. Over the table (24), under the full screens (29) and the HUD with SYS (30); its
+   leader at the same height. */
+.gt-tip { z-index: 26; width: 340px; max-width: calc(100% - 16px); padding: 12px 16px; pointer-events: auto; animation: tb-deal 200ms ease-out both; }
 .gt-tip.strip { left: 16px; right: 16px; bottom: calc(var(--feed-bottom, 70px) + var(--box-h, 216px) + 210px); width: auto; max-width: none; }
-.gt-title { display: block; font: 22px/1 var(--pixel); letter-spacing: 0.16em; color: var(--user); }
-/* The dossier (mockup tip-boxes.html A, 2026-11-07): one white line that says what it is, then amber labels down the
-   left, like the select screen's file. The HUD's words keep their own colours. */
-.gt-gist { margin: 6px 0 10px; font: 600 14px/1.4 var(--mono); color: #fff; }
-.gt-rows { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin: 0 0 10px; padding-top: 8px; border-top: 1px solid rgba(127, 233, 255, 0.2); }
-.gt-label { max-width: 96px; font: 15px/1.2 var(--pixel); letter-spacing: 0.12em; color: #ffc56b; }
-.gt-row-text { margin: 0; font: 12.5px/1.42 var(--mono); }
+svg.hv-lead[data-lead='tip'] { z-index: 26; }
+svg.hv-lead[data-lead='card'] { z-index: 31; }
+.gt-title { font-weight: normal; }
+.gt-rows { margin: 8px 0 0; }
+.gt-row-text { margin: 0; }
 .gt-lit { white-space: nowrap; }
 .gt-alarm { color: #ff5d6c; }
 .gt-take { color: #ffb347; }
 .gt-nerve { color: var(--user); }
 .gt-heat { color: #ff8a5c; }
-.gt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.gt-ok,
-.gt-skip { font: 12px var(--pixel); letter-spacing: 0.14em; background: none; border: 0; color: #cfeff7; cursor: pointer; padding: 2px 4px; }
-.gt-ok { border: 1px solid var(--user); padding: 4px 10px; color: var(--user); }
-.gt-skip { color: rgba(207, 239, 247, 0.5); }
-.gt-arrow { position: absolute; width: 10px; height: 10px; background: inherit; border: inherit; left: calc(50% - 5px); transform: rotate(45deg); }
-.gt-tip[data-side='above'] .gt-arrow { bottom: -6px; border-top: 0; border-left: 0; }
-.gt-tip[data-side='below'] .gt-arrow { top: -6px; border-bottom: 0; border-right: 0; }
-.gt-tip[data-side='left'] .gt-arrow,
-.gt-tip[data-side='right'] .gt-arrow,
-.gt-tip.strip .gt-arrow { display: none; }
+.gt-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 10px; }
+.gt-skip { padding: 2px 0; font: 13px var(--pixel); letter-spacing: 0.2em; color: #8fa3ad; background: none; border: 0; cursor: pointer; }
+.gt-skip:hover, .gt-skip:focus-visible { color: #d9e4ea; }
+.gt-ok { padding: 4px 14px 2px; font: 15px var(--pixel); letter-spacing: 0.2em; color: var(--hv-c); background: none; border: 0; box-shadow: inset 0 0 0 1px var(--hv-c); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); cursor: pointer; }
+.gt-ok:hover, .gt-ok:focus-visible { color: #05020a; background: var(--hv-c); outline: none; }
 
 /* Cards in the hand fill with their picture (the full-bleed look picked 2026-10-31): the faces and pictures are
    all 3:4, so the card shows them whole. The specialty and grade sit over the top, the words on a fade at the foot. */
@@ -549,7 +547,7 @@
 .ts-ready .tbc-symbol { left: 5px; width: 16px; }
 .ts-ready .tbc-rank { right: 5px; width: 14px; }
 /* A first card lifted stands over its group's label; the round corner would show a sliver of it. */
-.tb-group:has(.tb-slots > :first-child.lifted, .tb-slots > :first-child .tb-slot.lifted) .tb-group-label { opacity: 0; }
+.tb-group:has(.tb-slots > :first-child.lifted, .tb-slots > :first-child .tb-slot.lifted:not(.tb-mini)) .tb-group-label { opacity: 0; }
 .tb-slots > :nth-child(1) { --lx: 12%; }
 .tb-slots > :nth-child(2) { --lx: 27%; }
 .tb-slots > :nth-child(3) { --lx: 42%; }
@@ -717,6 +715,8 @@
 .tb.hud .tb-top { grid-area: top; display: flex; align-items: center; gap: 28px; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.8); }
 .tb.hud .tb-top-l { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .tb.hud .tb-top-l .tb-head { font-size: 22px; }
+/* The trace table's own parts, nowhere else (table-trace.css shows them). */
+.tb-names, .tb-sofar, .tb-clock-note { display: none; }
 .tb.hud .tb-log { grid-area: log; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; scrollbar-width: thin; }
 .tb.hud .tb-log .tb-art { width: 100%; }
 .tb.hud .tb-prose { max-width: none; justify-self: stretch; padding: 0; background: none; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.9); }
@@ -743,19 +743,35 @@
 .tb.hud:not(.phone) > .tb-middle:has(.tb-parked) { padding-top: 0; }
 /* A waiting roll in the HUD: its row (card, dice, stamp) over its costs, the costs in one row, all centred. */
 .tb.hud:not(.phone) .tb-deal:has(> .tb-parked) { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 14px; }
+/* The moment never pushes on the JOB column (2026-11-08): what it holds fits its 725px, and a six-dice roll may run a few
+   pixels past, so the column doesn't narrow while a roll waits. */
+.tb.hud:not(.phone) > .tb-middle { min-width: 0; }
+/* A waiting roll takes the room it draws in: the tray's empty lead-in (LEFT, 60px) tucks under its left, and after the dice
+   it keeps 200px for the stamp and the line under it rather than the run-in's 300 (pixel-dice.ts). Six dice: 752px. */
+.tb.hud:not(.phone) .tb-parked .tb-roll { width: calc(var(--rest) + 200px); margin-left: -60px; }
+/* Six dice (812px that way) draw at 88 %, 715px, so the first die stays off the column; five fit as they are (710px). */
+.tb.hud:not(.phone) .tb-parked .tb-roll[data-dice='6'] { zoom: 0.88; }
 .tb.hud:not(.phone) .tb-deal > .tb-parked,
 .tb.hud:not(.phone) .tb-deal > .tb-costs { grid-row: auto; align-self: center; }
 .tb.hud .tb-costs-row { flex-wrap: nowrap; }
 /* HUD: the contact stands at the far right, clear of the cards and out of the dim (2026-11-02). The table leaves
    her the screen's right fifth (the clocks bar still spans it); the dim drops under the stage, and your own figure on
    the left steps out. */
+/* The JOB column (the log track) is 480px (2026-11-11 survey of every table layout, was 374px, and 15% before that). The
+   moment keeps 617px: four choices (604px) and SETUP's approaches fit beside the levers. What's wider reaches into the
+   levers' track (below): a waiting roll's three costs (719px, no levers up then) and the debrief (725px, CLOSE over its top
+   corner, clear of the outcome word). */
 .tb.hud:not(.phone) {
-  grid-template-columns: minmax(200px, 15%) 1fr minmax(110px, 7%) 19%;
+  grid-template-columns: minmax(200px, 480px) 1fr minmax(110px, 7%) 19%;
   column-gap: 16px;
   grid-template-areas: 'top top top top' 'log middle levers .' 'bottom bottom bottom .';
 }
 /* The room's dim drops just under the stage (z 19), so she stands clear of it and her subtitle (z 20) stays over her. */
-#game.tb-dim:has(> .tb.hud:not([hidden]):not(.phone))::after { z-index: 18; }
+#game.tb-dim:has(> .tb.hud:not([hidden]):not(.phone))::after {
+  z-index: 18;
+  /* The subtitles' scrim steps out at the table (style.css): its shade from the floor joins the dim here. */
+  background: linear-gradient(180deg, transparent 38%, rgba(6, 2, 12, 0.5) 64%, rgba(6, 2, 12, 0.75)), rgba(5, 2, 12, 0.55);
+}
 #game:has(> .tb.hud:not([hidden]):not(.phone)) .stage-right[data-kind='sprite'] { right: -170px; transition: right 320ms ease; }
 /* Your own figure steps out during a job: the table is your side of the scene. */
 #game:has(> .tb.hud:not([hidden]):not(.phone)) .stage-left { opacity: 0; }
@@ -821,14 +837,10 @@
 /* The HUD has the height: a choice's whole line shows, its card growing a row rather than cutting it off (playtest: a ONE SHOT line lost its end). The phone keeps the three-line clamp. */
 .tb.hud:not(.phone) .tb-call .tb-line { display: block; -webkit-line-clamp: none; line-clamp: none; overflow: visible; }
 
-/* A card in words (card-info.ts): beside the card, never over it, and it takes no clicks. Dressed like a tip (.gt-tip):
-   the violet box with the cyan bar, a white gist, the rest under a rule; the HUD's words take .gt-lit's colours. */
-.tb-info { position: absolute; z-index: 30; width: 330px; max-width: calc(100% - 16px); box-sizing: border-box; padding: 12px 14px 10px; pointer-events: none; background: rgba(10, 5, 20, 0.97); border: 1px solid var(--user); border-left-width: 3px; box-shadow: 0 0 14px rgba(0, 0, 0, 0.6), 0 0 8px rgba(127, 233, 255, 0.25); color: #cfeff7; animation: tb-deal 200ms ease-out both; }
+/* A card in words (card-info.ts): beside the card, never over it, and it takes no clicks. The HUD trace's frame
+   (style.css .hv-*), a leader from the card; the HUD's words take .gt-lit's colours. Over every card on the table. */
+.tb-info { z-index: 30; width: 340px; max-width: calc(100% - 16px); pointer-events: none; animation: tb-deal 200ms ease-out both; }
 .tb-info[hidden] { display: none; }
-.tb-info-title { font: 22px/1 var(--pixel); letter-spacing: 0.16em; color: var(--user); }
-.tb-info-line { font: 12.5px/1.42 var(--mono); }
-.tb-info-gist { margin: 6px 0 0; font: 600 14px/1.4 var(--mono); color: #fff; }
-.tb-info-rows { display: grid; gap: 6px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(127, 233, 255, 0.2); }
 /* A long press on a card opens its panel, not the browser's image menu. */
 .tb button[data-id] img { -webkit-touch-callout: none; }
 
@@ -879,7 +891,7 @@
 .tb.hud:not(.phone) .tb-levers .tb-close { color: #05020a; background: #ffc56b; border-color: #ffc56b; }
 /* The line's keys stand where a long report's rolls end (playtest): they step out with the debrief up,
    and CLOSE brings them back on her closing line. */
-#game:has(> .tb.hud:not([hidden]):not(.phone) .tb-debrief) .line-keys { display: none; }
+#game:has(> .tb.hud:not([hidden]):not(.phone) .tb-debrief) .line-keys { display: none !important; }
 /* A waiting roll, its picked cost and the answers beside it ran down onto a full hand (playtest): the
    answers stay 3:4 at a smaller size, and the roll stands closer over them. */
 .tb.hud:not(.phone) .tb-deal:has(> .tb-parked) { gap: 6px; }
@@ -904,87 +916,6 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .tb-foil .tbc-pic::after { animation: none; }
-}
-
-/* A call as a printed card (mockup position-cards.html, C1): the crew cards' stock and size, its stat's picture filling it,
-   the words on a fade, the position's colour on the line round the picture. Five in a deal, or one asking THAT'S MY CHOICE,
-   stay wide: a second row would run onto the hand, and the question doesn't fit. */
-.tb.hud:not(.phone) .tb-deal:not(:has(> .tb-card:nth-of-type(5))) > .tb-card:is(:has(> .tb-call), :has(> .tb-plain)):not(:has(.tb-said)) {
-  width: 192px;
-  height: 256px;
-  min-height: 0;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  border-radius: 11px;
-  clip-path: none;
-  text-align: center;
-  background: #09080b linear-gradient(125deg, #2c1d10 0%, #15131a 30%, #3f3c47 46%, #14161c 60%, #10242e 100%) 27% 30% / 240% 240%;
-  box-shadow: 0 2px 7px rgba(0, 0, 0, 0.7);
-
-  /* The crew cards' light across the whole card. */
-  &::before { content: ''; position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; mix-blend-mode: screen; opacity: 0.4; background: linear-gradient(125deg, rgba(240, 170, 95, 0.5) 0%, rgba(240, 170, 95, 0) 30%, rgba(255, 250, 240, 0.32) 46%, rgba(120, 190, 225, 0) 60%, rgba(90, 170, 215, 0.5) 100%) 27% 30% / 240% 240%; }
-  &:hover[data-state='up'] { box-shadow: 0 0 14px color-mix(in srgb, var(--pc, #7fe9ff) 55%, transparent); }
-  &.is-locked { box-shadow: 0 0 0 2px var(--user); }
-  /* A result takes over the line round the picture, heavier. */
-  &.is-pass { --pc: #7dff9b; --edge: 2px; }
-  &.is-cost { --pc: #ffc56b; --edge: 2px; }
-  &.is-fail { --pc: #ff5a5a; --edge: 2px; }
-  /* A card you can't play dims with its frame; opacity stays the deal's, for the roll's fade. */
-  &:has(> .none) { filter: brightness(0.5) saturate(0.6); }
-
-  > .tb-face { position: absolute; inset: 8px; display: block; width: auto; min-height: 0; border-radius: 3px; background: #05020a; box-shadow: 0 0 0 var(--edge, 1px) color-mix(in srgb, var(--pc, #57525e) 62%, #57525e); }
-  > .tb-face.none { opacity: 1; }
-  .tb-side { position: absolute; inset: 0; overflow: hidden; border: 0; border-radius: 3px; background: #05020a; }
-  .tb-main { position: absolute; z-index: 1; left: 0; right: 0; bottom: 0; gap: 4px; padding: 26px 8px 7px; border-radius: 0 0 3px 3px; background: linear-gradient(to bottom, transparent, rgba(5, 2, 10, 0.86) 24px, rgba(5, 2, 10, 0.97)); }
-  .tb-line { display: block; font: 13px/1.36 'Libre Baskerville', Georgia, serif; letter-spacing: 0; color: #f0e6cd; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9); }
-  .tb-foot { align-items: center; margin-top: 0; }
-  .tb-flags { justify-content: center; }
-  .tb-tag, .tb-flags .tb-flag { padding: 1px 4px 0; font-size: 12px; letter-spacing: 0.1em; }
-  .tb-tray { justify-content: center; gap: 6px; }
-  /* The symbol says the stat; the words are on the hover panel. */
-  .tb-stat { display: none; }
-  .tb-cells i { width: 12px; height: 12px; box-shadow: 0 0 4px var(--c); }
-  .tb-sum { margin-left: 0; font-size: 24px; }
-  .tb-sum small { font-size: 12px; }
-  .tb-say { justify-content: center; }
-  .tb-side-word, .tb-eff { align-self: center; font-size: 14px; letter-spacing: 0.14em; }
-  .tb-eff { color: #ecd9a8; }
-  .tb-eff.small { color: rgba(236, 217, 168, 0.6); }
-  .tb-eff.big { color: #ffc56b; text-shadow: none; }
-  .tb-side .tbc-mark { top: 7px; }
-  .tb-side .tbc-symbol { left: 7px; width: 26px; }
-  /* Sources hang off the foot, as abilities do off a crew card. */
-  .tb-srcs { top: calc(100% + 6px); left: 2px; }
-
-  /* No dice: the black card, its line and what it is, in the middle. */
-  > .tb-plain .tb-main { top: 0; justify-content: center; gap: 12px; padding: 8px; background: none; }
-  > .tb-plain .tb-foot { margin-top: 0; }
-  .tb-noroll { font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: rgba(236, 217, 168, 0.6); }
-  &.cover > .tb-plain { box-shadow: 0 0 0 1px var(--tool); }
-}
-/* A card asking THAT'S MY CHOICE stays wide, at its own height beside the printed ones. */
-.tb.hud:not(.phone) .tb-deal > .tb-card:has(.tb-said) { align-self: flex-start; }
-/* A roll waiting on its costs: a small print of the card beside the dice, clear of the costs under it. */
-.tb.hud:not(.phone) .tb-parked .tb-card {
-  width: 99px;
-  height: 132px;
-  min-height: 0;
-  padding: 0;
-  overflow: hidden;
-  border: 0;
-  border-radius: 7px;
-  clip-path: none;
-  background: #09080b linear-gradient(125deg, #2c1d10 0%, #15131a 30%, #3f3c47 46%, #14161c 60%, #10242e 100%) 27% 30% / 240% 240%;
-
-  &.is-pass { --pc: #7dff9b; }
-  &.is-cost { --pc: #ffc56b; }
-  &.is-fail { --pc: #ff5a5a; }
-  > .tb-face { position: absolute; inset: 5px; display: block; width: auto; min-height: 0; border-radius: 2px; box-shadow: 0 0 0 2px var(--pc, #57525e); }
-  .tb-side { position: absolute; inset: 0; overflow: hidden; border: 0; background: #05020a; }
-  .tb-main { display: none; }
-  .tb-side .tbc-symbol { left: 5px; width: 18px; }
-  .tb-side .tbc-mark { top: 5px; }
 }
 
 /* The approaches on the crew cards' stock, full size (mockup approach-cards.html, C). Three at 256 only clear the
@@ -1017,3 +948,652 @@
   .tbc-spared { color: #7dff9b; }
   .tbc-first { color: #ff8fa3; }
 }
+
+/* Ride-along replies (2026-11-08): while the contact speaks, the moment holds, named; picks wait for them. */
+.tb-held .tb-middle .tb-card, .tb-held .tb-levers { opacity: 0.45; pointer-events: none; transition: opacity 0.2s; }
+.tb-held-note { font: 12px/1.4 var(--mono, monospace); letter-spacing: 0.18em; color: #7fe3ff; text-align: center; margin-bottom: 8px; animation: tb-held-pulse 1.6s ease-in-out infinite; }
+@keyframes tb-held-pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .tb-held-note { animation: none; } }
+
+
+/* The deduction board (spec 2026-11-09-deduction-board §4), mockup B in docs/mockups/board-layouts.html (playtest pick):
+   AGAINST at the top, the suspects large with the named one's WHO, HOW and WHY under its portrait and the deductions
+   beside them, the hand fanned along the bottom. All of it keeps to one 780px column left of her figure (it ends at 1260px
+   on the stage; her talk is in the JOB column, which keeps the beat's words at 440px). */
+.tb.hud.tb-deduction > .tb-middle,
+.tb.hud.tb-deduction > .tb-levers,
+.tb.hud.tb-deduction > .tb-bottom { display: none; }
+.tb.hud.tb-deduction { grid-template-columns: minmax(220px, 440px) 780px 1fr; }
+.tb-dboard { display: contents; --dd-gold: #ffd76a; --dd-alert: #ff5a5a; }
+.tb-dboard[hidden] { display: none; }
+/* The main column fills the HUD's middle row exactly, so what it holds ends where the fan begins (playtest). */
+.tb-dboard .dd-main { grid-row: 2; grid-column: 2; align-self: stretch; }
+/* The fan rests above the chat bar: the table already stops at the input line (.tb.hud's bottom), and the fan's cards
+   sit whole inside its row, so nothing hangs over the bar (playtest). */
+.tb-dboard .dd-hand { grid-row: 3; grid-column: 2; }
+.dd-main { position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 8px; min-height: 0; }
+.dd-patience { display: flex; align-items: center; gap: 5px; font: 14px var(--pixel); letter-spacing: 0.3em; color: #ff4f8b; }
+.dd-patience i { display: inline-block; width: 30px; height: 14px; border: 1px solid currentColor; }
+.dd-patience i.f { background: currentColor; }
+.dd-patience span { margin-left: 6px; }
+.dd-against { display: flex; align-items: flex-start; justify-content: center; gap: 24px; }
+.dd-against > .dd-vs { margin-top: 26px; }
+/* A pinned card keeps its whole picture; its words print under the slot, in the card's own type (clue card mockups, E). */
+.dd-sw { width: 190px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+/* The caption's room is kept whether or not a card is pinned, so pinning doesn't push the suspects into the fan. */
+.dd-cap { align-self: stretch; height: 64px; overflow: hidden; }
+.dd-cap-src { display: block; margin-bottom: 3px; font: 13px/1.1 'Special Elite', 'Courier Prime', monospace; letter-spacing: 0.08em; color: #d9cfba; }
+.dd-cap-line { display: block; font: 11.5px/1.35 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #eee6d4; text-shadow: 0 1px 2px #000; }
+/* A pinned card shows larger than the hand, so the two lines read side by side. */
+.dd-slot { width: 132px; height: 186px; border: 1px dashed rgba(255, 90, 90, 0.75); border-radius: 8px; display: grid; place-items: center; background: rgba(5, 2, 10, 0.5); }
+/* A pinned card shows at its hand size: its words are printed under the slot now, larger than on the card. */
+.dd-slot > .dd-card { transform: none; }
+.dd-empty { font: 15px var(--pixel); letter-spacing: 0.2em; color: rgba(255, 90, 90, 0.6); }
+.dd-vs { width: 330px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.dd-vs b { font: 600 30px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.12em; color: var(--dd-alert); }
+.dd-press, .dd-accuse { font: 600 24px/1.1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.14em; color: var(--dd-alert); background: rgba(5, 2, 10, 0.75); border: 1px solid currentColor; padding: 6px 14px 2px; cursor: pointer; }
+.dd-press { white-space: nowrap; font-size: 21px; }
+.dd-press:disabled, .dd-accuse:disabled { color: #5a4a55; cursor: default; }
+.dd-verdict { min-height: 40px; max-height: 62px; overflow: hidden; max-width: 330px; text-align: center; font: italic 13.5px/1.45 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #ecd9a8; text-shadow: 0 1px 2px #000; }
+/* The case field: the suspects, and the deductions to file beside them. */
+.dd-field { flex: 1 1 auto; display: grid; grid-template-columns: minmax(0, 1fr) 220px; grid-template-rows: minmax(0, 1fr); gap: 16px; min-height: 0; }
+.dd-left { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dd-sus { display: flex; gap: 12px; align-items: flex-start; }
+.dd-suspect { flex: 1; min-width: 0; display: flex; flex-direction: column; border: 1px solid #2c2340; background: rgba(5, 2, 10, 0.78); transition: flex 160ms ease-out; }
+.dd-suspect.on { flex: 3.4; border: 2px solid var(--dd-alert); box-shadow: 0 0 14px rgba(255, 90, 90, 0.5); }
+/* The named card lies on its side, portrait left and WHO, HOW and WHY beside it, so the field stays short enough to keep
+   above the fan. The others drop their role line to make room (it's still the button's title). */
+.dd-suspect.on { position: relative; display: grid; grid-template-columns: 112px minmax(0, 1fr); grid-template-rows: 186px; }
+.dd-sus:has(.dd-suspect.on) .dd-suspect:not(.on) .dd-rl { display: none; }
+.dd-pick { position: relative; display: block; padding: 0; border: 0; background: none; color: inherit; text-align: left; cursor: pointer; }
+.dd-pick img { display: block; width: 100%; height: 150px; object-fit: cover; object-position: 50% 20%; image-rendering: pixelated; }
+/* The named suspect's portrait runs the card's full height beside its blanks. */
+/* The portrait column: the portrait, then ACCUSE as a bar under it, never over the face (mockup accuse-panel.html D). */
+.dd-pcol { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid rgba(255, 90, 90, 0.35); }
+.dd-pcol > .dd-pick { flex: 1; min-height: 0; }
+.dd-suspect.on .dd-pick img { height: 100%; }
+/* A suspect's name is typed over the portrait's top, bare, as the clue cards' are; the role sits on smoke at its foot. */
+.dd-suspect .dd-nm { position: absolute; z-index: 2; left: 7px; right: 6px; top: 7px; font: 14px/1.1 'Special Elite', 'Courier Prime', monospace; letter-spacing: 0.06em; color: #e9e0cc; transform: rotate(-1deg); text-shadow: 0 0 2px rgba(0, 0, 0, 0.95), 0 1px 2px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.85), 0 0 10px rgba(0, 0, 0, 0.6); }
+.dd-suspect.on .dd-nm { color: #f2ead8; }
+.dd-rl { position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 7px 6px; background: linear-gradient(rgba(10, 8, 12, 0), rgba(10, 8, 12, 0.62) 22%, rgba(10, 8, 12, 0.7)); font: 11px/1.3 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #e2d8c4; text-shadow: 0 1px 2px #000; }
+.dd-hint { font: 14px/1.3 var(--pixel); letter-spacing: 0.16em; color: rgba(255, 215, 106, 0.6); }
+.dd-hint[hidden] { display: none; }
+.dd-blanks { display: flex; flex-direction: column; justify-content: space-around; padding: 6px 10px 6px 8px; min-width: 0; }
+/* Each blank one row: the word, then its slot (the question shows in the slot while it's empty). */
+.dd-blank { display: grid; grid-template-columns: 42px minmax(0, 1fr); gap: 4px; align-items: center; }
+.dd-q { min-width: 0; white-space: nowrap; font: 600 16px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.16em; color: var(--dd-gold); }
+/* A slot in the HUD's fine cut outline (as DEDUCTIONS' rows): its question in pixel caps while empty, amber once filed. */
+.dd-bslot {
+  position: relative;
+  min-height: 0;
+  padding: 6px 10px;
+  border: 0;
+  font: 11px/1.25 var(--pixel);
+  letter-spacing: 0.08em;
+  color: #8fb3bd;
+  background: rgba(10, 5, 20, 0.5);
+  box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.22);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  cursor: pointer;
+}
+.dd-bslot.hot { box-shadow: inset 0 0 0 1px var(--dd-gold), inset 0 0 12px rgba(255, 197, 107, 0.25); }
+.dd-bslot.full { padding: 4px 9px; font: 11px/1.3 var(--chat-font, 'Libre Baskerville', Georgia, serif); letter-spacing: 0; color: #f6e8bf; background: rgba(40, 28, 6, 0.55); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--dd-gold) 70%, transparent); }
+/* A filed deduction shows two whole lines, then an ellipsis (the clamp sits inside the padding, so no third line peeks). */
+.dd-t { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.dd-bslot .dd-k { display: inline; margin: 0 6px 0 0; }
+/* ACCUSE sits on the foot of the named suspect's portrait, where the role was, so it adds no row under the blanks and
+   stays clear of the fan however long the deductions filed are (playtest, 2026-11-10). */
+/* The panel keeps its own layers, so ACCUSE rides over the portrait but never over a hand card lifted into it (playtest). */
+.dd-suspect.on { isolation: isolate; }
+.dd-pcol > .dd-accuse { width: 100%; margin: 0; padding: 6px 0 2px; font-size: 21px; }
+.dd-suspect.on .dd-rl { display: none; }
+.dd-k { display: block; font: 14px/1 var(--pixel); letter-spacing: 0.16em; color: var(--dd-gold); margin-bottom: 3px; }
+/* The deductions column scrolls inside the field rather than running on under the fan (playtest, 2026-11-11). */
+.dd-dcol { display: flex; flex-direction: column; gap: 6px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+.dd-dcol > * { flex: none; }
+.dd-dcol > .dd-accuse { margin-bottom: 4px; }
+.dd-h { font: 16px var(--pixel); letter-spacing: 0.2em; color: var(--dd-gold); }
+.dd-deds { display: flex; flex-direction: column; gap: 6px; }
+/* The hand: a fan of fixed strips (deduction.ts places them). Only the picture inside a strip lifts, so the card under the
+   pointer is decided by x alone and nothing flickers (playtest); the hovered strip reaches up over its lifted card so the
+   pointer can rise onto it. */
+/* The fan's box takes no clicks itself, only its strips, so it never blocks what's above it. */
+.tb-dboard .dd-hand { position: relative; z-index: 2; width: 780px; height: 182px; margin-bottom: 4px; pointer-events: none; }
+.dd-fs { position: absolute; top: 0; height: 182px; cursor: pointer; pointer-events: auto; }
+.dd-fs > .dd-card { position: absolute; left: 0; top: 4px; pointer-events: none; transform: rotate(var(--r, 0deg)); transform-origin: 50% 100%; }
+.dd-fs:hover { z-index: 40; }
+/* A card lifts to read, as the accounts board's: its words are always on its face, so no zoom. */
+.dd-fs:hover > .dd-card { transform: translateY(-24px); }
+/* The clue card as the accounts board's (playtest 2026-11-12, "without the images"): a dark face in the HUD's fine cut
+   outline, a stripe of its kind down the left, its source typed, its kind in pixel caps, its line always showing. */
+.dd-card { --pc: #8fb3bd; position: relative; display: flex; flex-direction: column; flex: none; width: 120px; height: 174px; padding: 9px 9px 8px 11px; border: 0; color: #e6e2ec; text-align: left; cursor: pointer; background: linear-gradient(#1a1324, #0d0914); box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.28), 0 4px 10px rgba(0, 0, 0, 0.6); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); transition: transform 120ms ease-out, opacity 120ms; transform-origin: 50% 100%; }
+.dd-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--pc); opacity: 0.8; }
+.dd-card[data-k='body'], .dd-card[data-k='nix'] { --pc: #ff4f8b; } .dd-card[data-k='street'] { --pc: #8fd6d9; } .dd-card[data-k='grid'] { --pc: #7fe9ff; }
+.dd-card[data-k='notebook'] { --pc: #ffc56b; } .dd-card[data-k='said'] { --pc: #e9dcc0; }
+.dd-card.used { opacity: 0.25; }
+.dd-card .dd-nm { font: 13px/1.1 'Special Elite', 'Courier Prime', monospace; letter-spacing: 0.04em; color: #e9e0cc; }
+.dd-ft { margin-top: 3px; font: 12px var(--pixel); letter-spacing: 0.16em; color: color-mix(in srgb, var(--pc) 75%, #a29bb0); }
+.dd-line { flex: none; margin-top: 6px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 8; line-clamp: 8; font: 11px/1.3 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #e6e2ec; }
+.dd-badge { position: absolute; z-index: 4; left: 50%; top: 46%; transform: translate(-50%, -50%) rotate(-8deg); padding: 2px 7px 0; font: 16px/1.1 var(--pixel); letter-spacing: 0.14em; border: 1px solid currentColor; background: rgba(5, 2, 10, 0.85); }
+.dd-badge.bounced { color: #8fb3bd; } .dd-badge.filed { color: var(--dd-gold); }
+.dd-ded { border: 1px solid var(--dd-gold); background: rgba(40, 30, 6, 0.55); padding: 5px 8px; font: 11.5px/1.35 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #f6e8bf; cursor: pointer; text-align: left; }
+.dd-ded.sel { box-shadow: 0 0 0 2px var(--dd-gold), 0 0 14px rgba(255, 215, 106, 0.45); }
+.dd-ded.placed { opacity: 0.45; }
+.dd-ded.dim { border-style: dashed; border-color: #3c3326; background: none; color: #6f6550; cursor: default; }
+.dd-missing[hidden] { display: none; }
+/* In the JOB column's region (the trace board) the whole column goes with the board. */
+.dd-dcol[hidden] { display: none; }
+.dd-missing { display: flex; flex-direction: column; gap: 7px; margin-top: 6px; }
+.dd-missing .dd-h { color: #8fb3bd; }
+.dd-mc { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 8px; align-items: center; }
+.dd-back { width: 34px; height: 46px; border-radius: 4px; border: 1px solid #3a3150; background: repeating-linear-gradient(135deg, rgba(127, 233, 255, 0.14) 0 4px, rgba(127, 233, 255, 0.03) 4px 8px), #0b0618; }
+.dd-w { font: 14px/1.05 var(--pixel); letter-spacing: 0.12em; color: #b9c8d0; }
+.dd-w small { display: block; margin-top: 2px; font: 11.5px/1.3 var(--mono, monospace); letter-spacing: 0; color: #6f8a92; }
+/* While she speaks the board takes no moves (final review I3): it dims and says who's on the line. */
+.tb-dboard.held .dd-field, .tb-dboard.held .dd-hand, .tb-dboard.held .dd-slot, .tb-dboard.held .dd-press { pointer-events: none; opacity: 0.45; }
+.dd-held { font: 16px var(--pixel); letter-spacing: 0.2em; color: #7fe9ff; }
+.dd-held[hidden] { display: none; }
+
+
+/* ── The deduction board in the room HUD's language (playtest 2026-11-11) ──
+   AGAINST and its two THIS slots centre under the keys bar's drop (hud.ts publishes --bar-drop-mid; the board's column
+   starts at 480px, its centre at 870), narrowed to 640px so they clear the JOB column. The slots are fine cut-corner
+   outlines; PATIENCE a slanted track like the clocks; THEY CAN'T BOTH BE TRUE and ACCUSE outline keys in the board's red;
+   DEDUCTIONS and NOT IN YOUR HAND fine-outlined rows on the JOB column's neutral theme with an amber key. The hand lies
+   flat along the whole bottom (deduction.ts), and the clocks step out: nothing on the board moves them. */
+.tb-dboard { --dd-gold: #ffc56b; --dd-line: color-mix(in srgb, #ffc56b 38%, rgba(230, 220, 242, 0.25)); --dd-text: #e6e2ec; --dd-dim: #a29bb0; }
+.tb.hud.tb-deduction .tb-right { visibility: hidden; }
+.tb-dboard .dd-hand { grid-column: 1 / 3; width: 1236px; }
+.dd-fs > .dd-card { transform: none; }
+.dd-fs:hover > .dd-card { transform: translateY(-24px); }
+/* A card lifted to read rises over the JOB column (its layer would cover the cards under it, review); the first grows
+   rightward, so it stays on the stage. */
+#game:has(> .tb.tb-deduction .dd-fs:hover) > .tb.tb-deduction { z-index: 25; }
+.dd-fs:first-child > .dd-card { transform-origin: 0 100%; }
+/* Held inside the board's column (±70px of its centre): a short or long room name moves the drop (review). */
+.dd-against { position: relative; left: clamp(-70px, calc(var(--bar-drop-mid, 870px) - 870px), 70px); align-self: center; width: 640px; gap: 20px; }
+.dd-sw { width: 150px; }
+.dd-vs { width: 300px; }
+.dd-verdict { max-width: 300px; color: #fff6e8; }
+.dd-slot {
+  position: relative;
+  border: 0;
+  border-radius: 0;
+  background:
+    linear-gradient(to bottom left, transparent calc(50% - 0.6px), rgba(230, 220, 242, 0.3) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 0 / 11px 11px no-repeat,
+    linear-gradient(to bottom left, transparent calc(50% - 0.6px), rgba(230, 220, 242, 0.3) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 100% / 11px 11px no-repeat,
+    rgba(10, 5, 20, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.3);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+.dd-slot:has(> .dd-card) { background: none; box-shadow: none; clip-path: none; }
+.dd-empty { font: 14px var(--pixel); letter-spacing: 0.28em; color: rgba(230, 220, 242, 0.45); }
+.dd-patience { gap: 6px; color: #ff4f8b; }
+.dd-patience i { width: 24px; height: 9px; border: 1px solid color-mix(in srgb, currentColor 55%, transparent); transform: skewX(-30deg); }
+.dd-patience i.f { background: currentColor; border-color: currentColor; box-shadow: 0 0 6px color-mix(in srgb, currentColor 60%, transparent); }
+.dd-patience span { margin-left: 10px; font-size: 15px; letter-spacing: 0.22em; color: color-mix(in srgb, currentColor 80%, #fff); }
+/* Over her chest (deduction.ts placeClock): centred on the point, on a dark cut plate in the HUD's line so it reads on
+   any outfit; the track runs left of the word. */
+.dd-patience.on-fig {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  padding: 7px 12px 6px 14px;
+  background: rgba(10, 5, 20, 0.72);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 45%, transparent);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  pointer-events: none;
+  white-space: nowrap;
+}
+.dd-vs b { font: 500 34px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.16em; text-shadow: 0 0 10px rgba(255, 90, 90, 0.35), 0 1px 2px #000; }
+.dd-hint { color: var(--dd-dim); }
+/* The board's two keys, as the table's: a fine outline cut top-left and bottom-right in red, no fill; lit on hover. */
+.dd-press, .dd-accuse {
+  --kc: var(--dd-alert);
+  --kl: color-mix(in srgb, var(--kc) 60%, rgba(230, 238, 247, 0.3));
+  position: relative;
+  isolation: isolate;
+  border: 0;
+  background: none;
+  color: color-mix(in srgb, var(--kc) 80%, #fff);
+  text-shadow: 0 1px 2px #000;
+}
+.dd-press::before, .dd-accuse::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 9px 9px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 9px 9px no-repeat,
+    rgba(10, 5, 20, 0.6);
+  box-shadow: inset 0 0 0 1px var(--kl);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.dd-press:hover:not(:disabled), .dd-accuse:hover:not(:disabled) { --kl: var(--kc); color: #fff; filter: drop-shadow(0 0 4px var(--kc)); }
+.dd-press:disabled, .dd-accuse:disabled { --kl: rgba(230, 220, 242, 0.2); color: rgba(230, 220, 242, 0.32); }
+/* Under the portrait ACCUSE is a bar, not a cut key: a hairline over it, a red wash once it's open. */
+.dd-pcol > .dd-accuse::before { clip-path: none; background: rgba(10, 5, 20, 0.6); box-shadow: inset 0 1px 0 var(--kl); }
+.dd-pcol > .dd-accuse:not(:disabled)::before { background: rgba(255, 90, 90, 0.12); }
+/* The named card's frame: the HUD's 1px line in red, cut top-left and bottom-right, a hairline across each cut. */
+.dd-suspect.on {
+  border: 0;
+  box-shadow: none;
+  background: rgba(5, 2, 10, 0.82);
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+}
+.dd-suspect.on::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--dd-alert) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 11px 11px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--dd-alert) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 11px 11px no-repeat;
+  box-shadow: inset 0 0 0 1px var(--dd-alert);
+}
+/* The trace's layer over the case field (deduction.ts drawTrace); under a lifted hand card, never taking the pointer. */
+.dd-field { position: relative; }
+.dd-trace { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; shape-rendering: crispEdges; }
+.dd-trace .tl { fill: none; stroke: var(--dd-gold); stroke-width: 1; stroke-opacity: 0.4; }
+.dd-trace .tn { fill: var(--dd-gold); opacity: 0.45; }
+.dd-trace .tl.lit { stroke-opacity: 0.9; }
+.dd-trace .tn.lit { opacity: 1; }
+/* DEDUCTIONS and NOT IN YOUR HAND: a pixel head with a hairline, rows in a fine cut outline, their key in amber small
+   caps and their words in the neutral text. */
+.dd-h { display: flex; align-items: center; gap: 10px; font: 15px var(--pixel); letter-spacing: 0.26em; color: var(--dd-gold); }
+.dd-h::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--dd-line), transparent); }
+.dd-ded {
+  position: relative;
+  border: 0;
+  padding: 6px 9px 7px;
+  font: 11.5px/1.4 var(--chat-font, 'Libre Baskerville', Georgia, serif);
+  color: var(--dd-text);
+  background: rgba(10, 5, 20, 0.55);
+  box-shadow: inset 0 0 0 1px var(--dd-line);
+  clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+}
+.dd-ded .dd-k { color: var(--dd-gold); }
+.dd-ded:hover:not(.dim) { box-shadow: inset 0 0 0 1px var(--dd-gold); }
+.dd-ded.sel { box-shadow: inset 0 0 0 1px var(--dd-gold), inset 0 0 14px rgba(255, 197, 107, 0.25); }
+.dd-ded.dim { box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.14); background: none; color: var(--dd-dim); font-style: italic; }
+/* The cut clips the browser's focus ring: an inset one instead (review). */
+.dd-ded:focus-visible, .dd-press:focus-visible, .dd-accuse:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--dd-gold); }
+.dd-missing .dd-h { color: var(--dd-dim); }
+.dd-missing .dd-h::after { background: linear-gradient(90deg, rgba(230, 220, 242, 0.22), transparent); }
+.dd-mc { padding: 4px 6px; box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.12); clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); }
+.dd-w { color: var(--dd-text); }
+.dd-w small { color: var(--dd-dim); }
+/* THEY CAN'T BOTH BE TRUE counts it out (playtest 2026-11-11, from the courtroom games): 3, 2, 1 over AGAINST, each
+   number slamming in, the pair pinned in its slots and the rest of the board dimmed and still; then the verdict stamps
+   in under AGAINST, amber for a deduction filed, red for a bounce or a near miss (deduction.ts land). */
+.dd-vs { position: relative; }
+.dd-count {
+  position: absolute;
+  left: -40px;
+  right: -40px;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  font: 500 128px/1 var(--cs-teko, 'Teko', var(--pixel));
+  color: #fff;
+  text-shadow: 0 0 18px rgba(255, 90, 90, 0.75), 0 0 40px rgba(255, 90, 90, 0.4), 0 3px 4px #000;
+  background: radial-gradient(ellipse 50% 50% at 50% 50%, rgba(5, 2, 10, 0.88), rgba(5, 2, 10, 0) 72%);
+  pointer-events: none;
+}
+.dd-count[hidden] { display: none; }
+.dd-count.tick { animation: dd-count 800ms cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+@keyframes dd-count {
+  0% { transform: scale(1.7); opacity: 0; }
+  20% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.94); opacity: 0.85; }
+}
+.tb-dboard.counting .dd-field, .tb-dboard.counting .dd-hand { opacity: 0.45; transition: opacity 200ms; }
+/* The number stands alone between the pinned pair: AGAINST, its key and the patience track step out till it lands. */
+.tb-dboard.counting .dd-vs > :is(b, .dd-press, .dd-patience, .dd-verdict) { visibility: hidden; }
+.tb-dboard.counting :is(.dd-field, .dd-hand, .dd-slot, .dd-press, .dd-accuse) { pointer-events: none; }
+.dd-verdict.stamp { animation: dd-stamp 280ms cubic-bezier(0.2, 0.8, 0.3, 1) both; font-size: 15px; }
+.dd-verdict.hit { color: var(--dd-gold); text-shadow: 0 0 10px rgba(255, 197, 107, 0.45), 0 1px 2px #000; }
+.dd-verdict.miss { color: #ff7a7a; text-shadow: 0 0 10px rgba(255, 90, 90, 0.45), 0 1px 2px #000; }
+@keyframes dd-stamp {
+  0% { transform: scale(1.35); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dd-count.tick, .dd-verdict.stamp { animation: none; }
+}
+
+/* The accounts board (Two Stories spec 2026-11-10 §5), in the room HUD's language: mockup accounts-hud.html A (playtest
+   pick 2026-11-12). The two listeners side by side in the deduction board's 780px column, the glass a cyan trace in the
+   gap between them (accounts.ts drawTrace), TELL under both; the hand flat along the whole bottom from the JOB column's
+   edge; the clocks step out. Fine 1px cut outlines, pixel heads on hairlines, slanted patience tracks. */
+.tb.hud.tb-accounting > .tb-middle,
+.tb.hud.tb-accounting > .tb-levers,
+.tb.hud.tb-accounting > .tb-bottom { display: none; }
+.tb.hud.tb-accounting { grid-template-columns: minmax(220px, 440px) 780px 1fr; }
+.tb.hud.tb-accounting .tb-right { visibility: hidden; }
+.tb-accounts { display: contents; --ac-gold: #ffc56b; --ac-alert: #ff5a5a; --ac-glass: #7fe9ff; --ac-text: #e6e2ec; --ac-dim: #a29bb0; --ac-q: #8fb3bd; --ac-line: color-mix(in srgb, #ffc56b 38%, rgba(230, 220, 242, 0.25)); }
+.tb-accounts[hidden] { display: none; }
+.tb-accounts .ac-main { grid-row: 2; grid-column: 2; align-self: stretch; }
+.tb-accounts .ac-hand { grid-row: 3; grid-column: 1 / 3; }
+.ac-main { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.ac-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; min-height: 18px; }
+.ac-heldby { font: 16px var(--pixel); letter-spacing: 0.2em; color: var(--ac-glass); }
+.ac-heldby[hidden] { display: none; }
+.ac-line { flex: 1; text-align: right; font: italic 13px/1.4 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: #ecd9a8; text-shadow: 0 1px 2px #000; }
+.ac-field { position: relative; display: grid; grid-template-columns: 360px 60px 360px; align-items: start; }
+.ac-col { min-width: 0; display: flex; flex-direction: column; gap: 6px; --ac-who: var(--ac-text); }
+.ac-who { display: flex; gap: 12px; align-items: center; }
+/* The bust in a cut frame of her colour. */
+.ac-bust { width: 50px; height: 50px; flex: none; object-fit: cover; object-position: 50% 15%; image-rendering: pixelated; background: #0d0818; box-shadow: inset 0 0 0 1px var(--ac-who); clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); outline: 1px solid var(--ac-who); outline-offset: -1px; }
+span.ac-bust { display: grid; place-items: center; font: 34px var(--pixel); color: var(--ac-who); }
+.ac-nmb { display: flex; flex-direction: column; gap: 5px; }
+.ac-name { font: 500 28px/0.9 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.14em; color: color-mix(in srgb, var(--ac-who) 85%, #fff); text-shadow: 0 1px 2px #000; }
+/* Patience: the slanted track, as the deduction board's, by her name. */
+.ac-pat { display: flex; gap: 5px; align-items: center; color: #ff4f8b; }
+.ac-pat i { display: inline-block; width: 22px; height: 8px; border: 1px solid color-mix(in srgb, currentColor 55%, transparent); transform: skewX(-30deg); }
+.ac-pat i.on { background: currentColor; border-color: currentColor; box-shadow: 0 0 6px color-mix(in srgb, currentColor 60%, transparent); }
+.ac-pat.gone { color: var(--ac-alert); }
+.ac-patw { margin-left: 8px; font: 13px var(--pixel); letter-spacing: 0.22em; color: color-mix(in srgb, currentColor 80%, #fff); }
+/* A pixel head on a hairline: THEY'VE GOT dim, ASKS amber. */
+.ac-h { display: flex; align-items: center; gap: 10px; font: 15px var(--pixel); letter-spacing: 0.26em; color: var(--ac-gold); }
+.ac-h::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--ac-line), transparent); }
+.ac-h.dim { color: var(--ac-dim); }
+.ac-h.dim::after { background: linear-gradient(90deg, rgba(230, 220, 242, 0.22), transparent); }
+.ac-got { display: flex; flex-direction: column; gap: 5px; }
+.ac-heldrow { display: flex; flex-wrap: wrap; gap: 5px; min-height: 22px; }
+.ac-none { font: 12px var(--pixel); letter-spacing: 0.12em; color: var(--ac-dim); }
+/* THEY'VE GOT: small face-down chips in the cut outline; a pressed one turns up in red with its words; the glass's in cyan. */
+.ac-held { padding: 3px 8px 2px; font: 13px/1.15 var(--pixel); letter-spacing: 0.12em; color: var(--ac-dim); background: rgba(10, 5, 20, 0.5); box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.18); clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 6px 100%, 0 calc(100% - 6px)); white-space: nowrap; }
+.ac-held.unmarked { min-width: 26px; text-align: center; }
+.ac-held.glass { color: var(--ac-glass); white-space: normal; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-glass) 55%, transparent); }
+.ac-held small { margin-right: 6px; font-size: 12px; letter-spacing: 0.14em; opacity: 0.8; }
+.ac-held.up { white-space: normal; color: var(--ac-text); background: rgba(60, 8, 12, 0.5); box-shadow: inset 0 0 0 1px var(--ac-alert); font: 11.5px/1.35 var(--chat-font, 'Libre Baskerville', Georgia, serif); letter-spacing: 0; }
+.ac-held.up b { display: block; font: 13px var(--pixel); letter-spacing: 0.12em; color: #ffb0b0; font-weight: 400; margin-bottom: 2px; }
+.ac-held.up.glass { box-shadow: inset 0 0 0 1px var(--ac-glass); }
+.ac-held.up.glass b { color: var(--ac-glass); }
+.ac-blanks { display: flex; flex-direction: column; gap: 6px; }
+/* A blank: the cut outline; empty, its question in pixel caps; filled, amber (a cover in red), the card's two lines. */
+.ac-blank { position: relative; min-height: 46px; padding: 5px 10px; background: rgba(10, 5, 20, 0.5); box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.22); clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px)); cursor: pointer; }
+.ac-blank.hot { box-shadow: inset 0 0 0 1px var(--ac-gold), inset 0 0 12px rgba(255, 197, 107, 0.25); }
+.ac-blank.full { background: rgba(40, 28, 6, 0.55); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-gold) 70%, transparent); }
+.ac-blank.full:has(.ac-in.cover) { background: rgba(30, 10, 12, 0.55); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-alert) 55%, transparent); }
+.ac-blank.locked { cursor: default; }
+.ac-q { font: 12px/1.25 var(--pixel); letter-spacing: 0.1em; color: var(--ac-q); padding-right: 30px; }
+.ac-pin { position: absolute; right: 8px; top: 5px; font: 12px var(--pixel); letter-spacing: 0.14em; color: var(--ac-gold); }
+.ac-in { display: block; color: var(--ac-text); }
+.ac-k { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+.ac-in .ac-src { font: 13px/1 var(--pixel); letter-spacing: 0.16em; color: var(--ac-gold); font-weight: 400; }
+.ac-in.cover .ac-src { color: #ff8a8a; }
+.ac-in .ac-tf { font: 11px/1 var(--pixel); letter-spacing: 0.18em; color: var(--ac-dim); }
+.ac-in.cover .ac-tf { color: #ff8a8a; }
+.ac-blank.locked .ac-in .ac-tf { margin-right: 32px; }
+.ac-in .ac-ln { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font: 11.5px/1.3 var(--chat-font, 'Libre Baskerville', Georgia, serif); }
+.ac-said { min-height: 0; font: italic 12px/1.4 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: color-mix(in srgb, var(--ac-who) 70%, #fff); text-shadow: 0 1px 2px #000; }
+/* The eye: a node on the trace in the gap (drawTrace sets its top level with the other's THEY'VE GOT), its word down
+   the gap under it. */
+.ac-eye { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.ac-eye.none { visibility: hidden; }
+.ac-ball { position: relative; z-index: 2; width: 12px; height: 12px; background: #05020b; box-shadow: inset 0 0 0 1px var(--ac-glass); }
+.ac-ball::after { content: ''; position: absolute; inset: 4px; background: var(--ac-glass); box-shadow: 0 0 6px var(--ac-glass); }
+.ac-eye.dark .ac-ball { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ac-glass) 35%, transparent); }
+.ac-eye.dark .ac-ball::after { background: #20282e; box-shadow: none; }
+.ac-st { position: relative; z-index: 2; writing-mode: vertical-rl; font: 13px var(--pixel); letter-spacing: 0.24em; color: var(--ac-glass); text-shadow: 0 0 3px #05020b, 0 0 6px #05020b; }
+.ac-eye.dark .ac-st { color: var(--ac-dim); }
+/* The glass's trace (accounts.ts drawTrace), over the field, under a lifted hand card, never taking the pointer. */
+.ac-trace { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 1; shape-rendering: crispEdges; }
+.ac-trace .gl { fill: none; stroke: var(--ac-glass); stroke-width: 1; stroke-opacity: 0.45; stroke-dasharray: 4 3; }
+.ac-trace .gl.lit { stroke-opacity: 0.95; stroke-dasharray: none; }
+.ac-trace .gl.dk { stroke-opacity: 0.25; }
+.ac-trace .gn { fill: var(--ac-glass); opacity: 0.5; }
+.ac-trace .gn.lit { opacity: 1; }
+/* TELL: the board's red key, cut top-left and bottom-right, at the foot of the board's row under the glass (never pushed
+   into the hand by a tall column); a word under it says what's left. */
+.ac-tell {
+  --kc: var(--ac-alert);
+  --kl: color-mix(in srgb, var(--kc) 70%, rgba(230, 238, 247, 0.3));
+  position: absolute;
+  isolation: isolate;
+  left: 270px;
+  bottom: 6px;
+  width: 240px;
+  padding: 6px 0 3px;
+  border: 0;
+  font: 600 24px/1 var(--cs-teko, 'Teko', var(--pixel));
+  letter-spacing: 0.2em;
+  color: color-mix(in srgb, var(--kc) 80%, #fff);
+  background: none;
+  cursor: pointer;
+  text-shadow: 0 1px 2px #000;
+}
+.ac-tell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 10px 10px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 10px 10px no-repeat,
+    rgba(10, 5, 20, 0.6);
+  box-shadow: inset 0 0 0 1px var(--kl);
+  clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px);
+}
+.ac-tell small { display: block; margin-top: 2px; font: 12px var(--pixel); letter-spacing: 0.18em; color: var(--ac-dim); }
+.ac-tell:hover:not(:disabled) { --kl: var(--kc); color: #fff; filter: drop-shadow(0 0 4px var(--kc)); }
+.ac-tell:disabled { --kl: rgba(230, 220, 242, 0.2); color: rgba(230, 220, 242, 0.32); cursor: default; }
+.ac-tell:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ac-gold); }
+/* The hand: flat along the whole bottom from the JOB column's edge, in fixed strips (accounts.ts); only the card inside a
+   strip lifts, and the hand's box takes no clicks itself. */
+.tb-accounts .ac-hand { position: relative; z-index: 2; width: 1236px; height: 182px; margin-bottom: 4px; }
+/* The hand's box takes no clicks, only its strips (this outranks the HUD's `> * > *` rule that turns them on). */
+.tb.hud .tb-accounts .ac-hand, .tb-accounts .ac-fan { pointer-events: none; }
+.ac-fan { position: absolute; left: 0; top: 0; width: 1236px; height: 182px; }
+.ac-fs { position: absolute; top: 0; height: 182px; cursor: pointer; pointer-events: auto; }
+.ac-fs > .ac-card { position: absolute; left: 0; top: 6px; pointer-events: none; }
+/* A card lifted to read rises over the JOB column, as the deduction board's; the first grows rightward. */
+#game:has(> .tb.tb-accounting .ac-fs:hover) > .tb.tb-accounting { z-index: 25; }
+.ac-fs:hover { z-index: 50; }
+.ac-fs:hover > .ac-card, .ac-card.sel { transform: translateY(-20px); }
+/* A card: a fine cut outline on a dark face, a stripe of its kind down the left; a cover's face red-dark. */
+.ac-card { --pc: #8fb3bd; position: relative; display: flex; text-align: left; flex-direction: column; width: 118px; height: 168px; padding: 9px 9px 8px 11px; background: linear-gradient(#1a1324, #0d0914); box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.28), 0 4px 10px rgba(0, 0, 0, 0.6); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); transition: transform 120ms ease-out; }
+.ac-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--pc); opacity: 0.8; }
+.ac-card[data-k='body'] { --pc: #ff4f8b; } .ac-card[data-k='street'] { --pc: #8fd6d9; } .ac-card[data-k='grid'] { --pc: #7fe9ff; }
+.ac-card[data-k='notebook'] { --pc: #ffc56b; } .ac-card[data-k='said'] { --pc: #e9dcc0; } .ac-card[data-k='cover'] { --pc: #ff5a5a; }
+.ac-card.cover { background: linear-gradient(#24121a, #12090d); }
+.ac-card.sel { z-index: 41; box-shadow: inset 0 0 0 1px var(--ac-gold), 0 0 14px rgba(255, 197, 107, 0.35); }
+.ac-card .ac-src { font: 13px/1.1 'Special Elite', 'Courier Prime', monospace; letter-spacing: 0.04em; color: #e9e0cc; }
+.ac-card .ac-ln { flex: none; margin-top: 6px; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 7; line-clamp: 7; font: 11px/1.3 var(--chat-font, 'Libre Baskerville', Georgia, serif); color: var(--ac-text); }
+.ac-ft { display: flex; margin-top: 3px; font: 12px var(--pixel); letter-spacing: 0.16em; color: var(--ac-dim); }
+.ac-card:not(.cover) .ac-tf { color: #7dff9b; }
+.ac-card.cover .ac-tf { color: #ff8a8a; }
+.ac-card.pressed::after { content: 'PRESSED'; position: absolute; top: 46%; left: 0; right: 0; text-align: center; font: 16px var(--pixel); letter-spacing: 0.2em; color: var(--ac-alert); background: rgba(10, 5, 20, 0.8); transform: rotate(-8deg); }
+/* While she speaks the board takes no moves: it dims and says who's on the line. */
+.tb-accounts.held .ac-field, .tb-accounts.held .ac-hand, .tb-accounts.held .ac-tell { pointer-events: none; opacity: 0.45; }
+
+/* ── The room HUD's language at the job table (table-hud, docs/mockups/hud-frames.html TABLE) ──
+   The clocks: no boxes. The word in the bar's 15px in its colour and its number on one row, a fine track of slanted cells
+   under them (filled solid with a glow, the rest outlines) on a hairline, a small ring at its start. */
+.tb.hud:not(.phone) .tb-take, .tb.hud:not(.phone) .tb-alarm, .tb.hud:not(.phone) .tb-nerve { grid-template-areas: 'word num' 'cells cells'; row-gap: 7px; column-gap: 14px; }
+.tb.hud:not(.phone) .tb-word { justify-self: start; font: 15px var(--pixel); letter-spacing: 0.22em; color: color-mix(in srgb, currentColor 80%, #fff); text-shadow: 0 1px 2px #000, 0 0 6px color-mix(in srgb, currentColor 50%, transparent); }
+.tb.hud:not(.phone) .tb-num { justify-self: end; font: 18px/1 var(--pixel); color: color-mix(in srgb, currentColor 80%, #fff); text-shadow: 0 1px 2px #000; }
+.tb.hud:not(.phone) .tb-stack { position: relative; gap: 6px; padding: 0 4px 8px; }
+.tb.hud:not(.phone) .tb-stack::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 1px; background: color-mix(in srgb, currentColor 40%, #e6eef7); opacity: 0.5; }
+.tb.hud:not(.phone) .tb-stack::before { content: ''; position: absolute; left: -10px; bottom: -3px; width: 5px; height: 5px; border: 1px solid currentColor; border-radius: 50%; opacity: 0.8; }
+.tb.hud:not(.phone) .tb-stack i { width: 28px; height: 9px; transform: skewX(-30deg); opacity: 1; background: none; border: 1px solid color-mix(in srgb, currentColor 50%, transparent); }
+.tb.hud:not(.phone) .tb-stack i.f { background: currentColor; border-color: currentColor; box-shadow: 0 0 6px color-mix(in srgb, currentColor 60%, transparent); }
+
+/* PUSH, SAFE, BOLD: the scene stack's outline keys (style.css .scene-keys), cut top-left and bottom-right, no fill; lit
+   (on), the outline bright with a glow and the word white. PUSH pink with a ✦ for its chip, SAFE cyan, BOLD gold. */
+.tb.hud:not(.phone) :is(.tb-push, .tb-trade button) {
+  --kl: color-mix(in srgb, var(--kc) 55%, rgba(230, 238, 247, 0.3));
+  position: relative;
+  isolation: isolate;
+  color: color-mix(in srgb, var(--kc) 75%, #fff);
+  background: none;
+  border: 0;
+  box-shadow: none;
+  text-shadow: 0 1px 2px #000;
+}
+.tb.hud:not(.phone) :is(.tb-push, .tb-trade button)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 9px 9px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 9px 9px no-repeat;
+  box-shadow: inset 0 0 0 1px var(--kl);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.tb.hud:not(.phone) .tb-push { --kc: #ff4f8b; flex-direction: row; justify-content: center; gap: 8px; min-height: 0; padding: 6px 10px 5px; font: 16px var(--pixel); letter-spacing: 0.18em; }
+.tb.hud:not(.phone) .tb-push .tb-chip { display: none; }
+.tb.hud:not(.phone) .tb-push .tb-push-word:first-of-type::before { content: '✦ '; }
+.tb.hud:not(.phone) .tb-trade .tb-safe { --kc: #7fe9ff; }
+.tb.hud:not(.phone) .tb-trade .tb-bold { --kc: #ffc56b; }
+.tb.hud:not(.phone) .tb-trade :is(.tb-safe, .tb-bold) { background: none; }
+.tb.hud:not(.phone) :is(.tb-push.on, .tb-trade .tb-safe.on, .tb-trade .tb-bold.on, .tb-push:hover, .tb-trade button:hover:not(:disabled)) { --kl: var(--kc); color: #fff; background: none; box-shadow: none; filter: drop-shadow(0 0 4px var(--kc)); }
+/* The job's name is on the JOB column's plate now (job-column.css): the table's own title steps out at the HUD, its
+   HEAT · PAY strip (and any flag) rising into its place, clear of the plate. */
+.tb.hud:not(.phone) .tb-top-l .tb-title { display: none; }
+/* The HEAT · PAY line (or SETUP's) rises with the JOB column, 16px (job-column.css). */
+.tb.hud:not(.phone) .tb-top-l { position: relative; top: -16px; }
+
+/* ── SETUP as the job's table (playtest 2026-11-11) ──
+   Off a phone SETUP mounts the HUD shell: the JOB column in the log (its plate carries the job's name, so SETUP's own
+   title and pitch step out), the line under the title as the top bar's strip, HOW YOU GO IN in the moment, GO IN and
+   BACK in the levers column. Its bottom row spans her column too: the hand, READY CREW and CONTACTS need today's width. */
+.tb.hud.tb-setup:not(.phone) { grid-template-areas: 'top top top top' 'log middle levers .' 'bottom bottom bottom bottom'; }
+.tb.hud.tb-setup:not(.phone) > .tb-log > .ts-pitch { display: none; }
+/* The top bar keeps the clocks' height with no clocks up, so the strip clears the plate's details and the column starts
+   where it does at the table (measured: 43px). */
+.tb.hud.tb-setup:not(.phone) > .tb-top { min-height: 43px; }
+.tb.hud.tb-setup:not(.phone) .ts-strip-tier { color: #ffe2b0; }
+.tb.hud.tb-setup:not(.phone) .ts-mid { display: flex; justify-content: center; }
+.tb.hud.tb-setup:not(.phone) .ts-approach {
+  margin: 0;
+
+  > .tb-group-label { position: static; margin-bottom: 10px; text-align: center; }
+}
+/* GO IN and BACK as the levers' outline keys: GO IN cyan with its key under the word, BACK a smaller one with ESC. */
+.tb.hud.tb-setup:not(.phone) .tb-levers .ts-buttons { width: auto; align-items: stretch; gap: 12px; }
+.tb.hud.tb-setup:not(.phone) .tb-levers :is(.ts-go, .ts-back) {
+  --kl: color-mix(in srgb, var(--kc) 55%, rgba(230, 238, 247, 0.3));
+  position: relative;
+  isolation: isolate;
+  height: auto;
+  min-height: 0;
+  color: color-mix(in srgb, var(--kc) 75%, #fff);
+  background: none;
+  border: 0;
+  clip-path: none;
+  filter: none;
+  text-shadow: 0 1px 2px #000;
+}
+.tb.hud.tb-setup:not(.phone) .tb-levers :is(.ts-go, .ts-back)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 9px 9px no-repeat,
+    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 9px 9px no-repeat;
+  box-shadow: inset 0 0 0 1px var(--kl);
+  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+}
+.tb.hud.tb-setup:not(.phone) .tb-levers .ts-go { --kc: #7fe9ff; align-items: center; gap: 3px; padding: 10px 10px 8px; font: 28px/1 var(--cs-teko, 'Teko', var(--pixel)); letter-spacing: 0.12em; }
+.tb.hud.tb-setup:not(.phone) .tb-levers .ts-go::after { content: none; }
+.tb.hud.tb-setup:not(.phone) .tb-levers .ts-go .ts-key { opacity: 0.75; }
+.tb.hud.tb-setup:not(.phone) .tb-levers .ts-back { --kc: #7fe9ff; align-self: stretch; justify-content: center; padding: 6px 8px 5px; font: 14px var(--pixel); letter-spacing: 0.2em; opacity: 0.8; }
+.tb.hud.tb-setup:not(.phone) .tb-levers .ts-back kbd { border: 0; padding: 0; opacity: 0.7; }
+.tb.hud.tb-setup:not(.phone) .tb-levers :is(.ts-go:hover, .ts-back:hover) { --kl: var(--kc); color: #fff; opacity: 1; filter: drop-shadow(0 0 4px var(--kc)); }
+/* The wide moments reach into the levers' track: a waiting roll's costs (PUSH and the trade are down then), a blown
+   job's preview under the cover cards (693px), and the debrief (its CLOSE stays in the levers, drawn over the debrief's
+   top corner, where only the outcome word sits). */
+.tb.hud.tb-job:not(.phone):has(> .tb-levers > .tb-push[hidden]):has(> .tb-levers > .tb-trade[hidden]):is(:has(.tb-deal > .tb-costs), :has(.tb-debrief), :has(.tb-extra .db)) > .tb-middle { grid-column: 2 / 4; }
+/* The levers paint over the moment where it reaches under them (the debrief's card is positioned), and the outcome word
+   keeps to its own width, clear of CLOSE. */
+.tb.hud:not(.phone) > .tb-levers { position: relative; z-index: 2; }
+.tb.hud:not(.phone) .tb-debrief .db > .db-tier { justify-self: start; }
+/* The hand's cards at 85% (playtest 2026-11-11): the moment and the JOB column get the height back. Its labels keep
+   their size; the cards' tabs scale with them. SETUP's hand already sits at 87.5% (.ts-hand). */
+
+/* SETUP over a job's debrief (another job from QUEST): the two HUD tables share every region and neither has a panel,
+   so the debrief steps out of sight (and out of reach) until SETUP goes (review). */
+#game:has(> .tb-setup.hud:not([hidden]):not(.phone)) > .tb-job { visibility: hidden; }
+
+/* ── The hand at the HUD table (playtest 2026-11-11) ──
+   It starts under the JOB column's left edge. A recruit's abilities stand beside their card (hand.ts .tb-abil): two spots
+   one over the other in the card's height, an ability as a small printed card (its picture, its timing's mark, its
+   name; the hover panel has the rest), an outline in the card's cut where there's none. Sizes before the hand's 85%. */
+.tb.hud:not(.phone) > .tb-bottom { justify-content: flex-start; }
+.tb.hud:not(.phone) .tb-hand.tuck:not(.scroll-x) { left: 0; }
+/* Tied to their recruit by the HUD's fine lines (playtest 2026-11-11): a ring on the card's edge, a stub to a spine, a
+   tick to each spot, in the crew's pink. */
+.tb-crew-stack.minis { display: flex; align-items: flex-end; gap: 0; }
+.tb-abil { position: relative; display: flex; flex-direction: column; gap: 6px; height: 256px; padding-left: 14px; }
+.tb-abil > * { flex: 1 1 0; min-height: 0; width: 88px; box-sizing: border-box; }
+.tb-abil::before {
+  --l: color-mix(in srgb, var(--nix) 60%, transparent);
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  pointer-events: none;
+  background:
+    linear-gradient(var(--l), var(--l)) 6px 50% / 1px 50% no-repeat,
+    linear-gradient(var(--l), var(--l)) 6px 25% / 8px 1px no-repeat,
+    linear-gradient(var(--l), var(--l)) 6px 75% / 8px 1px no-repeat,
+    linear-gradient(var(--l), var(--l)) 0 50% / 6px 1px no-repeat;
+}
+.tb-abil::after { content: ''; position: absolute; left: -3px; top: calc(50% - 3px); width: 5px; height: 5px; border: 1px solid color-mix(in srgb, var(--nix) 75%, transparent); border-radius: 50%; background: #05020a; pointer-events: none; }
+/* No cut: a printed card's round border, as its recruit's, so the ready ring and the lifted glow show round it (review).
+   A thin print border (playtest 2026-11-11). */
+.tb-slot.tb-mini { height: auto; --print: 2px; border-radius: 6px; }
+.tb-slot.tb-mini > .tbc-print .tbc-body { gap: 0; padding: 12px 3px 5px; }
+.tb-slot.tb-mini > .tbc-print .tbc-name,
+.tb-slot.tb-mini > .tbc-print .tbc-name.long,
+.tb-slot.tb-mini > .tbc-print .tbc-name.wrap { font: 13px/1.1 var(--pixel); letter-spacing: 0.08em; white-space: normal; }
+.tb-slot.tb-mini > .tbc-print .tbc-note { display: none; }
+/* Its timing mark at the top left: a tucked hand's next recruit overlaps the minis' right edge (review). */
+.tb-slot.tb-mini .tbc-mark { top: 3px; left: 3px; right: auto; transform: scale(0.75); transform-origin: top left; }
+.tb-slot.tb-mini > .tbc-back .tbc-name { font: 12px/1.1 var(--pixel); }
+.tb-slot.tb-mini > .tbc-back .tbc-note { font-size: 11px; }
+.tb-slot.tb-mini.lifted { transform: translateY(-8px); }
+.tb-slot.tb-mini.off { filter: grayscale(0.7) brightness(0.65); }
+.tb-slot.tb-mini.s-down { filter: brightness(0.7); }
+/* An empty spot: the cut's outline, faint. */
+.tb-mini-empty {
+  position: relative;
+  background:
+    linear-gradient(to bottom left, transparent calc(50% - 0.6px), rgba(230, 220, 242, 0.22) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 0 / 9px 9px no-repeat,
+    linear-gradient(to bottom left, transparent calc(50% - 0.6px), rgba(230, 220, 242, 0.22) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 100% / 9px 9px no-repeat,
+    rgba(10, 5, 20, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(230, 220, 242, 0.22);
+  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+}
+
+/* A fork and a post (routes and posts spec §1–§2). LEADS TO: the last line of a card's foot, in the HUD's cyan. */
+.tb-leads { display: block; margin-top: 4px; font: 13px/1.2 var(--pixel, 'VT323', monospace); letter-spacing: 0.16em; color: #7fe9ff; }
+/* The post: a strip over the cards, cut like the hand's cards, dashed while nobody holds it. Armed, it pulses for a tap
+   in the hand; marked, it's solid in the crew's pink; held, it's quiet. */
+.tb-post { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 12px; align-self: start; flex: none; width: 100%; height: auto; margin: 0 0 12px; padding: 8px 14px 7px; text-align: left; color: #d9e4ea; background: rgba(5, 2, 10, 0.6); border: 1px dashed rgba(255, 79, 163, 0.6); clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); cursor: pointer; font: 12.5px/1.4 'IBM Plex Mono', ui-monospace, monospace; }
+/* The word and the state share the first row; the line, the promise and the cost each take a row under it. */
+.tb-post-word { flex: 1 1 auto; order: 1; font: 17px/1 var(--pixel, 'VT323', monospace); letter-spacing: 0.2em; color: #ff4fa3; white-space: nowrap; }
+.tb-post-state { flex: none; order: 2; padding: 4px 10px 2px; font: 15px/1 var(--pixel, 'VT323', monospace); letter-spacing: 0.18em; color: #ff4fa3; border: 1px solid currentColor; white-space: nowrap; }
+.tb-post-line { flex: 0 0 100%; order: 3; }
+.tb-post-gives { flex: 0 0 100%; order: 4; color: #3dff7a; }
+.tb-post-cost { flex: 0 0 100%; order: 5; font: 13px/1.2 var(--pixel, 'VT323', monospace); letter-spacing: 0.14em; color: #8fa3ad; }
+.tb-post.armed { border-style: solid; animation: tb-post-arm 0.9s steps(2) infinite; }
+.tb-post.marked { border-style: solid; }
+.tb-post.marked .tb-post-state, .tb-post.armed .tb-post-state { color: #05020a; background: #ff4fa3; border-color: #ff4fa3; }
+.tb-post.held { border: 1px solid rgba(230, 238, 247, 0.25); cursor: default; }
+.tb-post.held .tb-post-word, .tb-post.held .tb-post-state { color: #8fa3ad; }
+@keyframes tb-post-arm { 50% { border-color: rgba(255, 79, 163, 0.25); } }
+@media (prefers-reduced-motion: reduce) { .tb-post.armed { animation: none; } }
+/* Away at a post: their card stays in the hand, dimmed. */
+.tb-slot.away { opacity: 0.5; filter: saturate(0.5); }

@@ -3,7 +3,7 @@ export const CHAT_FONTS = ['plex', 'chakra', 'baskerville', 'sharetech'] as cons
 export type ChatFont = (typeof CHAT_FONTS)[number];
 const FONT_KEY = 'lowlight.chatFont';
 
-/** What SYS shows for each, and the family it's shown in. */
+/** What SYS shows for each, and the family it's shown in (with the decode's Chinese glyphs, style.css 'Lowlight Han', second). */
 export const CHAT_FONT_LABEL: Record<ChatFont, string> = {
   plex: 'PLEX MONO',
   chakra: 'CHAKRA PETCH',
@@ -11,10 +11,10 @@ export const CHAT_FONT_LABEL: Record<ChatFont, string> = {
   sharetech: 'SHARE TECH',
 };
 export const CHAT_FONT_FAMILY: Record<ChatFont, string> = {
-  plex: "'IBM Plex Mono', ui-monospace, monospace",
-  chakra: "'Chakra Petch', ui-sans-serif, sans-serif",
-  baskerville: "'Libre Baskerville', Georgia, serif",
-  sharetech: "'Share Tech Mono', ui-monospace, monospace",
+  plex: "'IBM Plex Mono', 'Lowlight Han', ui-monospace, monospace",
+  chakra: "'Chakra Petch', 'Lowlight Han', ui-sans-serif, sans-serif",
+  baskerville: "'Libre Baskerville', 'Lowlight Han', Georgia, serif",
+  sharetech: "'Share Tech Mono', 'Lowlight Han', ui-monospace, monospace",
 };
 
 /** The saved font; Plex Mono when none is saved, it isn't one, or storage is off. */

@@ -343,6 +343,27 @@ describe('outfits', () => {
     expect(warnings.filter((w) => w.includes("outfitByScene 'noodle-stall' names no outfit 'outdoors'; leaving it out")).length).toBe(1);
   });
 
+  it('commsFigure gives her a comms figure, served at /comms (2026-11-08)', () => {
+    png(path.join(charactersDir, 'nix', 'sprite.png'));
+    png(path.join(charactersDir, 'nix', 'line.png'));
+    setChar({ sprite: { src: 'sprite.png' }, commsFigure: 'line.png' });
+    const rec = byId('nix');
+    expect(rec.info.sprite!.comms).toBe('/api/agents/nix/comms');
+    expect(rec.sprite!.comms).toBe(path.join(charactersDir, 'nix', 'line.png'));
+    expect(warnings).toEqual([]);
+  });
+
+  it('a missing comms figure warns and she has none; without a sprite it is ignored', () => {
+    png(path.join(charactersDir, 'nix', 'sprite.png'));
+    setChar({ sprite: { src: 'sprite.png' }, commsFigure: 'gone.png' });
+    expect(byId('nix').info.sprite!.comms).toBeUndefined();
+    expect(warnings.some((w) => w.includes("commsFigure 'gone.png' is missing"))).toBe(true);
+    warnings.length = 0;
+    setChar({ commsFigure: 'gone.png' });
+    expect(byId('nix').info.sprite).toBeNull();
+    expect(warnings.some((w) => w.includes('commsFigure needs a sprite'))).toBe(true);
+  });
+
   it('drops bad outfit names and missing or escaping files, one warning each; neutral is a valid outfit name', () => {
     png(path.join(charactersDir, 'nix', 'sprite.png'));
     png(path.join(charactersDir, 'nix', 'x.png'));
@@ -477,7 +498,7 @@ describe('the committed cast', () => {
     const hicksRooms = (JSON.parse(fs.readFileSync(path.join(repoChars, 'hicks', 'character.json'), 'utf8')) as { rooms?: string[] }).rooms ?? [];
     const all = loadAgents({ charactersDir: repoChars, dataDir, rooms: fakeRooms([...new Set([...CITY, ...hicksRooms])]), warn: (m) => warned.push(m) });
     const hicks = all.find((a) => a.info.id === 'hicks')!;
-    expect(hicks.info).toMatchObject({ name: 'Hicks', backend: 'direct', connected: true, tagline: 'Netrunner. Old Town born. Crew of two.', thumb: '/api/agents/hicks/thumb' });
+    expect(hicks.info).toMatchObject({ name: 'Hicks', backend: 'direct', connected: true, tagline: 'Netrunner. Finder, no ticket.', thumb: '/api/agents/hicks/thumb' });
     expect(hicks.info.bio).toHaveLength(3);
     expect(hicks.info.facts.map((f) => f.label)).toEqual(['KNOWN FOR', "DON'T ASK ABOUT", 'TELL', 'DANGEROUS']);
     expect(hicks.direct!.identity()).toMatch(/^# Personality\n\nYou are Hicks\./);
@@ -503,7 +524,7 @@ describe('the committed cast', () => {
     const repoChars = path.join(__dirname, '..', '..', 'characters');
     const all = loadAgents({ charactersDir: repoChars, dataDir, rooms, warn: () => {} });
     const players = createPlayers({ records: () => all, characterId: 'hicks' });
-    expect(players.resolve(undefined).line).toBe('[you: Hicks (he) — Netrunner out of Old Town; runs a two-person crew from one room on Ribbon Level 2. Sly, dry, hard to find.]');
+    expect(players.resolve(undefined).line).toBe('[you: Hicks (he) — Netrunner and ticketless finder out of Old Town; runs a two-person crew from one room on Ribbon Level 2. Sly, dry, hard to find.]');
   });
 });
 
@@ -521,6 +542,13 @@ describe('playable and discover: who select offers (select leads spec §1)', () 
     fs.writeFileSync(path.join(charactersDir, 'alpha', 'character.json'), JSON.stringify({ playable: true, discover: true }));
     expect(byId('alpha').info).toMatchObject({ playable: true, discover: true });
     expect(byId('beta').info).toMatchObject({ playable: false, discover: false });
+  });
+
+  it('standIn: the player stand-in (character creator spec 2026-11-14); only true counts', () => {
+    fs.writeFileSync(path.join(charactersDir, 'alpha', 'character.json'), JSON.stringify({ standIn: true }));
+    fs.writeFileSync(path.join(charactersDir, 'beta', 'character.json'), JSON.stringify({ standIn: 'yes' }));
+    expect(byId('alpha').info.standIn).toBe(true);
+    expect(byId('beta').info.standIn).toBe(false);
   });
 
   it('a value that isn\'t true reads false, and she still loads', () => {
@@ -548,7 +576,7 @@ describe('group: where she belongs on the select screen', () => {
     expect(warnings.some((w) => w.includes("g-bad") && w.includes("group: no district 'atlantis'"))).toBe(true);
   });
 
-  it('the committed cast: the Spine for Adebayo (her desk is in Nexus), each other by home', () => {
+  it('the committed cast: the Spine for Kroll (her desk is in Nexus), each other by home', () => {
     const repoChars = path.join(__dirname, '..', '..', 'characters');
     const scenesDir = path.join(__dirname, '..', '..', 'scenes');
     const city = fs.readdirSync(scenesDir).flatMap((d) => (fs.statSync(path.join(scenesDir, d)).isDirectory() ? fs.readdirSync(path.join(scenesDir, d)).filter((r) => !r.startsWith('_')).map((r) => `${d}/${r}`) : []));

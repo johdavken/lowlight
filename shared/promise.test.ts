@@ -68,3 +68,14 @@ describe('the places she can promise to text from (deck controls e2e finding)', 
     ]);
   });
 });
+
+describe('her day marks her sleep (job texts spec §5)', () => {
+  it('says asleep on a sleeps block', async () => {
+    const { dayWords } = await import('./promise');
+    const blocks = [
+      { from: 300, to: 780, room: 'home', sleeps: true as const },
+      { from: 780, to: 1080, room: 'home' },
+    ];
+    expect(dayWords(blocks, () => "Nix's apartment")).toBe("Nix's apartment 05:00–13:00 (asleep) · Nix's apartment 13:00–18:00");
+  });
+});

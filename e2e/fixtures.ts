@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import type { ClientEvent, PlaythroughInfo } from '../shared/types';
 import type {} from '../web/src/main'; // window.__nixRoom
@@ -34,7 +37,7 @@ export const SECOND = {
 } as const;
 
 // This worker's (or server's) ports: each worker has a game server of its own (e2e/ports.ts).
-import { STUB_OR_LOG_PORT } from './ports';
+import { RUN_TAG, SLOT, STUB_OR_LOG_PORT } from './ports';
 export { BUG_RELAY_PORT, STUB_OR_LOG_PORT } from './ports';
 /** The key e2e links with, and one the fake OpenRouter refuses (the link panel's rejected path). */
 export const GOOD_KEY = 'sk-or-e2e';
@@ -42,6 +45,9 @@ export const BAD_KEY = 'sk-or-bad-e2e-key';
 /** The Anthropic stand-in's one good key, and its every reply (link.spec). */
 export const ANT_KEY = 'sk-ant-e2e-good';
 export const ANT_REPLY = 'Claude reply';
+/** The NanoGPT stand-in's one good key, and its every reply (link.spec). */
+export const NANO_KEY = 'sk-nano-e2e-good';
+export const NANO_REPLY = 'NanoGPT reply';
 
 /**
  * Opens the dial-in straight on the select screen, as if this session had already dismissed the
@@ -54,7 +60,8 @@ export async function skipSplash(page: Page, o: { intro?: boolean } = {}): Promi
 
 /**
  * Skips the opening card that plays before the splash, and waits for it to go. With sound blocked it
- * opens on the sound prompt, and that first key starts it rather than skipping, so a second key does.
+ * opens on the sound prompt, and that first key starts it rather than skipping. Then Esc skips the rest
+ * (any other key only finishes a page or moves to the next name).
  */
 export async function skipOpeningCard(page: Page): Promise<void> {
   await expect(page.locator('.opening-card')).toBeVisible();
@@ -62,7 +69,7 @@ export async function skipOpeningCard(page: Page): Promise<void> {
     await page.keyboard.press('Space');
     await expect(page.locator('.oc-sound')).toHaveCount(0);
   }
-  await page.keyboard.press('Space');
+  await page.keyboard.press('Escape');
   await expect(page.locator('.opening-card')).toHaveCount(0);
 }
 
@@ -85,7 +92,7 @@ export async function skipIntro(page: Page): Promise<void> {
   await page.addInitScript(() => localStorage.getItem('nix-room.graft-tips') ?? localStorage.setItem('nix-room.graft-tips', JSON.stringify({ off: true, seen: [] })));
 }
 
-/** QUEST's pane (quest panel 2026-10-31): a row on the HERE tab's list. */
+/** JOBS (trace panel 2026-11-15): a row on the open tab's list. */
 export const questRow = (page: Page, title: string) => page.locator('.ql-list .ql-row', { hasText: title }).first();
 
 /** Opens a QUEST tab (HERE, ELSEWHERE or FIXER) in the open pane. */
@@ -98,6 +105,16 @@ export async function startQuest(page: Page, title: string): Promise<void> {
   if ((await page.locator('.ql-pane[data-tab="here"]').count()) === 0) await questTab(page, 'here');
   await questRow(page, title).click();
   await page.locator('.ql-file .ql-start').click();
+}
+
+/** FIXER (the tab is up): picks an item on the list, the file beside it. */
+export const fixerItem = (page: Page, name: string) => page.locator('.ql-fixer .ql-list .ql-item', { hasText: name });
+
+/** Picks an item on FIXER's list and presses BUY in its file. */
+export async function buyAtFixer(page: Page, name: string): Promise<void> {
+  await fixerItem(page, name).click();
+  await expect(page.locator('.ql-fixer .ql-file .ql-file-title')).toHaveText(name.toUpperCase());
+  await page.locator('.ql-fixer .ql-file .ql-buy').click();
 }
 
 /** Graft's tips on, nothing seen, from this page's first load (graft-tips): after skipIntro, which turns them off. */
@@ -117,7 +134,7 @@ export async function showTile(page: Page, id: string): Promise<void> {
   await expect(page.locator(`.tile[data-id="${id}"]`)).toBeVisible();
 }
 
-/** The title menu's items, left to right: CONTINUE (with an active playthrough), NEW GAME, LOAD, REPORT A BUG. */
+/** The title menu's items, top to bottom: CONTINUE (with an active playthrough), NEW GAME, LOAD, REPORT A BUG. */
 export type TitleItem = 'continue' | 'new' | 'load' | 'report';
 
 /**
@@ -127,19 +144,24 @@ export type TitleItem = 'continue' | 'new' | 'load' | 'report';
 export async function toTitle(page: Page): Promise<void> {
   // Off the title (a room, or the select screen after NEW GAME): load `/`, which opens on it.
   if (!(await page.locator('.title-menu').isVisible())) await page.goto('/');
-  await expect(page.locator('.title-menu .tile[data-id="new"]')).toBeVisible();
+  await expect(page.locator('.title-menu .tm-item[data-id="new"]')).toBeVisible();
 }
 
-/** Moves the title's cursor to `item` with ←→, then presses Enter on it. */
+/** Moves the title's focus to `item` with ↑↓, then presses Enter on it. */
 export async function pickTitle(page: Page, item: TitleItem): Promise<void> {
-  const order = await page.locator('.title-menu .tile').evaluateAll((ns) => ns.map((n) => (n as HTMLElement).dataset.id));
+  const order = await page.locator('.title-menu .tm-item').evaluateAll((ns) => ns.map((n) => (n as HTMLElement).dataset.id));
   const to = order.indexOf(item);
   expect(to, `${item} is on the title`).toBeGreaterThanOrEqual(0);
-  const from = order.indexOf((await page.locator('.title-menu .tile.on').getAttribute('data-id')) ?? '');
-  for (let i = from; i !== to; i += to > from ? 1 : -1) await page.keyboard.press(to > from ? 'ArrowRight' : 'ArrowLeft');
-  await expect(page.locator(`.title-menu .tile[data-id="${item}"]`)).toHaveClass(/\bon\b/);
+  const from = order.indexOf((await page.locator('.title-menu .tm-item.on').getAttribute('data-id')) ?? '');
+  for (let i = from; i !== to; i += to > from ? 1 : -1) await page.keyboard.press(to > from ? 'ArrowDown' : 'ArrowUp');
+  await expect(page.locator(`.title-menu .tm-item[data-id="${item}"]`)).toHaveClass(/\bon\b/);
   await page.keyboard.press('Enter');
 }
+
+/** The file e2e/serve.ts writes its data folder's path to, for this slot. */
+export const dataDirMarker = (): string => path.join(os.tmpdir(), `nix-room-e2e-data${RUN_TAG}-${SLOT}.txt`);
+/** This slot's game server's data folder (playthroughs/ under it). */
+export const e2eDataDir = (): string => fs.readFileSync(dataDirMarker(), 'utf8');
 
 /** The active playthrough's id. */
 export async function activeId(page: Page): Promise<string> {
@@ -304,7 +326,9 @@ export async function goIn(page: Page): Promise<void> {
 export async function settleCostStep(page: Page): Promise<boolean> {
   const take = page.locator('.tb-costs .tb-cost-btn.take').first();
   if (await take.isVisible()) {
-    await take.click();
+    // The answers can be redrawn under the click (the last answer's result landing): a click that finds them gone is a
+    // step taken all the same, and the caller looks again.
+    await take.click({ timeout: 2_000 }).catch(() => undefined);
     return true;
   }
   const free = page.locator('.tb-costs .tb-cost.pickable').first();

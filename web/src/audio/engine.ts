@@ -4,8 +4,8 @@ import type { Mix } from './mix';
 import { defaultSoundCheck, MissingSound } from './present';
 import { bedVoice, humVoice, neonVoice, rainVoice, recordedRainVoice, spaceVoice, staticBurst, windVoice, type NeonVoiceNode, type RainVoice, type RecordedRainVoice, type Voice, type WindVoice } from './voices';
 
-export type Channel = 'weather' | 'room' | 'lights' | 'music';
-export const CHANNELS: Channel[] = ['weather', 'room', 'lights', 'music'];
+export type Channel = 'weather' | 'room' | 'lights' | 'music' | 'voice' | 'ui';
+export const CHANNELS: Channel[] = ['weather', 'room', 'lights', 'music', 'voice', 'ui'];
 
 export interface EngineState {
   available: boolean;
@@ -23,6 +23,8 @@ export interface EngineState {
   musicStarts?: number;
   /** Thunder takes played so far. */
   thunders?: number;
+  /** Voiced job beats: the clip speaking now (its url), or null. */
+  speaking?: string | null;
 }
 
 /** How long rolling thunder fades out when the room changes. */
@@ -37,6 +39,11 @@ const GLITCH_SECONDS = 0.15;
 const GLITCH_RETURN_SECONDS = 0.02;
 const BED_MIN_FADE = 0.05;
 const LEVEL_SECONDS = 0.1;
+/** Voiced job beats: how far the room and the music sink while a clip speaks, and how fast they go and come back. */
+const DUCK_LEVEL = 0.6;
+const DUCK_SECONDS = 0.4;
+/** A hushed clip fades this fast rather than clicking off. */
+const HUSH_SECONDS = 0.08;
 const CRACKLE_TIME_CONSTANT = 0.01;
 
 async function defaultFetch(ctx: AudioContext, url: string): Promise<AudioBuffer> {
@@ -59,18 +66,33 @@ function defaultContext(): AudioContext | null {
  * key — browsers require a gesture). `apply()` glides every voice to a new `Mix` over the room
  * change's duration; `tick()` drives the neon crackle each frame.
  *
- *   voices → channel gains (weather / room / lights) → fog high-shelf → compressor → master → out
- *   music  → channel gain (music) → musicOut → out
+ *   voices → channel gains (weather / room / lights) → fog high-shelf → compressor → duckRoom → master → out
+ *   music  → channel gain (music) → musicOut → duckMusic → out
+ *   speech → channel gain (voice) → voiceOut → out
+ *   UI cues and holds → channel gain (ui) → uiOut → out (SYS → UI; follows the master and the mute, never ducked)
  *
  * Music has its own output: the player's volume and mute apply, but not the landing's scale, the fog or
- * the glitch dip (the theme plays straight through a glitch transition).
+ * the glitch dip (the theme plays straight through a glitch transition). Speech (voiced job beats) has its own the
+ * same way, and while it plays the duck gains sink the room and the music under it.
  */
+/** The signal coming back on, after it dropped (picked with the CRT cues: going off at the collapse, on 0.8 s later). */
+const SIGNAL_ON_AFTER_MS = 800;
+
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private available = true;
   private needsResume = false;
   private master!: GainNode;
   private musicOut!: GainNode;
+  private voiceOut!: GainNode;
+  private uiOut!: GainNode;
+  private duckRoom!: GainNode;
+  private duckMusic!: GainNode;
+  /** The clip speaking now; `speechToken` bumps on every speak/hush so a clip still loading never plays. */
+  private speech: { src: AudioBufferSourceNode; out: GainNode; url: string } | null = null;
+  private speechToken = 0;
+  /** While a reading is still going: adds clips to its end (a ride-along beat held back, 2026-11-08). */
+  private speechMore: ((urls: readonly string[]) => void) | null = null;
   private fog!: BiquadFilterNode;
   private readonly channels = new Map<Channel, GainNode>();
   private readonly voices = new Map<string, Voice>();
@@ -79,7 +101,7 @@ export class AudioEngine {
   private volume = 0.6;
   private muted = false;
   private scale = 1;
-  private readonly channelLevels: Record<Channel, number> = { weather: 1, room: 1, lights: 1, music: 1 };
+  private readonly channelLevels: Record<Channel, number> = { weather: 1, room: 1, lights: 1, music: 1, voice: 1, ui: 1 };
   private bedUrl: string | null = null;
   private bedToken = 0;
   private readonly failedBeds = new Set<string>();
@@ -98,6 +120,8 @@ export class AudioEngine {
   private readonly oneShotBuffers = new Map<string, Promise<AudioBuffer | null>>();
   /** The last `oneShot` source still playing per url, so a repeat (held key, fast taps) stops it first. */
   private readonly oneShotSources = new Map<string, AudioBufferSourceNode>();
+  private readonly held = new Map<string, { src: AudioBufferSourceNode | null; out: GainNode | null }>();
+  private signal: { off: string; on: string; level: number } | null = null;
   /** Thunder takes scheduled or rolling; `thunderGen` bumps on a room change so loading ones never play. */
   private readonly thunders = new Set<{ src: AudioBufferSourceNode; out: GainNode; at: number }>();
   private thunderGen = 0;
@@ -168,14 +192,22 @@ export class AudioEngine {
     this.fog.type = 'highshelf';
     this.fog.frequency.value = 3000;
     this.fog.gain.value = 0;
-    this.fog.connect(comp).connect(this.master).connect(ctx.destination);
+    this.duckRoom = ctx.createGain();
+    this.duckMusic = ctx.createGain();
+    this.fog.connect(comp).connect(this.duckRoom).connect(this.master).connect(ctx.destination);
     this.musicOut = ctx.createGain();
     this.musicOut.gain.value = this.musicTarget();
-    this.musicOut.connect(ctx.destination);
+    this.musicOut.connect(this.duckMusic).connect(ctx.destination);
+    this.voiceOut = ctx.createGain();
+    this.voiceOut.gain.value = this.musicTarget();
+    this.voiceOut.connect(ctx.destination);
+    this.uiOut = ctx.createGain();
+    this.uiOut.gain.value = this.masterTarget();
+    this.uiOut.connect(ctx.destination);
     for (const ch of CHANNELS) {
       const g = ctx.createGain();
       g.gain.value = this.channelLevels[ch];
-      g.connect(ch === 'music' ? this.musicOut : this.fog);
+      g.connect(ch === 'music' ? this.musicOut : ch === 'voice' ? this.voiceOut : ch === 'ui' ? this.uiOut : this.fog);
       this.channels.set(ch, g);
     }
     ctx.onstatechange = () => {
@@ -229,7 +261,15 @@ export class AudioEngine {
       // The static stands in front of the dropout: its own gain (at the master level, so mute holds)
       // straight to the output. A room move sinks under it to the swap and rises back as the picture
       // clears; otherwise the room is held silent for the burst and comes back quickly.
-      this.playBurst(ctx, swapIn);
+      // A room move with the signal's own cues set (the room page): the picture's collapse, then its coming back on
+      // as the next room opens. Anything else (a glitch in place, the select screen) keeps the synth static.
+      const sig = swapIn > 0 ? this.signal : null;
+      if (sig) {
+        this.oneShot(sig.off, sig.level);
+        setTimeout(() => {
+          if (this.ctx === ctx) this.oneShot(sig.on, sig.level);
+        }, SIGNAL_ON_AFTER_MS);
+      } else this.playBurst(ctx, swapIn);
       const g = this.master.gain;
       const target = this.masterTarget();
       const back = swapIn > 0 ? swapIn : GLITCH_SECONDS;
@@ -330,14 +370,9 @@ export class AudioEngine {
         }
       }
       const out = ctx.createGain();
-      // Through a channel it follows the master, the mute and that channel's slider; a UI cue goes straight out.
-      if (channel) {
-        out.gain.value = level;
-        out.connect(this.channel(channel));
-      } else {
-        out.gain.value = this.masterTarget() * level;
-        out.connect(ctx.destination);
-      }
+      // Through its channel (a UI cue's is `ui`) it follows the master, the mute and that channel's slider.
+      out.gain.value = level;
+      out.connect(this.channel(channel ?? 'ui'));
       const src = ctx.createBufferSource();
       src.buffer = b;
       if (o.rate) src.playbackRate.value = o.rate;
@@ -350,6 +385,142 @@ export class AudioEngine {
       if (!o.overlap) this.oneShotSources.set(url, src);
       src.start();
     });
+  }
+
+  /**
+   * Voiced job beats: plays `urls` one after another on the voice channel, the room and the music ducked under
+   * them. Replaces whatever was speaking, unless `after`: then they follow the reading still going (or start one).
+   * Clips aren't cached (a beat plays once and they're long); a clip that fails to load warns and the next one plays.
+   */
+  /** The samples a room move plays in the static's place: `off` at the collapse, `on` as the next room opens. */
+  setSignalCues(off: string, on: string, level = 1): void {
+    this.signal = { off, on, level };
+    this.preload(off);
+    this.preload(on);
+  }
+
+  /** Loops a sample straight to the output until `release(url)`: one loop per url (a second hold of it changes nothing). */
+  hold(url: string, level = 1): void {
+    const ctx = this.ctx;
+    if (!ctx || this.held.has(url)) return;
+    // Marked at once, so a release that comes before the sample decodes still cancels it.
+    const mark = { src: null as AudioBufferSourceNode | null, out: null as GainNode | null };
+    this.held.set(url, mark);
+    this.sample(ctx, url).then((b) => {
+      if (!b || this.ctx !== ctx || this.held.get(url) !== mark) return;
+      const out = ctx.createGain();
+      out.gain.value = level;
+      out.connect(this.channel('ui'));
+      const src = ctx.createBufferSource();
+      src.buffer = b;
+      src.loop = true;
+      src.connect(out);
+      src.start();
+      mark.src = src;
+      mark.out = out;
+    });
+  }
+
+  /** Ends a held loop over a short fade (no click). */
+  release(url: string): void {
+    const mark = this.held.get(url);
+    if (!mark) return;
+    this.held.delete(url);
+    const ctx = this.ctx;
+    const { src, out } = mark;
+    if (!ctx || !src || !out) return;
+    out.gain.setTargetAtTime(0, ctx.currentTime, 0.04);
+    src.onended = () => {
+      src.disconnect();
+      out.disconnect();
+    };
+    src.stop(ctx.currentTime + 0.25);
+  }
+
+  speak(urls: readonly string[], o: { after?: boolean } = {}): void {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (o.after && this.speechMore) return this.speechMore(urls);
+    this.hush();
+    if (!urls.length) return;
+    const token = this.speechToken;
+    const all = [...urls];
+    const load = (url: string) =>
+      this.fetchBuffer(ctx, url).catch((err: unknown) => {
+        if (!this.quiet(err)) this.warn(`voice ${url} failed to load (${err instanceof Error ? err.message : String(err)})`);
+        return null;
+      });
+    const loads = all.map(load);
+    const live = () => token === this.speechToken && this.ctx === ctx;
+    const more = (add: readonly string[]) => {
+      all.push(...add);
+      loads.push(...add.map(load));
+    };
+    this.speechMore = more;
+    const next = async (k: number): Promise<void> => {
+      if (!live()) return;
+      if (k >= loads.length) {
+        if (this.speechMore === more) this.speechMore = null;
+        return this.duck(false);
+      }
+      const b = await loads[k];
+      if (!live()) return;
+      if (!b) return next(k + 1);
+      try {
+        const out = ctx.createGain();
+        out.connect(this.channel('voice'));
+        const src = ctx.createBufferSource();
+        src.buffer = b;
+        src.connect(out);
+        src.onended = () => {
+          src.disconnect();
+          out.disconnect();
+          if (this.speech?.src !== src) return; // hushed: hush() already let it go
+          this.speech = null;
+          void next(k + 1);
+        };
+        this.speech = { src, out, url: all[k] };
+        this.duck(true);
+        src.start();
+      } catch (err) {
+        // The context went away under it (or refused the clip): no reading, and the room comes back up.
+        this.warn(`voice ${all[k]} failed to play (${err instanceof Error ? err.message : String(err)})`);
+        this.speech = null;
+        if (this.speechMore === more) this.speechMore = null;
+        this.duck(false);
+      }
+    };
+    void next(0);
+  }
+
+  /** Stops the speaking clip (a short fade) and drops the clips after it; the room and the music come back up. */
+  hush(): void {
+    this.speechToken++;
+    this.speechMore = null;
+    const s = this.speech;
+    this.speech = null;
+    if (s && this.ctx) {
+      const now = this.ctx.currentTime;
+      this.glide(s.out.gain, 0, HUSH_SECONDS, now);
+      try {
+        s.src.stop(now + HUSH_SECONDS);
+      } catch {
+        // already stopped
+      }
+    }
+    this.duck(false);
+  }
+
+  /** Whether a clip is speaking now. */
+  speaking(): boolean {
+    return this.speech !== null;
+  }
+
+  private duck(on: boolean): void {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    this.glide(this.duckRoom.gain, on ? DUCK_LEVEL : 1, DUCK_SECONDS, now);
+    this.glide(this.duckMusic.gain, on ? DUCK_LEVEL : 1, DUCK_SECONDS, now);
   }
 
   /** A sample's decoded buffer, fetched once per url; a failed load warns once and resolves `null`. */
@@ -581,6 +752,7 @@ export class AudioEngine {
       musicUrl: this.musicUrl,
       musicStarts: this.musicStarts,
       thunders: this.thunderCount,
+      speaking: this.speech?.url ?? null,
     };
   }
 
@@ -588,6 +760,9 @@ export class AudioEngine {
   debug(): {
     master: AudioParam | undefined;
     musicOut: AudioParam | undefined;
+    voiceOut: AudioParam | undefined;
+    duckRoom: AudioParam | undefined;
+    duckMusic: AudioParam | undefined;
     fog: AudioParam | undefined;
     channel: Record<Channel, AudioParam | undefined>;
     voice(name: string): AudioParam | undefined;
@@ -598,12 +773,17 @@ export class AudioEngine {
     return {
       master: this.ctx ? this.master.gain : undefined,
       musicOut: this.ctx ? this.musicOut.gain : undefined,
+      voiceOut: this.ctx ? this.voiceOut.gain : undefined,
+      duckRoom: this.ctx ? this.duckRoom.gain : undefined,
+      duckMusic: this.ctx ? this.duckMusic.gain : undefined,
       fog: this.ctx ? this.fog.gain : undefined,
       channel: {
         weather: this.channels.get('weather')?.gain,
         room: this.channels.get('room')?.gain,
         lights: this.channels.get('lights')?.gain,
         music: this.channels.get('music')?.gain,
+        voice: this.channels.get('voice')?.gain,
+        ui: this.channels.get('ui')?.gain,
       },
       voice: (name) => this.voices.get(name)?.level,
       crackle: (id) => this.neon.get(id)?.node.crackle,
@@ -615,6 +795,9 @@ export class AudioEngine {
   dispose(): void {
     this.ctx?.close().catch(() => {});
     this.ctx = null;
+    this.speechToken++;
+    this.speechMore = null;
+    this.speech = null;
     this.musicToken++;
     this.musicUrl = null;
     this.musicKind = null;
@@ -676,6 +859,8 @@ export class AudioEngine {
     if (!this.ctx) return;
     this.glide(this.master.gain, this.masterTarget(), LEVEL_SECONDS, this.ctx.currentTime);
     this.glide(this.musicOut.gain, this.musicTarget(), LEVEL_SECONDS, this.ctx.currentTime);
+    this.glide(this.voiceOut.gain, this.musicTarget(), LEVEL_SECONDS, this.ctx.currentTime);
+    this.glide(this.uiOut.gain, this.masterTarget(), LEVEL_SECONDS, this.ctx.currentTime);
   }
 
   private channel(ch: Channel): GainNode {

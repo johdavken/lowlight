@@ -41,8 +41,10 @@ export interface Flag {
 
 const ROOM_CHANGES = new Set(['go_to', 'set_light', 'set_ambient', 'set_atmosphere', 'apply_mood', 'pass_time']);
 const LIGHTS = new Set(['set_light', 'apply_mood', 'set_ambient']);
-/** Tools named in the story: presets, "sets the expression / the scene", "note's updated", logging. */
-const TOOL_TALK = /\b(?:presets?|set_[a-z]+|tool calls?|logging|logs? (?:it|this)|sets? (?:the|my|her|his) (?:expression|scene)|note'?s updated)\b/i;
+/** Tools named in the story: presets, "sets the expression / the scene / the mood", "note's updated", logging. */
+const TOOL_TALK = /\b(?:presets?|set_[a-z]+|tool calls?|logging|logs? (?:it|this)|sets? (?:the|my|her|his) (?:expression|scene|mood)|note'?s updated)\b/i;
+/** A light given a level in her *actions* ("drops the monitors to 20%"): the controls, not the room (light groups). */
+const LIGHT_LEVEL = /\b(?:lights?|lamps?|monitors?|screens?|bulbs?|lanterns?|inside|outside|neon|heater)\b[^*.]{0,30}?\b\d{1,3} ?%/i;
 
 const words = (s: string) => s.toLowerCase().match(/[a-z0-9']+/g) ?? [];
 const triples = (s: string) => {
@@ -96,7 +98,7 @@ export function flagsOf(t: TurnRecord, earlier: readonly string[] = []): Flag[] 
     if (carried.length >= 2 || carried.some((p) => p.split(' ').length >= 4)) add('echo', carried.map((p) => `"${p}"`).join(', '));
   }
 
-  const talk = t.mode === 'rp' ? t.text.match(TOOL_TALK) : null;
+  const talk = t.mode === 'rp' ? (t.text.match(TOOL_TALK) ?? (t.text.match(/\*[^*]+\*/g) ?? []).join(' ').match(LIGHT_LEVEL)) : null;
   if (talk) add('tool-talk', talk[0]);
 
   for (const c of t.calls) if (c.out.startsWith('error')) add('failed-call', `${c.name}: ${c.out.slice(0, 120)}`);
@@ -121,4 +123,58 @@ export function summary(records: TurnRecord[]): string {
     records.filter((r) => c === null || r.contact === c).reduce((n, r) => n + (kind === null ? 1 : flagsOf(r, earlierOf(records, r)).filter((f) => f.kind === kind).length), 0);
   const row = (label: string, kind: FlagKind | null) => `| ${label} | ${contacts.map((c) => count(c, kind)).join(' | ')} | ${count(null, kind)} |`;
   return [`| | ${contacts.join(' | ')} | total |`, `| --- |${contacts.map(() => ' --- |').join('')} --- |`, row('turns', null), ...FLAG_KINDS.map((k) => row(k, k))].join('\n');
+}
+
+/** Words too plain to be a habit ("she", "looks" stays: a look is a habit). */
+const PLAIN = new Set(
+  (
+    'the and but that this with from into onto over under about then than just like what when where while have been were they them their there ' +
+    "your yours mine his hers her him she he it's its it you're i'm i've i'd i'll don't doesn't didn't can't won't isn't wasn't one two " +
+    'some more back down still only even once again away around through toward towards before after something nothing anything'
+  ).split(' '),
+);
+
+/** Words in a reply's *actions*, lower case, possessives and plural s off; proper names (capitalised mid-sentence) left out. */
+function actionWords(text: string): Set<string> {
+  const out = new Set<string>();
+  const names = new Set<string>();
+  for (const run of (text.match(/\*[^*]+\*/g) ?? []).map((a) => a.slice(1, -1))) {
+    for (const m of run.matchAll(/(?<=[a-z,;] )([A-Z][a-z]+)/g)) names.add(m[1]!.toLowerCase());
+    for (const w of run.toLowerCase().replace(/[’‘]/g, "'").match(/[a-z]+(?:'[a-z]+)?/g) ?? []) {
+      const x = w.replace(/'s$/, '');
+      const p = x.length > 4 && x.endsWith('s') && !x.endsWith('ss') ? x.slice(0, -1) : x;
+      if (p.length >= 4 && !PLAIN.has(p)) out.add(p);
+    }
+  }
+  for (const n of names) out.delete(n);
+  return out;
+}
+
+/** Share of a contact's replies a word must be in (their *actions*) to count as sticky. */
+export const STICKY_SHARE = 0.4;
+
+/**
+ * Each contact's sticky words: in the *actions* of two or more and `STICKY_SHARE` or more of their in-character replies, never in
+ * the player's lines to them (what they bring up is the scene). The props she cycles (Rue's monitors and rain, 2026-11-12).
+ */
+export function stickyWords(records: readonly TurnRecord[]): Map<string, { word: string; n: number; of: number }[]> {
+  const out = new Map<string, { word: string; n: number; of: number }[]>();
+  for (const c of [...new Set(records.map((r) => r.contact))]) {
+    const mine = records.filter((r) => r.contact === c && r.mode === 'rp' && r.text.trim() !== '');
+    const theirs = new Set(mine.flatMap((r) => r.you.toLowerCase().match(/[a-z]+/g) ?? []).flatMap((w) => [w, w.replace(/s$/, '')]));
+    const count = new Map<string, number>();
+    for (const r of mine) for (const w of actionWords(r.text)) count.set(w, (count.get(w) ?? 0) + 1);
+    const sticky = [...count.entries()]
+      .filter(([w, n]) => n >= 2 && n / mine.length >= STICKY_SHARE && !theirs.has(w))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([word, n]) => ({ word, n, of: mine.length }));
+    out.set(c, sticky);
+  }
+  return out;
+}
+
+/** The report's sticky-words section: one line per contact. */
+export function stickySection(records: readonly TurnRecord[]): string {
+  const lines = [...stickyWords(records).entries()].map(([c, ws]) => `- ${c} (${ws.length}): ${ws.length ? ws.map((w) => `${w.word} ${w.n}/${w.of}`).join(', ') : 'none'}`);
+  return ['## Sticky words', '', `In the actions of ${Math.round(STICKY_SHARE * 100)}% or more of her in-character replies, never in the player's lines.`, '', ...lines].join('\n');
 }

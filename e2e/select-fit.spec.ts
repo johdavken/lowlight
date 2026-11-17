@@ -19,7 +19,7 @@ test('select: every character file fits, bio and facts', async ({ page }) => {
 /** Hovers each tile on the grid that's up and measures its file on `side`'s strip. */
 async function measure(page: Page, side: 'p1' | 'p2'): Promise<string[]> {
   const ids = await page.locator('.grid .tile[data-id]').evaluateAll((ts) =>
-    ts.map((t) => (t as HTMLElement).dataset.id!).filter((id) => !id.includes('random')),
+    ts.map((t) => (t as HTMLElement).dataset.id!).filter((id) => id !== '+new' && !id.startsWith('@')),
   );
   expect(ids.length).toBeGreaterThan(0);
   const misfits: string[] = [];

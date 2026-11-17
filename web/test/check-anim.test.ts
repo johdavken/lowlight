@@ -281,7 +281,7 @@ describe('mission cues', () => {
     expect([MISSION_CUE_URL['land-crit'], MISSION_CUE_URL['land-clean'], MISSION_CUE_URL['land-cost'], MISSION_CUE_URL['land-miss']]).toEqual(['/sound/table/crit.ogg', '/sound/table/clean.ogg', '/sound/table/cost.ogg', '/sound/table/miss.ogg']);
     expect(MISSION_CUE_URL.lock).toBe('/sound/gig/select.ogg');
     expect(MISSION_CUE_URL.hover).toBe('/sound/ui/move.ogg');
-    expect(MISSION_CUE_URL.clean).toBe('/sound/gig/clean.ogg');
+    expect(MISSION_CUE_URL.clean).toBe('/sound/table/end-clean.ogg');
     expect(MISSION_CUE_URL.blown).toBe('/sound/mission/blown.ogg');
     // Graft's table sounds (picked 2026-10-31): the dice tumble and a new beat's deal.
     expect(MISSION_CUE_URL.tick).toBe('/sound/table/roll.ogg');

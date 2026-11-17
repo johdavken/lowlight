@@ -42,9 +42,9 @@ describe('guest files (The Passenger spec, engine §2)', () => {
   it('no folder: no guests', () => {
     expect(loadGuests('/nonexistent/guests', () => {})).toEqual([]);
   });
-  it('the real Noa loads', () => {
+  it('the real Noa and Wren load', () => {
     const warn: string[] = [];
-    expect(loadGuests('./world/crew/guests', (m) => warn.push(m)).map((g) => g.id)).toContain('noa');
+    expect(loadGuests('./world/crew/guests', (m) => warn.push(m)).map((g) => g.id)).toEqual(expect.arrayContaining(['noa', 'wren']));
     expect(warn).toEqual([]);
   });
 });

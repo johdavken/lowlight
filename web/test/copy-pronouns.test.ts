@@ -26,7 +26,7 @@ describe('copy follows the character pronoun (spec 2026-10-12 §4)', () => {
     expect(he.diceTruth(true)).toBe(' · ask him one');
     expect(he.diceBack).toBe('[ENTER] BACK TO HIM');
     expect(they.diceLastDie).toBe('The loser opens the next round. Lose your last die and the game is theirs.');
-    expect(he.changeModel('GLM 5.2')).toBe('GLM 5.2 — change his model');
+    expect(he.changeModel).toBe('The model that plays him. Click or Enter to pick another.');
   });
 
   it("the room page's contact: they until her portrait says otherwise", () => {

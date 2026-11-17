@@ -24,7 +24,25 @@ export interface CipherRunInput {
   state: CipherState;
   /** How many truths this run may add (openMax − open). */
   room: number;
+  /**
+   * The written quests this playthrough has started and every quest guest (2026-11-08): their story is already
+   * decided, so a truth leaves them alone (a run once named the voice in Noa "Spark", Ember's handle, and gave it a past).
+   */
+  written?: WrittenThreads;
 }
+
+export interface WrittenThreads {
+  /** A quest's `people:` are the ones its story writes by name. */
+  threads: { title: string; pitch: string | null; people?: string[] }[];
+  /** Guest files' full names ("Noa Vey"). */
+  guests: string[];
+}
+
+/** The name words a truth may not use, the guests' and the quests' people, whole words only ("Noa" yes, "Noah" no). */
+const ownedWords = (w: WrittenThreads | undefined): string[] =>
+  [...new Set([...(w?.guests ?? []), ...(w?.threads ?? []).flatMap((q) => q.people ?? [])].flatMap((g) => g.split(/\s+/)).filter((x) => x.length >= 3))];
+const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 
 const flat = (t: string) => t.replace(/\s*\n\s*/g, ' ');
 
@@ -32,6 +50,7 @@ const flat = (t: string) => t.replace(/\s*\n\s*/g, ' ');
 export function cipherRunMessages(i: CipherRunInput): CompletionMessage[] {
   const you = i.player.name;
   const later = i.state.truths.length > 0;
+  const written = (i.written?.threads.length ?? 0) > 0 || (i.written?.guests.length ?? 0) > 0;
   const system = [
     `You keep the secrets of a story in Lowlight. Lowlight is a rain-soaked cyberpunk port city, played as a roleplay with ${you}. You never write story: you read where it stands and choose the truths it holds back from ${you} — things that are true now, that someone would rather keep hidden, and that change how earlier scenes read once they come out. You answer with one JSON object.`,
     [
@@ -44,10 +63,15 @@ export function cipherRunMessages(i: CipherRunInput): CompletionMessage[] {
       `These examples only show the kinds; draw yours from the people, places and story below.`,
     ].join('\n'),
     `A truth is never ${you}'s own past or motives, never against the lore, never about whether someone will love ${you}, and never city-breaking: street scale, with a cost to whoever is caught holding it.`,
+    written
+      ? `Some threads belong to a written quest ([written: …]) and their guests ([guests: …]): what they hide is already decided. A truth never explains, extends or gives a past to them, to anyone their scenes bring in, named or not (a fixer, a seller, a guard at a van), or to anything that speaks through someone; it never names a guest or a quest's people. Handles are what others call a runner, not a name someone else gives itself. Choose truths from elsewhere.`
+      : null,
     `No two truths of the same kind, open at once, and nobody keeps more than one: spread them across the people and places listed. A truth nobody here knows has "knownBy": []. Use "yours" only when the story so far gives it something to grow from${later ? '; prefer it now' : ''}.`,
     `knownBy: ids from the [cast: …] lines, never ${you}. comesOutWhen: what earns it — somewhere to go, something to do or pay. changes: what the story does once it's out. clueIdeas: two or three small things that could point at it, each of which could also mean something else.`,
     `Write at most ${i.room} truths, each one or two sentences (at most ${CIPHER.truthMax} characters). Answer exactly: {"truths":[{"kind":"…","truth":"…","knownBy":["…"],"comesOutWhen":"…","changes":"…","clueIdeas":"…"}]}`,
-  ].join('\n\n');
+  ]
+    .filter((x): x is string => x !== null)
+    .join('\n\n');
 
   // Who holds what (review I3): nobody keeps two open truths, so the run must see who's taken.
   // A cold one is still true, so a new truth mustn't fight it; nobody carries it any more.
@@ -59,6 +83,8 @@ export function cipherRunMessages(i: CipherRunInput): CompletionMessage[] {
       .join('\n'),
     `[you: ${you}]`,
     i.lore.length > 0 ? `[lore: ${i.lore.join(', ')}]` : null,
+    ...(i.written?.threads ?? []).map((q) => `[written: ${q.title}${q.pitch ? ` — ${flat(q.pitch)}` : ''}${q.people?.length ? `; people: ${q.people.join(', ')}` : ''}]`),
+    i.written && i.written.guests.length > 0 ? `[guests: ${i.written.guests.join(', ')}]` : null,
     i.summary ? `Earlier: ${flat(i.summary)}` : null,
     i.recent.length > 0 ? `What happened lately:\n${i.recent.map((r) => `${r.speaker}: ${flat(r.text)}`).join('\n')}` : null,
     i.state.truths.length > 0 ? `Truths already kept:\n${i.state.truths.map(kept).join('\n')}` : 'No truths yet.',
@@ -97,6 +123,7 @@ export function parseCipherAnswer(raw: string, i: CipherRunInput): { truths: New
   const truths: NewTruth[] = [];
   const refused: string[] = [];
   const cast = new Set(i.cast.map((c) => c.id));
+  const owned = ownedWords(i.written).map((w) => ({ w, re: new RegExp(`(?<![\\p{L}\\p{N}])${escape(w)}(?![\\p{L}\\p{N}])`, 'u') }));
   // The accepted ones count as open for the next check.
   const state = (): CipherState => ({
     ...i.state,
@@ -114,6 +141,8 @@ export function parseCipherAnswer(raw: string, i: CipherRunInput): { truths: New
       changes: capAtWordBoundary(r.data.changes, CIPHER.changesMax),
       clueIdeas: capAtWordBoundary(r.data.clueIdeas, CIPHER.ideasMax),
     };
+    const name = owned.find((g) => [t.truth, t.comesOutWhen, t.changes, t.clueIdeas].some((f) => g.re.test(f)));
+    if (name) return void refused.push(`truths[${n}]: names someone a written quest owns (${name.w})`);
     const why = checkNewTruth(state(), t, { cast, playerId: i.player.id });
     if (why) refused.push(`truths[${n}]: ${why}`);
     else truths.push(t);

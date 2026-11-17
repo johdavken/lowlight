@@ -492,6 +492,14 @@ const renderSchema = z.object({
     contrast: z.number(),
   }),
   wet: z.object({ roofRoughMin: share, puddleRough: z.tuple([share, share]) }),
+  /** The city's reflection on the water, as a mirrored copy under it seen through the ripples (so tiles meet):
+   * `strength` how much shows (0: none), `stretch` how far it is drawn out, `half` the depth where its light has halved,
+   * `cut` the height (map px) above which nothing reflects (a raised highway's lamps would land far out in the bay). */
+  reflection: z.object({ strength: share, stretch: z.number().min(0.1), half: z.number().min(1), cut: z.number().min(1) }).optional(),
+  /** Land and walls lighter than drawn, so the moon shows the city's form (1: as drawn). */
+  landLift: z.number().min(0.1).optional(),
+  /** Contact shadows between blocks: their reach in map px (0 or absent: off). */
+  occlusion: z.number().min(0).optional(),
   blender: z.string(),
 });
 

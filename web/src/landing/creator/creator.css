@@ -1,0 +1,95 @@
+/* The creator at 1P (character creator spec 2026-11-14): a panel over the stage's middle, 1P's strip beside it. */
+.creator {
+  position: absolute;
+  z-index: 30;
+  left: 440px;
+  right: 40px;
+  top: 120px;
+  bottom: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 20px;
+  font: 14px/1.5 var(--mono);
+  color: var(--ink);
+  background: linear-gradient(180deg, rgba(5, 2, 12, 0.94), rgba(5, 2, 12, 0.86));
+  border-top: 4px solid var(--p1);
+  pointer-events: auto;
+}
+.mk-body { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 10px; overflow: auto; }
+.mk-steps { display: flex; gap: 24px; font: 22px var(--pixel); letter-spacing: 0.25em; color: #6f6585; }
+.mk-step.on { color: var(--p1); }
+.mk-status { min-height: 1.5em; font-size: 13px; color: #b8acd0; }
+.mk-status.bad { color: #ff6b6b; }
+.mk-hint { font-size: 12px; color: #a99cc4; letter-spacing: 0.05em; }
+.mk-label { display: flex; flex-direction: column; gap: 3px; font: 15px var(--pixel); letter-spacing: 0.25em; color: var(--p1); }
+.mk-input,
+.mk-name,
+.mk-background,
+.mk-wears {
+  padding: 6px 9px;
+  font: 14px var(--mono);
+  letter-spacing: 0;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(61, 255, 122, 0.45);
+  outline: none;
+  resize: vertical;
+}
+.mk-input:focus,
+.mk-name:focus,
+.mk-background:focus,
+.mk-wears:focus { border-color: var(--p1); }
+.mk-input::placeholder,
+.mk-background::placeholder { color: #6f6585; }
+
+/* LOOK: three groups side by side. */
+.mk-look { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-content: start; }
+.mk-group { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 8px 10px 10px; border: 1px solid rgba(61, 255, 122, 0.25); min-width: 0; }
+.mk-group legend { padding: 0 6px; font: 18px var(--pixel); letter-spacing: 0.3em; color: var(--p1); }
+.mk-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+.mk-actions button {
+  padding: 3px 14px;
+  font: 20px var(--pixel);
+  letter-spacing: 0.25em;
+  color: #05020c;
+  background: var(--p1);
+  border: 0;
+  cursor: pointer;
+}
+.mk-actions button:disabled { opacity: 0.45; cursor: default; }
+.mk-actions .mk-skip,
+.mk-actions .mk-to-look,
+.mk-actions .mk-more,
+.mk-actions .mk-to-fit { color: var(--p1); background: transparent; border: 1px solid var(--p1); }
+.mk-price { font-size: 12px; color: #a99cc4; }
+.mk-nokey { max-width: 52em; color: #ffb347; font-size: 13px; }
+
+/* FIT: the takes, then the picture to box and line, and the portrait as the game crops it. */
+.mk-fit { display: flex; flex-direction: column; gap: 10px; min-height: 0; flex: 1; }
+.mk-strip { display: flex; gap: 6px; overflow-x: auto; flex: none; }
+.mk-take { flex: none; width: 52px; height: 78px; padding: 0; background: rgba(0, 0, 0, 0.4); border: 2px solid transparent; cursor: pointer; }
+.mk-take img { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.mk-take.on { border-color: var(--p1); }
+.mk-pics { display: flex; gap: 24px; flex: 1; min-height: 0; }
+.mk-pic { display: flex; flex-direction: column; gap: 4px; min-height: 0; align-items: flex-start; }
+.mk-frame { position: relative; height: 430px; aspect-ratio: 2 / 3; cursor: crosshair; touch-action: none; background: rgba(255, 255, 255, 0.04); }
+.mk-frame img { width: 100%; height: 100%; display: block; image-rendering: pixelated; user-select: none; -webkit-user-drag: none; }
+.mk-box { position: absolute; border: 2px solid var(--cyan); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25); pointer-events: none; }
+.mk-waist { position: absolute; left: -8px; right: -8px; height: 0; border-top: 2px dashed #ffb347; cursor: ns-resize; }
+.mk-waist span { position: absolute; right: 0; top: -18px; font: 13px var(--pixel); letter-spacing: 0.2em; color: #ffb347; }
+.mk-crop { width: 208px; height: 240px; background-repeat: no-repeat; image-rendering: pixelated; border: 1px solid rgba(127, 233, 255, 0.5); background-color: rgba(255, 255, 255, 0.04); }
+.mk-raw { padding: 1px 10px; font: 15px var(--pixel); letter-spacing: 0.2em; color: #a99cc4; background: transparent; border: 1px solid #6f6585; cursor: pointer; }
+.mk-raw.on { color: var(--cyan); border-color: var(--cyan); }
+
+/* WHO. */
+.mk-who { display: flex; flex-direction: column; gap: 10px; max-width: 760px; }
+.mk-pronouns { display: flex; gap: 8px; }
+.mk-pronoun { padding: 2px 14px; font: 18px var(--pixel); letter-spacing: 0.25em; color: #b8acd0; background: transparent; border: 1px solid #6f6585; cursor: pointer; }
+.mk-pronoun[aria-pressed='true'] { color: #05020c; background: var(--p1); border-color: var(--p1); }
+
+.mk-confirm { margin: auto; max-width: 40em; font: 24px var(--pixel); letter-spacing: 0.15em; text-align: center; color: #ffb347; }
+
+/* While the creator is up the grid steps aside; the title is 1P's. */
+[data-phase='make'] .grid-band { visibility: hidden; }
+[data-phase='make'] .select-title { color: var(--p1); }

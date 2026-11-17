@@ -1,4 +1,4 @@
-/* The title menu (front-end restyle §3) on the select's 1600×900 stage: fighters, the band, the under line. */
+/* The title menu (front-end restyle §3; B TRACE 2026-11-14) on the select's 1600×900 stage: fighters, the list on 1P's rail. */
 .title-menu { position: absolute; inset: 0; z-index: 30; }
 .title-logo {
   position: absolute;
@@ -6,26 +6,33 @@
   left: 0;
   right: 0;
   z-index: 20;
-  text-align: center;
-  font: 56px var(--pixel);
-  letter-spacing: 0.3em;
   color: var(--p2);
-  text-shadow: 0 0 18px currentColor;
   pointer-events: none;
 }
-/* What the focused tile means, under the band (amber, like SET THE SCENE). */
+/* 1P's file stops above the list, which carries on down the same rail. */
+.title-menu .fighter.p1 .file-strip { bottom: 380px; }
+.title-menu .fighter.p1 .file-strip::before { bottom: 0; }
+.title-menu .fighter.p1 .file-strip::after { display: none; }
+.title-list { position: absolute; left: 26px; top: 556px; z-index: 16; display: flex; flex-direction: column; gap: 4px; }
+.title-list::before { content: ''; position: absolute; left: 4px; top: -12px; bottom: -12px; width: 1px; background: linear-gradient(transparent, rgba(61, 255, 122, 0.4) 20%, rgba(61, 255, 122, 0.4) 80%, transparent); }
+.title-list.locked { pointer-events: none; }
+/* A row: a dim tick on the rail; the focused one white with a ring, its amber line, a green hairline after. */
+.tm-item { position: relative; display: flex; align-items: center; gap: 14px; padding: 6px 0 6px 30px; font: 26px/1 var(--pixel); letter-spacing: 0.26em; white-space: nowrap; color: rgba(230, 238, 247, 0.5); text-shadow: 0 1px 2px #000; cursor: pointer; }
+.tm-item::before { content: ''; position: absolute; left: 4px; top: 50%; width: 9px; height: 1px; background: rgba(230, 238, 247, 0.4); }
+.tm-item:hover { color: rgba(230, 238, 247, 0.8); }
+.tm-item.on { color: #fff; text-shadow: 0 0 10px rgba(61, 255, 122, 0.6), 0 1px 2px #000; }
+.tm-item.on::before { left: 0; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--p1); border-radius: 50%; background: #05020a; }
+.tm-item.on::after { content: ''; flex: none; width: 90px; height: 1px; background: linear-gradient(90deg, var(--p1), transparent); }
+.tm-tag { padding: 1px 6px 0; font: 13px/1.1 var(--pixel); letter-spacing: 0.14em; color: #05020a; background: #ffb347; text-shadow: none; }
+/* What the focused row means, beside it (amber, like SET THE SCENE). */
 .title-under {
-  position: absolute;
-  left: 50%;
-  bottom: 72px;
-  z-index: 15;
-  transform: translateX(-50%);
-  font: 20px var(--pixel);
-  letter-spacing: 0.25em;
+  font: 14px/1 var(--pixel);
+  letter-spacing: 0.2em;
   white-space: nowrap;
   color: #ffb347;
-  text-shadow: 0 0 8px rgba(255, 179, 71, 0.4);
+  text-shadow: 0 0 8px rgba(255, 179, 71, 0.4), 0 1px 2px #000;
 }
+.title-under:empty { display: none; }
 /* JACK IN: select's banner, shown on Enter rather than at READY. */
 .title-menu .jack-in.on { opacity: 1; clip-path: inset(0 0 0 0); animation: jack-in 0.5s steps(14) backwards; }
 .title-hints {
@@ -35,9 +42,6 @@
   right: 0;
   z-index: 20;
   text-align: center;
-  font: 20px var(--pixel);
-  letter-spacing: 0.3em;
-  opacity: 0.65;
 }
 .title-error {
   position: absolute;
@@ -50,9 +54,9 @@
   font-size: 15px;
   letter-spacing: 0.06em;
   color: #ff6b8a;
-  background: rgba(5, 2, 12, 0.85);
-  border-left: 3px solid #ff6b8a;
+  background: rgba(5, 2, 10, 0.88);
+  box-shadow: inset 0 0 0 1px rgba(255, 107, 138, 0.45);
 }
 .title-error:empty { display: none; }
 /* UPDATED after an update came in: the same line, in the select's green. */
-.title-error.ok { color: #7dffb0; border-left-color: #7dffb0; }
+.title-error.ok { color: #7dffb0; box-shadow: inset 0 0 0 1px rgba(125, 255, 176, 0.45); }

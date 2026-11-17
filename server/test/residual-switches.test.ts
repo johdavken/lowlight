@@ -24,6 +24,21 @@ describe('the game prompt stays as it was', () => {
   });
 });
 
+describe('the lights backstop (light groups)', () => {
+  it('Lowlight asks for inside or outside; the SillyTavern default keeps light ids', () => {
+    const [groups] = residualMessages(input({ lightGroups: true }));
+    expect(groups.content).toContain('Use "inside" for the room\'s own lights');
+    expect(groups.content).toContain('"lights" holds {"id":"inside", "outside" or a light\'s name');
+    expect(residualMessages(input())[0].content).toContain('Use the light ids from that line');
+  });
+
+  it('lights: false leaves the rule and the key out, so a turn where she set the lights asks for nothing to refuse', () => {
+    const [system] = residualMessages(input({ lightGroups: true, lights: false }));
+    expect(system.content).not.toContain('LIGHTS:');
+    expect(system.content).not.toContain('"lights"');
+  });
+});
+
 describe('the SillyTavern switches', () => {
   it('standing: false leaves the standing rule and key out', () => {
     const [system] = residualMessages(input({ standing: false }));

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { firstPlaythrough, settleCostStep, goIn, nixAt, questRow, questTab, send, skipSplash, startQuest } from './fixtures';
+import { buyAtFixer, fixerItem, firstPlaythrough, settleCostStep, goIn, nixAt, questRow, questTab, send, skipSplash, startQuest } from './fixtures';
 
 // Small jobs (spec 2026-10-19): Back Door at the Intake (e2e/serve.ts), played without dice — the roll list belongs to missions.spec.
 test.describe.configure({ mode: 'serial' });
@@ -23,7 +23,8 @@ test("a board shows tonight's jobs", async ({ page }) => {
   await expect(row.locator('.ql-mission')).toHaveText('MISSION · TIER 1 · 350–450 SOL');
   // The fixer at this board: a burner you can buy.
   await questTab(page, 'fixer');
-  await expect(page.locator('.ql-fixer .ql-item', { hasText: 'Burner' }).locator('.ql-buy')).toBeEnabled();
+  await fixerItem(page, 'Burner').click();
+  await expect(page.locator('.ql-fixer .ql-file .ql-buy')).toBeEnabled();
 });
 
 test('a job with a drawn complication, a red check and a crack ends in a debrief', async ({ page }) => {
@@ -87,7 +88,7 @@ test('buy a burner, blow a job, use the burner: the halved loss and the tier lin
   const before = await replies.count();
   await page.locator('.hud-quest').click();
   await questTab(page, 'fixer');
-  await page.locator('.ql-fixer .ql-item', { hasText: 'Burner' }).locator('.ql-buy').click();
+  await buyAtFixer(page, 'Burner');
   await expect.poll(async () => ((await (await page.request.get('/api/kit')).json()) as { kit: { cover: { burner: number } } }).kit.cover.burner).toBe(1);
 
   // The list stays open after BUY.
@@ -229,7 +230,7 @@ test('a full ALARM: GET OUT with RUN and WALK IT OFF on the wire; the job ends e
   await expect(replies).toHaveCount(before, { timeout: 10_000 });
 });
 
-test('a mood landing after her reply joins the footer, in the box and at the table: the name stays in, the line clear of the text (playtest)', async ({ page }) => {
+test('a mood landing after her reply joins the footer in the box, and her line in the JOB column at the table (playtest)', async ({ page }) => {
   const { greetingId, errors } = await room(page);
   const replies = page.locator('.msg.agent.s-ok');
   const before = await replies.count();
@@ -251,7 +252,7 @@ test('a mood landing after her reply joins the footer, in the box and at the tab
       const m = msgs[msgs.length - 1];
       const shown = [...m.querySelectorAll<HTMLElement>('.foot .tool')].filter((t) => t.offsetHeight > 0).map((t) => t.getBoundingClientRect());
       const text = m.querySelector('.text')!.getBoundingClientRect();
-      return { feed: top('#feed .feed').top, name: m.querySelector('.meta')!.getBoundingClientRect().top, textLeft: text.left, textBottom: text.bottom, lines: shown.map((t) => ({ left: t.left, top: t.top, bottom: t.bottom, right: t.right })), loose: document.querySelectorAll('#feed .feed > .tool').length, button: document.querySelector('button.continue')?.getBoundingClientRect().top ?? null };
+      return { k: top('#game').width / 1600, feed: top('#feed .feed').top, name: m.querySelector('.meta')!.getBoundingClientRect().top, textLeft: text.left, textBottom: text.bottom, lines: shown.map((t) => ({ left: t.left, top: t.top, bottom: t.bottom, right: t.right })), loose: document.querySelectorAll('#feed .feed > .tool').length, button: document.querySelector('button.continue')?.getBoundingClientRect().top ?? null };
     });
 
   // The box outside a job: full width, so the line shares CONTINUE's row.
@@ -260,42 +261,77 @@ test('a mood landing after her reply joins the footer, in the box and at the tab
   await mood('tense');
   const plainAfter = await box();
   expect(plainAfter.name).toBe(plain.name);
-  expect(plainAfter.name).toBeGreaterThanOrEqual(plainAfter.feed);
+  // The name row stands on the head line (B TRACE: 52px over the box's top edge), never pushed above it.
+  expect(plainAfter.name).toBeGreaterThanOrEqual(plainAfter.feed - 52 * plainAfter.k - 0.5);
   expect(plainAfter.loose).toBe(0);
 
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Back Door');
   await goIn(page);
   await expect(page.locator('.tb-job .tb-deal .tb-card').first()).toBeVisible({ timeout: 10_000 });
+  // The box holds nothing while the table is up: her line from before the job doesn't surface as it starts (playtest).
+  await expect(page.locator('.feed-root.box-empty')).toHaveCount(1);
+  // Her long line from before is held out, not paged: no CONTINUE taking Enter for a page nobody sees (review).
+  await expect(page.locator('button.continue')).toHaveCount(0);
+  // The box's settings key stands on the JOB column's top edge near its right end, and opens there (playtest 2026-11-11).
+  const bsKey = page.locator('.bs-key');
+  await expect(bsKey).toBeVisible();
+  const [kb, cb] = await Promise.all([bsKey.boundingBox(), page.locator('.jc').boundingBox()]);
+  expect(Math.abs(kb!.y + kb!.height / 2 - cb!.y)).toBeLessThanOrEqual(3);
+  expect(kb!.x + kb!.width).toBeLessThanOrEqual(cb!.x + cb!.width);
+  expect(kb!.x).toBeGreaterThan(cb!.x + cb!.width / 2);
+  await bsKey.click();
+  await expect(page.locator('.bs-panel')).toBeVisible();
+  await page.screenshot({ path: 'test-results/jobs-box-settings.png' });
+  // It opens to the column's right, so the column shows each change; a BOX COLOUR colours the column too.
+  const [pb, cb2] = await Promise.all([page.locator('.bs-panel').boundingBox(), page.locator('.jc').boundingBox()]);
+  expect(pb!.x).toBeGreaterThanOrEqual(cb2!.x + cb2!.width);
+  const hue = () => page.locator('.jc-layer').evaluate((n) => getComputedStyle(n).getPropertyValue('--hf-c').trim());
+  const amber = await hue();
+  await page.locator('.bs-panel i[data-colour="cyan"]').click();
+  await expect.poll(hue).not.toBe(amber);
+  await page.locator('.bs-panel i[data-colour="speaker"]').click();
+  await expect.poll(hue).toBe(amber);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.bs-panel')).toBeHidden();
 
-  // At the table the box is narrow: the line takes the row over CONTINUE, whole, on the text's left edge.
-  await longReply();
-  const hud = await box();
-  await mood('storm');
-  const hudAfter = await box();
-  expect(hudAfter.name).toBe(hud.name);
-  expect(hudAfter.name).toBeGreaterThanOrEqual(hudAfter.feed);
-  expect(hudAfter.loose).toBe(0);
-  expect(hudAfter.lines).toHaveLength(1);
-  const [line] = hudAfter.lines;
-  expect(line.left).toBeCloseTo(hudAfter.textLeft, 0);
-  expect(line.top).toBeGreaterThanOrEqual(hudAfter.textBottom);
-  expect(line.bottom).toBeLessThanOrEqual(hudAfter.button!);
+  // At the table her lines read in the JOB column (2026-11-11): a long one there, not paged in the box, and a mood
+  // landing after it shows under her words in the column.
+  const n = await replies.count();
+  await send(page, { type: 'user_message', text: 'len:1400' });
+  await expect(replies).toHaveCount(n + 1, { timeout: 10_000 });
+  const said = page.locator('.jc-body .jc-reply').last();
+  await expect(said).toBeVisible();
+  await expect(page.locator('#feed .msg:not(.hidden-collapsed)')).toHaveCount(0);
+  await expect(page.locator('button.continue')).toHaveCount(0);
+  await send(page, { type: 'dev_action', tool: 'apply_mood', args: { name: 'storm' }, as: 'agent' });
+  await expect(said.locator('.jc-tool').last()).toHaveText('// APPLY_MOOD · STORM');
+  // Her actions read as plain narration and her words in quotes, a paragraph to a line (playtest 2026-11-11).
+  const m = await replies.count();
+  await send(page, { type: 'user_message', text: 'act and speak' });
+  await expect(replies).toHaveCount(m + 1, { timeout: 10_000 });
+  await expect(page.locator('.jc-body .jc-reply').last()).toHaveText(
+    /^I'm on the daybed, taping paper to the wall\. “You knocked twice\. Good\.”\s*I climb down\. “Intake's shut Sundays\.”/,
+    { timeout: 5_000 },
+  );
+  await page.screenshot({ path: 'test-results/jobs-column-talk.png' });
+  expect(await page.locator('#feed .feed > .tool').count()).toBe(0);
   await page.screenshot({ path: 'test-results/jobs-footer-line.png' });
-
-  // A second one shows alone, the newest; on the last page, with no CONTINUE, it still clears the text.
-  await mood('late');
-  expect((await box()).lines).toHaveLength(1);
-  await expect(replies.last().locator('.foot .tool').last()).toBeVisible();
-  const go = page.locator('button.continue');
-  for (let i = 0; i < 12 && (await go.count()); i++) await go.click();
-  await expect(go).toHaveCount(0);
-  const last = await box();
-  expect(last.lines).toHaveLength(1);
-  expect(last.lines[0].top).toBeGreaterThanOrEqual(last.textBottom);
-  await page.screenshot({ path: 'test-results/jobs-footer-line-last.png' });
+  // Nor after a delete at the table: the box doesn't fall back to a line from before the job (playtest).
+  const lastId = await replies.last().getAttribute('data-id');
+  const kept = (await replies.count()) - 1;
+  await send(page, { type: 'delete_message', messageId: lastId! });
+  await expect(replies).toHaveCount(kept, { timeout: 10_000 });
+  await expect(page.locator('.feed-root.box-empty')).toHaveCount(1);
+  await expect(page.locator('#feed .msg:not(.hidden-collapsed)')).toHaveCount(0);
 
   expect(errors).toEqual([]);
   await send(page, { type: 'rewind', messageId: greetingId });
   await expect(replies).toHaveCount(before, { timeout: 10_000 });
+  // The table gone, the box's settings key is back on the box's top edge, not left where the column was (playtest).
+  await expect(page.locator('.tb.hud:not([hidden])')).toHaveCount(0);
+  await expect.poll(async () => {
+    const [k, f] = await Promise.all([page.locator('.bs-key').boundingBox(), page.locator('#feed .feed').boundingBox()]);
+    return !!k && !!f && Math.abs(k.y + k.height + 8 - f.y) <= 3 && k.x > f.x + f.width / 2; // 8px over the head line (B TRACE)
+  }).toBe(true);
 });

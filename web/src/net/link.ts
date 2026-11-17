@@ -1,11 +1,13 @@
-/** The in-game link routes (spec 2026-10-08 §4): the OpenRouter and Anthropic keys and the model lists. A key goes up once; only its last 4 come back. */
-import type { LinkState, ModelChoice, NarratorThinking } from '../../../shared/types';
+/** The in-game link routes (spec 2026-10-08 §4): the OpenRouter, Anthropic and NanoGPT keys and the model lists. A key goes up once; only its last 4 come back. */
+import type { ChatThinking, LinkState, ModelChoice, NarratorThinking, ReplyLength } from '../../../shared/types';
 
-export type LinkInfo = { linked: boolean; last4: string | null; credit: number | null; state: LinkState };
-export type Provider = 'openrouter' | 'anthropic';
-export const PROVIDERS: readonly Provider[] = ['openrouter', 'anthropic'];
-/** Both links; `state` is ok when either key works. */
-export type LinkStatus = { state: LinkState; openrouter: LinkInfo; anthropic: LinkInfo };
+/** NanoGPT's plan: on or off, and the share of the week's input tokens left (0–1; null: not said). */
+export type NanoPlan = { active: boolean; weekLeft: number | null };
+export type LinkInfo = { linked: boolean; last4: string | null; credit: number | null; state: LinkState; plan?: NanoPlan };
+export type Provider = 'openrouter' | 'anthropic' | 'nanogpt';
+export const PROVIDERS: readonly Provider[] = ['openrouter', 'anthropic', 'nanogpt'];
+/** Every link; `state` is ok when any key works. */
+export type LinkStatus = { state: LinkState } & Record<Provider, LinkInfo>;
 export type LinkError = 'bad-key' | 'key-rejected' | 'unreachable';
 export type ModelLists = { picks: ModelChoice[]; recent: ModelChoice[]; results: ModelChoice[] };
 /** The model step's lists: the picks, recent models and the whole catalog (null when it can't be read). */
@@ -49,6 +51,19 @@ export async function searchModels(q: string): Promise<ModelLists> {
   const res = await fetch(q ? `/api/models?q=${encodeURIComponent(q)}` : '/api/models');
   if (!res.ok) throw new Error(`/api/models: HTTP ${res.status}`);
   return (await res.json()) as ModelLists;
+}
+
+/** SYS → REPLY LENGTH and REPLY THINKING, as saved in data/settings.json. */
+export async function getReplyPrefs(): Promise<{ length: ReplyLength; thinking: ChatThinking }> {
+  const res = await fetch('/api/reply-prefs');
+  if (!res.ok) throw new Error(`/api/reply-prefs: HTTP ${res.status}`);
+  return (await res.json()) as { length: ReplyLength; thinking: ChatThinking };
+}
+
+export async function putReplyPrefs(p: { length?: ReplyLength; thinking?: ChatThinking }): Promise<{ length: ReplyLength; thinking: ChatThinking }> {
+  const res = await fetch('/api/reply-prefs', { method: 'PUT', headers: json, body: JSON.stringify(p) });
+  if (!res.ok) throw new Error(`/api/reply-prefs: HTTP ${res.status}`);
+  return (await res.json()) as { length: ReplyLength; thinking: ChatThinking };
 }
 
 /** SYS → NARRATOR THINKING, as saved in data/settings.json. */

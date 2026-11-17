@@ -18,6 +18,7 @@ loot: a hotel lock server's log card
 ---
 
 # ask
+title: The Tilt
 
 *Silas found it on the Second Socket board and brought it home without a word, and put it on your milk crates where you'd see it. A hotel under the Cat, a room safe opened at ten past three, and a porter the house means to hand over. The card doesn't say what Silas saw in the hotel's log. He told you that part to your face, and then he went to bed without looking at you.*
 
@@ -29,14 +30,19 @@ loot: a hotel lock server's log card
 
 view hicks: Ember has never asked you to be her operator. Not once in three years. She says it's a nothing job and she's smiling too much. You don't run with anyone in your own ear and you don't love being in anyone else's, but you won't say no to her. Ask one question. Don't push past the answer.
 
-- favour: Tell him it's a favour for Silas. → yes
+- favour: Tell him it's a favour for Silas. → for-silas
 - company: Tell him you just fancied the company. → yes
+
+## for-silas
+*"Silas doesn't ask for favours," he says. He lets that sit between you a second, and doesn't pick it up. Then he holds out his hand for a bead.*
+→ street
 
 ## yes
 *He smiles before he answers, the way he does when he's already worked something out. "Fine," he says, and holds out his hand for a bead.*
 → street
 
 # street
+title: The Street
 room: velvet/under-the-cat
 
 *Velvet at the foot of the cliffs, quieter and cleaner than anywhere you live. The Cat watches the street from the cliff face in pink and violet tube. The hotel is narrow and old, with a violet strip over a glass door and a lit lobby behind it. There's a clerk at the desk, and an office behind her with a key on a nail.*
@@ -57,6 +63,7 @@ view hicks: You're on her ear and you can see the street through the camera on h
 → office
 
 # office
+title: The Office
 room: velvet/under-the-cat
 
 *The lock server runs the whole hotel's doors, and it keeps a log because somebody's insurer made it. Last Thursday, ten past three, room nine: safe opened, door logged. The log's behind the plainest lacquer you've seen in a month.*
@@ -77,6 +84,7 @@ view hicks: She's in the lock server. You've heard her work a hundred times and 
 → porter
 
 # porter
+title: The Lobby
 room: velvet/under-the-cat
 
 *Out in the lobby there's a man in a good coat from one of the houses, with the porter beside him and a hand on the porter's shoulder. The porter's grey to the lips. Somebody's called it in already.*
@@ -99,6 +107,7 @@ take: none
 → signed
 
 # home
+title: His Stool
 
 *Back at the Tilt he's kept your stool, and pushed his glass away, which he never does. He's waiting for you to say it.*
 
@@ -122,6 +131,7 @@ hire-pitch: Velvet's done with me. I can talk a house out of anything it hasn't 
 → end
 
 # signed
+title: The Next Stool
 
 *Back at the Tilt you take the stool next to his. A house in Velvet has your sparkle on a theft you never did, and now it has your face to go with it.*
 
@@ -141,6 +151,7 @@ view hicks: It went wrong. A Velvet house has her face now, beside something in 
 → end
 
 # getaway
+title: The House Phone
 room: velvet/under-the-cat
 
 *The house phone's going off in the lobby, and in Velvet that's worse than a Sentinel's whistle. There's a man in a good coat at the front door, and the alley's dark.*

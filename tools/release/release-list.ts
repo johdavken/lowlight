@@ -38,9 +38,14 @@ export function resolveRelease(root: string, list: ReleaseList): ResolvedRelease
   });
 
   const characters: string[] = [];
-  const queue = list.characters.map((id) => ({ id, baseOf: null as string | null }));
+  const queue = list.characters.map((id) => ({ id, baseOf: null as string | null, standIn: false }));
+  // The made person's stand-in (character creator spec 2026-11-14) ships whatever the list says: made people play on it.
+  const charsDir = path.join(root, 'characters');
+  for (const id of isDir(charsDir) ? fs.readdirSync(charsDir).sort() : []) {
+    if (!list.characters.includes(id) && isDir(path.join(charsDir, id)) && loadCharacter(path.join(charsDir, id))?.standIn === true) queue.push({ id, baseOf: null, standIn: true });
+  }
   while (queue.length > 0) {
-    const { id, baseOf } = queue.shift()!;
+    const { id, baseOf, standIn } = queue.shift()!;
     if (characters.includes(id)) continue;
     const dir = path.join(root, 'characters', id);
     const char = isDir(dir) ? loadCharacter(dir) : null;
@@ -50,12 +55,13 @@ export function resolveRelease(root: string, list: ReleaseList): ResolvedRelease
     }
     characters.push(id);
     if (baseOf) notes.push(`copied ${id} as the base of ${baseOf}`);
+    if (standIn) notes.push(`shipped ${id}, the stand-in made people play on`);
     const rooms = char.rooms ?? [];
     for (const room of rooms) {
       if (!packs.includes(room.split('/')[0])) errors.push(`${id}: room ${room} is not in a shipped pack`);
     }
     if (rooms.length === 0 && char.scenePack && !packs.includes(char.scenePack)) errors.push(`${id}: pack ${char.scenePack} is not shipped`);
-    if (char.extends) queue.push({ id: char.extends, baseOf: id });
+    if (char.extends) queue.push({ id: char.extends, baseOf: id, standIn: false });
   }
 
   if (!characters.includes(list.defaultPlayer)) errors.push(`defaultPlayer ${list.defaultPlayer} is not a shipped character`);

@@ -172,6 +172,13 @@ describe('drops: (crew goods spec §6)', () => {
   it('refuses an unknown kind', () => expect(messages(file('drops: gold')).join()).toContain('drops'));
 });
 
+describe('people: (Cipher keeps off them, 2026-11-08)', () => {
+  const file = (line: string) => MISSION.replace(/^title:/m, `${line}\ntitle:`);
+  it('reads the names a story writes', () => expect(ok(file('people: [Lusk, Pell]')).people).toEqual(['Lusk', 'Pell']));
+  it('is absent when not given', () => expect(ok(MISSION).people).toBeUndefined());
+  it('refuses an empty list', () => expect(messages(file('people: []')).join()).toContain('people'));
+});
+
 describe('a guest on a mission (The Passenger spec, engine §1)', () => {
   const WITH = MISSION.replace('pay: 400\n---', 'pay: 400\nguest: noa GREEN\n---');
   it('a mission can have a guest, with no lead', () => {

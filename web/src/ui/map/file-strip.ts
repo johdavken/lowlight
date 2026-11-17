@@ -7,6 +7,7 @@ import type { District, Place } from '../../../../shared/map-schema';
 import type { SideRoom } from '../../../../shared/exits';
 import type { MapPerson, WhoIsWhere } from './city-map';
 import { el } from './band';
+import { setTip } from '../hover-tag';
 
 const ROLE: Record<MapPerson['role'], string> = { you: 'YOU', contact: 'CONTACT', fixed: 'FIXED' };
 
@@ -111,7 +112,7 @@ function travelControl(p: Place, who: WhoIsWhere, onTravel: (placeId: string, co
     b.type = 'button';
     if (blocked) {
       b.disabled = true;
-      b.title = blocked;
+      setTip(b, blocked);
     }
     b.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -133,7 +134,7 @@ function gigsControl(p: Place, district: District, who: WhoIsWhere, onGigs: (pla
   const blocked = who.busy ? her().waitFor : (who.gigBlock ?? null);
   if (blocked) {
     b.disabled = true;
-    b.title = blocked;
+    setTip(b, blocked);
   }
   b.addEventListener('click', (e) => {
     e.stopPropagation();

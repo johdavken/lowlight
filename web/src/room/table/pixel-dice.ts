@@ -234,6 +234,8 @@ export function rollPixelDice(o: { faces: number[]; red: boolean; reduced: boole
   const w = Math.round(LEFT + n * STEP + RUN);
   const root = document.createElement('div');
   root.className = 'tb-roll';
+  // How many dice: a waiting six-dice roll draws smaller at the HUD, clear of the JOB column (table.css).
+  root.dataset.dice = String(n);
   const canvas = document.createElement('canvas');
   canvas.className = 'tb-roll-dice';
   canvas.width = w;

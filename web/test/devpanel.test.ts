@@ -258,16 +258,16 @@ describe('DevPanel', () => {
 });
 
 describe('DevPanel sound', () => {
-  it('a SOUND section with weather, room, lights and music sliders that report changes', () => {
+  it('a SOUND section with weather, room, lights, music and voice sliders that report changes', () => {
     const { root, panel } = setup();
     expect(root.querySelector<HTMLElement>('.dp-sound')!.hidden).toBe(true);
     const onChange = vi.fn();
-    panel.setSoundMixer({ weather: 1, room: 0.5, lights: 0.25, music: 0.4 }, onChange);
+    panel.setSoundMixer({ weather: 1, room: 0.5, lights: 0.25, music: 0.4, voice: 0.75, ui: 1 }, onChange);
     const section = root.querySelector<HTMLElement>('.dp-sound')!;
     expect(section.hidden).toBe(false);
     expect(section.querySelector('.dp-label')!.textContent).toBe('SOUND');
     const sliders = [...section.querySelectorAll<HTMLInputElement>('input[type="range"]')];
-    expect(sliders.map((s) => s.value)).toEqual(['100', '50', '25', '40']);
+    expect(sliders.map((s) => s.value)).toEqual(['100', '50', '25', '40', '75', '100']);
     sliders[1].value = '30';
     sliders[1].dispatchEvent(new Event('change'));
     expect(onChange).toHaveBeenCalledWith('room', 0.3);
@@ -275,7 +275,7 @@ describe('DevPanel sound', () => {
 
   it('shows the engine state', () => {
     const { root, panel } = setup();
-    panel.setSoundMixer({ weather: 1, room: 1, lights: 1, music: 1 }, () => {});
+    panel.setSoundMixer({ weather: 1, room: 1, lights: 1, music: 1, voice: 0.75, ui: 1 }, () => {});
     panel.setSoundState({ available: true, unlocked: false, context: 'none', voices: [], mix: null });
     expect(root.querySelector('.dp-sound-state')!.textContent).toBe('LOCKED — waiting for a click or key');
     panel.setSoundState({ available: true, unlocked: true, context: 'running', voices: ['rain', 'neon:sign'], mix: null });

@@ -2,20 +2,20 @@
   "name": "Hicks",
   "pronoun": "he",
   "playable": true,
-  "description": "Netrunner out of Old Town; runs a two-person crew from one room on Ribbon Level 2. Sly, dry, hard to find.",
+  "description": "Netrunner and ticketless finder out of Old Town; runs a two-person crew from one room on Ribbon Level 2. Sly, dry, hard to find.",
   "accent": "#3dff7a",
   "sprite": {
     "src": "hicks-outfit-outdoors.png",
     "pixel": true,
     "waist": 0.43
   },
-  "tagline": "Netrunner. Old Town born. Crew of two.",
+  "tagline": "Netrunner. Finder, no ticket.",
   "bio": "bio.md",
   "facts": [
-    { "label": "KNOWN FOR", "value": "Finding the gap before the fight." },
+    { "label": "KNOWN FOR", "value": "Finding people who don't want finding." },
     { "label": "DON'T ASK ABOUT", "value": "Wren. Why he runs without an operator." },
     { "label": "TELL", "value": "Smiles before he answers. Means he's already worked it out." },
-    { "label": "DANGEROUS", "value": "Thick SDG file. Never took their offer." }
+    { "label": "DANGEROUS", "value": "Thick SDG file. Said no to them; lost his ticket." }
   ],
   "face": { "x": 0.505, "y": 0.085 },
   "identity": "identity.md",
@@ -74,7 +74,7 @@
     "sleepwear": "charcoal henley with the sleeves pushed up, loose dark drawstring sleep pants, barefoot"
   },
   "knows": {
-    "nix-direct": "Hicks. Court-ordered sessions at the Intake; you signed his SDG attendance slip on paper every week. The order ran out months ago and he still climbs the stairs every week. Netrunner, dry, hard to find."
+    "nix-direct": "Hicks. Court-ordered sessions at the Intake; you signed his SDG attendance slip on paper every week. The order ran out months ago and he still climbs the stairs every week. Netrunner and finder, dry, hard to find. He split with Wren, his operator, recently; he has said her name in your room maybe twice, and you let him leave it there."
   },
   "standing": {
     "vouches": "runner",
@@ -94,6 +94,12 @@
   "schedule": [
     {
       "from": "02:00",
+      "to": "11:00",
+      "room": "karasu/hicks-room",
+      "sleeps": true
+    },
+    {
+      "from": "11:00",
       "to": "14:00",
       "room": "karasu/hicks-room"
     },

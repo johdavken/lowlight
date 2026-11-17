@@ -6,22 +6,32 @@ import { pageLayout, type PageMeasure } from './paging';
 import { modelLabel } from '../../../shared/model-label';
 import { controlRow, editInPlace, takeSwitcher, type ControlAction } from './message-controls';
 import { LineKeys } from './line-keys';
+import type { TextEffect } from './box-prefs';
 import { createMarkup, type Markup, type Segment } from './rp-markup';
-import { charDelay, renderBeats, renderFrontier } from './typing';
+import { charDelay, noiseOf, renderBeats, renderFrontier } from './typing';
 import { speakerBeats, type Beat } from '../../../shared/beats';
 import { strangerAt, type Stranger } from '../../../shared/encounter';
 import type { GigSnapshot } from '../../../shared/gig/brief';
 import { roundSummary, type DiceSnapshot } from '../../../shared/dice/text';
 import { beatOnPage, beatStarts } from './beat-pages';
+import { setTip } from './hover-tag';
+import { startNameSlip } from './name-slip';
 
 /** How many feed entries (messages or standalone tool rows) stay visible while collapsed. */
 const COLLAPSED_VISIBLE = 6;
+/** DECODE's flicker: how often the noise ahead of the cursor changes (the JOB column's pace, about 15 a second). */
+const NOISE_MS = 66;
 /** How long a scene or event banner takes to fade once it has done its job (style.css `.fading`). */
 const BANNER_FADE_MS = 600;
 /** How long a notice with UNDO stays (as journal notes); a plain notice. */
 const NOTICE_UNDO_MS = 6000;
 const NOTICE_MS = 4000;
 
+/** The most characters one tick shows when the drawing fell behind the pace, and how far behind it gives up catching up. */
+const CATCH_UP_CHARS = 12;
+/** DECODE while she's still sending: the letters stay this far behind the newest glyphs, so the noise fills the box ahead of them. */
+const DECODE_LEAD = 360;
+const CATCH_UP_SLACK_MS = 250;
 /** Room kept under a paged reply's text for the [CONTINUE] button. */
 const CONTINUE_PX = 40;
 /** The controls row's room (17px buttons + 6px margin in the box) until one has been measured. */
@@ -269,6 +279,7 @@ export class Feed {
   private currentKey = '';
   /** Message controls: where they go is decided here, the buttons in message-controls.ts. */
   private readonly onControl: ((a: ControlAction) => void) | null;
+  private readonly onPage: (() => void) | null;
   /** Stage mode: the latest line's options, in the box's bottom-left corner. */
   private readonly lineKeys = new LineKeys();
   private busy = false;
@@ -278,10 +289,12 @@ export class Feed {
   private labelsVersion = 0;
   private notice: { node: HTMLElement; timer: ReturnType<typeof setTimeout> } | null = null;
   /** Her reply typing out: characters `[0, shown)` are visible; a pending timer shows the next one. */
-  private typing: { id: string; shown: number; timer: ReturnType<typeof setTimeout> | null } | null = null;
+  /** `due`: when the next character is owed (ms, Date.now's clock); 0 while nothing is owed (parked, caught up, not begun). */
+  private typing: { id: string; shown: number; timer: ReturnType<typeof setTimeout> | null; due: number } | null = null;
   /** The player's text speed as a pace scale (2 slow … 0.5 fast); 0 shows her replies as they come. */
   private pace = 1;
   private readonly reducedMotion: boolean;
+  private stopSlip: () => void = () => {};
   private readonly pageEnd: PageEnd;
   /** Everyone else here, whose marked lines are their own beats (the who's-here strip's people). */
   private others: { id: string; name: string; accent: string }[] = [];
@@ -304,14 +317,17 @@ export class Feed {
     private readonly root: HTMLElement,
     private readonly onRetry: (userMessageId: string) => void,
     measure?: (id: string) => PageMeasure,
-    opts: { stage?: boolean; onControl?: (a: ControlAction) => void; reducedMotion?: boolean; pageEnd?: PageEnd } = {},
+    opts: { stage?: boolean; onControl?: (a: ControlAction) => void; reducedMotion?: boolean; pageEnd?: PageEnd; nameSlip?: boolean; /** A paged reply turned to its next page. */ onPage?: () => void } = {},
   ) {
     this.onControl = opts.onControl ?? null;
+    this.onPage = opts.onPage ?? null;
     this.measure = measure ?? ((id) => this.measureDom(id));
     this.reducedMotion = opts.reducedMotion ?? globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     this.pageEnd = opts.pageEnd ?? ((id, page, pageHeight) => this.pageEndDom(id, page, pageHeight));
     this.stage = opts.stage === true;
     if (this.stage) root.classList.add('feed-stage');
+    // Now and then a letter of the speaker's name over the box flickers to a glyph (name-slip.ts).
+    if (this.stage && opts.nameSlip) this.stopSlip = startNameSlip(root, this.reducedMotion);
     root.classList.add('feed-root');
     root.addEventListener('animationend', (e) => {
       if (e.animationName === 'jc-new') root.classList.remove('line-new');
@@ -331,11 +347,11 @@ export class Feed {
       if (!this._expanded && e.deltaY < 0) this.expand();
     });
 
-    // The box's border and fill are their own layer, so the nameplate can sit on its top edge
-    // (the list clips what overflows it).
-    // Subtitles (spec 2026-10-16): a scrim under the line, and the latest line's options in the corner beside it.
+    // Subtitles (spec 2026-10-16): a scrim under the line, and the latest line's options beside it.
     if (this.stage) root.append(dim, head, el('div', 'sub-scrim'), this.list, this.lineKeys.el);
     else root.append(dim, head, this.list);
+    // The box has no pane (mockup main-trace.html B TRACE): its head line and rail are drawn on the list itself
+    // (style.css `.feed::after`), so they follow it wherever it moves.
     // No portrait until the server sends hers (it does on every connect): an empty frame, not someone else's face.
     root.classList.add('portrait-pending');
 
@@ -403,7 +419,10 @@ export class Feed {
     const beats = this.beatLayout(entry);
     const m = this.measure(this.pager.id);
     const { pages } = beats ?? pageLayout(m.content, m.available, m.lineHeight, this.continueReserve);
-    if (this.pager.page < pages - 1) this.pager.page++;
+    if (this.pager.page < pages - 1) {
+      this.pager.page++;
+      this.onPage?.();
+    }
     // In the box a reply stays on its last page: unpaged, it would run under the footer (and a
     // reply in beats would show everyone at once).
     else if (!this.stage && entry.msg.status !== 'streaming') {
@@ -433,10 +452,103 @@ export class Feed {
     if (scale === 0) this.finishTyping();
   }
 
+  /** AUTO PAGE (the box's settings): a finished page turns itself after `ms`; null waits for the reader. */
+  setAutoPage(ms: number | null): void {
+    this.autoPageMs = ms;
+    // A wait already running keeps its old length: start over with the new one (or none).
+    if (this.autoTimer !== null) clearTimeout(this.autoTimer);
+    this.autoTimer = null;
+    this.autoKey = null;
+    this.autoPage();
+  }
+  private autoPageMs: number | null = null;
+  private autoTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The page the auto page waits on (`id:page`), so a refresh while it waits doesn't start the wait again. */
+  private autoKey: string | null = null;
+
+  /**
+   * AUTO PAGE: a page in the box that has typed out, with another after it, waits `autoPageMs` and turns itself, as
+   * Enter would. Anything else lets the wait go: typing still behind, the archive, the last page, AUTO PAGE off, or the
+   * reader turning it first (the page changes). Checked after every refresh and paint; it checks again as it fires.
+   */
+  private autoPage(): void {
+    const p = this.pager;
+    const ready = this.stage && this.autoPageMs !== null && !this._expanded && p !== null && p.page < this.pagerPages - 1 && this.skipTo() === null && this.canTurn();
+    const key = ready && p ? `${p.id}:${p.page}` : null;
+    if (key === this.autoKey && (key === null || this.autoTimer !== null)) return;
+    if (this.autoTimer !== null) clearTimeout(this.autoTimer);
+    this.autoTimer = null;
+    this.autoKey = key;
+    if (key === null || this.autoPageMs === null) return;
+    this.autoTimer = setTimeout(() => {
+      this.autoTimer = null;
+      this.autoKey = null;
+      // Something over the room (pause, a screen, the map): the page waits a full wait again once it's away.
+      if (this.held()) return this.autoPage();
+      const now = this.pager;
+      if (now && `${now.id}:${now.page}` === key && !this._expanded && this.skipTo() === null) this.advance();
+    }, this.autoPageMs);
+  }
+
+  /** What holds AUTO PAGE back (main.ts: the pause menu, a screen, the map…): a page out of sight doesn't turn. */
+  setHold(held: () => boolean): void {
+    this.held = held;
+  }
+  private held: () => boolean = () => false;
+
+  /** TEXT EFFECT (the box's settings): her words typed in, or decoded out of glyph noise ahead of the cursor. */
+  setTextEffect(e: TextEffect): void {
+    if (e === this.textEffect) return;
+    this.textEffect = e;
+    // A reply typing now changes over at once.
+    this.repaintTyping();
+  }
+  private textEffect: TextEffect = 'type';
+  /** DECODE's flicker: the noise ahead of the cursor changes about 15 times a second while a reply types. */
+  private noiseTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Decoding: in the box, a reply typing, motion allowed. */
+  private decoding(): boolean {
+    return this.textEffect === 'decode' && this.stage && !this.reducedMotion;
+  }
+
+  /** The typing reply drawn again at its frontier, without moving it on (an effect switched under it). */
+  private repaintTyping(): void {
+    const t = this.typing;
+    const entry = t && this.entries.get(t.id);
+    if (!t || !entry) return;
+    this.render(entry, t.shown);
+    this.flicker();
+  }
+
+  /**
+   * Runs DECODE's flicker while a reply types toward text still ahead, and stops it when there's none: parked at a page's
+   * end the rest is off the page, and caught up with the stream there's nothing ahead.
+   */
+  private flicker(): void {
+    // Typing toward it, or holding the letters back while she still sends (lockLimit): the noise is on the page either way.
+    const t = this.typing;
+    const entry = t && this.entries.get(t.id);
+    const held = Boolean(t && entry && entry.msg.status === 'streaming' && t.shown < this.limit(entry));
+    const on = this.decoding() && t !== null && (t.timer !== null || held);
+    if (on && this.noiseTimer === null) {
+      this.noiseTimer = setInterval(() => {
+        const t = this.typing;
+        const entry = t && this.entries.get(t.id);
+        if (!entry || !this.decoding()) return this.flicker();
+        // Only the painted noise (each word's data-n): the real letters under it don't change, so nothing reflows.
+        for (const n of entry.text.querySelectorAll<HTMLElement>('.noise .nw')) n.dataset.n = noiseOf(n.textContent ?? '');
+      }, NOISE_MS);
+    } else if (!on && this.noiseTimer !== null) {
+      clearInterval(this.noiseTimer);
+      this.noiseTimer = null;
+    }
+  }
+
   /** Starts typing her reply from character `shown`, finishing any other reply typing first. */
   private startTyping(id: string, shown: number): void {
     this.finishTyping();
-    this.typing = { id, shown, timer: null };
+    this.typing = { id, shown, timer: null, due: 0 };
   }
 
   /** Stops typing and shows the whole reply. */
@@ -445,6 +557,7 @@ export class Feed {
     if (!t) return;
     if (t.timer !== null) clearTimeout(t.timer);
     this.typing = null;
+    this.flicker();
     const entry = this.entries.get(t.id);
     if (!entry) return;
     this.render(entry, null);
@@ -456,9 +569,9 @@ export class Feed {
   private render(entry: Entry, shown: number | null): void {
     const top = entry.text.scrollTop;
     if (entry.beats.length > 0) {
-      renderBeats(entry.text, entry.segments, entry.beats, shown, this.accentOf);
+      renderBeats(entry.text, entry.segments, entry.beats, shown, this.accentOf, { noise: this.decoding() });
       this.applyBeatMargins(entry);
-    } else renderFrontier(entry.text, entry.segments, shown);
+    } else renderFrontier(entry.text, entry.segments, shown, { noise: this.decoding() });
     entry.text.scrollTop = top;
     markBusy(entry.text, shown !== null || entry.msg.status === 'streaming');
     // Lore words once the line is all there (not while it types or streams).
@@ -482,10 +595,25 @@ export class Feed {
     return Math.min(end, words);
   }
 
+  /**
+   * How far the letters may lock in now. As `limit`, except in DECODE while the reply still streams: there the glyphs
+   * come first (playtest, 2026-11-16: the noise fills the box, then the words come out of it), so the letters wait
+   * until the page is full of noise, or keep `DECODE_LEAD` behind the newest of it; once she's done they run to the end.
+   */
+  private lockLimit(entry: Entry): number {
+    const limit = this.limit(entry);
+    if (!this.decoding() || entry.msg.status !== 'streaming') return limit;
+    const len = entry.msg.text.length;
+    return limit < len ? limit : Math.max(0, len - DECODE_LEAD);
+  }
+
   /** Where a skip would jump the typing frontier to; null when nothing is typing behind its limit. */
   private skipTo(): number | null {
     const entry = this.typing && this.entries.get(this.typing.id);
     if (!this.typing || !entry) return null;
+    // A reply the box doesn't show (the JOB column's, or held out at a table) has nothing here for a key to skip:
+    // Enter goes to the table (GO IN), not to typing nobody sees (review).
+    if (entry.node.classList.contains('in-column') || entry.node.classList.contains('held-out')) return null;
     const limit = this.limit(entry);
     return this.typing.shown < limit ? limit : null;
   }
@@ -495,7 +623,7 @@ export class Feed {
     const to = this.skipTo();
     if (to === null || !this.typing) return false;
     if (this.typing.timer !== null) clearTimeout(this.typing.timer);
-    this.typing = { ...this.typing, shown: to, timer: null };
+    this.typing = { ...this.typing, shown: to, timer: null, due: 0 };
     this.paint();
     return true;
   }
@@ -506,9 +634,24 @@ export class Feed {
     const entry = t && this.entries.get(t.id);
     if (!t || !entry) return;
     t.timer = null;
-    const limit = this.limit(entry);
-    t.shown = Math.min(t.shown + 1, limit);
-    while (entry.markup && t.shown < limit && entry.msg.text[t.shown] === '*') t.shown++;
+    const limit = this.lockLimit(entry);
+    // Nothing to lock in yet (the glyphs' lead, or a skip went past it): it waits for the next delta.
+    if (t.shown >= limit) {
+      t.due = 0;
+      return this.paint();
+    }
+    // The pace is kept by the clock, not by the timer: a tick shows every character owed by now. Drawing the line costs
+    // more than FAST's wait between characters (DECODE redraws its noise each time), and one character a tick ran at
+    // under half the set speed (measured 2026-11-16: 47 a second on FAST).
+    const now = Date.now();
+    let steps = 0;
+    do {
+      t.shown = Math.min(t.shown + 1, limit);
+      while (entry.markup && t.shown < limit && entry.msg.text[t.shown] === '*') t.shown++;
+      t.due += charDelay(entry.msg.text, t.shown - 1) * this.pace;
+    } while (t.shown < limit && t.due <= now && ++steps < CATCH_UP_CHARS);
+    // Still far behind (a tab that slept): it goes on from here rather than pouring the backlog out.
+    if (t.shown >= limit || t.due < now - CATCH_UP_SLACK_MS) t.due = 0;
     this.paint();
   }
 
@@ -522,11 +665,20 @@ export class Feed {
     // overflow wasn't read yet, so it un-types and comes in front of the reader on the next page.
     const limit = this.limit(entry);
     if (t.shown > limit) t.shown = limit;
-    if (t.shown >= entry.msg.text.length && entry.msg.status !== 'streaming') return this.finishTyping();
+    if (t.shown >= entry.msg.text.length && entry.msg.status !== 'streaming') {
+      this.finishTyping();
+      return this.autoPage();
+    }
     this.render(entry, t.shown);
     if (this.stage && this.currentNode === entry.node) this.reportCurrent(entry.node);
     // The wait follows the character just shown (before the first, index -1: the base pace).
-    if (t.timer === null && t.shown < limit) t.timer = setTimeout(() => this.tick(), charDelay(entry.msg.text, t.shown - 1) * this.pace);
+    if (t.timer === null && t.shown < this.lockLimit(entry)) {
+      const now = Date.now();
+      if (t.due === 0) t.due = now + charDelay(entry.msg.text, t.shown - 1) * this.pace;
+      t.timer = setTimeout(() => this.tick(), Math.max(0, t.due - now));
+    }
+    this.flicker();
+    this.autoPage();
   }
 
   /** While she replies (or a turn is pending) every control is disabled. */
@@ -549,6 +701,8 @@ export class Feed {
 
   /** Drops deleted lines (delete, rewind). */
   remove(ids: string[]): void {
+    // The reply typing goes: its typing (and DECODE's flicker) stop with it.
+    if (this.typing && ids.includes(this.typing.id)) this.finishTyping();
     if (this.scene && ids.includes(this.scene.id)) this.setScene(null);
     for (const id of ids) {
       const entry = this.entries.get(id);
@@ -580,7 +734,7 @@ export class Feed {
    * A quiet line under the feed (`// LINE DELETED · UNDO`); with an action, a button for it for 6 s. A
    * `polite` one gives way to a notice already showing (returns false then), and hides while a Graft table is up.
    */
-  showNotice(text: string, action?: { label: string; run: () => void }, o: { polite?: boolean } = {}): boolean {
+  showNotice(text: string, action?: { label: string; run: () => void }, o: { polite?: boolean; ms?: number } = {}): boolean {
     if (o.polite && this.notice) return false;
     if (this.notice) {
       clearTimeout(this.notice.timer);
@@ -601,13 +755,18 @@ export class Feed {
       node.append(' ', b);
     }
     this.root.append(node);
-    this.notice = { node, timer: setTimeout(close, action ? NOTICE_UNDO_MS : NOTICE_MS) };
+    this.notice = { node, timer: setTimeout(close, o.ms ?? (action ? NOTICE_UNDO_MS : NOTICE_MS)) };
     return true;
   }
 
   /** Removes the feed's window listeners. */
   dispose(): void {
     this.finishTyping();
+    if (this.autoTimer !== null) clearTimeout(this.autoTimer);
+    this.autoTimer = null;
+    if (this.noiseTimer !== null) clearInterval(this.noiseTimer);
+    this.noiseTimer = null;
+    this.stopSlip();
     window.removeEventListener('keydown', this.onKey);
     window.removeEventListener('resize', this.onResize);
     document.fonts?.removeEventListener('loadingdone', this.onResize);
@@ -767,7 +926,8 @@ export class Feed {
     const entry = this.entries.get(id);
     if (!entry) return this.warnUnknown('delta', id);
     if (d.length === 0) return;
-    if (entry.msg.role === 'agent' && entry.msg.text === '') this.cueLine();
+    // A line the JOB column shows doesn't pulse the box: the column has it (playtest: a yellow flash on an empty box).
+    if (entry.msg.role === 'agent' && entry.msg.text === '' && this.inColumn?.(entry.msg) !== true) this.cueLine();
     entry.msg = { ...entry.msg, text: entry.msg.text + d };
     entry.segments.push(...split(entry.markup, d));
     entry.beats = this.beatsFor(entry.msg, entry.stranger);
@@ -1048,9 +1208,34 @@ export class Feed {
     return { msg: m, node, text, tools, foot, looseLines: [], markup, segments, beats, stranger, beatMargins: null };
   }
 
+  /** Her replies the JOB column shows instead of the box (2026-11-11): hidden here while collapsed, kept in the archive. */
+  private inColumn: ((m: ChatMessage) => boolean) | null = null;
+  setInColumn(pred: ((m: ChatMessage) => boolean) | null): void {
+    this.inColumn = pred;
+    this.refresh();
+  }
+
+  /**
+   * While the job table is up (main.ts) the box holds no line at all: the talk is in the JOB column, and a line from
+   * before the job, or your own, no longer surfaces in the box as the job starts or after a delete or rewind (playtest).
+   * Only a failed or lost reply of hers stays, where its RETRY is. The archive still shows everything.
+   */
+  setBoxHeld(on: boolean): void {
+    if (on === this.boxHeld) return;
+    this.boxHeld = on;
+    this.refresh();
+  }
+  private boxHeld = false;
+
   /** Re-applies the collapsed window (and paging) and keeps the view pinned to the newest entry. */
   private refresh(forceBottom = false): void {
     this.tellStranger();
+    // A reply that failed or was lost stays in the box, where RETRY is.
+    for (const e of this.entries.values())
+      e.node.classList.toggle('in-column', e.msg.role === 'agent' && (e.msg.status === 'ok' || e.msg.status === 'streaming') && this.inColumn?.(e.msg) === true);
+    // Held at the table, the box keeps only what failed (your line not delivered, her reply lost): their RETRY is here.
+    for (const e of this.entries.values())
+      e.node.classList.toggle('held-out', this.stage && this.boxHeld && !(e.msg.status === 'failed' || e.msg.status === 'lost'));
     const all = [...this.list.children] as HTMLElement[];
     const current = this.stage ? this.currentIndex(all) : -1;
     // Controls first, so paging measures the message as it will stand.
@@ -1060,7 +1245,7 @@ export class Feed {
       const cut = this.stage ? current : paged ? all.length - 1 : all.length - COLLAPSED_VISIBLE;
       // In the box nothing shows after the current message (an empty reply waits).
       // The opening scene's card is the banner's while collapsed: the archive shows it in its place.
-      all.forEach((n, i) => n.classList.toggle('hidden-collapsed', i < cut || (this.stage && i > cut && n.classList.contains('msg')) || n.classList.contains('scene-entry') || n.classList.contains('encounter-entry') || n.classList.contains('quest-row')));
+      all.forEach((n, i) => n.classList.toggle('hidden-collapsed', i < cut || (this.stage && i > cut && n.classList.contains('msg')) || n.classList.contains('scene-entry') || n.classList.contains('encounter-entry') || n.classList.contains('quest-row') || n.classList.contains('in-column') || n.classList.contains('held-out')));
     }
     if (this.scene) {
       // Once her greeting has finished (or you answer, or END SCENE went through), the banner goes; the archive keeps its card.
@@ -1079,6 +1264,7 @@ export class Feed {
       // The box shows its line from the top, where the nameplate sits.
       this.list.scrollTop = 0;
     } else if (forceBottom || nearBottom || !this._expanded) this.list.scrollTop = this.list.scrollHeight;
+    this.autoPage();
   }
 
   /**
@@ -1102,6 +1288,8 @@ export class Feed {
   private reportCurrent(node: HTMLElement | undefined): void {
     const e = node ? this.entries.get(node.dataset.id ?? '') : undefined;
     this.currentNode = node;
+    // No line showing in the box (none yet, or the JOB column has it): its frame and leader go too.
+    this.root.classList.toggle('box-empty', !node || node.classList.contains('hidden-collapsed'));
     const c: CurrentLine | null = e ? { id: e.msg.id, role: e.msg.role, status: e.msg.status, ...this.speakerOf(e), actions: '' } : null;
     if (c && e) c.actions = this.actionsOf(e, c);
     if (c && e && node) c.held = this.heldFaces(node, e, c);
@@ -1243,7 +1431,8 @@ export class Feed {
 
     // Stage mode pages the current message (tool lines may follow it); otherwise the newest entry.
     const last = this.stage ? all[current] : all[all.length - 1];
-    const id = last?.classList.contains('msg') && last.classList.contains('agent') ? last.dataset.id : undefined;
+    // A reply the JOB column shows, or one held out at the table, isn't paged here: the box has nothing of it to page.
+    const id = last?.classList.contains('msg') && last.classList.contains('agent') && !last.classList.contains('in-column') && !last.classList.contains('held-out') ? last.dataset.id : undefined;
     this.fitBox(id);
     if (this.pager && this.pager.id !== id) {
       // Left behind by a newer entry: it stays unpaged. If instead the box fell back to an older
@@ -1374,7 +1563,7 @@ export class Feed {
         const tag = document.createElement('span');
         tag.className = 'model-tag';
         tag.textContent = this.modelLabels.get(entry.msg.model) ?? modelLabel(entry.msg.model);
-        tag.title = entry.msg.model;
+        setTip(tag, entry.msg.model);
         meta.append(tag);
       }
       const switcher = isLatest && entry.msg.role === 'agent' ? takeSwitcher(entry.msg, this.busy, act) : null;

@@ -1144,6 +1144,11 @@ describe('hub travel', () => {
     expect(validateClientEvent({ type: 'greet' })).toEqual({ type: 'greet' });
   });
 
+  it("greet takes a STORY's job id (2026-11-11)", () => {
+    expect(validateClientEvent({ type: 'greet', story: 'run-sheet' })).toEqual({ type: 'greet', story: 'run-sheet' });
+    expect(validateClientEvent({ type: 'greet', story: 7 })).toBe("greet's 'story' must be a job id");
+  });
+
   describe('your line on the way (arrival screen spec §4)', () => {
     const refusal = `travel's 'line' must be a string of at most ${TRAVEL_LINE_MAX} characters`;
     it('takes a line, and refuses anything but a short enough string', () => {

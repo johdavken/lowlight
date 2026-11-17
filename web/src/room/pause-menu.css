@@ -1,40 +1,120 @@
-/* PAUSED (pause menu mockup 2026-10-30): a framed panel centred over the dimmed room. Every class is pause-. */
-.pause-menu { position: absolute; inset: 0; z-index: 60; display: grid; place-items: center; background: rgba(4, 2, 10, 0.62); backdrop-filter: blur(1px); }
-.pause-panel {
-  width: 620px;
-  padding: 28px 40px 30px;
-  font-family: var(--pixel);
-  background: rgba(6, 3, 16, 0.92);
-  border: 1px solid rgba(70, 227, 252, 0.45);
-  box-shadow: 0 0 40px rgba(70, 227, 252, 0.18);
-  clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+/*
+ * PAUSED in the HUD trace (2026-11-15; the title menu's list, title-menu in landing/title.css, in the UI's one red): no
+ * pane and no frame. The room dims and blurs as under a trace panel; the word on two hairlines, the rows on a rail,
+ * where you are, and the key line. Every class is pause-.
+ */
+.pause-menu {
+  --c: var(--ui-red, #ff4d4d);
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  color: #d9e4ea;
+  background:
+    radial-gradient(ellipse 60% 70% at 50% 50%, rgba(5, 2, 10, 0.55), rgba(5, 2, 10, 0.35)),
+    linear-gradient(rgba(5, 2, 10, 0.5), transparent 16%, transparent 84%, rgba(5, 2, 10, 0.6));
+  backdrop-filter: blur(calc(4px * var(--ui-blur, 1))) brightness(0.62) saturate(0.85);
+  animation: pause-dim 0.2s ease-out;
 }
-.pause-panel.pause-glitch-in { animation: map-glitch-in 0.5s steps(1, end) backwards; }
-.pause-head { display: flex; justify-content: space-between; margin-bottom: 18px; font-size: 20px; letter-spacing: 0.25em; color: #3dff7a; }
-.pause-hint { color: #8e86a3; }
-.pause-title { margin: 6px 0 22px; text-align: center; font-size: 64px; letter-spacing: 0.35em; color: var(--cyan, #46e3fc); text-shadow: 0 0 16px currentColor; }
-.pause-rows { display: flex; flex-direction: column; }
+.pause-panel { position: relative; width: 560px; font-family: var(--pixel); animation: pause-on 0.3s steps(4, end) backwards; }
+
+/* The word, centred on two hairlines that fade out (the front end's titles, landing/trace.css). */
+.pause-title { display: flex; justify-content: center; align-items: center; gap: 18px; margin-bottom: 34px; font: 34px/1 var(--pixel); letter-spacing: 0.42em; color: var(--c); text-shadow: 0 0 14px color-mix(in srgb, var(--c) 45%, transparent); }
+.pause-title::before, .pause-title::after { content: ''; flex: none; width: 160px; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 70%, transparent)); }
+.pause-title::after { transform: scaleX(-1); }
+
+/* The rows on a rail: a dim tick each; the lit one white with a ring on the rail and a hairline to its hint. */
+.pause-rows { position: relative; display: flex; flex-direction: column; gap: 4px; margin-left: 60px; }
+.pause-rows::before { content: ''; position: absolute; left: 4px; top: -12px; bottom: -12px; width: 1px; background: linear-gradient(transparent, color-mix(in srgb, var(--c) 55%, transparent) 18%, color-mix(in srgb, var(--c) 55%, transparent) 82%, transparent); filter: drop-shadow(0 0 2px var(--c)); }
 .pause-row {
   position: relative;
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  padding: 10px 18px;
-  font: 34px var(--pixel);
-  letter-spacing: 0.25em;
+  align-items: center;
+  gap: 14px;
+  padding: 7px 0 7px 30px;
+  font: 28px/1 var(--pixel);
+  letter-spacing: 0.26em;
+  white-space: nowrap;
   text-align: left;
-  color: #c8bfdb;
+  color: rgba(230, 238, 247, 0.5);
+  text-shadow: 0 1px 2px #000;
   background: none;
   border: 0;
-  border-left: 3px solid transparent;
   cursor: pointer;
 }
-.pause-row small { font-size: 17px; letter-spacing: 0.15em; color: #7f7896; }
-.pause-row.on { color: #fff; border-left-color: var(--cyan, #46e3fc); background: linear-gradient(90deg, rgba(70, 227, 252, 0.18), transparent); text-shadow: 0 0 10px rgba(70, 227, 252, 0.6); }
-.pause-row.on::before { content: '▸'; position: absolute; left: -22px; color: var(--cyan, #46e3fc); }
-.pause-row.blocked { cursor: default; opacity: 0.55; }
-.pause-row.blocked small { color: #ffb347; }
-.pause-where { margin-top: 18px; text-align: center; font-size: 18px; letter-spacing: 0.22em; color: #7f7896; }
+.pause-row::before { content: ''; position: absolute; left: 4px; top: 50%; width: 9px; height: 1px; background: color-mix(in srgb, var(--c) 60%, transparent); }
+.pause-row:focus-visible { outline: none; }
+.pause-row .pause-line { flex: 1; min-width: 20px; height: 1px; }
+.pause-row small { flex: none; font: 15px/1 var(--pixel); letter-spacing: 0.18em; color: #8fa3ad; }
+.pause-row.on { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent), 0 1px 2px #000; }
+.pause-row.on::before { left: 0; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: #05020a; }
+.pause-row.on .pause-line { background: linear-gradient(90deg, var(--c), transparent); }
+.pause-row.on small { color: #d9e4ea; }
+/* SAVE while she replies: dimmed, and who it waits for as an amber tag. */
+.pause-row.blocked { cursor: default; color: rgba(230, 238, 247, 0.32); }
+.pause-row.blocked small { padding: 1px 6px 0; font-size: 13px; letter-spacing: 0.14em; color: #05020a; background: #ffc56b; text-shadow: none; }
+
+/* Where you are, and the key line under a hairline. */
+.pause-where { margin-top: 34px; text-align: center; font: 15px/1.3 var(--pixel); letter-spacing: 0.2em; color: #8fa3ad; text-shadow: 0 1px 2px #000; }
+.pause-keys { margin-top: 12px; padding-top: 11px; text-align: center; border-top: 1px solid rgba(230, 238, 247, 0.16); }
+.pause-keys.hint-line b { color: var(--c); }
+
+/* Resumed: it steps away and the room's dim lifts; clicks already reach the room. */
+.pause-menu.pause-closing { pointer-events: none; animation: pause-dim 0.2s ease-in reverse forwards; }
+.pause-menu.pause-closing .pause-panel { animation: pause-on 0.16s steps(3, end) reverse forwards; }
+@keyframes pause-dim { from { opacity: 0; } }
+@keyframes pause-on { 0%, 35% { opacity: 0; } 60% { opacity: 0.5; } 100% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pause-menu, .pause-menu .pause-panel { animation: none !important; } }
 
 /* LOAD from PAUSED: the title's LOAD over the room, on the stage's dark. */
 .pause-load { position: absolute; inset: 0; z-index: 60; color: #e9defa; background: #07030f; }
+
+/*
+ * SETTINGS (2026-11-16): SYS (sys-menu.ts) inside the panel, on the same trace. Its groups hang off one rail, each
+ * head a small node and a word in the red; the rows as PAUSED's, smaller, their values at the right end of the lit
+ * row's hairline. The hint under the rows keeps its two lines' room, so moving down doesn't shift the panel.
+ */
+.pause-panel.on-settings { width: 760px; }
+.pause-panel.on-settings .pause-title { margin-bottom: 22px; }
+.pause-rows[hidden], .pause-settings[hidden] { display: none; }
+.pause-menu .sys-menu.sys-paged {
+  position: relative;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  max-width: none;
+  margin-left: 40px;
+  padding: 0;
+  font: 22px/1 var(--pixel);
+  letter-spacing: 0.2em;
+  color: rgba(230, 238, 247, 0.5);
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+.pause-menu .sys-paged::before { content: ''; position: absolute; left: 4px; top: -10px; bottom: 58px; width: 1px; background: linear-gradient(transparent, color-mix(in srgb, var(--c) 55%, transparent) 8%, color-mix(in srgb, var(--c) 55%, transparent) 92%, transparent); filter: drop-shadow(0 0 2px var(--c)); }
+.pause-menu .sys-paged .sys-group + .sys-group { border-top: 0; margin-top: 5px; }
+.pause-menu .sys-paged .sys-head { position: relative; display: flex; align-items: center; gap: 12px; padding: 6px 0 4px 30px; font: 15px/1 var(--pixel); letter-spacing: 0.34em; color: var(--c); text-shadow: 0 0 8px color-mix(in srgb, var(--c) 40%, transparent); }
+.pause-menu .sys-paged .sys-head::before { content: ''; position: absolute; left: 1px; top: 50%; width: 7px; height: 7px; margin-top: -4px; background: var(--c); transform: rotate(45deg); box-shadow: 0 0 6px var(--c); }
+.pause-menu .sys-paged .sys-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 40%, transparent), transparent 70%); }
+.pause-menu .sys-paged .sys-row { position: relative; gap: 14px; padding: 3px 0 3px 30px; white-space: nowrap; text-shadow: 0 1px 2px #000; background: none; box-shadow: none; }
+.pause-menu .sys-paged .sys-row::before { content: ''; position: absolute; left: 4px; top: 50%; width: 9px; height: 1px; background: color-mix(in srgb, var(--c) 60%, transparent); }
+.pause-menu .sys-paged .sys-label { margin-right: 0; color: inherit; }
+.pause-menu .sys-paged .sys-line { display: block; flex: 1; min-width: 20px; height: 1px; }
+.pause-menu .sys-paged .sys-row.on { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent), 0 1px 2px #000; }
+.pause-menu .sys-paged .sys-row.on::before { left: 0; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: #05020a; }
+.pause-menu .sys-paged .sys-row.on .sys-line { background: linear-gradient(90deg, var(--c), transparent); }
+/* Values: the picks and steps in the dim blue-grey, the one in use on a red chip; meters in the red. */
+.pause-menu .sys-paged .sys-value { font-size: 19px; letter-spacing: 0.16em; color: #8fa3ad; }
+.pause-menu .sys-paged .sys-row.on .sys-value { color: #d9e4ea; }
+.pause-menu .sys-paged .sys-keys i { color: #8fa3ad; text-shadow: none; }
+.pause-menu .sys-paged .sys-keys i:hover { color: #fff; }
+.pause-menu .sys-paged .sys-keys i.on { color: #05020a; background: var(--c); }
+.pause-menu .sys-paged .sys-meter i { width: 8px; height: 13px; background: rgba(230, 238, 247, 0.12); }
+.pause-menu .sys-paged .sys-meter i.on { background: var(--c); box-shadow: 0 0 6px color-mix(in srgb, var(--c) 50%, transparent); }
+.pause-menu .sys-paged .sys-value.down { color: #ffc56b; }
+/* The hint: two lines' room, empty until a row with one is picked or hovered. */
+.pause-menu .sys-paged .sys-foot { min-height: 44px; margin-top: 16px; padding: 0 30px; font: 16px/1.35 var(--pixel); letter-spacing: 0.08em; text-align: left; white-space: normal; color: #b9c6cd; border: 0; }
+.pause-menu .sys-paged .sys-foot:not(.hint) { visibility: hidden; }
+.pause-panel.on-settings .pause-where { margin-top: 14px; }

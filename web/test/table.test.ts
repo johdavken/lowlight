@@ -20,6 +20,24 @@ afterEach(() => {
   setWidth(1600);
 });
 
+describe('HUD tables share the JOB column\'s region (review)', () => {
+  it('one closing over another hands the column\'s place back to the one still up', () => {
+    const g = document.createElement('div');
+    g.id = 'game';
+    document.body.append(g);
+    const under = mountTableShell(g, { hud: true });
+    under.open();
+    const over = mountTableShell(g, { hud: true });
+    over.open();
+    g.style.setProperty('--hud-log-h', '999px');
+    over.close();
+    // The table still up publishes again: the stale value is replaced.
+    expect(g.style.getPropertyValue('--hud-log-h')).not.toBe('999px');
+    under.close();
+    g.remove();
+  });
+});
+
 describe('the table shell', () => {
   it('opens and closes, dimming the room', () => {
     const g = game();
@@ -69,14 +87,43 @@ describe('the table shell', () => {
     t.corners({ take: { filled: 2, size: 3 }, alarm: 1, nerve: { left: 4, max: 5 } });
     // The rail: a cell per step, lit as filled, the number above and the word below.
     expect($$('.tb-take .tb-stack i').map((i) => i.className)).toEqual(['f', 'f', '']);
-    expect($$('.tb-alarm .tb-stack i').map((i) => i.className)).toEqual(['f', '', '', '']);
-    expect($$('.tb-nerve .tb-stack i').filter((i) => i.className === 'f')).toHaveLength(4);
+    // ALARM's steps where something changes are marked (2: every position a step worse; 4: get out), and it says so under its clock.
+    expect($$('.tb-alarm .tb-stack i').map((i) => i.className)).toEqual(['f', 'mark', '', 'mark']);
+    expect($$('.tb-alarm > *').map((n) => n.className)).toEqual(['tb-num', 'tb-of', 'tb-stack', 'tb-word', 'tb-clock-note']);
+    expect(t.root.querySelector('.tb-alarm .tb-word')!.textContent).toBe('ALARM');
+    expect(t.root.querySelector('.tb-alarm span.tb-clock-note')!.textContent).toBe('AT 2 EVERY POSITION A STEP WORSE · AT 4 GET OUT');
+    expect(t.root.querySelector('.tb-alarm')!.getAttribute('aria-label')).toBe('ALARM 1/4');
+    // Only ALARM has marks and a note; nothing blinks unless something is about to change.
+    expect(t.root.querySelector('.tb-take .tb-clock-note, .tb-nerve .tb-clock-note, .tb-take i.mark, .tb-nerve i.mark')).toBeNull();
+    expect(t.root.querySelector('.tb-stack i.g')).toBeNull();
+    expect($$('.tb-nerve .tb-stack i').map((i) => i.className)).toEqual(['f', 'f', 'f', 'f', '']);
     expect(t.root.querySelector('.tb-nerve')!.getAttribute('aria-label')).toBe('NERVE 4/5');
     expect(t.root.querySelector('.tb-nerve .tb-num')!.textContent).toBe('4');
     t.corners({ alarm: 4, nerve: { left: 0, max: 5 } });
     expect(t.root.querySelector<HTMLElement>('.tb-take')!.hidden).toBe(true);
     expect(t.root.querySelector('.tb-alarm.out .tb-word')!.textContent).toBe('GET OUT');
+    expect($$('.tb-alarm .tb-stack i').map((i) => i.className)).toEqual(['f', 'f mark', 'f', 'f mark']);
+    expect(t.root.querySelector('.tb-alarm .tb-clock-note')!.textContent).toBe('AT 2 EVERY POSITION A STEP WORSE · AT 4 GET OUT');
     expect(t.root.querySelector('.tb-nerve.gone .tb-word')!.textContent).toBe('GONE');
+    // Pips about to change blink (the trace table): the next to fill on TAKE and ALARM, the last to be spent on NERVE.
+    const pips = (box: string) => $$(`.tb-${box} .tb-stack i`).map((i) => i.className);
+    t.corners({ take: { filled: 1, size: 4 }, alarm: 1, nerve: { left: 4, max: 5 }, soon: { take: 2, alarm: 1, nerve: 2 } });
+    expect(pips('take')).toEqual(['f', 'g', 'g', '']);
+    expect(pips('alarm')).toEqual(['f', 'g mark', '', 'mark']);
+    expect(pips('nerve')).toEqual(['f', 'f', 'f g', 'f g', '']);
+    // The numbers and the names for screen readers stay what is, not what is coming.
+    expect(['take', 'alarm', 'nerve'].map((b) => t.root.querySelector(`.tb-${b}`)!.getAttribute('aria-label'))).toEqual(['TAKE 1/4', 'ALARM 1/4', 'NERVE 4/5']);
+    expect(['take', 'alarm', 'nerve'].map((b) => t.root.querySelector(`.tb-${b} .tb-num`)!.textContent)).toEqual(['1', '1', '4']);
+    // One clock alone; more than is left stops at the clock's end.
+    t.corners({ take: { filled: 3, size: 4 }, alarm: 3, nerve: { left: 1, max: 5 }, soon: { take: 3, nerve: 2 } });
+    expect(pips('take')).toEqual(['f', 'f', 'f', 'g']);
+    expect(pips('alarm')).toEqual(['f', 'f mark', 'f', 'mark']);
+    expect(pips('nerve')).toEqual(['f g', '', '', '', '']);
+    // Zeroes, and no `soon`: nothing blinks.
+    t.corners({ take: { filled: 1, size: 4 }, alarm: 1, nerve: { left: 4, max: 5 }, soon: { take: 0, alarm: 0, nerve: 0 } });
+    expect(t.root.querySelector('.tb-stack i.g')).toBeNull();
+    t.corners({ take: { filled: 1, size: 4 }, alarm: 1, nerve: { left: 4, max: 5 } });
+    expect(t.root.querySelector('.tb-stack i.g')).toBeNull();
     t.prose('The house deck sits by the dealer.');
     expect(t.root.querySelector('.tb-prose')!.textContent).toBe('The house deck sits by the dealer.');
     t.prose('You wait. *He looks away.*');

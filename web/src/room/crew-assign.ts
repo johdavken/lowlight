@@ -1,9 +1,11 @@
 /**
- * ERRANDS (ASSIGN in code; crew spec §4): tonight's wanted line, then the work down the left, a contract's three pieces first, one row each
- * with its picture, title and state; BACK TONIGHT and OUT NOW at the column's foot. The picked row's file on the right:
- * its art, terms, who can go as SETUP's ready cards, the CLEAN / MESSY / BLOWN bar, SEND. The odds are the server's
- * (`CrewView.errands[].odds`).
+ * ERRANDS (ASSIGN in code; crew spec §4): tonight's wanted line, then the work on the panel's rail, a contract's three
+ * pieces first, one row each with its picture, title and state; BACK TONIGHT and OUT NOW at the column's foot. The
+ * picked row's file on its own rail: its art fading into the room, terms, who can go as outlined faces, and beside them
+ * what happens if the picked one goes (the CLEAN / MESSY / BLOWN track), then SEND (filled: Enter does it). The odds are
+ * the server's (`CrewView.errands[].odds`).
  */
+import { panelCue } from '../ui/panel-sound';
 import { GRADES } from '../../../shared/crew-book';
 import type { CrewAction, CrewRosterEntry, CrewView } from '../../../shared/types';
 import { artSlot, cardPic, el, face, hhmm, keepScroll } from './crew-ui';
@@ -45,7 +47,7 @@ function pieceState(p: Piece, c: Contract, v: CrewView): [string, string] {
 }
 
 function rowButton(r: Row, cls: string, state: string, stateCls: string, pick: () => void): HTMLButtonElement {
-  const b = el('button', `cr-errand${cls}`);
+  const b = el('button', `cr-errand tp-row${cls}`);
   b.type = 'button';
   const text = el('span', 'cr-et');
   text.append(el('span', 'cr-et-title', r.title), el('span', `cr-es${stateCls ? ` ${stateCls}` : ''}`, state));
@@ -57,11 +59,11 @@ function rowButton(r: Row, cls: string, state: string, stateCls: string, pick: (
 export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: string | null; sel: AssignPick }): HTMLElement {
   const root = el('div', 'cr-assign');
   const left = el('div', 'cr-assign-left');
-  const brief = el('div', 'cr-brief');
+  const brief = el('div', 'cr-brief tp-file');
   root.append(left, brief);
   const live = v.roster.filter((m) => m.state !== 'gone');
   if (v.wanted?.length) left.append(el('div', 'cr-wanted', ['WANTED TONIGHT', ...v.wanted.map((w) => `${w.name.toUpperCase()} ${up(w.kind)}`)].join(' · ')));
-  const list = el('div', 'cr-errands');
+  const list = el('div', 'cr-errands tp-list');
   list.dataset.keep = 'errands';
   left.append(list);
 
@@ -86,7 +88,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
   // The contract first: all three pieces, sendable or not.
   const inPieces = new Set<string>();
   for (const c of v.contracts ?? []) {
-    list.append(el('div', 'cr-grp hot', `${c.title.toUpperCase()} · ${c.nightsLeft} NIGHT${c.nightsLeft === 1 ? '' : 'S'} LEFT`));
+    list.append(el('div', 'cr-grp tp-head hot', `${c.title.toUpperCase()} · ${c.nightsLeft} NIGHT${c.nightsLeft === 1 ? '' : 'S'} LEFT`));
     for (const p of c.pieces) {
       const errand = p.state === 'open' ? (v.errands.find((e) => e.id === p.errand) ?? null) : null;
       if (errand) inPieces.add(errand.id);
@@ -99,7 +101,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
   const lowKey = (e: Errand) => e.kind === 'lay-low';
   const group = (head: string, errands: Errand[], state: (e: Errand) => string) => {
     if (errands.length === 0) return;
-    list.append(el('div', 'cr-grp', head));
+    list.append(el('div', 'cr-grp tp-head', head));
     const targets = [...new Set(errands.map((e) => e.target))];
     for (const e of targets.flatMap((t) => errands.filter((x) => x.target === t))) {
       add({ key: e.id, title: errandLabel(e), art: e.art, errand: e }, e.taken ? ' taken' : '', e.taken ? 'TAKEN TONIGHT' : state(e));
@@ -111,7 +113,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
   // Offers are only drawn where you're Known, so none means Known nowhere. A bare list has the empty line instead.
   if (collect.length === 0 && (rows.length > 0 || rest.length > 0 || v.stash?.length)) list.append(el('div', 'cr-locked', 'COLLECT · LOCKED · REP 20 IN A DISTRICT'));
   // STASH (crew goods spec §8): one row a lot, its district picked in its file.
-  if (v.stash?.length) list.append(el('div', 'cr-grp', 'STASH'));
+  if (v.stash?.length) list.append(el('div', 'cr-grp tp-head', 'STASH'));
   for (const l of v.stash ?? []) {
     const who = l.out ? v.roster.find((m) => m.recruit.id === l.out!.recruit) : undefined;
     const state = l.out ? `OUT · ${who ? first(who.recruit.name).toUpperCase() : 'SOMEONE'}` : [String(l.value), ...(l.damaged ? ['DAMAGED'] : []), ...(l.stale ? ['STALE'] : l.damaged ? [] : [`${l.nightsLeft} NIGHT${l.nightsLeft === 1 ? '' : 'S'} LEFT`])].join(' · ');
@@ -129,7 +131,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
   const back = v.results.slice(0, 5);
   if (back.length > 0) {
     const b = el('div', 'cr-back');
-    b.append(el('div', 'cr-sub', 'BACK TONIGHT'));
+    b.append(el('div', 'cr-sub tp-head quiet', 'BACK TONIGHT'));
     for (const r of back) {
       const line = el('div', `cr-back-row r-${r.band}`);
       line.append(el('span', 'cr-when', hhmm(r.at)), el('span', 'cr-what', r.line), el('span', 'cr-eff', r.effects));
@@ -140,7 +142,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
   const out = live.filter((m) => m.state === 'out');
   if (out.length > 0) {
     const box = el('div', 'cr-out');
-    box.append(el('div', 'cr-sub', 'OUT NOW'));
+    box.append(el('div', 'cr-sub tp-head quiet', 'OUT NOW'));
     for (const m of out) {
       const e = v.errands.find((x) => x.id === m.errand);
       const piece = v.contracts?.flatMap((c) => c.pieces).find((p) => p.recruit === m.recruit.id);
@@ -193,32 +195,40 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
     // A sale opens on whoever pays best: hire order could be the wrong route at 60 %.
     const best = e.routes ? [...ready].sort((a, b) => (e.routes![b.recruit.id]?.price ?? 0) - (e.routes![a.recruit.id]?.price ?? 0)) : ready;
     if (!o.sel.who || !ready.some((m) => m.recruit.id === o.sel.who)) o.sel.who = best[0]?.recruit.id ?? null;
-    inner.append(el('div', 'cr-sub', 'WHO GOES'), picks(e.odds, e.spec, e.routes));
+    // Who goes, and beside them what happens if the picked one does.
+    const cols = el('div', 'cr-go-cols');
+    const who = el('div', 'cr-who');
+    who.append(el('div', 'cr-sub tp-head', 'WHO GOES'), picks(e.odds, e.spec, e.routes));
+    cols.append(who);
+    inner.append(cols);
     const m = live.find((x) => x.recruit.id === o.sel.who);
     const od = o.sel.who ? e.odds[o.sel.who] : undefined;
     if (!m || !od) return void inner.append(el('div', 'cr-empty', 'NOBODY FREE TO SEND.'));
-    const bar = el('div', 'cr-odds');
+    const bar = el('div', 'cr-odds tp-track');
     for (const [cls, name, n] of [['o-clean', 'CLEAN', od.clean], ['o-messy', 'MESSY', od.messy], ['o-blown', 'BLOWN', od.blown]] as const) {
-      const seg = el('div', cls, n >= 14 ? `${name} ${n}` : String(n));
-      seg.style.flexBasis = `${n}%`;
+      const seg = el('div', cls);
+      seg.append(el('span', '', n >= 14 ? `${name} ${n}` : String(n)));
+      seg.style.flex = `${Math.max(n, 1)} 1 0`;
       bar.append(seg);
     }
     const name = first(m.recruit.name);
-    const send = el('button', 'cr-btn cr-send', `SEND ${name.toUpperCase()}`);
+    const send = el('button', 'cr-btn tp-key go cr-go cr-send', `SEND ${name.toUpperCase()}`);
     send.type = 'button';
     send.addEventListener('click', () => {
       // On to the next errand when it lands; a piece stays up, its file says who's on it.
       if (!row?.piece) o.sel.row = null;
       o.sel.where = null;
       if (e.lot) o.sel.who = null;
+      panelCue(e.group === 'collect' ? 'collect' : 'send');
       o.act({ do: 'send', recruit: m.recruit.id, errand: e.id });
     });
-        const line = el('div', 'cr-odds-row');
-    line.append(bar, el('div', 'cr-split', `HURT ${od.hurt} · HELD ${od.held} · GONE ${od.gone}`));
+    const line = el('div', 'cr-odds-row');
+    line.append(el('div', 'cr-sub tp-head cr-odds-head', `IF ${name.toUpperCase()} GOES`), bar, el('div', 'cr-split', `HURT ${od.hurt} · HELD ${od.held} · GONE ${od.gone}`));
+    cols.append(line);
     const go = el('div', 'cr-send-row');
     go.append(el('span', 'cr-cost', `${e.cost ? `COSTS ${e.cost} SOL · ` : ''}BACK IN ABOUT ${e.routes?.[m.recruit.id]?.hours ?? e.hours}H · RECALL ANY TIME, NO RESULT`), send);
     const end = el('div', 'cr-file-foot');
-    end.append(line, go);
+    end.append(go);
     inner.append(end);
   }
 
@@ -238,7 +248,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
       });
       box.append(b);
     }
-    inner.append(el('div', 'cr-sub', 'WHERE'), box);
+    inner.append(el('div', 'cr-sub tp-head', 'WHERE'), box);
     return e;
   }
 
@@ -248,7 +258,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
     const go = el('div', 'cr-send-row');
     go.append(el('span', 'cr-cost', `${who ? first(who.recruit.name).toUpperCase() : 'SOMEONE'} HAS IT${l.out!.due !== undefined ? ` · BACK ${hhmm(l.out!.due)}` : ''}`));
     if (who) {
-      const recall = el('button', 'cr-btn soft cr-recall', 'RECALL');
+      const recall = el('button', 'cr-btn tp-key soft cr-recall', 'RECALL');
       recall.type = 'button';
       recall.addEventListener('click', () => o.act({ do: 'recall', recruit: who.recruit.id }));
       go.append(recall);
@@ -260,18 +270,22 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
 
   /** A piece that can't go tonight: who's on it, or why it waits. */
   function unsent(r: Row & { piece: Piece; contract: Contract }, inner: HTMLElement): void {
-    inner.append(el('div', 'cr-sub', 'WHO GOES'), picks(null, r.piece.spec));
+    const cols = el('div', 'cr-go-cols');
+    const who2 = el('div', 'cr-who');
+    who2.append(el('div', 'cr-sub tp-head', 'WHO GOES'), picks(null, r.piece.spec));
+    cols.append(who2);
+    inner.append(cols);
     const who = v.roster.find((m) => m.recruit.id === r.piece.recruit);
     const line = r.piece.state === 'out' ? `${who ? first(who.recruit.name).toUpperCase() : 'SOMEONE'} IS ON IT` : r.piece.state === 'back' ? 'BACK. THE REPORT COMES TO WHOEVER GAVE YOU THIS' : allSent(r.contract) ? 'TWO PIECES AT MOST. THIS ONE STAYS UNDONE' : 'ONE PIECE A NIGHT · BACK AT 06:00';
     const go = el('div', 'cr-send-row');
     go.append(el('span', 'cr-cost', line));
     if (r.piece.state === 'out' && who) {
-      const recall = el('button', 'cr-btn soft cr-recall', 'RECALL');
+      const recall = el('button', 'cr-btn tp-key soft cr-recall', 'RECALL');
       recall.type = 'button';
       recall.addEventListener('click', () => o.act({ do: 'recall', recruit: who.recruit.id }));
       go.append(recall);
     } else {
-      const send = el('button', 'cr-btn', 'SEND');
+      const send = el('button', 'cr-btn tp-key', 'SEND');
       send.type = 'button';
       send.disabled = true;
       go.append(send);
@@ -294,7 +308,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
         const l = r.lot;
         const meta = el('div', 'cr-meta');
         for (const text of [`${l.value} SOL`, ...(l.damaged ? ['DAMAGED'] : []), l.stale ? 'STALE' : `${l.nightsLeft} NIGHT${l.nightsLeft === 1 ? '' : 'S'} LEFT`, `FROM ${up(l.district)}`]) meta.append(el('span', '', text));
-        inner.append(el('h2', '', l.label.toUpperCase()), meta);
+        inner.append(el('h2', 'tp-name', l.label.toUpperCase()), meta);
         if (l.out) return lotOut(l, inner);
         const sale = where(l, inner);
         if (sale) odds(sale, inner);
@@ -307,7 +321,7 @@ export function assignTab(v: CrewView, o: { act(a: CrewAction): void; picked?: s
       const suits = r.piece ? up(r.piece.spec) : e!.suits.map(up).join(' · ');
       const meta = el('div', 'cr-meta');
       for (const text of [`${hours}H`, `${riskWord(risk)} RISK`, `SUITS ${suits}`, ...(e?.district ? [up(e.district)] : [])]) meta.append(el('span', '', text));
-      inner.append(el('h2', '', r.title.toUpperCase()), meta);
+      inner.append(el('h2', 'tp-name', r.title.toUpperCase()), meta);
       const blurb = r.piece?.line ?? (e ? fill(e, e.blurb) : '');
       if (blurb) inner.append(el('p', 'cr-blurb', blurb));
       if (e?.taken) return void inner.append(el('div', 'cr-taken', 'TAKEN TONIGHT. IT COMES BACK AT 06:00, OR NOT.'));

@@ -36,3 +36,26 @@ describe('text rows (deck spec §3)', () => {
   });
 });
 
+
+describe('job texts in the db (job texts spec §2–§3)', () => {
+  it("a job text's hidden row keeps its job id and stays hidden", () => {
+    const db = openDb(':memory:', { defaultPlayer: 'hicks' });
+    db.insertMessage('hicks', row('j', 1, { mode: 'text', promised: true, jobText: 'arrears' }));
+    expect(db.getMessage('hicks', 'j')).toMatchObject({ promised: true, jobText: 'arrears' });
+    db.updateMessage('hicks', 'j', { status: 'ok' });
+    expect(db.getMessage('hicks', 'j')?.jobText).toBe('arrears');
+    db.insertMessage('hicks', row('p', 2, { mode: 'text', promised: true }));
+    expect(db.getMessage('hicks', 'p')?.jobText).toBeUndefined();
+  });
+  it('told. rows are story meta: a rewind past the reply that told it drops it', () => {
+    const db = openDb(':memory:', { defaultPlayer: 'hicks' });
+    db.insertMessage('hicks', row('a', 1));
+    db.insertMessage('hicks', row('b', 2, { role: 'agent' }));
+    db.withStamp({ messageId: 'b', take: 0 }, () => db.setMeta('told.hicks.arrears', '{"how":"text","at":5}'));
+    db.setMeta('toldseeded.hicks', '1');
+    const { rebuilt } = db.cutAfter('hicks', 'a');
+    expect(db.getMeta('told.hicks.arrears')).toBeNull();
+    expect(db.getMeta('toldseeded.hicks')).toBe('1');
+    expect(rebuilt.quests).toBe(true);
+  });
+});

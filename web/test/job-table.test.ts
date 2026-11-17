@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mountJobTable, onTable, tableAction, tipsFor } from '../src/room/table/job-table';
 import { WAIT_CHARS } from '../src/room/table/decode';
 import { tabWords } from '../src/room/table/tabs';
@@ -57,6 +57,36 @@ const slot = (id: string) => $(`.tb-hand .tb-slot[data-id="${id}"], .tb-load-tra
 afterEach(() => {
   document.body.replaceChildren();
   vi.restoreAllMocks();
+});
+
+describe('the cards hold while the contact speaks (ride-along replies, 2026-11-08)', () => {
+  it('hold names who is on the line, dims the moment, and takes no pick until it clears', () => {
+    const { t, onChoose } = mount();
+    t.show(A, 'The house deck sits by the dealer.');
+    t.hold('Ember');
+    expect(t.root.classList.contains('tb-held')).toBe(true);
+    expect($('.tb-held-note').textContent).toBe('EMBER ON THE LINE');
+    choice('leave').click();
+    expect(onChoose).not.toHaveBeenCalled();
+    t.hold(null);
+    expect(t.root.classList.contains('tb-held')).toBe(false);
+    expect($('.tb-held-note').hidden).toBe(true);
+    choice('leave').click();
+    expect(onChoose).toHaveBeenCalledWith('leave', expect.anything());
+  });
+});
+
+describe('the hold leaves the debrief alone (review I1)', () => {
+  it('an ended table is never held, so CLOSE works during her closing line', () => {
+    const { t } = mount();
+    t.show(A, 'The house deck sits by the dealer.');
+    t.hold('Ember');
+    t.end('Marked Cards', 'It went.', document.createElement('div'));
+    expect(t.root.classList.contains('tb-held')).toBe(false);
+    expect($('.tb-held-note').hidden).toBe(true);
+    t.hold('Ember');
+    expect(t.root.classList.contains('tb-held')).toBe(false);
+  });
 });
 
 describe('a job on the table', () => {
@@ -139,6 +169,9 @@ describe('a job on the table', () => {
     t.show(A);
     $('.tb-push').click();
     expect($('.tb-push').classList.contains('on')).toBe(true);
+    // Its name for screen readers and its tag say the same (review: the tag's swap emptied the name).
+    expect($('.tb-push').getAttribute('aria-label')).toMatch(/^PUSH .* NERVE$/);
+    expect($('.tb-push').dataset.tip).toBe($('.tb-push').getAttribute('aria-label'));
     slot('favour').click();
     choice('sit').click();
     expect(onChoose).toHaveBeenLastCalledWith('sit', { push: 'dice', card: 'favour' });
@@ -408,7 +441,58 @@ describe('Graft tips on the table', () => {
   });
 });
 
-describe("ability cards: index tabs under the recruit that turn their card over (crew abilities spec §2)", () => {
+describe('ability cards at the HUD table: small cards beside the recruit (playtest 2026-11-11)', () => {
+  const ab = (id: string, label: string, kind: 'die' | 'nerve' | 'take', timing: 'roll' | 'after' | 'end', o: Record<string, unknown> = {}) => ({ id, label, kind, timing, words: 'WORDS', nerve: (kind === 'die' ? 1 : 0) as 0 | 1, afford: true, used: false, playable: false, ...o });
+  const withAbilities = (abilities: ReturnType<typeof ab>[], o: Record<string, unknown> = {}): Active => ({
+    ...A,
+    choices: A.choices.map((c) => (c.id === 'sit' ? { ...c, plays: { ...c.plays, 'dez/cool-head': { dice: 2, position: 'dark' as const } } } : c)),
+    hand: { ...A.hand!, people: [{ ...A.hand!.people[0], abilities, ...o }, A.hand!.people[1]] },
+  });
+  const spots = (rid: string) => $$(`.tb-crew-stack[data-stack="${rid}"] .tb-abil > *`).map((e) => (e.classList.contains('tb-mini-empty') ? 'EMPTY' : e.dataset.id));
+
+  it('two spots beside each recruit: an ability as a small card, an outline where there is none; no tabs, no turning', () => {
+    const { t } = mount();
+    t.show(withAbilities([ab('cool-head', 'Cool Head', 'die', 'roll')]));
+    expect(spots('dez')).toEqual(['dez/cool-head', 'EMPTY']);
+    expect(spots(A.hand!.people[1].id)).toEqual(['EMPTY', 'EMPTY']);
+    expect($('.tb-crew-stack[data-stack="dez"]').classList.contains('minis')).toBe(true);
+    expect($('.tb-crew-stack[data-stack="dez"] > .tb-slot').dataset.id).toBe('dez');
+    expect(document.querySelector('.tb-tab, .tb-flip')).toBeNull();
+    t.show(withAbilities([ab('cool-head', 'Cool Head', 'die', 'roll'), ab('log-wipe', 'Log Wipe', 'nerve', 'after')]));
+    expect(spots('dez')).toEqual(['dez/cool-head', 'dez/log-wipe']);
+    expect($('.tb-slot.tb-mini[data-id="dez/cool-head"]').textContent).toContain('COOL HEAD');
+  });
+
+  it('a mini lifts and goes with the pick, as the turned card did', () => {
+    const { t, onChoose } = mount();
+    t.show(withAbilities([ab('cool-head', 'Cool Head', 'die', 'roll')]));
+    slot('dez/cool-head').click();
+    expect(slot('dez/cool-head').classList.contains('lifted')).toBe(true);
+    choice('sit').click();
+    expect(onChoose).toHaveBeenCalledWith('sit', expect.objectContaining({ card: 'dez/cool-head' }));
+  });
+
+  it('a ready AFTER A ROLL mini is lit and a tap sends !after; one it cannot pay for, or played, is dimmed', () => {
+    const { t, onChoose } = mount();
+    t.show({ ...withAbilities([ab('log-wipe', 'Log Wipe', 'nerve', 'after', { playable: true })]), costs: COSTS_VIEW });
+    expect(slot('dez/log-wipe').classList.contains('tb-after')).toBe(true);
+    slot('dez/log-wipe').click();
+    expect(onChoose.mock.calls.at(-1)?.[0]).toMatch(/^!after/);
+    t.show(withAbilities([ab('cool-head', 'Cool Head', 'die', 'roll', { afford: false, nerve: 1 })]));
+    expect(slot('dez/cool-head').classList.contains('off')).toBe(true);
+    t.show(withAbilities([ab('cool-head', 'Cool Head', 'die', 'roll', { used: true })]));
+    expect(slot('dez/cool-head').dataset.state).toBe('down');
+  });
+});
+
+describe("ability cards on a phone: index tabs under the recruit that turn their card over (crew abilities spec §2)", () => {
+  // The HUD table shows abilities as small cards (above); a phone keeps the tabs and the turn.
+  let width = 0;
+  beforeEach(() => {
+    width = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 400 });
+  });
+  afterEach(() => Object.defineProperty(window, 'innerWidth', { configurable: true, value: width }));
   const ab = (id: string, label: string, kind: 'die' | 'nerve' | 'take', timing: 'roll' | 'after' | 'end', o: Record<string, unknown> = {}) => ({ id, label, kind, timing, words: 'WORDS', nerve: (kind === 'die' ? 1 : 0) as 0 | 1, afford: true, used: false, playable: false, ...o });
   const withAbilities = (abilities: ReturnType<typeof ab>[], o: Partial<Active['hand'] extends infer H ? (H extends { people: (infer P)[] } ? P : never) : never> = {}): Active => ({
     ...A,
@@ -494,7 +578,7 @@ describe("ability cards: index tabs under the recruit that turn their card over 
     expect(up()).toBe('dez');
     expect($$('.tb-crew-stack[data-stack="dez"] .tb-tab').map((g) => [g.dataset.id, g.className.match(/t-\w+/)![0]])).toEqual([['dez/cool-head', 't-roll'], ['dez/log-wipe', 't-after'], ['dez/quick-sale', 't-end']]);
     expect($$('.tb-crew-stack[data-stack="dez"] .tb-tab').map((g) => g.textContent)).toEqual(['+1D', '+1 NERVE', '+1 TAKE']);
-    expect(glyph('dez/cool-head').title).toBe('COOL HEAD');
+    expect(glyph('dez/cool-head').getAttribute('aria-label')).toBe('COOL HEAD');
     // Over to the card's back first, then on to the ability.
     glyph('dez/cool-head').click();
     expect(up()).toBe('BACK');
@@ -791,7 +875,7 @@ describe('effect on the table (effect and NERVE spec §3)', () => {
     const { t } = mount();
     t.show({ ...E, choices: [E.choices[1], E.choices[2]] });
     expect(safe().disabled).toBe(true);
-    expect(safe().title).toBe('ALREADY IN THE DARK');
+    expect(safe().dataset.tip).toBe('ALREADY IN THE DARK');
     expect(bold().disabled).toBe(true);
   });
 
@@ -801,13 +885,10 @@ describe('effect on the table (effect and NERVE spec §3)', () => {
     const withAb: Active = { ...E, nerve: { left: 2, max: 5 }, hand: { ...A.hand!, people: [{ ...A.hand!.people[0], abilities: [ab('steady-hand', 'roll')] }, A.hand!.people[1]] } };
     t.show(withAb);
     $('.tb-push').click();
-    expect($('.tb-tab[data-id="dez/steady-hand"]').classList.contains('off')).toBe(true);
+    // At the HUD the ability is a small card beside the recruit (no tab to turn by): it carries the state itself.
+    expect($('.tb-slot.tb-mini[data-id="dez/steady-hand"]').classList.contains('off')).toBe(true);
     t.show({ ...withAb, nerve: { left: 0, max: 5 }, hand: { ...withAb.hand!, people: [{ ...withAb.hand!.people[0], abilities: [{ ...ab('log-wipe', 'after'), afford: false }] }, A.hand!.people[1]] } });
-    vi.useFakeTimers();
-    $('.tb-tab[data-id="dez/log-wipe"]').click();
-    vi.advanceTimersByTime(1000);
     expect(slot('dez/log-wipe').textContent).toContain('1 NERVE · YOU HAVE 0');
-    vi.useRealTimers();
   });
 
   it('tipsFor offers PROGRAMS where a slot would LOAD (programs spec §2.6)', () => {
@@ -828,12 +909,23 @@ describe('effect on the table (effect and NERVE spec §3)', () => {
 describe("a dealt roll's cost cards (roll lifecycle spec §1.5, mockup cost-cards.html A)", () => {
   const dealt = (o: Partial<NonNullable<Active['costs']>> = {}): Active => ({ ...A, choices: [], rolled: { choice: 'swap', faces: [3, 1], keep: 'high', kind: 'miss', cost: { alarm: 0, heat: 0 } }, costs: { ...COSTS_VIEW, ...o } });
   const cost = (id: string) => $(`.tb-costs .tb-cost[data-cost="${id}"]`);
+  it('TAKE −1 shows the roll earning and the cost taking it back; a resisted one drops the sums (2026-11-08, playtest)', () => {
+    const { t } = mount();
+    const take = { cost: 'take' as const, tag: 'TAKE −1', line: 'Gone again.', by: 'written' as const, picked: false, take: { banked: 0, earned: 1, other: 0, after: 0, size: 4 } };
+    t.show(dealt({ dealt: [COSTS_VIEW.dealt[0], take] }));
+    expect([...cost('take').querySelectorAll('.tb-cost-take span')].map((s) => s.textContent)).toEqual(['THIS ROLL +1', 'COST −1', 'LEAVES 0/4']);
+    expect(cost('alarm').querySelector('.tb-cost-take')).toBeNull();
+    t.show(dealt({ dealt: [COSTS_VIEW.dealt[0], { ...take, take: { banked: 2, earned: 0, other: 1, after: 0, size: 4 } }] }));
+    expect([...cost('take').querySelectorAll('.tb-cost-take span')].map((s) => s.textContent)).toEqual(['COST −1', 'ALSO −1', 'LEAVES 0/4']);
+    t.show(dealt({ dealt: [COSTS_VIEW.dealt[0], { ...take, picked: true, settled: 'resisted' }] }));
+    expect(cost('take').querySelector('.tb-cost-take')).toBeNull();
+  });
   it('while the GM writes, a written line waits', () => {
     const { t } = mount();
     t.show(dealt({ writing: true }));
     const line = cost('alarm').querySelector('.tb-cost-line')!;
     expect(line.classList.contains('wait')).toBe(true);
-    expect(line.textContent).toHaveLength(WAIT_CHARS);
+    expect(line.textContent).toHaveLength(WAIT_CHARS / 2);
     expect(line.textContent).not.toContain('log');
   });
   it('a picked cost shows its line, the GM or not', () => {
@@ -887,7 +979,7 @@ describe("a dealt roll's cost cards (roll lifecycle spec §1.5, mockup cost-card
     t.show(dealt({ resist: { dice: 2, ok: false, why: 'ONE SHOT' }, armour: { ok: false, left: 0 }, dealt: COSTS_VIEW.dealt.map((c) => (c.cost === 'alarm' ? { ...c, picked: true } : c)) }));
     const resist = $('.tb-costs .tb-cost-panel.resist') as HTMLButtonElement;
     expect(resist.disabled).toBe(true);
-    expect(resist.title).toBe('ONE SHOT');
+    expect(resist.dataset.tip).toBe('ONE SHOT');
     expect($$('.tb-costs .tb-cost-panel.armour')).toEqual([]);
     t.show(dealt({ dealt: COSTS_VIEW.dealt.map((c) => (c.cost === 'alarm' ? { ...c, picked: true, settled: 'taken' as const } : c)) }));
     expect($$('.tb-costs .tb-cost').map((c) => c.dataset.cost)).toEqual(['alarm', 'heat', 'worse']);
@@ -1096,6 +1188,9 @@ describe('DECK: the carried deck and its slots (programs spec §2.1)', () => {
     slot('prog-pick:foil:skeleton-key').click();
     expect(choice('swap').querySelector('.tb-side-word')!.textContent).toBe('DARK');
     expect(Number(choice('swap').querySelector('.tb-sum')!.firstChild!.textContent)).toBe(before + 1);
+    // Its die is named under the dice, last (the trace table, 2026-11-15); the card it can't run on names none.
+    expect([...choice('swap').querySelectorAll('.tb-names .tb-src')].map((n) => [n.className, n.textContent])).toEqual([['tb-src k-stat', 'REFLEX'], ['tb-src k-pocket lift', '+FOIL']]);
+    expect([...choice('sit').querySelectorAll('.tb-names .tb-src')].map((n) => n.textContent)).toEqual(['COOL']);
   });
 
   it('the pool line previews programs', () => {
@@ -1254,13 +1349,15 @@ describe('DECK: the carried deck and its slots (programs spec §2.1)', () => {
         const { t } = mount();
         t.show(cut());
         vi.useFakeTimers();
-        expect(rest(choice('swap'))).toContain('SMALL: a crit fills 2 TAKE');
-        expect($('.tb-info').textContent).toContain('TIER 2 −1: a HAND recruit called on this roll lifts it');
+        expect(rest(choice('swap'))).toContain('a crit fills 2 TAKE');
+        expect($('.tb-info').textContent).toContain('a HAND recruit called on this roll lifts it');
+        // Their keys in pixel caps beside the words (the HUD trace).
+        expect([...document.querySelectorAll('.tb-info .hv-k')].map((k) => k.textContent)).toEqual(expect.arrayContaining(['SMALL', 'TIER 2 −1']));
         slot('dez').click();
         expect($('.tb-info').hidden).toBe(true);
         choice('sit').dispatchEvent(new MouseEvent('pointerover', { bubbles: true }));
         expect(rest(choice('swap'))).toContain('Tier cut lifted by DEZ · HAND.');
-        expect($('.tb-info').textContent).toContain('FAIR: a crit fills 3 TAKE');
+        expect($('.tb-info').textContent).toContain('FAIRa crit fills 3 TAKE');
       });
       it('a recruit says what they would do here', () => {
         const { t } = mount();
@@ -1312,5 +1409,157 @@ describe('DECK: the carried deck and its slots (programs spec §2.1)', () => {
     expect($('.tb-cost-panel.armour small').textContent).toBe('FIREWALL LOADED · 1 LEFT');
     t.show({ ...withPockets(), costs: { ...picked, armour: { ok: false, left: 0 } } });
     expect(document.querySelector('.tb-cost-panel.armour')).toBeNull();
+    // On the wire (2026-11-08): shown, off, saying why; a click sends nothing.
+    t.show({ ...withPockets(), costs: { ...picked, armour: { ok: false, left: 1, why: 'ON THE WIRE' } } });
+    const off = $('.tb-cost-panel.armour') as HTMLButtonElement;
+    expect(off.disabled).toBe(true);
+    expect(off.querySelector('small')!.textContent).toBe('ON THE WIRE · NOTHING SHIELDS YOU');
+  });
+});
+
+describe("the dice's names under them (the trace table, 2026-11-15; mockup graft-trace.html)", () => {
+  /** A card's names in order: each one's classes and text. */
+  const names = (id: string) => [...choice(id).querySelectorAll('.tb-names > .tb-src')].map((n) => [n.className, n.textContent]);
+  const texts = (id: string) => names(id).map(([, t]) => t);
+
+  it("the stat's own dice are named in capitals, in the foot after the tray; a card with no roll has no names", () => {
+    const { t } = mount();
+    t.show({ ...A, choices: [{ ...A.choices[0], pool: pool('Reflex', 3, 'open') }, A.choices[1], A.choices[2]] });
+    expect(names('swap')).toEqual([['tb-src k-stat', 'REFLEX']]);
+    expect(names('sit')).toEqual([['tb-src k-stat', 'COOL']]);
+    expect(choice('swap').querySelectorAll('.tb-names')).toHaveLength(1);
+    expect(choice('swap').querySelector('.tb-foot > .tb-names')!.previousElementSibling!.className).toBe('tb-tray');
+    expect(choice('leave').querySelector('.tb-names')).toBeNull();
+  });
+
+  it('each part is named after the stat in its own colour: a kind, a plain modifier, and one that takes a die', () => {
+    const { t } = mount();
+    const parts = [{ label: 'SMOOTH', dice: 1 as const, kind: 'setup' as const }, { label: 'HEAT', dice: -1 as const }, { label: 'NIX', dice: 1 as const }, { label: 'HURT', dice: -1 as const, kind: 'people' as const }];
+    t.show({ ...A, choices: [{ ...A.choices[0], pool: { ...pool('REFLEX', 3, 'open'), dice: 3, parts } }, A.choices[1], A.choices[2]] });
+    // A die taken is `minus` whatever its kind, with a real minus sign (U+2212).
+    expect(names('swap')).toEqual([['tb-src k-stat', 'REFLEX'], ['tb-src k-setup', '+SMOOTH'], ['tb-src minus', '−HEAT'], ['tb-src k-mod', '+NIX'], ['tb-src minus', '−HURT']]);
+    expect(texts('swap')[2].charCodeAt(0)).toBe(0x2212);
+    // The sources as tabs are still there, beside the names.
+    expect([...choice('swap').querySelectorAll('.tb-srcs > .tb-src')].map((n) => n.textContent)).toEqual(['+SMOOTH', '−HEAT', '+NIX', '−HURT']);
+  });
+
+  it("a pool with none of the stat's own dice names only its parts", () => {
+    const { t } = mount();
+    t.show({ ...A, choices: [{ ...A.choices[0], pool: { ...pool('REFLEX', 0, 'open'), dice: 1, parts: [{ label: 'SMOOTH', dice: 1 as const, kind: 'setup' as const }] } }, A.choices[1], A.choices[2]] });
+    expect(names('swap')).toEqual([['tb-src k-setup', '+SMOOTH']]);
+  });
+
+  it("a lifted recruit who adds a die is named by first name on that card; where they add none, or can't play, they aren't", () => {
+    const { t } = mount();
+    t.show(A);
+    slot('dez').click();
+    // Dez: 3 on SWAP's 3 (no die), 3 on SIT's 2 (one die).
+    expect(names('swap')).toEqual([['tb-src k-stat', 'REFLEX']]);
+    expect(names('sit')).toEqual([['tb-src k-stat', 'COOL'], ['tb-src lift k-people', '+DEZ']]);
+    // Put back: the name goes.
+    slot('dez').click();
+    expect(texts('sit')).toEqual(['COOL']);
+    // A card that isn't one of the crew (the favour) has no first name to give.
+    slot('favour').click();
+    expect(names('swap')).toEqual([['tb-src k-stat', 'REFLEX'], ['tb-src lift k-people', '+CALL']]);
+  });
+
+  it("a lifted card that moves the roll to another stat names that stat", () => {
+    const { t } = mount();
+    t.show({ ...A, choices: [{ ...A.choices[0], plays: { dez: { stat: 'cool', dice: 4, position: 'open' as const } } }, A.choices[1], A.choices[2]] });
+    slot('dez').click();
+    expect(names('swap')).toEqual([['tb-src k-stat', 'COOL'], ['tb-src lift k-people', '+DEZ']]);
+  });
+
+  it('PUSH with nothing lifted names its die +PUSH; +EFFECT adds no die and no name', () => {
+    const { t } = mount();
+    t.show(A);
+    $('.tb-push').click();
+    expect(names('swap')).toEqual([['tb-src k-stat', 'REFLEX'], ['tb-src lift k-push', '+PUSH']]);
+    expect(names('sit')).toEqual([['tb-src k-stat', 'COOL'], ['tb-src lift k-push', '+PUSH']]);
+    $('.tb-push').click();
+    if ($$('.tb-push .tb-push-word')[1].textContent === '+EFFECT') expect(texts('swap')).toEqual(['REFLEX']);
+    while ($('.tb-push').classList.contains('on')) $('.tb-push').click();
+    expect(texts('swap')).toEqual(['REFLEX']);
+  });
+
+  // Dez adds no die on SWAP (3 on 3), so PUSH's is the only one named there; on SIT each of the two added dice has its own name.
+  it('with a card lifted and PUSH on, each added die is named for what adds it', () => {
+    const { t } = mount();
+    t.show(A);
+    slot('dez').click();
+    $('.tb-push').click();
+    expect(texts('swap')).toEqual(['REFLEX', '+PUSH']);
+    expect(texts('sit')).toEqual(['COOL', '+DEZ', '+PUSH']);
+  });
+});
+
+describe('the clocks show what is about to change (the trace table, 2026-11-15)', () => {
+  const pips = (box: string) => $$(`.tb-${box} .tb-stack i`).map((i) => i.className);
+  const rolled = (alarm: number) => ({ choice: 'swap', faces: [3, 1], keep: 'high' as const, kind: 'miss' as const, cost: { alarm, heat: 0 } });
+  const take = { cost: 'take' as const, tag: 'TAKE −1', line: 'Gone again.', by: 'written' as const, picked: false, take: { banked: 1, earned: 1, other: 0, after: 1, size: 3 } };
+
+  it('nothing blinks on a plain beat; ALARM carries its marks and its note', () => {
+    const { t } = mount();
+    t.show(A);
+    expect([pips('take'), pips('alarm'), pips('nerve')]).toEqual([['f', '', ''], ['f', 'mark', '', 'mark'], ['f', 'f', 'f', 'f', '']]);
+    expect($('.tb-alarm .tb-clock-note').textContent).toBe('AT 2 EVERY POSITION A STEP WORSE · AT 4 GET OUT');
+  });
+
+  it("a waiting roll's ALARM blinks on the next pips to fill; it stops when the roll is settled", () => {
+    const { t } = mount();
+    t.show({ ...A, choices: [], rolled: rolled(2), costs: COSTS_VIEW });
+    expect(pips('alarm')).toEqual(['f', 'g mark', 'g', 'mark']);
+    expect([pips('take'), pips('nerve')]).toEqual([['f', '', ''], ['f', 'f', 'f', 'f', '']]);
+    // The same roll parked without a deal (TAKE IT): its ALARM still blinks.
+    t.show({ ...A, choices: [{ id: '!take', line: 'TAKE IT' }], rolled: rolled(1) });
+    expect(pips('alarm')).toEqual(['f', 'g mark', '', 'mark']);
+    t.show({ ...A, alarm: 2 });
+    expect(document.querySelector('.tb-stack i.g')).toBeNull();
+    expect(pips('alarm')).toEqual(['f', 'f mark', '', 'mark']);
+  });
+
+  it('the TAKE a waiting roll will fill blinks on the next pips, as the view says (`rolled.take`), whatever the deal', () => {
+    const { t } = mount();
+    t.show({ ...A, choices: [], rolled: { ...rolled(0), take: 1 }, costs: COSTS_VIEW });
+    expect(pips('take')).toEqual(['f', 'g', '']);
+    expect(pips('alarm')).toEqual(['f', 'mark', '', 'mark']);
+    t.show({ ...A, choices: [], rolled: { ...rolled(0), take: 2 }, costs: { ...COSTS_VIEW, dealt: [COSTS_VIEW.dealt[0], take] } });
+    expect(pips('take')).toEqual(['f', 'g', 'g']);
+    // Nothing earned (a miss, a TAKE −1 taken, an older server): no blink, even with a TAKE cost in the deal.
+    t.show({ ...A, choices: [], rolled: rolled(0), costs: { ...COSTS_VIEW, dealt: [COSTS_VIEW.dealt[0], take] } });
+    expect(document.querySelector('.tb-stack i.g')).toBeNull();
+    // An old d100 roll waiting has neither.
+    t.show({ ...A, choices: [{ id: '!take', line: 'TAKE IT' }], rolled: { choice: 'swap', chance: 60, rolls: [80] } });
+    expect(document.querySelector('.tb-stack i.g')).toBeNull();
+  });
+
+  it('ALARM blinks as it will land: the roll\'s own, the card\'s, and each ALARM +1 already taken', () => {
+    const { t } = mount();
+    const alarmCost = { cost: 'alarm' as const, tag: 'ALARM +1', line: 'A log fills.', by: 'written' as const, picked: true, settled: 'taken' as const };
+    t.show({ ...A, choices: [{ id: 'swap', line: 'Swap it.', alarm: 1 }], rolled: rolled(0), costs: { ...COSTS_VIEW, dealt: [alarmCost] } });
+    expect(pips('alarm')).toEqual(['f', 'g mark', 'g', 'mark']);
+  });
+
+  it('PUSH armed blinks the NERVE it will spend, the last pips lit; off again, or picked, it stops', () => {
+    const { t } = mount();
+    t.show(A);
+    $('.tb-push').click();
+    expect(pips('nerve')).toEqual(['f', 'f', 'f g', 'f g', '']);
+    expect([pips('take'), pips('alarm')]).toEqual([['f', '', ''], ['f', 'mark', '', 'mark']]);
+    while ($('.tb-push').classList.contains('on')) $('.tb-push').click();
+    expect(document.querySelector('.tb-stack i.g')).toBeNull();
+    $('.tb-push').click();
+    choice('sit').click();
+    expect($('.tb-push').classList.contains('on')).toBe(false);
+    t.show({ ...A, beat: 'next', nerve: { left: 2, max: 5 } });
+    expect(pips('nerve')).toEqual(['f', 'f', '', '', '']);
+  });
+
+  it('the debrief keeps the clocks still', () => {
+    const { t } = mount();
+    t.show({ ...A, choices: [], rolled: rolled(1), costs: COSTS_VIEW });
+    t.end('Marked Cards', 'It went.', document.createElement('div'));
+    expect(document.querySelector('.tb-stack i.g')).toBeNull();
   });
 });

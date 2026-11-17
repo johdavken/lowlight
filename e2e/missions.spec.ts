@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectTableClear, firstPlaythrough, goIn, nixAt, questRow, questTab, send, settleCostStep, skipSplash } from './fixtures';
+import { buyAtFixer, expectTableClear, fixerItem, firstPlaythrough, goIn, nixAt, questRow, questTab, send, settleCostStep, skipSplash } from './fixtures';
 
 test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST, TAKE IT), the pay on YOU', async ({ page }) => {
   const errors: string[] = [];
@@ -39,6 +39,13 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   // HUD (2026-11-02): the title and clocks lead the top bar; the quest's picture steps aside for the JOB column.
   await expect(page.locator('.tb-job .tb-top .tb-title')).toHaveText('NIGHT SHIFT');
   await expect(page.locator('.tb-job .tb-top .tb-take')).toBeVisible();
+  // The dice name where they come from, under them; ALARM says what it does, with its two steps marked.
+  await expect(page.locator('.tb-card[data-choice="roof"] .tb-names .tb-src').first()).toHaveText('TECH');
+  // GO IN as it stands is QUIET: its die is named too.
+  await expect(page.locator('.tb-card[data-choice="roof"] .tb-names .tb-src.k-setup')).toHaveText('+QUIET');
+  await expect(page.locator('.tb-alarm .tb-clock-note')).toHaveText('AT 2 EVERY POSITION A STEP WORSE · AT 4 GET OUT');
+  await expect(page.locator('.tb-alarm .tb-stack i.mark')).toHaveCount(2);
+  await expect(page.locator('.tb-sofar')).toBeHidden();
   await page.screenshot({ path: 'test-results/missions-cards.png' });
   await expectTableClear(page, 'the deal');
 
@@ -82,6 +89,22 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   while (await settleCostStep(page)) await page.waitForTimeout(300);
   await expect(page.locator('.tb-card[data-choice="wipe"]')).toBeVisible({ timeout: 10_000 });
   await expect(page.locator('#feed')).toContainText(`TECH ${dice}d · IN THE OPEN — 2, no ·`);
+  // SO FAR (the table in the trace): the door as the dice had it, and what it changed on the clocks.
+  const soFar = page.locator('.tb-sofar .tb-sofar-row');
+  await expect(soFar).toHaveCount(1);
+  await expect(soFar.locator('.tb-sofar-beat')).toHaveText('DOOR');
+  await expect(soFar.locator('.tb-sofar-line')).toHaveText('TECH 2 · MISS');
+  // What it changed depends on the costs picked: whatever is there reads as a clock and a signed number.
+  for (const m of await soFar.locator('.tb-sofar-moved b').allTextContents()) expect(m).toMatch(/^(TAKE|ALARM) [+−]\d$/);
+  // The card that rolls nothing says what it does for certain: the TAKE it fills (1 on a job that isn't a template) and where it goes.
+  const sure = page.locator('.tb-deal .tb-sure');
+  await expect(sure.locator('.tb-noroll')).toHaveText('NO ROLL');
+  await expect(sure.locator('.tb-oddsbar')).toHaveText('SURE 100');
+  await expect(sure.locator('.tb-res-row').first()).toHaveText(/TAKE\s*\+1 TAKE\. No dice, no cost\./);
+  await expect(sure.locator('.tb-res-row').last()).toHaveText(/THEN\s*The job ends\./);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'test-results/missions-sofar.png' });
+  await expectTableClear(page, 'the second beat, with SO FAR');
   await expect(replies).toHaveCount(before + 1);
 
   // The last check keeps a 6 and pays; her closing line ends it.
@@ -121,11 +144,14 @@ test('programs: load SOLVENT at SETUP, run it twice, the debrief counts it', asy
   const before = await replies.count();
   await page.locator('.hud-quest').click();
   await questTab(page, 'fixer');
-  await page.locator('.ql-fixer .ql-item', { hasText: 'Cortex Meridian' }).locator('.ql-buy').click();
+  await buyAtFixer(page, 'Cortex Meridian');
   await expect.poll(async () => ((await (await page.request.get('/api/kit')).json()) as { kit: { deck: { id: string } | null } }).kit.deck?.id).toBe('meridian');
   // Owned programs: SOLVENT and FIREWALL are the starter; LEECH is bought; the rest aren't offered.
-  await page.locator('.ql-fixer .ql-item', { hasText: 'LEECH' }).locator('.ql-buy').click();
-  await expect(page.locator('.ql-fixer .ql-item', { hasText: 'LEECH' }).locator('.ql-item-why')).toHaveText('YOU HAVE ONE');
+  await buyAtFixer(page, 'LEECH');
+  // Bought: the row and the file say so, and BUY is gone.
+  await expect(fixerItem(page, 'LEECH').locator('.ql-row-why')).toHaveText('YOU HAVE ONE');
+  await expect(page.locator('.ql-fixer .ql-file .ql-item-why')).toHaveText('YOU HAVE ONE');
+  await expect(page.locator('.ql-fixer .ql-file .ql-buy')).toHaveCount(0);
   await questTab(page, 'here');
   await questRow(page, 'Night Shift').click();
   await page.locator('.ql-file .ql-start').click();
@@ -192,8 +218,13 @@ test('programs: CARRY a bigger deck at SETUP, its slots show without backing out
   const deckId = async () => ((await (await page.request.get('/api/kit')).json()) as { kit: { deck: { id: string } | null } }).kit.deck?.id;
   await page.locator('.hud-quest').click();
   await questTab(page, 'fixer');
-  await page.locator('.ql-fixer .ql-item', { hasText: 'Cortex Meridian' }).locator('.ql-buy').click();
-  await expect.poll(deckId).toBe('meridian');
+  // Bought here, unless an earlier test on this worker's playthrough already owns it (then there's no BUY).
+  await fixerItem(page, 'Cortex Meridian').click();
+  await expect(page.locator('.ql-fixer .ql-file .ql-file-title')).toHaveText('CORTEX MERIDIAN');
+  if ((await page.locator('.ql-fixer .ql-file .ql-buy').count()) > 0) {
+    await buyAtFixer(page, 'Cortex Meridian');
+    await expect.poll(deckId).toBe('meridian');
+  }
   // Everyone owns a pocket deck: back to it, so the bigger one has something to replace.
   await page.keyboard.press('Escape');
   await page.keyboard.press('Alt+y');

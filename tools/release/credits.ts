@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { creditRows } from './credit-rows';
 
 const AUDIO = /\.(ogg|mp3|wav)$/i;
 const IMAGE = /\.(png|jpe?g|webp)$/i;
-const FULL = /^(scenes|web\/public\/sound|world\/splash|world\/districts|world\/lore)\//;
 
 /** Files under `dir` matching `re`, as forward-slash paths relative to `dir`. */
 function files(dir: string, re: RegExp): string[] {
@@ -14,20 +14,9 @@ function files(dir: string, re: RegExp): string[] {
     .map((e) => path.relative(dir, path.join(e.parentPath, e.name)).split(path.sep).join('/'));
 }
 
-/** A Source cell naming any of these can't go public (spec 2026-10-28 open-source release §2). */
-const RESTRICTED_SOURCE = /GDC|Sonniss|Bleeoop|JDSherbert/i;
-
-const backticked = (s: string) => [...s.matchAll(/`([^`]+)`/g)].map((m) => m[1].trim());
-
 /**
- * What CREDITS.md credits, read from its structure rather than its prose:
- * - a table row's first cell names files (backticked): a full path (`scenes/…`, `web/public/sound/…`,
- *   `world/splash/…`); a path under web/public/sound inside the section headed with it; or a path in a
- *   scene folder, credited for each `<pack>/<scene>` in the row's second cell (Used by);
- * - a list item `- <scene>: <path> ←` (Studio's picks) credits that path in that scene, in any pack;
- *   a list item with a backticked full path credits that path.
- * Nothing in the `## Patrons` section credits anything: those lines are names.
- * Returns the full paths credited and the (scene, path) pairs of the picks (ElevenLabs takes apart, in freePicks).
+ * What CREDITS.md credits (the rows as `creditRows` reads them): the full paths credited and the
+ * (scene, path) pairs of the picks (ElevenLabs takes apart, in freePicks).
  */
 function credits(text: string, restrictedOnly = false): { full: Set<string>; picks: Set<string>; freePicks: Set<string>; free: Set<string> } {
   const full = new Set<string>();
@@ -35,44 +24,17 @@ function credits(text: string, restrictedOnly = false): { full: Set<string>; pic
   const freePicks = new Set<string>();
   // The full paths that may go public: a row in the Suno music section, or a CC0 Glitch Noises or generated ElevenLabs row with nothing restricted mixed in.
   const free = new Set<string>();
-  let shared = false;
-  let patrons = false;
-  let suno = false;
-  for (const raw of text.split('\n')) {
-    const line = raw.trim();
-    if (line.startsWith('#')) {
-      if (/^##\s/.test(line)) {
-        patrons = /^##\s+Patrons\b/i.test(line);
-        suno = /^##\s+Music: Suno\b/i.test(line);
-      }
-      shared = line.includes('web/public/sound/');
-      continue;
-    }
-    if (patrons) continue;
-    if (line.startsWith('|')) {
-      const cells = line.split('|').slice(1, -1);
-      if (cells.length < 2 || /^[\s:-]+$/.test(cells[0])) continue;
-      const rooms = cells[1].match(/[\w-]+\/[\w-]+/g) ?? [];
-      const source = cells[2] ?? '';
-      const isFree = suno || (/Glitch Noises|ElevenLabs/.test(source) && !RESTRICTED_SOURCE.test(source));
-      const add = (f: string) => {
-        if (restrictedOnly && isFree) return;
+  for (const row of creditRows(text)) {
+    if (row.kind === 'table') {
+      for (const f of row.files) {
+        if (restrictedOnly && row.free) continue;
         full.add(f);
-        if (isFree) free.add(f);
-      };
-      for (const f of backticked(cells[0])) {
-        if (FULL.test(f)) add(f);
-        else if (shared) add(`web/public/sound/${f}`);
-        else for (const room of rooms) add(`scenes/${room}/${f}`);
+        if (row.free) free.add(f);
       }
       continue;
     }
-    if (line.startsWith('- ')) {
-      const pick = /^- ([\w-]+): (\S.*?) ←(.*)$/.exec(line);
-      // A generated ElevenLabs take picked in Studio may go public; any other pick (a Sonniss bundle's) may not.
-      if (pick) (/ElevenLabs/.test(pick[3]) && !RESTRICTED_SOURCE.test(pick[3]) ? freePicks : picks).add(`${pick[1]}/${pick[2]}`);
-      for (const f of backticked(line)) if (FULL.test(f)) full.add(f);
-    }
+    if (row.pick) (row.pick.free ? freePicks : picks).add(`${row.pick.scene}/${row.pick.rel}`);
+    for (const f of row.files) full.add(f);
   }
   return { full, picks, freePicks, free };
 }

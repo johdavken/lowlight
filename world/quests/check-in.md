@@ -12,6 +12,7 @@ starts: zhou-flat
 after: passenger_two=yes
 trust: 1 / 2
 guest: noa GREEN
+people: [Lusk, Pell]
 pitch: Lusk is out of patience. Aegis never had any.
 posted-by: Lusk, under the Cat. A time and a kerb, and no more retainers.
 brief: "Lusk wants the girl under the Cat by six. Aegis crews are asking at the dead blocks' fire. Ember's on Hicks's ear."
@@ -20,8 +21,11 @@ loot: Aegis's check-in relay, for a minute
 ---
 
 # ask
+title: Three O'Clock
 
 *Lusk calls at three. "Six o'clock, under the Cat," he says. "Bring her, or I tell the house who my finder's been keeping warm." He doesn't raise his voice. Fixers don't.*
+
+[noa=seen] *He doesn't ask what she looks like. Somebody with a lamp told him that days ago.*
 
 *At half past, the dead-blocks kid is at the door, soaked. Men in Aegis vests on the far side of the wall, asking questions at the drum fire with their hands on their belts. Aegis doesn't care that the dead blocks don't call SDG. Aegis doesn't call anyone.*
 
@@ -46,6 +50,7 @@ view ember if ear1=allowed and ear2=allowed: He's never once asked you onto his 
 → out
 
 # out
+title: The Dead Blocks
 room: karasu/dead-blocks
 
 *Old Town at the back end of the night. Work lamps on the far side of the broken wall, three of them, swinging. Two Aegis vests at the drum fire, and the old man who nodded you through is looking at his boots. Pell's lantern is out. The girl is on the third floor, where Pell moved her, and she can barely stand.*
@@ -71,6 +76,7 @@ view ember if guest.noa=yes: The thing in the girl's head is reading the Aegis m
 → meet
 
 # meet
+title: Under the Cat
 room: velvet/under-the-cat
 
 *Velvet, under the Cat, rain coming down pink. Lusk is under a hotel awning with his collar up. At the kerb there's a plain grey van with its back doors open, and inside it a rack of small amber lights and a padded case lying open and empty, waiting for a cart.*
@@ -93,6 +99,7 @@ view ember: You know what that rack is before Hicks does: Aegis's check-in relay
 → choice
 
 # choice
+title: The Van
 room: velvet/under-the-cat
 
 *The girl's face goes still under the hood. The flat voice doesn't speak to you. "Spark," it says, on your bead, from a girl's mouth a foot away. "Ask him what he's going to do."*
@@ -117,6 +124,7 @@ settles: ember: Hicks handed the girl, Noa, to Aegis under the Cat for Lusk's mo
 → relay
 
 # relay
+title: The Relay
 room: velvet/under-the-cat
 
 *The relay listens for one cart. One last check-in, from a cart that's dying, and Aegis writes it off: no cart, no mind, no girl worth a van. It has to sound like it came from inside her slot.*
@@ -142,6 +150,7 @@ take: none
 → burned
 
 # home
+title: Dawn
 
 *Dawn at the Zhous'. The girl is asleep on the couch where you used to sleep, in Pell's coat. Aegis's books say the cart in her head died at five fifty-two. Lusk's corner of the Switchboard says you work both sides.*
 
@@ -170,6 +179,7 @@ settles: ember: Hicks put Noa on the ferry out of Lowlight with nothing to hold 
 → end
 
 # burned
+title: The Kerb
 
 *Lusk is gone. The van is gone. Aegis has her, and the mind in her, and your face on a screen beside them. The Switchboard has your name for working both sides, and you have nothing to show for it.*
 
@@ -189,6 +199,7 @@ view ember: It failed. Aegis took the girl, and the thing in her head said your 
 → end
 
 # getaway
+title: The Canal Stair
 room: velvet/under-the-cat
 
 *The Aegis man is shouting and Lusk has stepped back under the awning, out of it. The girl has your sleeve. The street runs both ways and both ways are wet.*

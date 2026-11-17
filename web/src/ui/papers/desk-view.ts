@@ -248,9 +248,10 @@ export function renderPapers(o: Pick<DeskViewOpts, 'desk' | 'origins' | 'notes' 
   // medical slip
   const medical = p.medical
     ? (() => {
-        const m = el('div', 'pp-doc pp-medical');
+        // A slip beside the ticket (2026-11-15: the middle has no room for the full documents): what it is, what it says.
+        const m = el('div', 'pp-doc pp-medical pp-slip');
         if (!t.medical) m.append(el('span', 'pp-forgedmark', '✎ +2'));
-        m.append(el('b', '', 'ISLE HEALTH OFFICE'), 'MEDICAL SLIP', el('br'), 'No quarantine markers.', el('br'), 'Fit for work.', ink('pp-cleared', 'CLEARED'), btn('REMOVE', 'pp-fbtn', () => o.onAct({ k: 'extra', x: 'medical', on: false }), { 'data-k': 'extra-medical' }));
+        m.append(el('b', '', 'MEDICAL SLIP'), el('span', 'pp-slip-sub', 'fit for work'), ink('pp-cleared', 'CLEARED'), btn('REMOVE', 'pp-fbtn', () => o.onAct({ k: 'extra', x: 'medical', on: false }), { 'data-k': 'extra-medical' }));
         return m;
       })()
     : (() => {
@@ -263,9 +264,9 @@ export function renderPapers(o: Pick<DeskViewOpts, 'desk' | 'origins' | 'notes' 
   let letter: HTMLElement;
   if (p.sponsor !== 'none') {
     const lCost = t.sponsor === 'none' ? 2 : p.sponsor !== t.sponsor ? 1 : 0;
-    letter = el('div', 'pp-doc pp-letter');
+    letter = el('div', 'pp-doc pp-letter pp-slip');
     if (lCost) letter.append(el('span', 'pp-forgedmark', `✎ +${lCost}`));
-    letter.append(el('div', 'pp-lh', 'LETTER OF SPONSORSHIP'), 'To the Office of Arrivals: the bearer is known to us and placed with us. We answer for them.', el('br'), el('br'), `Signed, on behalf of ${p.sponsor}.`);
+    letter.append(el('b', '', 'SPONSOR LETTER'), el('span', 'pp-slip-sub', `signed for ${p.sponsor}`));
   } else {
     letter = el('div', 'pp-ghost', 'NO SPONSOR LETTER');
     letter.append(el('span', '', 'comes with a sponsor on the permit'));

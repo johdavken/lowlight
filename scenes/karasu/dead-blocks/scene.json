@@ -193,5 +193,11 @@
       "to": "karasu/sixth-floor",
       "way": "up the open stairwell, six floors"
     }
-  ]
+  ],
+  "sound": {
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
+    }
+  }
 }

@@ -60,7 +60,7 @@ export function dayWords(blocks: readonly Block[], placeName: (room: string) => 
   if (blocks.length === 0) return null;
   return [...blocks]
     .sort((a, b) => a.from - b.from)
-    .map((b) => `${placeName(b.room)} ${hhmmOf(b.from)}–${hhmmOf(b.to)}${b.days ? ` (${b.days.map((d) => weekdayShort(d)).join(', ')})` : ''}`)
+    .map((b) => `${placeName(b.room)} ${hhmmOf(b.from)}–${hhmmOf(b.to)}${b.days ? ` (${b.days.map((d) => weekdayShort(d)).join(', ')})` : ''}${b.sleeps ? ' (asleep)' : ''}`)
     .join(' · ');
 }
 

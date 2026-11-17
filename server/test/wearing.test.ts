@@ -92,3 +92,19 @@ describe('wearingEntries', () => {
     expect(wearingEntries({ ...base, sceneId: 'x', player: { id: 'you', name: 'You', pronoun: 'they' } }).map((e) => e.name)).toEqual(['Ember']);
   });
 });
+
+describe("the player's own figure (persona figure spec 2026-11-12)", () => {
+  it('its wears line beats the wardrobe', () => {
+    const sprite = { outfits: { work: 'w.png' }, outfitByScene: {}, outfitWears: { work: 'an apron' } } as unknown as Parameters<typeof wearingEntries>[0]['wardrobe'] extends (id: string) => infer R ? R : never;
+    const entries = wearingEntries({
+      self: { id: 'nix', name: 'Nix', pronoun: 'she' },
+      sceneId: 'karasu/x',
+      player: { id: 'rue', name: 'Vee', pronoun: 'they', wears: 'a long grey coat' },
+      playerOutfit: 'work',
+      others: [],
+      wardrobe: (id) => (id === 'rue' ? sprite : null),
+    });
+    expect(entries).toEqual([{ name: 'Vee', pronoun: 'they', text: 'a long grey coat' }]);
+  });
+});
+

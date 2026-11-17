@@ -850,6 +850,35 @@ describe('the cipher run (cipher spec §2.2)', () => {
     expect(db.getMeta(cipherKey(P))).toBeNull();
   });
 
+  it("the player's started quests and the guests reach the run, and a truth naming a guest is refused (2026-11-08)", async () => {
+    const written = (p: string) => ({ threads: p === P ? [{ title: 'The Passenger', pitch: 'A house wants its runaway back.' }] : [], guests: ['Noa Vey'] });
+    const r = runner({ cipher: live(() => 6), cipherCast: cast, selfId: 'nix', cipherWritten: written });
+    const a1 = exchange('hi', 'Hey.');
+    answers.push(answer({ notes: [] }));
+    answers.push(truthAnswer([{ ...good, truth: "Noa's other voice has a name." }]));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.waitAll();
+    const user = calls.find(isCipherCall)!.messages[1].content;
+    expect(user).toContain('[written: The Passenger — A house wants its runaway back.]');
+    expect(user).toContain('[guests: Noa Vey]');
+    expect(db.residualRuns(5).find((x) => x.kind === 'cipher')!.refused).toEqual(["truths[0]: names someone a written quest owns (Noa)"]);
+  });
+
+  it("a job's beats never reach the run: they're written story (2026-11-08)", async () => {
+    const r = runner({ cipher: live(() => 6), cipherCast: cast, selfId: 'nix' });
+    db.insertMessage(P, { id: 'q1', role: 'user', text: 'You take the van relay while Lusk counts.', toolLines: [], ts: 400, status: 'ok', mode: 'quest' });
+    db.insertMessage(P, { id: 'q2', role: 'agent', text: 'Jack it in, Hicks.', toolLines: [], ts: 401, status: 'ok', mode: 'quest' });
+    const a1 = exchange('hi', 'Hey.');
+    answers.push(answer({ notes: [] }));
+    answers.push(truthAnswer([good]));
+    r.afterTurn(P, { id: a1.id, take: 0 }, 'turn');
+    await r.waitAll();
+    const user = calls.find(isCipherCall)!.messages[1].content;
+    expect(user).toContain('Hey.');
+    expect(user).not.toContain('van relay');
+    expect(user).not.toContain('Jack it in');
+  });
+
   it('a run with every truth refused still waits refillGap', async () => {
     let replies = 6;
     const r = runner({ cipher: live(() => replies), cipherCast: cast, selfId: 'nix' });

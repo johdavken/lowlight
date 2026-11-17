@@ -123,7 +123,7 @@ describe('the solo screen', () => {
     await vi.waitFor(() => expect(document.querySelector('.save-card')).toBeNull());
     expect(cues()).toEqual(['move', 'save']); // the prompt closing hands focus back without a step
     key('Enter');
-    expect(cues()).toEqual(['move', 'save', 'confirm']);
+    expect(cues()).toEqual(['move', 'save', 'rejoin']);
   });
 
   it('Esc goes back to the title', async () => {

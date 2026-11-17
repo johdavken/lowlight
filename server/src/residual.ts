@@ -74,6 +74,10 @@ export interface ResidualInput {
   noPlans?: boolean;
   /** Promised texts (spec 2026-10-23 §4) apply to this reply. */
   promises?: boolean;
+  /** The lights backstop applies (default): false when she changed the lights herself this turn, so it isn't asked for writes it would refuse. */
+  lights?: boolean;
+  /** The room line shows the lights as groups (Lowlight): the backstop writes `inside`/`outside`. The SillyTavern package keeps light ids. */
+  lightGroups?: boolean;
   /** Her standing promise in words, for the `[your promise: …]` line. */
   promiseLine?: string | null;
   /** Her schedule in words (deck controls spec §1), so "when I'm in bed" can become a time. */
@@ -603,14 +607,17 @@ export function applyResidual(d: ApplyDeps, a: ResidualAnswer, at: { messageId: 
           return null;
         };
         for (const k of a.cipher.clues) {
-          const text = capAtWordBoundary(k.text.trim(), CIPHER.clueMax);
+          const whole = k.text.trim();
+          // Cut to fit, it ends in … so it doesn't read as broken (2026-11-08); the page check reads the words kept.
+          const kept = whole.length > CIPHER.clueMax ? capAtWordBoundary(whole, CIPHER.clueMax - 1).replace(/[\s,;:–—-]+$/, '') : whole;
+          const text = kept === whole ? whole : `${kept}…`;
           if (text === '') {
             refused.push('cipher: empty clue');
             continue;
           }
           const id = truthOf(k.id);
           if (id === null) continue;
-          c.append({ t: 'clue', id, text, messageId: at.messageId, at: c.clock, place: c.place, onPage: clueOnPage(text, c.prose), replies: c.replies, seq: Date.now() });
+          c.append({ t: 'clue', id, text, messageId: at.messageId, at: c.clock, place: c.place, onPage: clueOnPage(kept, c.prose), replies: c.replies, seq: Date.now() });
           applied.push(`clue ${k.id.trim()}`);
         }
         for (const label of a.cipher.learned) {
@@ -662,12 +669,17 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
   const offered = i.leads ?? [];
   const here = i.here ?? [];
   const standing = i.standing !== false;
+  const lit = i.lights !== false;
   const system = [
     `You keep the records for a roleplay between ${her} (${i.self.pronoun}) and ${you}. You never write story: you read what just happened and answer with one JSON object.`,
     `NOTES are ${her}'s memory. Only lasting facts: what is owed or promised, what was revealed, what changed, where something is. Not moods, not small talk. One fact per note: a new fact is a new note, even about the same person; rewrite a note only when that same fact changed, and forget it once it stops being true. "about": "me" is ${her}'s own journal (her life, her room, her plans); "about": "you" is what ${her} learns about ${you}. Up to ${NOTE_MAX} characters each, in ${her}'s words. Give every note 1–4 keywords, written the way they would be said (\"chrome hand\", not \"chrome-hand\"): names of other people, places, objects, words that would come up again in talk — not ${her}'s or ${you}'s names, not everyday words. Pin only what should matter every scene (at most ${PIN_CAP} pins). Jobs done together are remembered already (the [done together: …] line): never note a job's run or its payout, only what it revealed about someone or changed that will matter later (a debt, an enemy, a favour owed). Most turns add nothing.`,
     ...(standing ? [`STANDING is about what ${you} did this turn and how it lands with ${her}: something ${you} said or did, never what ${her} or anyone else did. ${her}'s reply only shows how it landed. Leave it null unless what ${you} did would still matter to ${her} next week: most turns move nothing, and ordinary courtesy, small favours, flirting or a pleasant chat are not enough. Decide the reason first, then its sign: a lie, a dodge, hiding something, pushing ${her} or bringing ${her} trouble moves down; keeping a promise, telling a hard truth or taking a risk for ${her} moves up. Trust and warmth usually move apart: someone can earn trust and still not be liked, or be liked and not believed — move only the one that changed. Each is -1, 0 or +1. trust: whether ${her} believes them and would tell them things. warmth: whether ${her} likes having them around. reason: a few words.`] : []),
     ...(i.jobs === false ? [] : [JOBS_APART, `A [job — …] or [quest — …] line is the narrator's, told to ${you}: its "you" is ${you}, and its "she" or "he" can be ${her}. Every note is written as ${her}: "I" in a note is always ${her}, never ${you}.`]),
-    `LIGHTS: only when the reply says a light changed (the power cut, a lamp switched off) and the [room: …] line shows it didn't. Use the light ids from that line; intensity 0–1.`,
+    ...(!lit
+      ? []
+      : i.lightGroups
+        ? [`LIGHTS: only when the reply says a light changed (the power cut, a lamp switched off) and the [room: …] line shows it didn't. Use "inside" for the room's own lights (or "outside"), as a share of how the room is lit, 0 off to 1; a single light by its name from that line only when one alone changed.`]
+        : [`LIGHTS: only when the reply says a light changed (the power cut, a lamp switched off) and the [room: …] line shows it didn't. Use the light ids from that line; intensity 0–1.`]),
     ...(timed
       ? [
           `TIME: the [clock: …] line is the story's time when ${her}'s reply was written, by Lowlight's count. If what just happened moves the story on past it — a later hour named, "hours later", the night going on, "till dawn" — give the hour the story has reached by the end of the reply: not a time planned, promised or mentioned for later ("meet me at midnight", "come back at ten"). Otherwise null; most turns don't move it.`,
@@ -717,10 +729,11 @@ export function residualMessages(i: ResidualInput): CompletionMessage[] {
     )
       .replace('"recap":null', ciphered ? '"cipher":null,"recap":null' : '"recap":null')
       .replace('"recap":null', here.length > 0 ? '"witnesses":[],"recap":null' : '"recap":null')
-      .replace(standing ? '' : '"standing":null,', ''),
+      .replace(standing ? '' : '"standing":null,', '')
+      .replace(lit ? '' : '"lights":[],', ''),
     'Each entry in "notes" is one of: add {"op":"add","about":"me" or "you","text":the note,"keys":[1–4 keywords],"pin":true or false}; rewrite {"op":"rewrite","id":an id from the notes listed,"text":the new text,"keys":[…],"pin":…} (any of text, keys, pin; leave out what stays); forget {"op":"forget","id":an id from the notes listed}.' +
       (standing ? ' "standing" is null or {"reason":"a few words","trust":n,"warmth":n}.' : '') +
-      ' "lights" holds {"id":a light id from the [room: …] line,"intensity":0 to 1}.' +
+      (!lit ? '' : i.lightGroups ? ' "lights" holds {"id":"inside", "outside" or a light\'s name from the [room: …] line,"intensity":0 to 1}.' : ' "lights" holds {"id":a light id from the [room: …] line,"intensity":0 to 1}.') +
       (timed ? ' "time" is null or {"until":"HH:MM"}.' : '') +
       (planned ? ' "plan" is null, {"cancel":true}, or {"going":{"place":id,"until":"HH:MM" or null} or null,"meet":{"place":id,"at":"HH:MM" or null,"tomorrow":true (only if said),"with":[ids] (only if named)} or null}.' : '') +
       (promising ? ' "promise" is null, {"cancel":true}, {"at":"HH:MM","about":"…"}, or {"place":id,"about":"…"}.' : '') +

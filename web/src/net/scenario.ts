@@ -20,6 +20,18 @@ export interface OpeningSet {
   pair: { player: { id: string; name: string }; tie: string | null };
 }
 
+/** The STORY a new game with `ai` opens on (her job's authored scene), or null: none, or no answer. */
+export async function storyOpening(ai: string): Promise<{ job: string; text: string } | null> {
+  try {
+    const res = await fetch(`/api/scenario/story/${encodeURIComponent(ai)}`);
+    if (!res.ok) return null;
+    const s = ((await res.json()) as { story?: { job?: unknown; text?: unknown } | null }).story;
+    return s && typeof s.job === 'string' && typeof s.text === 'string' ? { job: s.job, text: s.text } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Three openings for `ai`'s new game, steered by `steer`. Rejects with an Error in SUGGEST's words. */
 export async function sceneOptions(ai: string, steer: string | null): Promise<OpeningSet> {
   const b = await postJson<{ options?: unknown; pair?: unknown }>('/api/scenario/draft', { ai, steer });

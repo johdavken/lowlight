@@ -1,4 +1,5 @@
 import type { Beat } from '../../../shared/beats';
+import { noiseWord } from '../room/table/decode';
 import type { Segment } from './rp-markup';
 
 /** Typing pace: characters per second, and extra pauses layered on top. */
@@ -93,11 +94,39 @@ function appendVisible(into: HTMLElement, kind: Segment['kind'], text: string): 
   into.append(cls ? span(cls, text) : text);
 }
 
-/** Appends `text` for `kind` past the frontier: always a span (to carry `unshown`), styling class kept. */
-function appendHidden(into: HTMLElement, kind: Segment['kind'], text: string): void {
+/**
+ * TEXT EFFECT DECODE (the box's settings): the text past the frontier as glyph noise, the JOB column's (room/table/
+ * decode.ts). Each word becomes its width in glyphs and every space and newline stays, so the line breaks are the text's
+ * own. Only painted (data-n): the real letters under it keep the layout and every offset.
+ */
+export function noiseOf(text: string, r: () => number = Math.random): string {
+  return text.replace(/\S+/g, (w) => noiseWord(w, r));
+}
+
+/**
+ * Appends `text` for `kind` past the frontier: always a span (to carry `unshown`), styling class kept. With `noise`
+ * (DECODE) its words show as glyphs instead of being hidden: each word keeps its real letters (unseen, so the layout,
+ * the paging and every offset are the text's own, whatever the font) and wears its noise in `data-n`, painted over it by
+ * style.css. Hidden from screen readers, which have the line once it's there. The `*` markers stay hidden either way.
+ */
+function appendHidden(into: HTMLElement, kind: Segment['kind'], text: string, noise = false): void {
   if (!text) return;
-  const cls = [SEGMENT_CLASS[kind], 'unshown'].filter(Boolean).join(' ');
-  into.append(span(cls, text));
+  const decode = noise && kind !== 'mark';
+  const cls = [SEGMENT_CLASS[kind], 'unshown', decode ? 'noise' : ''].filter(Boolean).join(' ');
+  if (!decode) return void into.append(span(cls, text));
+  const s = span(cls, '');
+  s.setAttribute('aria-hidden', 'true');
+  for (const part of text.split(/(\s+)/)) {
+    if (!part) continue;
+    if (/^\s+$/.test(part)) {
+      s.append(part);
+      continue;
+    }
+    const w = span('nw', part);
+    w.dataset.n = noiseOf(part);
+    s.append(w);
+  }
+  into.append(s);
 }
 
 /**
@@ -107,7 +136,7 @@ function appendHidden(into: HTMLElement, kind: Segment['kind'], text: string): v
  * with the extra class `unshown` (hidden by CSS, but kept in the DOM so layout doesn't shift as
  * typing reveals them); a `.type-cursor` span sits right at the frontier.
  */
-export function renderFrontier(into: HTMLElement, segments: Segment[], shown: number | null): void {
+export function renderFrontier(into: HTMLElement, segments: Segment[], shown: number | null, opts: { noise?: boolean } = {}): void {
   into.replaceChildren();
   if (shown === null) {
     for (const seg of segments) appendVisible(into, seg.kind, seg.text);
@@ -124,9 +153,9 @@ export function renderFrontier(into: HTMLElement, segments: Segment[], shown: nu
       appendVisible(into, seg.kind, seg.text.slice(0, cut));
       into.append(cursor());
       cursorPlaced = true;
-      appendHidden(into, seg.kind, seg.text.slice(cut));
+      appendHidden(into, seg.kind, seg.text.slice(cut), opts.noise);
     } else if (cursorPlaced) {
-      appendHidden(into, seg.kind, seg.text);
+      appendHidden(into, seg.kind, seg.text, opts.noise);
     } else {
       appendVisible(into, seg.kind, seg.text);
     }
@@ -193,7 +222,7 @@ function textAt(segments: Segment[], i: number): string {
  * character stays in the DOM in order, so offsets into the text still match the message's (the
  * typing frontier, the page end). The cursor sits at the frontier, as with `renderFrontier`.
  */
-export function renderBeats(into: HTMLElement, segments: Segment[], beats: Beat[], shown: number | null, accentOf?: (id: string) => string | undefined): void {
+export function renderBeats(into: HTMLElement, segments: Segment[], beats: Beat[], shown: number | null, accentOf?: (id: string) => string | undefined, opts: { noise?: boolean } = {}): void {
   into.replaceChildren();
   let cursorPlaced = shown === null;
   let last: HTMLElement = into;
@@ -209,13 +238,14 @@ export function renderBeats(into: HTMLElement, segments: Segment[], beats: Beat[
       if (from >= to) continue;
       const text = seg.text.slice(from - segStart, to - segStart);
       if (cursorPlaced) {
-        (shown === null ? appendVisible : appendHidden)(target, seg.kind, text);
+        if (shown === null) appendVisible(target, seg.kind, text);
+        else appendHidden(target, seg.kind, text, opts.noise);
       } else if (shown! <= to) {
         const cut = Math.max(0, shown! - from);
         appendVisible(target, seg.kind, text.slice(0, cut));
         target.append(cursor());
         cursorPlaced = true;
-        appendHidden(target, seg.kind, text.slice(cut));
+        appendHidden(target, seg.kind, text.slice(cut), opts.noise);
       } else {
         appendVisible(target, seg.kind, text);
       }

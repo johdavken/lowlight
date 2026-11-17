@@ -351,3 +351,28 @@ describe('quest events', () => {
   });
 });
 
+
+describe('quest_board (deduction board spec §3)', () => {
+  it('passes good moves and refuses bad shapes', () => {
+    const ok = (move: unknown) => validateClientEvent({ type: 'quest_board', id: 'q', move });
+    expect(ok({ kind: 'pair', a: 'HAND', b: 'BOWL' })).toEqual({ type: 'quest_board', id: 'q', move: { kind: 'pair', a: 'HAND', b: 'BOWL' } });
+    expect(ok({ kind: 'file', deduction: 'OUT', blank: 'WHO' })).toMatchObject({ move: { kind: 'file' } });
+    expect(ok({ kind: 'unfile', blank: 'HOW' })).toMatchObject({ move: { kind: 'unfile' } });
+    expect(ok({ kind: 'name', suspect: null })).toMatchObject({ move: { kind: 'name', suspect: null } });
+    expect(ok({ kind: 'accuse' })).toMatchObject({ move: { kind: 'accuse' } });
+    for (const bad of [null, { kind: 'pair', a: 'X' }, { kind: 'file', deduction: 'OUT', blank: 'WHEN' }, { kind: 'name', suspect: 3 }, { kind: 'dance' }, { kind: 'pair', a: 'x'.repeat(81), b: 'Y' }]) expect(typeof ok(bad)).toBe('string');
+    expect(typeof validateClientEvent({ type: 'quest_board', move: { kind: 'accuse' } })).toBe('string');
+  });
+});
+
+describe('quest_accounts (Two Stories spec §3)', () => {
+  it('validates its moves', () => {
+    const ok = (move: unknown) => validateClientEvent({ type: 'quest_accounts', id: 'q', move });
+    expect(ok({ kind: 'place', card: 'KESTREL', listener: 'adebayo', blank: 'WHERE' })).toEqual({ type: 'quest_accounts', id: 'q', move: { kind: 'place', card: 'KESTREL', listener: 'adebayo', blank: 'WHERE' } });
+    expect(ok({ kind: 'take', listener: 'rue', blank: 'LAST' })).toEqual({ type: 'quest_accounts', id: 'q', move: { kind: 'take', listener: 'rue', blank: 'LAST' } });
+    expect(ok({ kind: 'tell' })).toEqual({ type: 'quest_accounts', id: 'q', move: { kind: 'tell' } });
+    for (const bad of [{ kind: 'place', card: 'KESTREL', listener: 'adebayo', blank: 'where' }, { kind: 'place', card: 'KESTREL', blank: 'WHERE' }, { kind: 'place', card: 'K'.repeat(81), listener: 'adebayo', blank: 'WHERE' }, { kind: 'take', listener: 'Rue', blank: 'LAST' }, null]) expect(typeof ok(bad)).toBe('string');
+    expect(ok({ kind: 'dance' })).toBe("quest_accounts 'move' isn't a place, take or tell");
+    expect(typeof validateClientEvent({ type: 'quest_accounts', move: { kind: 'tell' } })).toBe('string');
+  });
+});

@@ -1,8 +1,9 @@
-/** The model lists (OpenRouter's: labels, prices, valid ids; Anthropic's for a player with only that key) and a direct character's model picker. */
+/** The model lists (OpenRouter's: labels, prices, valid ids; NanoGPT's and Anthropic's for a player without OpenRouter) and a direct character's model picker. */
 import { modelLabel } from '../../shared/model-label';
 import type { ModelChoice, ModelEvent } from '../../shared/types';
 import { anthropicClient } from './anthropic';
-import { fromNative } from './model-route';
+import { fromNative, type NanoIndex } from './model-route';
+import { nanoApi } from './nanogpt';
 
 const CATALOG_CACHE_MS = 3_600_000;
 const CATALOG_TIMEOUT_MS = 8_000;
@@ -118,11 +119,104 @@ export function createAnthropicCatalog(opts: { apiKey: () => string | null; base
   }, opts.now ?? Date.now);
 }
 
-/** Anthropic's list when that's the only key linked (an Anthropic-only player), else OpenRouter's. */
-export function createRoutedCatalog(o: { openrouter: ModelCatalog; anthropic: ModelCatalog; keys: () => { openrouter: string | null; anthropic: string | null } }): ModelCatalog {
+/** NanoGPT's list, which also tells routing which models its plan covers (`NanoIndex`, read without waiting). */
+export type NanoCatalog = ModelCatalog &
+  NanoIndex & {
+    /** Loads the list now (at start, after a NanoGPT key is linked) so the first turn routes on it. */
+    warm(): Promise<void>;
+    spent(): boolean;
+    /** The allowance ran out: plan models leave NanoGPT for `retryAfterS` (its Retry-After; unsaid: an hour). */
+    markSpent(retryAfterS: number): void;
+    /** A relinked key starts afresh. */
+    clearSpent(): void;
+  };
+
+/** How long plan models stay off NanoGPT after its allowance runs out, when its 429 says nothing (and at most). */
+const SPENT_DEFAULT_MS = 3_600_000;
+const SPENT_MAX_MS = 7 * 24 * 3_600_000;
+/** A list that failed to load is tried again at most this often (routing asks on every call). */
+const NANO_RETRY_MS = 60_000;
+
+/**
+ * GET <host>/api/v1/models?detailed=true, cached for an hour (it needs no key). Models that say they can't call
+ * tools aren't offered; prices come per million already; `subscription.included` marks the plan's models.
+ */
+export function createNanoGptCatalog(opts: { host: string; fetchImpl?: typeof fetch; now?: () => number; timeoutMs?: number }): NanoCatalog {
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  const now = opts.now ?? Date.now;
+  const baseUrl = nanoApi(opts.host);
+  let included = new Set<string>();
+  let loadedAt: number | null = null;
+  let triedAt = -Infinity;
+  let spentUntil = 0;
+  const price = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null);
+  const catalog = cachedCatalog(async () => {
+    try {
+      const res = await fetchImpl(`${baseUrl}/models?detailed=true`, { signal: AbortSignal.timeout(opts.timeoutMs ?? CATALOG_TIMEOUT_MS) });
+      if (!res.ok) return null;
+      const body = (await res.json()) as {
+        data?: { id?: unknown; name?: unknown; pricing?: { prompt?: unknown; completion?: unknown }; context_length?: unknown; capabilities?: { tool_calling?: unknown }; subscription?: { included?: unknown } }[];
+      };
+      const byId = new Map<string, ModelChoice>();
+      const inPlan = new Set<string>();
+      for (const m of body.data ?? []) {
+        if (typeof m.id !== 'string') continue;
+        if (m.capabilities?.tool_calling === false) continue;
+        if (m.subscription?.included === true) inPlan.add(m.id);
+        byId.set(m.id, {
+          id: m.id,
+          label: modelLabel(m.id, typeof m.name === 'string' ? m.name : undefined),
+          priceIn: price(m.pricing?.prompt),
+          priceOut: price(m.pricing?.completion),
+          ...(typeof m.context_length === 'number' && m.context_length > 0 ? { context: m.context_length } : {}),
+        });
+      }
+      included = inPlan;
+      loadedAt = now();
+      return byId;
+    } catch {
+      return null;
+    }
+  }, now);
+  const load = () => {
+    triedAt = now();
+    return catalog.list().then(
+      () => {},
+      () => {},
+    );
+  };
+  return {
+    ...catalog,
+    baseUrl,
+    // Never loaded, or an hour old: load it again in the background (a failed load waits a minute between tries).
+    included: (id) => {
+      if ((loadedAt === null || now() - loadedAt >= CATALOG_CACHE_MS) && now() - triedAt >= NANO_RETRY_MS) void load();
+      return included.has(id);
+    },
+    warm: load,
+    spent: () => now() < spentUntil,
+    markSpent: (retryAfterS) => {
+      const ms = Number.isFinite(retryAfterS) && retryAfterS > 0 ? Math.min(retryAfterS * 1000, SPENT_MAX_MS) : SPENT_DEFAULT_MS;
+      spentUntil = now() + ms;
+    },
+    clearSpent: () => {
+      spentUntil = 0;
+    },
+  };
+}
+
+/** The list of the key that serves most models: OpenRouter's when linked, else NanoGPT's, else Anthropic's. */
+export function createRoutedCatalog(o: {
+  openrouter: ModelCatalog;
+  anthropic: ModelCatalog;
+  nanogpt?: ModelCatalog;
+  keys: () => { openrouter: string | null; anthropic: string | null; nanogpt?: string | null };
+}): ModelCatalog {
   const pick = () => {
     const k = o.keys();
-    return !k.openrouter && k.anthropic ? o.anthropic : o.openrouter;
+    if (k.openrouter) return o.openrouter;
+    if (k.nanogpt && o.nanogpt) return o.nanogpt;
+    return k.anthropic ? o.anthropic : o.openrouter;
   };
   return {
     list: () => pick().list(),
@@ -151,8 +245,10 @@ export function createModelPicker(opts: {
   credit: () => Promise<number | null>;
   /** The model she actually runs for a stored one (an Anthropic-only player's fallback); absent: the stored one. */
   shown?: (id: string) => string;
-  /** Whether a model runs through the player's Anthropic key (the MODEL menu says so). */
-  via?: (id: string) => boolean;
+  /** The provider her current model's route goes to now (the dev panel's MODEL line); absent: `provider`. */
+  providerFor?: (id: string) => string;
+  /** Which of the player's other keys a model runs through, if not OpenRouter (the MODEL menu says so). */
+  via?: (id: string) => 'anthropic' | 'nanogpt' | null;
 }): ModelPicker {
   const choiceFor = async (id: string): Promise<ModelChoice> =>
     (await opts.catalog.get(id)) ?? { id, label: modelLabel(id), priceIn: null, priceOut: null };
@@ -163,11 +259,14 @@ export function createModelPicker(opts: {
       const listed = await opts.catalog.list();
       const offered = opts.curated().filter((id) => listed === null || listed.some((m) => m.id === id));
       const ids = [...new Set([opts.defaultModel, ...offered, current])];
-      const choices = (await Promise.all(ids.map(choiceFor))).map((c): ModelChoice => (opts.via?.(c.id) ? { ...c, via: 'anthropic' } : c));
+      const choices = (await Promise.all(ids.map(choiceFor))).map((c): ModelChoice => {
+        const via = opts.via?.(c.id) ?? null;
+        return via ? { ...c, via } : c;
+      });
       return {
         type: 'model',
         model: current,
-        provider: opts.provider,
+        provider: opts.providerFor?.(current) ?? opts.provider,
         label: opts.catalog.labelFor(current),
         backend: 'direct',
         choices,

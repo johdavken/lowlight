@@ -6,7 +6,7 @@
   color: #ffd9e6;
   text-shadow: 0 0 6px rgba(255, 79, 139, 0.4);
   background: linear-gradient(135deg, rgba(255, 79, 139, 0.14), rgba(127, 233, 255, 0.06) 60%, rgba(9, 4, 18, 0.35));
-  backdrop-filter: blur(6px) brightness(0.55);
+  backdrop-filter: blur(calc(6px * var(--ui-blur, 1))) brightness(0.55);
   border: 1px solid rgba(255, 79, 139, 0.45);
   box-shadow: 0 0 30px rgba(255, 79, 139, 0.25), inset 0 0 40px rgba(255, 79, 139, 0.08);
   transform: perspective(1600px) rotateY(-8deg);

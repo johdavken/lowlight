@@ -1,0 +1,49 @@
+/*
+ * The front end in the HUD trace (mockup frontend-hud.html B TRACE, playtest 2026-11-14), the parts the select, the
+ * title and LOAD share. Imported by hint-line.ts, so LOAD over a room (no select.css there) has them too.
+ */
+
+/* The key line: keys lit in cyan, words dim, the dots between dimmer. */
+.hint-line { font: 15px/1 var(--pixel); letter-spacing: 0.18em; color: #8fa3ad; opacity: 1; white-space: nowrap; text-shadow: 0 1px 2px #000; }
+.hint-line b { font-weight: normal; color: #7fe9ff; }
+.hint-line i { font-style: normal; color: rgba(230, 238, 247, 0.3); margin: 0 6px; }
+
+/* A screen's title, centred on two fading hairlines. */
+.select-title,
+.title-logo,
+.load-title {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  font: 34px/1 var(--pixel);
+  letter-spacing: 0.42em;
+  text-shadow: 0 0 14px color-mix(in srgb, currentColor 45%, transparent);
+}
+.select-title::before,
+.select-title::after,
+.title-logo::before,
+.title-logo::after,
+.load-title::before,
+.load-title::after {
+  content: '';
+  flex: none;
+  width: 160px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, currentColor 70%, transparent));
+}
+.select-title::after,
+.title-logo::after,
+.load-title::after { transform: scaleX(-1); }
+.select-title:empty::before,
+.select-title:empty::after,
+.title-logo:empty::before,
+.title-logo:empty::after { display: none; }
+
+/* A rail's head: a ring on the rail, the words in pixel caps, a hairline running off. --c is the rail's colour. */
+.rail-head { position: relative; display: flex; align-items: center; gap: 10px; font: 17px/1 var(--pixel); letter-spacing: 0.24em; color: var(--c); }
+.rail-head::before { content: ''; position: absolute; left: -26px; top: 50%; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--c); border-radius: 50%; background: #05020a; }
+.rail-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 60%, transparent), transparent); }
+
+/* A cut-corner button in pixel caps. */
+.cut-btn { padding: 3px 12px 1px; font: 15px/1.1 var(--pixel); letter-spacing: 0.2em; color: #8fa3ad; background: rgba(5, 2, 10, 0.6); border: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.25); clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); cursor: pointer; }

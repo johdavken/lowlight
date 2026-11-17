@@ -6,7 +6,7 @@
   "sprite": {
     "src": "cass-base.png",
     "pixel": true,
-    "waist": 0.342
+    "waist": 0.405
   },
   "face": { "x": 0.496, "y": 0.088 },
   "tagline": "Late shift at the Tilt. Teasing by default. Remembers everything.",
@@ -57,6 +57,12 @@
     },
     {
       "from": "04:00",
+      "to": "12:00",
+      "room": "karasu/cass-apartment",
+      "sleeps": true
+    },
+    {
+      "from": "12:00",
       "to": "19:00",
       "room": "karasu/cass-apartment"
     },

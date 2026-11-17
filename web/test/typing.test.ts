@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { charDelay, indentParagraphs, loadTextSpeed, paceFromSearch, renderFrontier, saveTextSpeed, stepTextSpeed, textSpeedScale } from '../src/ui/typing';
+import { charDelay, indentParagraphs, loadTextSpeed, noiseOf, paceFromSearch, renderFrontier, saveTextSpeed, stepTextSpeed, textSpeedScale } from '../src/ui/typing';
 import type { Segment } from '../src/ui/rp-markup';
 
 describe('charDelay', () => {
@@ -114,5 +114,37 @@ describe('paragraphs indent instead of a blank line', () => {
     el.textContent = 'A.\nB.';
     indentParagraphs(el);
     expect(el.innerHTML).toBe('A.\nB.');
+  });
+});
+
+describe('DECODE (the box settings TEXT EFFECT)', () => {
+  it('noiseOf keeps every space and newline, and swaps each word for its width in glyphs', () => {
+    const text = 'Two knocks,\nthen one.';
+    expect(noiseOf(text, () => 0)).toBe('电电 电电电电\n电电 电电');
+  });
+
+  it('renderFrontier with noise: past the frontier each word keeps its letters (the layout) and wears noise of its width; the * markers stay hidden', () => {
+    const div = document.createElement('div');
+    const segs: Segment[] = [
+      { kind: 'plain', text: 'Hi there ' },
+      { kind: 'mark', text: '*' },
+      { kind: 'action', text: 'nods' },
+      { kind: 'mark', text: '*' },
+    ];
+    renderFrontier(div, segs, 3, { noise: true });
+    const noise = [...div.querySelectorAll<HTMLElement>('.unshown.noise')];
+    expect(noise.map((n) => n.textContent)).toEqual(['there ', 'nods']);
+    expect(noise.every((n) => n.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(noise[1].classList.contains('act')).toBe(true);
+    const words = [...div.querySelectorAll<HTMLElement>('.noise .nw')];
+    expect(words.map((w) => w.textContent)).toEqual(['there', 'nods']);
+    expect(words.map((w) => w.dataset.n!.length)).toEqual([3, 2]);
+    expect(words[0].dataset.n).not.toBe('there');
+    expect([...div.querySelectorAll('.unshown.mk')].map((n) => n.textContent)).toEqual(['*', '*']);
+    expect(div.querySelector('.mk.noise')).toBeNull();
+    // The DOM text is the line itself: offsets, paging and indents all read it as they do typed.
+    expect(div.textContent).toBe('Hi there *nods*');
+    renderFrontier(div, segs, 3);
+    expect(div.querySelector('.noise')).toBeNull();
   });
 });

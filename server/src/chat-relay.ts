@@ -1,8 +1,12 @@
+import { roomDetail, roomDetailLine } from '../../shared/room-details';
+import type { CaseFile } from '../../shared/cases';
+import type { AccountsFile } from '../../shared/accounts';
+import { toldSeededKey } from './job-texts';
 import { parsePhotoReply, photoForModel, photosLine, type Photo } from '../../shared/photos';
 import { type TrustControl } from './standing';
 import { commsKey, parseComms, type CommsState } from '../../shared/comms';
 import { arrangementLine } from '../../shared/arrangement';
-import type { ChatMessage, ChatMode, ContactCard, CrewView, GuestCard, PlanCard, RoomState, ServerEvent, Take } from '../../shared/types';
+import type { ChatMessage, ChatMode, ContactCard, CrewView, GuestCard, PlanCard, ReplyLength, RoomState, ServerEvent, Take } from '../../shared/types';
 import { type Recruit } from '../../shared/crew';
 import { crewLine } from '../../shared/crew-line';
 import type { CrewState } from '../../shared/crew-fold';
@@ -17,8 +21,8 @@ import { readSummary } from './summary';
 import type { Backend } from './backend';
 import { NO_LINK_NOTICE, TurnError, STREAM_OPEN_EVENT, type CompletionMessage, type ModelPair } from './turn';
 import { wearingLine, type WearEntry } from './wearing';
-import { whoIsYou, TEXT_HEADING, TEXT_INSTRUCTIONS, promisedLine, textPlanLine, textWhereLine, herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, COMMS_BACK_INSTRUCTIONS, COMMS_DROP_LINE, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, commsLine, beatLine, RP_HEADING, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, ENCOUNTER_INSTRUCTIONS, QUEST_INSTRUCTIONS, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, endSceneText, othersBlock, strangerBlock, type OtherVoice } from './instructions';
-import { echoLine } from './echoes';
+import { whoIsYou, TEXT_HEADING, TEXT_INSTRUCTIONS, promisedLine, jobTextLine, jobRoomLine, storyLine, storyJobLine, textPlanLine, textWhereLine, herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, COMMS_BACK_INSTRUCTIONS, COMMS_DROP_LINE, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, commsLine, beatLine, RP_HEADING, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, ENCOUNTER_INSTRUCTIONS, QUEST_INSTRUCTIONS, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, endSceneText, othersBlock, strangerBlock, type OtherVoice } from './instructions';
+import { echoLine, propWords } from './echoes';
 import { habitsLine, readHabits } from './habits';
 import { parsePlan, parseSay, planKey, planSayKey, planSeenKey } from '../../shared/plan';
 import { encounterText, parseEncounter, strangerAt, type Encounter } from '../../shared/encounter';
@@ -33,7 +37,7 @@ import { leadsBlock, leadsLogLine, type LeadEntry, type LeadsForTurn } from '../
 import { sceneBlock, WRITTEN_SCENE_TITLE } from '../../shared/scenario';
 import { moveLine } from '../../shared/arrival';
 import type { Extra } from '../../shared/extras';
-import { questRowText, type CondCtx, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { questRowText, toldKey, toldOf, type Told, type CondCtx, type QuestEntry, type QuestStatus } from '../../shared/quests';
 import { oneLine } from './persona';
 import { type CostId } from '../../shared/costs';
 import { type GmComplete } from './gm';
@@ -183,6 +187,16 @@ export interface ChatRelayDeps {
     contactCards?(): ContactCard[];
     /** Guest files (The Passenger spec, engine §2): someone a mission brings who isn't a contact. */
     guestCards?(): GuestCard[];
+    /** Deduction board cases (spec 2026-11-09 §1): clue lines on the debrief, and the board beat. */
+    cases?(): CaseFile[];
+    /** Two Stories accounts files (spec 2026-11-10 §2): the accounts beat. */
+    accounts?(): AccountsFile[];
+    /** A case card's picture URL, when it has one. */
+    caseArt?(caseId: string, card: string): string | undefined;
+    /** A Two Stories listener's name and face (the roster's, as PEOPLE shows them). */
+    listener?(id: string): { name: string; portrait: string | null } | null;
+    /** A case's recorded barks by group (The Fourteenth voice script). */
+    caseBarks?(caseId: string): Record<string, string[]>;
     /** The crew book's traits (the hand spec §2: never-held on a call's loss). */
     crewTraits?(): Trait[];
     /** The crew book's abilities (crew abilities spec §2): labels, effects and timings at the table. */
@@ -195,6 +209,8 @@ export interface ChatRelayDeps {
     jobRecruit?(o: { runKey: string; title: string; place: string; district: string } & JobHire): Recruit;
     /** A district's display name (the favour's line); absent: its id title-cased. */
     districtName?(id: string): string;
+    /** Voiced job beats (2026-11-08): the recorded clips for a row's texts, in order; absent: none. */
+    clips?(quest: string, texts: readonly string[]): string[];
   };
   /** A check's dice (the table spec §1): `n` d6 faces for a roll keeping `keep`. Default: random; tests and e2e pass their own. */
   rollDice?: (n: number, keep: 'high' | 'low') => number[];
@@ -204,6 +220,8 @@ export interface ChatRelayDeps {
   rerunFaces?: (seed: string) => number[];
   /** Comms (spec 2026-10-20 §2): her place's name and yours while on the line. */
   commsPlaces?: (player: string) => { her: string; you: string } | null;
+  /** SYS → REPLY LENGTH, read per turn (absent: NORMAL). */
+  replyLength?: () => ReplyLength;
   /** The line dropped (comms spec §1): the playthrough goes solo and every tab hears it. */
   goSolo?: () => void;
   /** A job's trust stake (Intake board spec §2): her word before/after, and the move on the job's last row. */
@@ -259,7 +277,7 @@ const feedOf = (m: ChatMessage): 'text' | 'scene' => (m.mode === 'text' ? 'text'
 const CREW_LINE_FALLBACK = 360;
 
 /** Whose key a failed turn went to, for the player's notice. */
-const providerName = (err: TurnError): string => (err.provider === 'anthropic' ? 'ANTHROPIC' : 'OPENROUTER');
+const providerName = (err: TurnError): string => (err.provider === 'anthropic' ? 'ANTHROPIC' : err.provider === 'nanogpt' ? 'NANOGPT' : 'OPENROUTER');
 
 /**
  * Relays chat turns between the browser and her model. Lowlight owns the conversation: each turn
@@ -352,6 +370,15 @@ export class ChatRelay {
   questStateFor(...a: Parameters<JobRunner['questStateFor']>) {
     return this.jobs.questStateFor(...a);
   }
+  jobTextsDue(...a: Parameters<JobRunner['jobTextsDue']>) {
+    return this.jobs.jobTextsDue(...a);
+  }
+  /** The arrival screen's STORY for `player` (null: none, or not a new game): the job and the scene it opens on. */
+  storyFor(player: string): { job: string; text: string } | null {
+    if (this.deps.db.recentMessages(player, 1).length > 0) return null;
+    const s = this.jobs.storyOpening(player);
+    return s ? { job: s.id, text: s.text } : null;
+  }
   questCheck(...a: Parameters<JobRunner['questCheck']>) {
     return this.jobs.questCheck(...a);
   }
@@ -372,6 +399,12 @@ export class ChatRelay {
   }
   startQuest(...a: Parameters<JobRunner['startQuest']>) {
     return this.jobs.startQuest(...a);
+  }
+  boardMove(...a: Parameters<JobRunner['boardMove']>) {
+    return this.jobs.boardMove(...a);
+  }
+  accountsMove(...a: Parameters<JobRunner['accountsMove']>) {
+    return this.jobs.accountsMove(...a);
   }
   chooseQuest(...a: Parameters<JobRunner['chooseQuest']>) {
     return this.jobs.chooseQuest(...a);
@@ -580,6 +613,26 @@ export class ChatRelay {
     return r;
   }
 
+  /**
+   * Her job text (job texts spec §3): a `text:` job's gate opened while you were apart, and she's awake. A hidden line
+   * stamped `due` (hidden as a promised line is) stands in for yours; her reply is her text. Kept, the job is told.
+   */
+  async sendJobText(player: string, o: { job: string; text: string; due: number }): Promise<Result> {
+    if (this.turnActive) return { ok: false, error: 'busy' };
+    this.enter(player);
+    const you = this.deps.players.resolve(this.pid).name;
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', text: jobTextLine({ you, text: o.text }), toolLines: [], ts: Date.now(), status: 'ok', mode: 'text', promised: true, jobText: o.job, clock: o.due };
+    this.deps.db.insertMessage(this.pair(), userMessage);
+    this.emitPair({ type: 'message', message: userMessage });
+    const r = await this.runTurn(userMessage);
+    // The turn tells the job under her reply's take (runTurn's finally), so a REGEN tells it again.
+    if (!r.ok) {
+      this.deps.db.deleteMessage(this.pair(), userMessage.id);
+      this.emitPair({ type: 'messages_removed', ids: [userMessage.id] });
+    }
+    return r;
+  }
+
   /** `leave` (LEAVE) marks an end line that walks out; ignored on any other mode. */
   async send(player: string, text: string, mode: ChatMode = 'rp', o: { leave?: boolean; parting?: 'her' } = {}): Promise<Result> {
     if (this.turnActive) return { ok: false, error: 'busy' };
@@ -612,15 +665,18 @@ export class ChatRelay {
    * while a turn is running or when no greeting is due — another tab got there first, or they
    * spoke first.
    */
-  async greet(player: string, opening?: string): Promise<Result | null> {
+  async greet(player: string, opening?: string, story?: string): Promise<Result | null> {
     if (this.turnActive || !this.ready) return null;
     this.enter(player);
     if (!greetDue(this.latest(), Date.now())) return null;
 
     // The arrival screen's opening (spec 2026-10-27 §3): a written scene, on a new game only, before the greeting.
-    const scene = opening?.trim() ?? '';
+    // STORY: her job's authored opening, when it's still the one this game can open on; else what was typed.
+    const told = story ? this.jobs.storyOpening(this.pid) : null;
+    const job = told && told.id === story ? told : null;
+    const scene = job?.text ?? opening?.trim() ?? '';
     if (scene && this.deps.db.recentMessages(this.pid, 1).length === 0) {
-      const row: ChatMessage = { id: `scene-${crypto.randomUUID()}`, role: 'user', text: scene, toolLines: [], ts: Date.now(), status: 'ok', mode: 'scene', scene: { title: WRITTEN_SCENE_TITLE, source: 'written' } };
+      const row: ChatMessage = { id: `scene-${crypto.randomUUID()}`, role: 'user', text: scene, toolLines: [], ts: Date.now(), status: 'ok', mode: 'scene', scene: { title: WRITTEN_SCENE_TITLE, source: 'written', ...(job ? { job: job.id } : {}) } };
       this.deps.db.insertMessage(this.pid, row);
       this.emitPair({ type: 'message', message: row });
     }
@@ -726,6 +782,10 @@ export class ChatRelay {
 
   /** This turn's reply spends her plan (spec §6). */
   private planSpend = false;
+  /** The job she was told to raise this turn (job texts spec §4); told under her reply, cleared at turn end. */
+  private jobRoom: string | null = null;
+  /** The STORY job her greeting raised this turn: its line goes under her reply in the chat (2026-11-11). */
+  private storyRaised: string | null = null;
 
   /** What each pair's tabs last heard of her plan's card. */
   private readonly planShown = new Map<string, string>();
@@ -772,6 +832,16 @@ export class ChatRelay {
    * For a regenerate, the stored plan as it stood before the take being replaced spent it: `[raw]`; otherwise `[]`
    * (read the plan as stored). The new take's rebuild comes after this turn's lines are built.
    */
+  /** The job the reply a REGEN replaces raised in the room (job texts final review I1); null otherwise. */
+  private raisedByTake(): { id: string; text: string } | null {
+    if (this.target.kind !== 'take') return null;
+    const id = this.target.reply.id;
+    const prefix = `told.${this.pid}.`;
+    const w = this.deps.db.writes().find((x) => x.kind === 'meta' && x.messageId === id && x.key.startsWith(prefix) && toldOf(x.value)?.how === 'room');
+    const q = w ? this.deps.quests?.book().find((e) => e.id === w.key.slice(prefix.length)) : undefined;
+    return q?.text ? { id: q.id, text: q.text } : null;
+  }
+
   private planBeforeTake(): [string | null, string | null] | [] {
     if (this.target.kind !== 'take') return [];
     const id = this.target.reply.id;
@@ -901,10 +971,27 @@ export class ChatRelay {
       this.planSpend = false;
       // A promised text (promised texts spec §5) spends its promise under the take that said it (mid review I1):
       // a REGEN or a swipe keeps it spent, and a rewind past her text brings it back.
-      if (ok && reply && userMessage.promised) {
+      if (ok && reply && userMessage.promised && !userMessage.jobText) {
         this.deps.db.withStamp({ messageId: reply.id, take: reply.take }, () => this.deps.db.deleteMeta(promiseKey(this.pid)));
         this.deps.db.deleteMeta(promiseTriesKey(this.pid));
       }
+      // Her job text (job texts spec §3), or the job she raised in the room (§4): told, under the take that said it.
+      const told = ok && reply ? (userMessage.jobText ? { job: userMessage.jobText, how: 'text' as const } : this.jobRoom ? { job: this.jobRoom, how: 'room' as const } : null) : null;
+      if (told && reply) {
+        const at = told.how === 'text' ? (userMessage.clock ?? this.deps.clockNow?.() ?? 0) : (this.deps.clockNow?.() ?? 0);
+        this.deps.db.withStamp({ messageId: reply.id, take: reply.take }, () => this.deps.db.setMeta(toldKey(this.pid, told.job), JSON.stringify({ how: told.how, at } satisfies Told)));
+      }
+      this.jobRoom = null;
+      // Her greeting raised the STORY's job: say under her reply, in the chat, that it's on JOBS now (once per take).
+      if (ok && reply && this.storyRaised) {
+        const line = storyJobLine(this.storyRaised);
+        const row = this.deps.db.getMessage(this.pid, reply.id);
+        if (row && !row.toolLines.includes(line)) {
+          this.deps.db.updateMessage(this.pid, reply.id, { toolLines: [...row.toolLines, line] });
+          this.emitPair({ type: 'tool_line', messageId: reply.id, text: line });
+        }
+      }
+      this.storyRaised = null;
       this.deps.onTurnEnd?.({ player: this.pid, mode: userMessage.mode, ok, ...(userMessage.leave ? { leave: true } : {}), reply: ok ? reply : null });
       this.jobs.emitQuestState();
       // A quest waiting for this moment (her reply crossed the hour, a move arrived) plays now (quest waits spec §3).
@@ -1066,7 +1153,7 @@ export class ChatRelay {
    * answered once — mark it spent for good, so it isn't sent again (deck controls spec §3.6).
    */
   private spendCutPromise(cut: readonly ChatMessage[]): void {
-    if (!cut.some((m) => m.promised)) return;
+    if (!cut.some((m) => m.promised && !m.jobText)) return;
     const back = parsePromise(this.deps.db.getMeta(promiseKey(this.pid)));
     if (back) this.deps.db.setMeta(promiseSpentKey(this.pid), back.from);
   }
@@ -1386,9 +1473,12 @@ export class ChatRelay {
     // In character, the lights rule opens the lines by their words, after any change (not OOC, not an END SCENE's recap turn, not from her desk).
     const lights = userMessage.mode === 'ooc' || userMessage.mode === 'end' || comms ? null : LIGHTS_LINE;
     // A plain in-character turn: the length and their-part rules, last before their words (prompt measurement 2026-10-20).
-    const beat = userMessage.mode === undefined ? beatLine(player.name) : null;
+    const beat = userMessage.mode === undefined ? beatLine(player.name, this.deps.replyLength?.() ?? 'normal') : null;
     // What she keeps writing, right before the beat (the lantern in eight replies running).
     const echo = beat ? this.echoLineFor(userMessage) : null;
+    // One of the room's details now and then on a plain turn, in rotation (room details), not on comms. It heads the turn
+    // with the room line (headLines): by their words, GLM opened 5 of 7 replies with it (2026-11-12).
+    this.headDetail = beat && !comms ? this.detailLine() : null;
     // What she keeps writing over the longer stretch (habits spec §2): the Residual's rules, before the echo line; not on comms.
     const habits = beat && !comms ? habitsLine(readHabits(this.deps.db, this.pair())?.rules ?? []) : null;
     // Her plan (spec 2026-10-21 §6): the meeting you came to, or the one you missed; her reply spends an ended plan.
@@ -1398,7 +1488,14 @@ export class ChatRelay {
     const [since, clothes] = this.changedLines(userMessage, wearing);
     // What the crew did off-screen since the last contact turn (crew spec §5): in character, not her greeting.
     const crew = inCharacter && userMessage.mode !== 'greet' ? this.crewLineFor(userMessage) : null;
-    if (!journal) return [since, lights, clothes, this.timeLine(), crew, comms, presence, arrival, plan, you, habits, echo, beat].filter((l): l is string => l !== null);
+    // Her own job's gate opened while you're with her (job texts spec §4): she raises it, on a plain turn in character.
+    // Only once the checker has seeded this save (final review): an old save's open jobs aren't news. A REGEN of the
+    // reply that raised one raises it again, since the old take's told row still stands until the new take shows.
+    const raise = beat && this.deps.db.getMeta(toldSeededKey(this.pid)) !== null ? (this.raisedByTake() ?? this.jobTextsDue(this.pid)[0] ?? null) : null;
+    this.jobRoom = raise?.id ?? null;
+    const story = this.storyLineFor(userMessage, player);
+    const planWithJob = [story, raise ? jobRoomLine({ you: player.name, text: raise.text }) : null, plan].filter(Boolean).join('\n') || null;
+    if (!journal) return [since, lights, clothes, this.timeLine(), crew, comms, presence, arrival, planWithJob, you, habits, echo, beat].filter((l): l is string => l !== null);
     // The gap is measured from the latest message that isn't this turn's own user message (a retry
     // reuses an old one) or the reply now streaming.
     const last = db
@@ -1406,7 +1503,7 @@ export class ChatRelay {
       .filter((m) => m.id !== userMessage.id && m.status !== 'streaming')
       .reduce<number | null>((max, m) => (max === null || m.ts > max ? m.ts : max), null);
     const greeting = userMessage.mode === 'greet';
-    return [since, lights, clothes, this.timeLine(), crew, comms, presence, journal.journalLine(this.pair(), recent), journal.previouslyLine(this.pair(), last, greeting), arrival, plan, you, habits, echo, beat].filter(
+    return [since, lights, clothes, this.timeLine(), crew, comms, presence, journal.journalLine(this.pair(), recent), journal.previouslyLine(this.pair(), last, greeting), arrival, planWithJob, you, habits, echo, beat].filter(
       (l): l is string => l !== null,
     );
   }
@@ -1416,8 +1513,17 @@ export class ChatRelay {
    * their words until 2026-10-23, and GLM wrote the paper lantern and her bare feet into eight replies running.
    */
   private headLines(wearing: string | null): string[] {
-    return [this.deps.room.summary(), wearing].filter((l): l is string => l !== null);
+    return [this.deps.room.summary({ weather: this.weatherNews }), wearing, this.headDetail].filter((l): l is string => l !== null);
   }
+
+  /**
+   * Whether this turn's room line names the weather: on her first turn here, or in a room she's just arrived in. A
+   * change of weather comes in the [since your last reply] line. Set by changedLines (contextLines runs first).
+   */
+  private weatherNews = true;
+
+  /** This turn's room detail line, set by contextLines (which runs first), for headLines. */
+  private headDetail: string | null = null;
 
   /**
    * The room's changes since she was last shown it, and the wearing line when it changed; each null when nothing did.
@@ -1437,9 +1543,24 @@ export class ChatRelay {
     })();
     const before = stored === null ? null : stored.id === userMessage.id ? stored.prev : { room: stored.room, wearing: stored.wearing };
     const now: Seen = { room: this.deps.room.state, wearing };
+    this.weatherNews = before === null || before.room.sceneId !== now.room.sceneId;
     this.deps.db.setMeta(key, JSON.stringify({ id: userMessage.id, ...now, prev: before }));
     if (before === null) return [null, null];
     return [roomChanges(before.room, now.room), wearing !== null && wearing !== before.wearing ? wearing : null];
+  }
+
+  /**
+   * The room's detail for this turn, or null (shared/room-details.ts). The turn count is kept per pair and room in meta
+   * `roomDetail.<pair>.<room>` (not story meta, like `seen.<pair>`: a rewind or a retake moves on to the next detail).
+   */
+  private detailLine(): string | null {
+    const scene = this.deps.room.scene();
+    if (!scene.details?.length) return null;
+    const key = `roomDetail.${this.pair()}.${scene.id}`;
+    const n = Number(this.deps.db.getMeta(key) ?? '0') || 0;
+    this.deps.db.setMeta(key, String(n + 1));
+    const d = roomDetail(scene.details, `${this.pid}:${this.pair()}:${scene.id}`, n);
+    return d === null ? null : roomDetailLine(d);
   }
 
   /** The [you keep writing …] line from her last replies before this turn, minus what they just brought up; null when she isn't repeating. */
@@ -1447,7 +1568,9 @@ export class ChatRelay {
     const lines = this.turnHistory(userMessage).filter((m) => m.status === 'ok' && m.text !== '' && m.mode !== 'scene' && m.mode !== 'ooc');
     const hers = lines.filter((m) => m.role === 'agent').map((m) => m.text);
     const theirs = [...lines.filter((m) => m.role === 'user').map((m) => m.text).slice(-1), userMessage.text];
-    return echoLine(hers, theirs);
+    // The room's props too (its light labels and the weather): single words she keeps coming back to.
+    const props = propWords(this.deps.room.scene().lights.map((l) => l.label), this.deps.room.state.atmosphere.weather);
+    return echoLine(hers, theirs, props);
   }
 
   /** Set while building a turn on comms whose deal has stepped back: her reply signs off and the line drops. */
@@ -1467,6 +1590,23 @@ export class ChatRelay {
     if (at < 0) return null;
     const ended = all.slice(at + 1).some((m) => m.mode === 'end' && m.role === 'user' && m.id !== userMessage.id && m.status !== 'failed');
     return ended ? null : all[at];
+  }
+
+  /**
+   * The STORY line (instructions `storyLine`): on her greeting or a plain turn in character, while the opening scene is on,
+   * names a job, and that job is still the story this game opens on (not started). Her greeting raises it.
+   */
+  private storyLineFor(userMessage: ChatMessage, player: Player): string | null {
+    if (userMessage.mode !== undefined && userMessage.mode !== 'greet') return null;
+    // The story first: a game with none never reads its history for it.
+    const story = this.jobs.storyOpening(player.id);
+    if (!story) return null;
+    const all = this.deps.db.allMessages(this.pair());
+    const scene = this.openingScene(userMessage, all);
+    if (!scene || scene.scene?.job !== story.id) return null;
+    const raise = userMessage.mode === 'greet' && this.sceneUnplayed(scene, userMessage, all);
+    if (raise) this.storyRaised = story.title;
+    return storyLine({ you: player.name, view: story.view, raise });
   }
 
   /** True while her greeting is the scene's first beat: no reply of hers follows the scene row but this greeting's own. */
@@ -1599,7 +1739,10 @@ export class ChatRelay {
     const wearing = this.deps.wearing ? wearingLine(this.deps.wearing(player, others)) : null;
     const presence = inCharacter ? (this.deps.presence?.(before, now) ?? null) : null;
     // An event's stranger, while they're here at the line this turn answers (in character only).
-    const stranger = userMessage.mode === 'ooc' ? null : strangerAt(all, all.findIndex((m) => m.id === userMessage.id));
+    // A ride-along pick (House Glass live check): she answers the move, so the next beat, held back on the page, and
+    // whoever it brings in stay out of this turn. A beat she only heard over the line is cut already (`heard`).
+    const held = userMessage.mode === 'quest' && userMessage.quest?.held && userMessage.quest.heard === undefined ? userMessage.quest.held.at : null;
+    const stranger = userMessage.mode === 'ooc' || held !== null ? null : strangerAt(all, all.findIndex((m) => m.id === userMessage.id));
     const strangerNote = stranger ? strangerBlock(stranger) : null;
     const target = this.target;
     const turnText =
@@ -1610,7 +1753,7 @@ export class ChatRelay {
           : userMessage.mode === 'encounter'
             ? encounterText({ title: userMessage.encounter?.title ?? '', text: userMessage.text }, oneLine)
             : userMessage.mode === 'quest'
-              ? questRowText({ title: userMessage.quest?.title ?? '', text: userMessage.text, run: userMessage.quest?.run, heard: userMessage.quest?.heard }, oneLine, player.name)
+              ? questRowText({ title: userMessage.quest?.title ?? '', text: held !== null ? userMessage.text.slice(0, held) : userMessage.text, run: userMessage.quest?.run, heard: userMessage.quest?.heard }, oneLine, player.name)
             : userMessage.mode === 'gig' && userMessage.gig
               ? gigText(userMessage.gig)
               : userMessage.mode === 'dice' && userMessage.dice
@@ -1654,7 +1797,7 @@ export class ChatRelay {
     // Cache-friendly order (scribe spec §7): what rarely changes in the system message; what changes turn to turn with the turn.
     const instructions = [this.deps.identity?.(), note, sceneText, player.whosHere, othersNote].filter(Boolean).join('\n\n');
     // The quest at a beat here (in character only): the beat, the shown choices and their view (quest lines spec §3).
-    const questText = inCharacter ? this.jobs.questBlockFor(player.id, userMessage.mode === 'quest' && target.kind !== 'continue') : null;
+    const questText = inCharacter ? this.jobs.questBlockFor(player.id, userMessage.mode === 'quest' && target.kind !== 'continue', { beatReply: userMessage.mode === 'quest' && this.jobs.isBeatReply(userMessage) }) : null;
     // Texts from the last story day (deck spec §3): the scene knows what was said on the deck.
     const textsNote = inCharacter ? this.textsNote(player) : null;
     // Cipher (spec §2.6): what she keeps from them, after how she feels about them.
@@ -1665,8 +1808,9 @@ export class ChatRelay {
         ? { kind: 'continue', blocks }
         : {
             kind: 'reply',
-            head: this.headLines(wearing),
+            // contextLines first: it sets this turn's room detail, which heads the turn.
             contextLines: this.contextLines(userMessage, player, presence, recentText, wearing),
+            head: this.headLines(wearing),
             text: turnText,
             blocks,
           };
@@ -1923,7 +2067,8 @@ export class ChatRelay {
         emit({ type: 'notice', text: '// RATE LIMITED' });
         return { ok: false, error: 'busy' };
       case 'credit':
-        emit({ type: 'notice', text: `// ${providerName(err)} CREDIT IS OUT` });
+        // NanoGPT's 429 is the plan's allowance (the week's tokens), not dollars.
+        emit({ type: 'notice', text: err.provider === 'nanogpt' && err.status === 429 ? '// NANOGPT ALLOWANCE IS OUT — WAIT FOR THE RESET OR RELINK' : `// ${providerName(err)} CREDIT IS OUT` });
         return { ok: false, error: 'credit' };
       case 'no-link':
         emit({ type: 'notice', text: NO_LINK_NOTICE });

@@ -32,11 +32,14 @@ const save = (id: string) => `/api/saves/${encodeURIComponent(id)}`;
 
 /** A listed playthrough: its info plus how many contacts its player knows (null when the server couldn't read them). */
 /** `sprite`: whether the player has one (absent from an older server: ask anyway). */
-export type PlaythroughListing = PlaythroughInfo & { contacts: number | null; sprite?: boolean };
+/** `figure`: its persona has its own figure (spec 2026-11-12), so its face is `/api/persona/thumb?pt=<id>`. */
+export type PlaythroughListing = PlaythroughInfo & { contacts: number | null; sprite?: boolean; figure?: boolean };
 export const listPlaythroughs = () => call<{ active: string | null; playthroughs: PlaythroughListing[] }>('GET', '/api/playthroughs');
 /** A new game as `player`; `persona` (EDIT / CUSTOM at the YOU step) is who you are on them. */
 export const createPlaythrough = (player: string, startContact: string, persona?: PlaythroughPersona) =>
   call<PlaythroughInfo>('POST', '/api/playthroughs', { player, startContact, ...(persona ? { persona } : {}) });
+/** A new game as a made person (character creator spec 2026-11-14): they play on the stand-in. */
+export const createPersonPlaythrough = (person: string, startContact: string) => call<PlaythroughInfo>('POST', '/api/playthroughs', { person, startContact });
 export const activate = (id: string) => call<PlaythroughInfo>('POST', `${pt(id)}/activate`);
 export const rename = (id: string, name: string) => call<PlaythroughInfo>('PATCH', pt(id), { name });
 export const removePlaythrough = (id: string) => call<void>('DELETE', pt(id));
@@ -52,8 +55,6 @@ export const branchSave = (saveId: string, name: string) => call<PlaythroughInfo
 export const star = (id: string, on: boolean) => call<PlaythroughInfo>('PATCH', pt(id), { starred: on });
 export const removeSave = (saveId: string) => call<void>('DELETE', save(saveId));
 export const renameSave = (saveId: string, name: string) => call<SaveInfo>('PATCH', save(saveId), { name });
-/** BRANCH HERE: the story from this line of `contactId`'s chat, as a new playthrough, now active. */
-export const branchFrom = (contactId: string, messageId: string, name: string) => call<PlaythroughInfo>('POST', '/api/branch', { contactId, messageId, name });
 /** The contacts the player knows in the active playthrough (§7). */
 export const contacts = () => call<ContactEntry[]>('GET', '/api/playthroughs/active/contacts');
 export const leads = () => call<LeadView[]>('GET', '/api/playthroughs/active/leads');

@@ -16,8 +16,8 @@ export class TurnError extends Error {
     public status?: number,
     /** Seconds to wait before a retry, when the provider said (a 429). */
     public retryAfter?: number,
-    /** The failure came from Anthropic (the player's notice names it); absent: OpenRouter or her own address. */
-    public provider?: 'anthropic',
+    /** The failure came from Anthropic or NanoGPT (the player's notice names it); absent: OpenRouter or her own address. */
+    public provider?: 'anthropic' | 'nanogpt',
   ) {
     super(msg);
     this.name = 'TurnError';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { echoes, echoLine } from '../src/echoes';
+import { echoes, echoLine, propEchoes, propWords } from '../src/echoes';
 
 // Her replies at Nix's apartment, 2026-10-23 21:03–21:07 (trimmed).
 const AT_2103 =
@@ -51,5 +51,32 @@ describe('echoLine', () => {
     expect(echoLine(['*The paper lantern glows.*', '*Under the paper lantern.*'])).toBe(
       `[you keep writing these — "paper lantern". Leave them out of this reply; write what's new in this moment instead.]`,
     );
+  });
+});
+
+describe('room props (single words she keeps writing)', () => {
+  it('propWords takes each light label\'s own words, plain, and the weather', () => {
+    expect(propWords(['monitors', 'the clamp lamp over the desk', "the next pylon's windows through the porthole"], 'rain')).toEqual(['monitor', 'clamp', 'lamp', 'desk', 'pylon', 'porthole', 'rain']);
+    expect(propWords(['space heater'], 'none')).toEqual(['space', 'heater']);
+  });
+
+  it('propEchoes names a prop in the actions of two of her last three replies, any form of it', () => {
+    const props = ['monitor', 'rain', 'heater'];
+    const hers = ['*The monitors scroll.* Fine.', '*Rain on the steel.* No.', "*The monitor's glow dips.* Why?"];
+    expect(propEchoes(hers, props)).toEqual(['monitor']);
+    // In speech only, it isn't business: not counted.
+    expect(propEchoes(['The monitors are cheap.', 'Monitors, yeah.', '*Shrugs.*'], props)).toEqual([]);
+    // Older than the last three: forgotten.
+    expect(propEchoes(['*The monitors scroll.*', '*The monitors flicker.*', '*Shrugs.*', '*Nods.*', '*Sighs.*'], props)).toEqual([]);
+  });
+
+  it('propEchoes leaves out a prop they just brought up', () => {
+    expect(propEchoes(['*Rain.*', '*Rain again.*'], ['rain'], ['*comes in out of the rain*'])).toEqual([]);
+  });
+
+  it('echoLine adds the props after her phrases, unless a phrase already has the word', () => {
+    const hers = ['*Under the paper lantern I wait. The monitors scroll.*', '*The paper lantern sways. The monitor hums.*'];
+    expect(echoLine(hers, [], ['lantern', 'monitor'])).toBe('[you keep writing these — "paper lantern", "monitor". Leave them out of this reply; write what\'s new in this moment instead.]');
+    expect(echoLine(['*The monitors scroll.*', '*The monitor hums.*'], [], [])).toBeNull();
   });
 });

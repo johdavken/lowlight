@@ -2,7 +2,7 @@ import type { Atmosphere, LightDef, RoomState, Source, Transition, Weather } fro
 import { applyPresetTo } from '../../shared/presets';
 import { WEATHER_MOODS } from '../../shared/city-weather';
 import { BLACKOUT_MOODS } from '../../shared/outage';
-import { withBase } from '../../shared/light-share';
+import { asGroup, groupOf, setGroup, withBase } from '../../shared/light-share';
 import { normalizeHex } from '../../shared/color';
 import type { SceneDef } from '../../shared/types';
 import { currentSceneId } from '../../shared/scene-aliases';
@@ -220,7 +220,8 @@ export class Room {
     return ids.map((id) => this.scenes.get(id)).filter((s): s is SceneDef => s !== undefined);
   }
 
-  summary(): string {
+  /** The `[room: …]` line; `weather` false leaves the weather out (a turn names it only when it's news). */
+  summary(o: { weather?: boolean } = {}): string {
     const scene = this.scene();
     const { atmosphere, lights } = this.current;
     // Her other places, with ids, so taking them somewhere is one go_to call (GLM skipped the list_scenes round).
@@ -235,6 +236,9 @@ export class Room {
       district: scene.district ? this.o.districtName(scene.district) : undefined,
       places: others.map((s) => ({ id: s.id, name: s.name })),
       ways: exits.map((e) => ({ id: e.scene.id, name: e.scene.name, way: e.way })),
+      ...(o.weather === false ? { weather: false } : {}),
+      groups: true,
+      painted: scene.lights,
     });
   }
 
@@ -339,6 +343,8 @@ export class Room {
     a: { light_id: string; color?: string; intensity?: number; flicker?: number; duration?: number },
     src: Source,
   ): Result {
+    const group = asGroup(a.light_id);
+    if (group) return this.setGroupLight(group, a, src);
     // Nix sees both ids and labels in the room line; accept either (labels case-insensitively).
     const wanted = a.light_id.trim().toLowerCase();
     const light =
@@ -346,7 +352,7 @@ export class Room {
       this.current.lights.find((l) => l.label.toLowerCase() === wanted);
     if (!light) {
       const ids = this.current.lights.map((l) => `${l.id} ("${l.label}")`).join(', ');
-      return { ok: false, error: `unknown light '${a.light_id}'; available: ${ids}` };
+      return { ok: false, error: `unknown light '${a.light_id}'; available: inside, outside, ${ids}` };
     }
 
     let color = light.color;
@@ -380,6 +386,42 @@ export class Room {
     this.emit('set_light', args, nextState, duration, src);
     const suffix = notes.length > 0 ? ` (${notes.join(', ')})` : '';
     return this.applied(`${light.label} → ${color} · ${pct(intensity)} · flicker ${pct(flicker)}${suffix}`);
+  }
+
+  /**
+   * A whole group at once (light groups): every light in it to `intensity` of its full level (its base, or the
+   * painted level when a dark mood left it at 0), in one change, so the ambient follows and the mood's balance holds.
+   */
+  private setGroupLight(
+    group: 'inside' | 'outside',
+    a: { color?: string; intensity?: number; flicker?: number; duration?: number },
+    src: Source,
+  ): Result {
+    const members = this.current.lights.filter((l) => groupOf(l) === group);
+    if (members.length === 0) return { ok: false, error: `no ${group} lights here` };
+    if (a.color !== undefined) return { ok: false, error: 'set colour light by light, not on a group' };
+    if (a.intensity === undefined && a.flicker === undefined) return { ok: false, error: 'give intensity or flicker' };
+    const args: Record<string, unknown> = { light_id: group };
+    const notes: string[] = [];
+    let lights = this.current.lights.map((l) => ({ ...l }));
+    if (a.intensity !== undefined) {
+      // A share of how the room is lit: 1 is as painted, over 1 brightens each light toward full.
+      const share = Number.isFinite(a.intensity) ? Math.max(0, a.intensity) : 1;
+      if (share !== a.intensity) notes.push(`intensity read as ${share}`);
+      args.intensity = share;
+      lights = setGroup(lights, group, share, { painted: new Map(this.scene().lights.map((l) => [l.id, l.intensity])) });
+    }
+    if (a.flicker !== undefined) {
+      const flicker = unit(a.flicker, 'flicker', notes);
+      args.flicker = flicker;
+      lights = lights.map((l) => (groupOf(l) === group ? { ...l, flicker } : l));
+    }
+    const duration = this.clampDuration(a.duration, args, notes);
+    this.emit('set_light', args, { ...this.current, lights }, duration, src);
+    const suffix = notes.length > 0 ? ` (${notes.join(', ')})` : '';
+    const level = args.intensity !== undefined ? ` · ${pct(args.intensity as number)}` : '';
+    const flick = args.flicker !== undefined ? ` · flicker ${pct(args.flicker as number)}` : '';
+    return this.applied(`${group} (${members.map((l) => l.label).join(', ')})${level}${flick}${suffix}`);
   }
 
   setAmbient(a: { color?: string; level?: number; duration?: number }, src: Source): Result {

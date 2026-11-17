@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ANT_KEY, ANT_REPLY, BAD_KEY, DIRECT, GOOD_KEY, awaitGreeting, lockPlayer, newGame, phase, send, showTile, skipSplash, skipIntro } from './fixtures';
+import { ANT_KEY, ANT_REPLY, BAD_KEY, DIRECT, GOOD_KEY, NANO_KEY, NANO_REPLY, awaitGreeting, lockPlayer, newGame, phase, send, showTile, skipSplash, skipIntro } from './fixtures';
 
 // Rooms here skip the district load screen (arrival.spec covers it).
 test.beforeEach(async ({ page }) => {
@@ -28,6 +28,8 @@ test.beforeEach(async ({ page }) => {
 });
 test.afterEach(async ({ page }) => {
   expect((await relink(page)).ok()).toBe(true);
+  // A NanoGPT key left linked would take GLM turns in the specs after this one.
+  expect((await page.request.delete('/api/link/nanogpt')).status()).toBe(204);
   // The Anthropic test's leftovers: its key, and her model back to her default.
   expect((await page.request.delete('/api/link/anthropic')).status()).toBe(204);
   expect((await page.request.post(`/api/agents/${DIRECT.id}/model`, { data: { model: null } })).ok()).toBe(true);
@@ -164,4 +166,42 @@ test('only an Anthropic key: LINK A MIND on ANTHROPIC, Claude picks only, and he
   await send(page, { type: 'user_message', text: 'hello' });
   await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
   await expect(page.locator('.msg.agent.s-ok').last()).toContainText(ANT_REPLY);
+});
+
+test('only a NanoGPT key: LINK A MIND on NANOGPT, her GLM via it, and her reply comes through it', async ({ page }) => {
+  expect((await page.request.delete('/api/link/openrouter')).status()).toBe(204);
+  await page.reload();
+  await newGame(page);
+  await lockPlayer(page, 'hicks');
+  await showTile(page, DIRECT.id);
+  await page.locator(`.tile[data-id="${DIRECT.id}"]`).click();
+  const panel = page.locator('.model-band');
+  await expect(panel.locator('.lp-field')).toBeVisible();
+
+  await panel.locator('.mp-link[data-provider="nanogpt"] .mp-add').click();
+  const field = panel.locator('.lp-key');
+  await expect(field).toHaveAttribute('aria-label', 'NANOGPT KEY');
+  await field.fill('sk-nano-wrong-e2e');
+  await page.keyboard.press('Enter');
+  await expect(panel.locator('.lp-msg')).toHaveText("key rejected — NanoGPT didn't accept that key. Check you copied all of it.");
+  await field.fill(NANO_KEY);
+  await page.keyboard.press('Enter');
+
+  const list = page.locator('.model-band[data-tab="her"]');
+  await expect(list).toBeVisible();
+  await page.locator('.mb-tab[data-tab="keys"]').click();
+  await expect(panel.locator('.mp-link[data-provider="nanogpt"]')).toContainText('NANOGPT …good · PLAN 75% OF THE WEEK');
+  await page.locator('.mb-tab[data-tab="her"]').click();
+  await expect(list.locator('.mp-current .mp-label')).toContainText('GLM');
+  await expect(list.locator('.mp-current .mp-via')).toHaveText('via your NanoGPT key');
+  await list.locator('.mp-current').click();
+  await expect(phase(page)).toHaveAttribute('data-phase', 'ready');
+  await page.keyboard.press('Enter');
+  await page.waitForURL(`**/room/${DIRECT.id}*`);
+  await page.waitForFunction(() => window.__nixRoom !== undefined);
+  await awaitGreeting(page);
+  const before = await page.locator('.msg.agent.s-ok').count();
+  await send(page, { type: 'user_message', text: 'hello' });
+  await expect(page.locator('.msg.agent.s-ok')).toHaveCount(before + 1, { timeout: 10_000 });
+  await expect(page.locator('.msg.agent.s-ok').last()).toContainText(NANO_REPLY);
 });

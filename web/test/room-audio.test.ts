@@ -37,6 +37,8 @@ function setup(opts: { available?: boolean; saved?: SoundSettings; scale?: numbe
     preload: vi.fn(),
     thunder: vi.fn(),
     cancelThunder: vi.fn(),
+    speak: vi.fn(),
+    hush: vi.fn(),
     state: vi.fn(() => ({ available: true, unlocked: true, context: ctxState, voices: [], mix: null })),
     onStateChange: vi.fn((fn: () => void) => (changed = fn)),
   };
@@ -213,7 +215,7 @@ describe('createRoomAudio', () => {
     expect(engine.unlock).toHaveBeenCalledTimes(1);
     // A short fade-in, not a step from silence (final review 5).
     expect(engine.apply).toHaveBeenCalledWith(soundMix(state({ weather: 'rain', weatherLevel: 0.5 }), scene, '/scenes/p/'), 0.6, undefined);
-    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, ambient: 1 });
+    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, voice: 0.75, ui: 1, ambient: 1, muteInBackground: false });
   });
 
   it('after unlock, room changes glide over their duration with their transition', () => {
@@ -232,7 +234,7 @@ describe('createRoomAudio', () => {
   });
 
   it('applies saved settings and the scale up front', () => {
-    const saved = { master: 0.3, muted: true, channels: { weather: 0.5, room: 1, lights: 0.2, music: 1 } };
+    const saved = { master: 0.3, muted: true, channels: { weather: 0.5, room: 1, lights: 0.2, music: 1, voice: 0.75, ui: 1 }, muteInBackground: false };
     const { engine } = setup({ saved, scale: 0.25 });
     expect(engine.setMaster).toHaveBeenCalledWith(0.3, true);
     expect(engine.setChannel).toHaveBeenCalledWith('weather', 0.5);
@@ -245,7 +247,7 @@ describe('createRoomAudio', () => {
     audio.gesture();
     audio.toggleMute();
     expect(engine.setMaster).toHaveBeenLastCalledWith(0.6, true);
-    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: true, music: 1, ambient: 1 });
+    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: true, music: 1, voice: 0.75, ui: 1, ambient: 1, muteInBackground: false });
     expect(stored().muted).toBe(true);
     audio.toggleMute();
     audio.wheel(1);
@@ -260,22 +262,41 @@ describe('createRoomAudio', () => {
   });
 
   it('MUSIC steps the music channel; AMBIENT moves weather, room and lights together from the loudest', () => {
-    const saved = { master: 0.6, muted: false, channels: { weather: 0.5, room: 0.8, lights: 0.2, music: 1 } };
+    const saved = { master: 0.6, muted: false, channels: { weather: 0.5, room: 0.8, lights: 0.2, music: 1, voice: 0.75, ui: 1 }, muteInBackground: false };
     const { engine, views, audio, stored } = setup({ saved });
     audio.musicStep(-1);
     expect(stored().channels.music).toBe(1); // locked: nothing changes
     audio.gesture();
-    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, ambient: 0.8 });
+    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, voice: 0.75, ui: 1, ambient: 0.8, muteInBackground: false });
     audio.musicStep(-1);
     expect(engine.setChannel).toHaveBeenLastCalledWith('music', 0.95);
     expect(stored().channels.music).toBe(0.95);
     audio.ambientStep(-1);
-    expect(stored().channels).toEqual({ weather: 0.75, room: 0.75, lights: 0.75, music: 0.95 });
+    expect(stored().channels).toEqual({ weather: 0.75, room: 0.75, lights: 0.75, music: 0.95, voice: 0.75, ui: 1 });
     for (const ch of ['weather', 'room', 'lights']) expect(engine.setChannel).toHaveBeenCalledWith(ch, 0.75);
-    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 0.95, ambient: 0.75 });
+    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 0.95, voice: 0.75, ui: 1, ambient: 0.75, muteInBackground: false });
     for (let i = 0; i < 30; i++) audio.ambientStep(-1);
     expect(stored().channels.room).toBe(0);
     expect(stored().master).toBe(0.6);
+  });
+
+  it('VOICE steps the voice channel, kept like the others; speak and hush reach the engine only once unlocked', () => {
+    const { engine, views, audio, stored } = setup();
+    audio.voiceStep(1);
+    audio.speak(['/a.ogg']);
+    audio.hush();
+    expect(stored().channels.voice).toBe(0.75);
+    expect(engine.speak).not.toHaveBeenCalled();
+    expect(engine.hush).not.toHaveBeenCalled();
+    audio.gesture();
+    audio.voiceStep(1);
+    expect(engine.setChannel).toHaveBeenLastCalledWith('voice', 0.8);
+    expect(stored().channels.voice).toBe(0.8);
+    expect(views.at(-1)).toMatchObject({ kind: 'on', voice: 0.8 });
+    audio.speak(['/a.ogg', '/b.ogg']);
+    expect(engine.speak).toHaveBeenLastCalledWith(['/a.ogg', '/b.ogg'], undefined);
+    audio.hush();
+    expect(engine.hush).toHaveBeenCalledTimes(1);
   });
 
   it('suspends while hidden and resumes when visible; frames tick the engine once unlocked', () => {
@@ -323,7 +344,7 @@ describe('createRoomAudio', () => {
   });
 
   it('a new page starts locked even when the saved settings are unmuted (Review Focus 1)', () => {
-    const saved = { master: 0.8, muted: false, channels: { weather: 1, room: 1, lights: 1, music: 1 } };
+    const saved = { master: 0.8, muted: false, channels: { weather: 1, room: 1, lights: 1, music: 1, voice: 0.75, ui: 1 }, muteInBackground: false };
     const { views } = setup({ saved });
     expect(views).toEqual([{ kind: 'locked' }]);
   });
@@ -336,7 +357,7 @@ describe('createRoomAudio', () => {
     audio.gesture({ fromSpeaker: true }); // pointerdown on the speaker…
     audio.toggleMute(); // …then its click
     expect(stored().muted).toBe(false);
-    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, ambient: 1 });
+    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, voice: 0.75, ui: 1, ambient: 1, muteInBackground: false });
     audio.toggleMute(); // the next click mutes
     expect(stored().muted).toBe(true);
     expect(engine.setMaster).toHaveBeenLastCalledWith(0.6, true);
@@ -349,7 +370,7 @@ describe('createRoomAudio', () => {
     expect(views.at(-1)).toEqual({ kind: 'locked' });
     ctxState = 'running';
     changed();
-    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, ambient: 1 });
+    expect(views.at(-1)).toEqual({ kind: 'on', volume: 0.6, muted: false, music: 1, voice: 0.75, ui: 1, ambient: 1, muteInBackground: false });
     ctxState = 'suspended';
     changed();
     expect(views.at(-1)).toEqual({ kind: 'locked' });

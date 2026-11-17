@@ -2,7 +2,8 @@
  * The chat box's keys as pixel glyphs (spec 2026-10-16 subtitle chat box §7): small SVGs on a 16-px
  * grid, drawn in `currentColor`, so they look the same on every OS (the pixel fonts lack ↻ ✎ ⑂ ⇥).
  */
-export type KeyId = 'regenerate' | 'continue' | 'edit' | 'delete' | 'branch' | 'suggest' | 'dice' | 'draw' | 'end' | 'leave';
+import { setTip } from './hover-tag';
+export type KeyId = 'regenerate' | 'continue' | 'edit' | 'delete' | 'suggest' | 'dice' | 'draw' | 'end' | 'leave';
 
 type Rect = [x: number, y: number, w: number, h: number];
 
@@ -18,8 +19,6 @@ const SHAPES: Record<KeyId, Rect[]> = {
   edit: [[11, 2, 3, 3], [9, 4, 3, 3], [7, 6, 3, 3], [5, 8, 3, 3], [3, 10, 3, 3], [2, 13, 2, 1]],
   // ✕
   delete: [...steps(6, (i): Rect => [2 + 2 * i, 2 + 2 * i, 2, 2]), ...steps(6, (i): Rect => [12 - 2 * i, 2 + 2 * i, 2, 2])],
-  // ⑂ one stem, two branches
-  branch: [[7, 8, 2, 6], [5, 6, 2, 2], [9, 6, 2, 2], [3, 2, 2, 4], [11, 2, 2, 4]],
   // 💬 a speech bubble holding an ellipsis: a line to say
   suggest: [[3, 2, 10, 2], [1, 4, 2, 6], [13, 4, 2, 6], [3, 10, 10, 2], [4, 12, 2, 2], [3, 14, 2, 1], [4, 6, 2, 2], [7, 6, 2, 2], [10, 6, 2, 2]],
   // ⚄ a die's outline, showing five
@@ -63,6 +62,6 @@ export function keyButton(id: KeyId, label: string, title?: string): HTMLButtonE
   lb.textContent = label;
   b.append(keyGlyph(id), lb);
   b.setAttribute('aria-label', label);
-  b.title = title ?? label;
+  setTip(b, title ?? label);
   return b;
 }

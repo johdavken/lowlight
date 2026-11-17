@@ -38,6 +38,14 @@ export interface Renderer {
   setMaxFps(fps: number): void;
   /** The cap in force; 0 means none. */
   maxFps(): number;
+  /** SYS → RENDER SCALE: the canvas at this share of the screen's pixel density (1, 0.75, 0.5). */
+  setRenderScale(f: number): void;
+  /** SYS → EFFECTS: the effect kinds to leave out; the room's effects are built again without them. */
+  setEffectsLeftOut(kinds: ReadonlySet<string>): void;
+  /** SYS → BLUR: off, the bars beside the room go black instead of a blurred copy of it. */
+  setBlur(on: boolean): void;
+  /** SYS → POST EFFECTS: off, no scanlines or vignette over the room. */
+  setPost(on: boolean): void;
   /** Called on each lightning strike in the current room (the sound plays the thunder). */
   onStrike(fn: (s: Strike) => void): void;
   /** The room's light at a point on screen (CSS px), from what was shaded last frame; null before a room state is shaded. */
@@ -146,6 +154,11 @@ export class PixiRenderer implements Renderer {
   /** The room's window shapes in frame px, clipping the rain (unscaled: the rain's gfx is the scaled one). */
   private readonly weatherMask = new Graphics();
   private effects: EffectsLayer | null = null;
+  /** The loaded room, so SYS → EFFECTS can build its effects again. */
+  private effectsScene: SceneDef | null = null;
+  private effectsLeftOut: ReadonlySet<string> = new Set();
+  private renderScale = 1;
+  private blurOn = true;
   private readonly strikeFns: Array<(s: Strike) => void> = [];
   private weatherHidden = false;
   private weatherDrawn = false;
@@ -267,16 +280,46 @@ export class PixiRenderer implements Renderer {
       }
     }
     // After the layers, so the effects' glow pass (LED dimming) sits above the room's glow maps.
-    if (scene.effects?.length || scene.lights.some((l) => l.dust)) {
-      this.effects = new EffectsLayer(scene, roomArt(layers), { reducedMotion: this.reducedMotion, seed: effectsSeed(scene) });
-      for (const msg of this.effects.state().disabled) this.warn(msg);
-      this.effects.onStrike((s) => {
-        for (const fn of this.strikeFns) fn(s);
-      });
-      this.effectsHost.addChild(this.effects.view);
-      this.glassHost.addChild(this.effects.glassView);
-      this.emissive.addChild(this.effects.glowView);
-    }
+    this.effectsScene = scene;
+    this.buildEffects();
+  }
+
+  /** The loaded room's effects, less what SYS → EFFECTS leaves out. */
+  private buildEffects(): void {
+    this.effects?.destroy();
+    this.effects = null;
+    const scene = this.effectsScene;
+    if (!scene || !(scene.effects?.length || scene.lights.some((l) => l.dust))) return;
+    this.effects = new EffectsLayer(scene, roomArt(this.layers), { reducedMotion: this.reducedMotion, seed: effectsSeed(scene), leftOut: this.effectsLeftOut });
+    for (const msg of this.effects.state().disabled) this.warn(msg);
+    this.effects.onStrike((s) => {
+      for (const fn of this.strikeFns) fn(s);
+    });
+    this.effectsHost.addChild(this.effects.view);
+    this.glassHost.addChild(this.effects.glassView);
+    this.emissive.addChild(this.effects.glowView);
+  }
+
+  setEffectsLeftOut(kinds: ReadonlySet<string>): void {
+    if (kinds.size === this.effectsLeftOut.size && [...kinds].every((k) => this.effectsLeftOut.has(k))) return;
+    this.effectsLeftOut = new Set(kinds);
+    this.buildEffects();
+  }
+
+  setBlur(on: boolean): void {
+    if (on === this.blurOn) return;
+    this.blurOn = on;
+    this.resize();
+  }
+
+  setPost(on: boolean): void {
+    this.grade.setPost(on);
+  }
+
+  setRenderScale(f: number): void {
+    if (f === this.renderScale) return;
+    this.renderScale = f;
+    this.resize();
   }
 
   /** `transition` only matters for scene changes, which go through `playTransition`. */
@@ -474,7 +517,8 @@ export class PixiRenderer implements Renderer {
   }
 
   private resize(): void {
-    const dpr = window.devicePixelRatio || 1;
+    // SYS → RENDER SCALE: fewer pixels than the screen has; the canvas's CSS size stretches them back.
+    const dpr = (window.devicePixelRatio || 1) * this.renderScale;
     // Work in device pixels so the integer scale is integer on the physical screen.
     const w = devicePixels(this.host.clientWidth, dpr);
     const h = devicePixels(this.host.clientHeight, dpr);
@@ -483,7 +527,7 @@ export class PixiRenderer implements Renderer {
     this.viewFit = { scale, x, y, dpr };
     this.view.scale.set(scale);
     this.view.position.set(x, y);
-    const back = backdropView(this.frameRes, w, h, { scale, x, y }, this.backdropOn);
+    const back = backdropView(this.frameRes, w, h, { scale, x, y }, this.backdropOn && this.blurOn);
     this.backdrop.visible = back.show;
     this.backdrop.scale.set(back.scale);
     this.backdrop.position.set(back.x, back.y);

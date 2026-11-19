@@ -40,8 +40,8 @@ export function parseExtras(json: unknown): { ok: true; extras: Extra[] } | { ok
 }
 
 /** What a quest's `face:` can name: the ids, and the tags with at least one face. */
-export function extrasKnown(extras: readonly Extra[]): { ids: Set<string>; tags: Set<string> } {
-  return { ids: new Set(extras.map((e) => e.id)), tags: new Set(extras.flatMap((e) => e.tags)) };
+export function extrasKnown(extras: readonly Extra[]): { ids: Set<string>; tags: Set<string>; list: { id: string; tags: string[] }[] } {
+  return { ids: new Set(extras.map((e) => e.id)), tags: new Set(extras.flatMap((e) => e.tags)), list: extras.map((e) => ({ id: e.id, tags: [...e.tags] })) };
 }
 
 /** Each tag and how many faces carry it, by tag (COPY FOR OPUS lists them). */

@@ -51,6 +51,8 @@ export interface Deck {
   promised(contact: string, o: { about: string; due: number; where: string; place: string; from: string }): Promise<boolean>;
   /** Her job text (job texts spec §3), through the same queue as any text of hers. */
   jobText(contact: string, o: { job: string; text: string; due: number }): Promise<boolean>;
+  /** Her move text (off-screen moves spec §4.2), through the same queue. */
+  moveText(contact: string, o: { about: string; due: number }): Promise<boolean>;
 }
 
 interface Client {
@@ -345,6 +347,9 @@ export function createDeck(deps: DeckDeps): Deck {
     },
     jobText(contact, o) {
       return text(null, contact, undefined, (rt, player) => rt.relay.sendJobText(player, o));
+    },
+    moveText(contact, o) {
+      return text(null, contact, undefined, (rt, player) => rt.relay.sendMoveText(player, o));
     },
     refresh() {
       lastUnread = '';

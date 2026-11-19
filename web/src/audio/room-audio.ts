@@ -16,7 +16,7 @@ const AMBIENT: Channel[] = ['weather', 'room', 'lights'];
 const UNLOCK_FADE_SECONDS = 0.6;
 
 export type EngineLike = Pick<AudioEngine, 'unlock' | 'apply' | 'music' | 'tick' | 'setMaster' | 'setChannel' | 'setScale' | 'suspend' | 'resume' | 'state' | 'burst' | 'oneShot' | 'preload' | 'thunder' | 'cancelThunder'> &
-  Partial<Pick<AudioEngine, 'onStateChange' | 'onMusicEnded' | 'clock' | 'speak' | 'hush' | 'hold' | 'release' | 'setSignalCues'>>;
+  Partial<Pick<AudioEngine, 'onStateChange' | 'onMusicEnded' | 'clock' | 'speak' | 'hush' | 'pauseVoice' | 'playVoice' | 'hold' | 'release' | 'setSignalCues'>>;
 
 /** The engine's state plus the room's playlist (what plays, or the pause until when). */
 export type RoomAudioState = EngineState & { playlist: PlaylistState; scene: string | null };
@@ -352,6 +352,19 @@ export function createRoomAudio(deps: {
     /** Stops the reading (new text replaced it, or the table closed). */
     hush(): void {
       if (unlocked) engine.hush?.();
+    },
+
+    /** The narrator's ❚❚ and ▶ (the JOB column's controls): the reading holds where it is, then goes on from there. */
+    pauseVoice(): void {
+      if (unlocked) engine.pauseVoice?.();
+    },
+    playVoice(): void {
+      if (unlocked) engine.playVoice?.();
+    },
+
+    /** The VOICE channel's level, 0–1 (SYS's VOICE and the JOB column's VOICE %). */
+    voiceLevel(): number {
+      return s.channels.voice;
     },
 
     /** SYS's AMBIENT: weather, room and lights to one level, in 5% steps from the loudest. */

@@ -58,6 +58,11 @@ export class ModelMenu {
     root.append(this.panel);
   }
 
+  /** Puts the panel in `root` (the board hides the HUD it lives in: main.ts moves it to the stage while the board is up). */
+  mount(root: HTMLElement): void {
+    if (this.panel.parentElement !== root) root.append(this.panel);
+  }
+
   get isOpen(): boolean {
     return !this.panel.hidden;
   }

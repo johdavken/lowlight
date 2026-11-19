@@ -5,7 +5,9 @@
 import type { ContactCard, HandView } from '../../shared/types';
 import type { CrewMember } from '../../shared/crew-fold';
 import { worksInGraft, type Ability } from '../../shared/crew-book';
-import { isLegacyPending, type QuestEntry, type QuestRun } from '../../shared/quests';
+import { holds, isLegacyPending, ownedBy, type CondCtx, type QuestEntry, type QuestRun } from '../../shared/quests';
+import { DAY, hhmmOf, minuteOfDay, nextBlockStart, scheduledRoom, weekdayOf, weekdayShort, type Block } from '../../shared/clock';
+import { bookId } from './mission-run';
 import { withGuest } from './guest';
 import { type Position } from '../../shared/dice';
 import { abilityEffect, CALL_VERB, callEffect, contactId, type Setup, lossOnAgain, type Call, type CallEffect } from '../../shared/hand';
@@ -16,9 +18,47 @@ export function crewOn(quests: QuestDeps | undefined, setup: Pick<Setup, 'guest'
   return withGuest(quests?.crewState?.()?.members ?? [], setup);
 }
 
-/** A job's district (its board's); null without districts. */
+/**
+ * RECOMMENDED (Kroll's desk spec): `contact`'s first job in book order that her desk would list for `player` (openJobs):
+ * a mission for `player`, hers alone, once, its gate held, a `text:` job only once she has told you (`heard`), its tier
+ * no higher than your rep's in its district (`tier`), and not started (a run of it, done or not, under any run id);
+ * none while you're with her.
+ */
+export function recommendedJob(
+  book: QuestEntry[],
+  o: { player: string; contact: string; ctx: CondCtx; started: readonly { id: string }[]; withNow: string | null; heard: (questId: string) => boolean; tier: (q: QuestEntry) => number },
+): QuestEntry | null {
+  if (o.contact === o.withNow) return null;
+  return (
+    book.find(
+      (q) =>
+        q.kind === 'mission' &&
+        q.for === o.player &&
+        ownedBy(q) === o.contact &&
+        q.once &&
+        holds(q.after, o.ctx) &&
+        (!q.text || o.heard(q.id)) &&
+        q.tier <= o.tier(q) &&
+        !o.started.some((s) => bookId(s.id) === q.id),
+    ) ?? null
+  );
+}
+
+/**
+ * RECOMMENDED's `FROM 09:00`: when her schedule doesn't have her at `home` at `clock`, when it next does, its weekday
+ * first (`Mon 09:00`) when that's more than a day off, as her schedule line has it; null when it does now, or never.
+ */
+export function recommendedFrom(blocks: Block[], home: string, clock: number): string | null {
+  if (scheduledRoom(blocks, clock) === home) return null;
+  const next = nextBlockStart(blocks.filter((b) => b.room === home), clock);
+  if (!next) return null;
+  const hhmm = hhmmOf(minuteOfDay(next.at));
+  return next.at - clock <= DAY ? hhmm : `${weekdayShort(weekdayOf(next.at))} ${hhmm}`;
+}
+
+/** A job's district: its `district:` line (Kroll's desk: taken in one, paid in another), else its board's; null without districts. */
 export function districtOf(quests: QuestDeps | undefined, q: QuestEntry): string | null {
-  return quests?.districtOf?.(q.starts) ?? null;
+  return q.district ?? quests?.districtOf?.(q.starts) ?? null;
 }
 
 /** A district as she'd say it: its map name, else its id title-cased. */

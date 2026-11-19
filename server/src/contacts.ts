@@ -113,6 +113,8 @@ type Names = {
   standing?(contactId: string, stored: StoredStanding | null): NonNullable<ContactEntry['standing']>;
   /** Her plan's tail (spec 2026-10-21 §7); absent or null: none. */
   planTail?(contactId: string): string | null;
+  /** RECOMMENDED (Kroll's desk spec): her open job for the player, given her standing values (null: none read); absent or null: none. */
+  recommended?(contactId: string, standing: { trust: number; warmth: number } | null): NonNullable<ContactEntry['recommended']> | null;
 };
 
 /** Her plan's tail when she has one (her plans spec §7); entries without a plan stay as they were. */
@@ -172,6 +174,8 @@ function known(facts: Map<string, DbFacts>, pt: PlaythroughInfo, roster: RosterC
     const status = c.id === pt.startContact ? 'start' : f?.met ? 'met' : names.ties?.[c.id] !== undefined ? 'knows' : sharedBy.has(c.id) ? 'shared' : null;
     if (!status) continue;
     const sceneId = placeOf(c, f, names);
+    const standing = names.standing && status !== 'shared' ? names.standing(c.id, f?.standing ?? null) : null;
+    const recommended = names.recommended?.(c.id, standing ? { trust: standing.trust, warmth: standing.warmth } : null) ?? null;
     entries.push({
       id: c.id,
       name: c.name,
@@ -182,10 +186,11 @@ function known(facts: Map<string, DbFacts>, pt: PlaythroughInfo, roster: RosterC
       sceneId,
       placeName: names.placeName(sceneId),
       ...tailOf(names, c.id),
+      ...(recommended ? { recommended } : {}),
       timeOfDay: f?.room?.atmosphere?.timeOfDay ?? null,
       lastLine: f ? lastLine(f.recent, { player: names.playerName, contact: c.name, residents: names.residentNames }) : null,
       // You don't know how someone feels about you before you've met (a contact only heard of has none).
-      ...(names.standing ? { standing: status === 'shared' ? null : names.standing(c.id, f?.standing ?? null) } : {}),
+      ...(names.standing ? { standing } : {}),
       // Her deal (arrangement spec §3): in force while her trust is high.
       ...(f?.arrangement
         ? { arrangement: { cut: f.arrangement.cut, nights: f.arrangement.nights, tier: f.arrangement.tier, active: arrangementActive(f.arrangement, names.standing ? names.standing(c.id, f.standing).trust : (f.standing?.trust ?? null)) } }
@@ -196,8 +201,8 @@ function known(facts: Map<string, DbFacts>, pt: PlaythroughInfo, roster: RosterC
     });
   }
   const rank = { start: 0, met: 1, knows: 2, shared: 3 };
-  // Stable: within a status, roster order.
-  return entries.sort((a, b) => rank[a.status] - rank[b.status]);
+  // RECOMMENDED first (Kroll's desk spec); stable: within a status, roster order.
+  return entries.sort((a, b) => Number(!a.recommended) - Number(!b.recommended) || rank[a.status] - rank[b.status]);
 }
 
 /**

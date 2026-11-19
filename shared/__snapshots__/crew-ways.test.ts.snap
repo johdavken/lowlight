@@ -1,0 +1,826 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`a job without rules: crew > cold-storage parses as before 1`] = `
+{
+  "entry": {
+    "after": null,
+    "art": "cold-storage.webp",
+    "beats": Map {
+      "lockers" => [
+        {
+          "choices": [
+            {
+              "check": {
+                "base": 50,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "cass",
+                  },
+                  {
+                    "bonus": 10,
+                    "contact": "adebayo",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "cool",
+              },
+              "crack": null,
+              "fail": "suspicious",
+              "id": "talk",
+              "line": "Say you're family.",
+              "tags": [],
+              "to": "inside",
+            },
+            {
+              "check": {
+                "base": 50,
+                "crew": [],
+                "grid": false,
+                "mods": [
+                  {
+                    "delta": 15,
+                    "label": "he's busy with her",
+                    "when": [
+                      {
+                        "kind": "flag",
+                        "name": "complication",
+                        "op": "=",
+                        "value": "family-came-early",
+                      },
+                    ],
+                  },
+                ],
+                "red": false,
+                "stat": "reflex",
+              },
+              "crack": null,
+              "fail": "suspicious",
+              "id": "keys",
+              "line": "Lift the keys off the nail while he reads the board.",
+              "tags": [],
+              "to": "inside",
+            },
+          ],
+          "id": "lockers",
+          "segments": [
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*The cold lockers run under the Spine in two long rows of steel, frost on every handle. The warden doesn't get up when you come in. He's seen your face on the board by the door.*",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*A woman in a black coat is arguing with the warden about locker 61. She has the death certificate in her hand.*",
+              "when": [
+                {
+                  "kind": "flag",
+                  "name": "complication",
+                  "op": "=",
+                  "value": "family-came-early",
+                },
+              ],
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+          ],
+          "stranger": {
+            "face": {
+              "id": "local-02",
+            },
+            "name": "The warden",
+            "temper": "warden",
+            "voice": "night shift at the cold lockers, coat buttoned to the chin",
+          },
+          "text": "*The cold lockers run under the Spine in two long rows of steel, frost on every handle. The warden doesn't get up when you come in. He's seen your face on the board by the door.*",
+          "views": [],
+          "when": [
+            {
+              "kind": "heat",
+              "op": ">=",
+              "value": 4,
+            },
+          ],
+        },
+        {
+          "choices": [
+            {
+              "check": {
+                "base": 55,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "cass",
+                  },
+                  {
+                    "bonus": 10,
+                    "contact": "adebayo",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "cool",
+              },
+              "crack": null,
+              "fail": "suspicious",
+              "id": "talk",
+              "line": "Say you're family.",
+              "tags": [],
+              "to": "inside",
+            },
+            {
+              "check": {
+                "base": 55,
+                "crew": [],
+                "grid": false,
+                "mods": [
+                  {
+                    "delta": 15,
+                    "label": "he's busy with her",
+                    "when": [
+                      {
+                        "kind": "flag",
+                        "name": "complication",
+                        "op": "=",
+                        "value": "family-came-early",
+                      },
+                    ],
+                  },
+                ],
+                "red": false,
+                "stat": "reflex",
+              },
+              "crack": null,
+              "fail": "suspicious",
+              "id": "keys",
+              "line": "Lift the keys off the nail while he's busy.",
+              "tags": [],
+              "to": "inside",
+            },
+          ],
+          "id": "lockers",
+          "segments": [
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*The cold lockers run under the Spine in two long rows of steel, frost on every handle. Locker 61 belonged to a man who died on Tuesday. The warden keeps the keys on a nail behind him.*",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*A woman in a black coat is arguing with the warden about locker 61. She has the death certificate in her hand.*",
+              "when": [
+                {
+                  "kind": "flag",
+                  "name": "complication",
+                  "op": "=",
+                  "value": "family-came-early",
+                },
+              ],
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+          ],
+          "stranger": {
+            "face": {
+              "id": "local-02",
+            },
+            "name": "The warden",
+            "temper": "warden",
+            "voice": "night shift at the cold lockers, coat buttoned to the chin",
+          },
+          "text": "*The cold lockers run under the Spine in two long rows of steel, frost on every handle. Locker 61 belonged to a man who died on Tuesday. The warden keeps the keys on a nail behind him.*",
+          "views": [],
+          "when": null,
+        },
+      ],
+      "row" => [
+        {
+          "choices": [
+            {
+              "check": {
+                "base": 55,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "nix-direct",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "wits",
+              },
+              "crack": null,
+              "fail": "slow",
+              "id": "count",
+              "line": "Count the doors off the plan on the wall.",
+              "tags": [],
+              "to": "found",
+            },
+            {
+              "check": {
+                "base": 55,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "ines",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "body",
+              },
+              "crack": null,
+              "fail": "slow",
+              "id": "force",
+              "line": "Break the frost off the handles, one by one.",
+              "tags": [],
+              "to": "found",
+            },
+          ],
+          "id": "row",
+          "segments": [
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*The numbers on the row wore off years ago, and the frost has eaten the stencils. Somewhere behind you a compressor kicks in and the lights drop to half.*",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*She's followed you in. You can hear her heels on the grating, two rows over.*",
+              "when": [
+                {
+                  "kind": "flag",
+                  "name": "complication",
+                  "op": "=",
+                  "value": "family-came-early",
+                },
+              ],
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+          ],
+          "stranger": null,
+          "text": "*The numbers on the row wore off years ago, and the frost has eaten the stencils. Somewhere behind you a compressor kicks in and the lights drop to half.*",
+          "views": [],
+          "when": null,
+        },
+      ],
+      "safe" => [
+        {
+          "choices": [
+            {
+              "check": null,
+              "crack": {
+                "kind": "crack",
+                "length": 7,
+                "mods": [],
+              },
+              "fail": "locked",
+              "id": "crack",
+              "line": "Crack the terminal.",
+              "tags": [],
+              "to": "open",
+            },
+            {
+              "check": {
+                "base": 55,
+                "crew": [
+                  {
+                    "bonus": 15,
+                    "contact": "ines",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "body",
+              },
+              "crack": null,
+              "fail": "alarm",
+              "id": "pry",
+              "line": "Pry the lid with the locker bar.",
+              "tags": [],
+              "to": "open",
+            },
+          ],
+          "id": "safe",
+          "segments": [
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*The false floor has its own lock: an old courier safe with a terminal on the lid, still running on a battery that should have died with its owner.*",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*Someone's spliced a second line into the safe's power. It runs off up the wall, back the way you came.*",
+              "when": [
+                {
+                  "kind": "flag",
+                  "name": "complication",
+                  "op": "=",
+                  "value": "locker-rewired",
+                },
+              ],
+            },
+            {
+              "label": "TECH",
+              "text": "*The safe's a Kessler courier model. Its passwords come from a word list; its makers were lazy.*",
+              "when": [
+                {
+                  "kind": "stat",
+                  "op": ">=",
+                  "stat": "tech",
+                  "value": 7,
+                },
+              ],
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+          ],
+          "stranger": null,
+          "text": "*The false floor has its own lock: an old courier safe with a terminal on the lid, still running on a battery that should have died with its owner.*",
+          "views": [],
+          "when": null,
+        },
+      ],
+      "plant" => [
+        {
+          "choices": [
+            {
+              "check": {
+                "base": 50,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "rue",
+                  },
+                  {
+                    "bonus": 10,
+                    "contact": "silas",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "tech",
+              },
+              "crack": null,
+              "fail": "shut",
+              "id": "relay",
+              "line": "Pull the door's relay before it locks.",
+              "tags": [],
+              "to": "through",
+            },
+            {
+              "check": {
+                "base": 50,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "ember",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "reflex",
+              },
+              "crack": null,
+              "fail": "shut",
+              "id": "swing",
+              "line": "Get through on the swing, before the bolt drops.",
+              "tags": [],
+              "to": "through",
+            },
+          ],
+          "id": "plant",
+          "segments": [
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*The way back runs past the plant room. Something in there is ticking, and a cable from the ceiling runs straight to the row's one working door.*",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*It's the second line from the safe. It ends here, in a box with a fresh seal on it.*",
+              "when": [
+                {
+                  "kind": "flag",
+                  "name": "complication",
+                  "op": "=",
+                  "value": "locker-rewired",
+                },
+              ],
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+          ],
+          "stranger": null,
+          "text": "*The way back runs past the plant room. Something in there is ticking, and a cable from the ceiling runs straight to the row's one working door.*",
+          "views": [],
+          "when": null,
+        },
+      ],
+      "out" => [
+        {
+          "choices": [
+            {
+              "check": {
+                "base": 50,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "ines",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "body",
+              },
+              "crack": null,
+              "fail": "cornered",
+              "id": "door",
+              "line": "Kick the service door.",
+              "tags": [],
+              "to": "gone",
+            },
+            {
+              "check": {
+                "base": 50,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "cass",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "reflex",
+              },
+              "crack": null,
+              "fail": "cornered",
+              "id": "bluff",
+              "line": "Drop over the stair rail behind them, crate on your shoulder, and run.",
+              "tags": [],
+              "to": "gone",
+            },
+          ],
+          "id": "out",
+          "segments": [
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*There are boots on the stairs now, and the warden's shouting up them. The service door at the back is chained, but the chain is old.*",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+          ],
+          "stranger": null,
+          "text": "*There are boots on the stairs now, and the warden's shouting up them. The service door at the back is chained, but the chain is old.*",
+          "views": [],
+          "when": [
+            {
+              "kind": "alarm",
+              "op": ">=",
+              "value": 2,
+            },
+          ],
+        },
+        {
+          "choices": [
+            {
+              "check": {
+                "base": 50,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "cass",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "reflex",
+              },
+              "crack": null,
+              "fail": "cornered",
+              "id": "walk",
+              "line": "Wait for the warden's eyes to drop and slip out the front with the crate.",
+              "tags": [],
+              "to": "gone",
+            },
+            {
+              "check": {
+                "base": 50,
+                "crew": [
+                  {
+                    "bonus": 10,
+                    "contact": "ines",
+                  },
+                ],
+                "grid": false,
+                "mods": [],
+                "red": false,
+                "stat": "body",
+              },
+              "crack": null,
+              "fail": "cornered",
+              "id": "back",
+              "line": "Haul the crate out through the loading bay.",
+              "tags": [],
+              "to": "gone",
+            },
+          ],
+          "id": "out",
+          "segments": [
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "*The rows are quiet again. The warden doesn't look up as you pass.*",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+            {
+              "label": null,
+              "text": "",
+              "when": null,
+            },
+          ],
+          "stranger": null,
+          "text": "*The rows are quiet again. The warden doesn't look up as you pass.*",
+          "views": [],
+          "when": null,
+        },
+      ],
+    },
+    "brief": "The cold lockers under the Spine. The dead man's locker hides a crate of chips. Get past the warden, open it and carry the crate out before the family clears it.",
+    "commsAt": null,
+    "draws": [
+      {
+        "name": "complication",
+        "values": [
+          "none",
+          "family-came-early",
+          "locker-rewired",
+        ],
+      },
+      {
+        "name": "warden",
+        "values": [
+          "easy",
+          "hard",
+        ],
+      },
+    ],
+    "first": "lockers",
+    "id": "cold-storage",
+    "kind": "mission",
+    "knownBy": [
+      "silas",
+    ],
+    "minutes": null,
+    "outcomes": Map {
+      "inside" => {
+        "effects": {},
+        "id": "inside",
+        "next": null,
+        "text": "*The warden doesn't look up. The rows run off into the cold ahead of you.*",
+        "to": "row",
+        "wait": null,
+      },
+      "suspicious" => {
+        "effects": {},
+        "id": "suspicious",
+        "next": null,
+        "text": "*He watches you go down the row, and then he picks up his phone and turns his back to you to use it.*",
+        "to": "row",
+        "wait": null,
+      },
+      "found" => {
+        "effects": {},
+        "id": "found",
+        "next": null,
+        "text": "*Locker 61 is fogged with frost. Behind the meat and the unlabelled tubs, under a false floor, a keypad glows.*",
+        "to": "safe",
+        "wait": null,
+      },
+      "slow" => {
+        "effects": {},
+        "id": "slow",
+        "next": null,
+        "text": "*You find it, but the compressor's cycle has run out and the lights come back up. Locker 61: behind the meat and the unlabelled tubs, under a false floor, a keypad glows.*",
+        "to": "safe",
+        "wait": null,
+      },
+      "open" => {
+        "effects": {},
+        "id": "open",
+        "next": null,
+        "text": "*Inside, a flat crate packed with foam: twelve chips in clear cases, each one with a little paper label in a dead man's handwriting.*",
+        "to": "plant",
+        "wait": null,
+      },
+      "locked" => {
+        "effects": {
+          "take": "part",
+        },
+        "id": "locked",
+        "next": null,
+        "text": "*The terminal wipes its own screen. Something under the lid clicks, then hisses: a little acid, eating the top layer of chips.*",
+        "to": "plant",
+        "wait": null,
+      },
+      "alarm" => {
+        "effects": {
+          "take": "part",
+        },
+        "id": "alarm",
+        "next": null,
+        "text": "*The lid comes up with a crack you feel in your teeth. Three of the cases go with it. The rest lie in the foam, each with a little paper label in a dead man's handwriting.*",
+        "to": "plant",
+        "wait": null,
+      },
+      "through" => {
+        "effects": {},
+        "id": "through",
+        "next": null,
+        "text": "*The door sighs open. Cold air follows you through.*",
+        "to": "out",
+        "wait": null,
+      },
+      "shut" => {
+        "effects": {},
+        "id": "shut",
+        "next": null,
+        "text": "*The bolt drops a second after you're through, loud enough to hear on the deck above.*",
+        "to": "out",
+        "wait": null,
+      },
+      "gone" => {
+        "effects": {
+          "payKind": "full",
+        },
+        "id": "gone",
+        "next": null,
+        "text": "*The Spine's lower deck is empty and wet. The chips are cold through the crate all the way home.*",
+        "to": "end",
+        "wait": null,
+      },
+      "cornered" => {
+        "effects": {
+          "take": "none",
+        },
+        "id": "cornered",
+        "next": null,
+        "text": "*Two men are waiting where the way out should be. The crate stays with them. You get out with bruises and a description.*",
+        "to": "end",
+        "wait": null,
+      },
+    },
+    "pay": 360,
+    "payRange": [
+      360,
+      440,
+    ],
+    "pitch": "A dead man's freezer locker in the Spine, and a crate of chips his family doesn't know about. Yet.",
+    "postedBy": "A go-between at Second Socket, for someone who knew what the dead man kept.",
+    "posts": null,
+    "starts": "second-socket",
+    "template": true,
+    "tier": 2,
+    "timed": false,
+    "title": "Cold Storage",
+    "trust": null,
+    "with": null,
+  },
+  "warnings": [],
+}
+`;

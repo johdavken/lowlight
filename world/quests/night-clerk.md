@@ -1,8 +1,8 @@
 ---
 title: Night Clerk
 kind: mission
+rules: crew
 tier: 2
-template: true
 starts: under-the-cat
 after: null
 pitch: Forty seconds of hotel camera somebody wants gone before morning.
@@ -10,71 +10,83 @@ posted-by: A fixer under the Cat, for a guest who won't give a name.
 brief: The hotel under the Cat. Forty seconds of camera sit on a recorder in a closet upstairs. Go in the front past the night clerk, or up the back where nobody looks, and get rid of them before morning.
 pay: 360-440
 art: night-clerk.webp
-draw complication: none | guest-in-the-corridor | second-camera
-draw clerk: easy | hard
 ---
-
-# lobby if heat>=4
-
-title: The Lobby
-stranger: The night clerk — young, tired, a screen he watches more than the door
-face: local-08
-temper: clerk
-
-*The hotel under the Cat keeps one clerk on at night, behind glass. Tonight he looks up when you come in, and then down at something on his screen, and then up again.*
-
-*He has your face on there. Not a warrant. Just a face. The service stair is round the side, past the bins.*
-
-- charm: Go to the glass anyway and be a guest. → walked-up / noticed [check cool 55 · adebayo +10, set route=front]
-- stairs: Go round the side and take the service stair. → upstairs / heard [check reflex 55 · ember +10, set route=back, set quiet=yes]
 
 # lobby
 
 title: The Lobby
 stranger: The night clerk — young, tired, a screen he watches more than the door
 face: local-08
-temper: clerk
 
 *The hotel under the Cat keeps one clerk on at night, behind glass, with a screen he watches more than the door. Somewhere upstairs is a camera closet, and in it forty seconds of somebody's evening.*
 
 *The front way is through him. The service stair is round the side, past the bins.*
 
-- charm: Go to the glass and be a guest. → walked-up / noticed [check cool 55 · adebayo +10, set route=front]
-- stairs: Go round the side and take the service stair. → upstairs / heard [check reflex 55 · ember +10, set route=back, set quiet=yes]
-
-## walked-up
-*He slides a card across and doesn't look at it again. You're a guest. Guests get signed in.*
-→ desk
+- charm: Go to the glass and be a guest. [short THE GLASS, set route=front]
+  · you: Give him a name and be a guest. → noticed [take 1, heat 1]
+  · face: Sign in as a couple halfway through an argument. → couple [take 1]
+  · muscle: Sign in, and let him look. → looked [take 1, alarm 1]
+- stairs: Go round the side and take the service stair. [short THE SIDE STAIR, set route=back]
+  · you: Go round past the bins and up. → heard [take 1, alarm 1]
+  · runner: Lift the latch code off the hotel's net. → coded [take 1]
+  · muscle: Lift the door off its latch and hold it. → lifted [take 1]
 
 ## noticed
 *He takes the name you give him and holds it a second too long. You're a guest, and he'll know this one again.*
 → desk
 
-## upstairs
-*The stair door gives without a sound. Concrete, a mop bucket, a bulb in a cage.*
-→ stairwell
+## couple
+*{who} signs you both in as a couple halfway through an argument. He doesn't look up twice.*
+→ desk
+
+## looked
+*He signs {who} in, and goes on looking.*
+→ desk
 
 ## heard
 *The stair door bangs once behind you. Up top, someone stops walking, and then starts again.*
 → stairwell
 
+## coded
+*{who} has the latch code off the hotel's net before you reach the bins. The door gives without a sound.*
+→ stairwell
+
+## lifted
+*{who} lifts the door a finger off its latch and holds it there, and you go under the arm.*
+→ stairwell
+
 # desk
 
 title: The Desk
-post desk: Someone stays at the glass and keeps him talking. [suits face]
-gives desk: He watches them, not the stairs. A miss on the way out doesn't lose the take.
 
 *He turns the register round to you. His screen is angled away, but the glass behind him isn't. The key board hangs at his shoulder, fourth floor along the top.*
 
-- read: Read his log-in off the glass while you sign. → signed / fumbled [check wits 55 · nix-direct +10, set login=yes]
-- palm: Lift the fourth-floor pass off the board as he turns. → signed / fumbled [check reflex 55 · ember +10]
+- read: Get his log-in off the glass while you sign. [short HIS LOG-IN]
+  · you: Read his log-in off the glass while you sign. → read-glass [take 1, alarm 1, set login=yes]
+  · ears: Read it off the glass from the lobby chairs. → read-chairs [take 1, set login=yes]
+  · runner: Lift his whole session off the hotel's net. → read-session [take 2, heat 1, set login=yes]
+- palm: Lift the fourth-floor pass off the board as he turns. [short THE PASS]
+  · you: Lift the pass off its hook as he turns. → palmed [take 1, heat 1, set pass=yes]
+  · face: Ask him for a map of the district. → mapped [take 1, set pass=yes]
 
-## signed
-*He stamps it. The lift is already open.*
+## read-glass
+*You get the nine characters. He gets a look at where your eyes went.*
 → floor-front
 
-## fumbled
-*He looks at your hands, and then at the board, and then says the lift's on the left.*
+## read-chairs
+*{who} reads it from the lobby chairs, off the glass, over the top of a magazine.*
+→ floor-front
+
+## read-session
+*{who} lifts his whole session, not just the log-in. The lacquer on the hotel's net writes down that somebody did.*
+→ floor-front
+
+## palmed
+*You have the pass. The hook it hung on is still swinging when he turns back.*
+→ floor-front
+
+## mapped
+*{who} asks him for a map of the district. He turns for it. He always turns left.*
 → floor-front
 
 # floor-front
@@ -83,36 +95,61 @@ title: The Floor
 
 *The lift opens straight into the lens. The camera over the closet door sweeps the corridor, stops on the lift, sweeps back. You are a guest on the fourth floor, and it has seen guests before.*
 
-[complication=guest-in-the-corridor] *A man in a hotel robe is at the ice machine, in no hurry.*
+- stroll: Walk it like a guest who can't find the room. [short THE WALK]
+  · you: Hold the pass up to a door that isn't yours. → pass-door [take 1] if pass=yes
+  · you: Walk it slow, reading the room numbers. → lens-stops [take 1, alarm 1]
+  · face: Walk it in one shoe, carrying the other. → one-shoe [take 1]
+- cart: Get behind the linen cart and work it down the corridor. [short THE LINEN CART]
+  · you: Work the cart down the corridor yourself. → wheel [take 1, heat 1]
+  · muscle: Roll the cart like it's the job, and lift the minibar keys. → minibar [take 2, heat 1]
 
-- stroll: Walk it like a guest who can't find his room. → passed / stared [check reflex 55 · ember +10]
-- cart: Put your shoulder to the linen cart and work behind it. → passed / stared [check body 55 · ines +10]
-
-## passed
-*The lens goes over you and on. The closet lock takes less time than the walk did.*
+## pass-door
+*You hold the pass up to a door that isn't yours. The lens has seen that a hundred times.*
 → closet
 
-## stared
-*The lens stops on you for a moment too long before it moves on. You're in the closet, and you don't know who was watching.*
+## lens-stops
+*The lens stops on you for a moment too long before it moves on.*
+→ closet
+
+## one-shoe
+*{who} walks it in one shoe, carrying the other. The lens gives up the whole corridor.*
+→ closet
+
+## wheel
+*A wheel sticks. A door opens down the corridor, and somebody watches you fight a cart.*
+→ closet
+
+## minibar
+*{who} rolls it like it's the job, and lifts the minibar keys on the way. The man at the ice machine gets a good look.*
 → closet
 
 # stairwell
 
 title: The Stairwell
-post door: Someone holds the service door at the bottom. [suits muscle]
-gives door: The way out stays open. A miss on the way out doesn't lose the take.
 
 *Four flights of concrete. The door at the bottom locks itself from the street side. The fire door on four has been painted shut since before the clerk was born, and the laundry comes up at ten past.*
 
-- force: Put your shoulder through the paint on four. → up-clean / up-loud [check body 55 · ines +10]
-- wait: Wait out the laundry and go up behind the cart. → up-clean / up-loud [check wits 55 · nix-direct +10]
+- force: Go through the paint on four. [short THE FIRE DOOR]
+  · you: Put your shoulder through the paint. → second-try [take 1, alarm 1]
+  · muscle: Put your weight through the paint in one go. → one-sheet [take 2, alarm 1]
+- wait: Wait out the laundry and go up behind the cart. [short THE LAUNDRY]
+  · you: Go up behind the cart and keep your head down. → porter [take 1, heat 1]
+  · ears: Time the cart and go up in its noise. → timed [take 1]
 
-## up-clean
-*Fourth floor. Carpet cleaner, and nobody.*
+## second-try
+*It goes on the second try, and the second try is loud. A door closes somewhere that was open a second ago.*
 → floor-back
 
-## up-loud
-*Fourth floor. Carpet cleaner, and a door closing somewhere that was open a second ago.*
+## one-sheet
+*The paint lets go in one sheet. You're on four ten minutes ahead of the night, and the whole floor heard it.*
+→ floor-back
+
+## porter
+*The porter looks back once on the third landing. He says nothing. He has a face to describe now.*
+→ floor-back
+
+## timed
+*{who} has the cart's time to the minute. You go up in its noise and the porter never turns.*
 → floor-back
 
 # floor-back
@@ -121,17 +158,27 @@ title: The Floor
 
 *You come out behind the lens. The camera over the closet door sweeps the corridor, stops, sweeps back. It runs on the hotel's own line, and the junction box is on your side of it.*
 
-[complication=guest-in-the-corridor] *Somebody's ice bucket clatters at the far end. Footsteps stop, then go on.*
+- blind: Splice the camera line and feed it its last ten seconds. [short THE CAMERA LINE]
+  · you: Splice it at the junction box yourself. → spliced [take 1, alarm 1, set blind=yes]
+  · runner: Feed the lens an empty corridor off a deck. → fed [take 1, set blind=yes]
+- slip: Go under the sweep, on the count. [short THE SWEEP]
+  · you: Count it yourself and go on four. → on-four [take 1, heat 1]
+  · ears: Call the count. → counted [take 1]
 
-- blind: Splice the camera line at the junction box and feed it its last ten seconds. → unseen / swept [check tech 55 grid · rue +10 · silas +10]
-- slip: Go under the sweep, on the count. → unseen / swept [check reflex 55 · ember +10]
-
-## unseen
-*The lens goes on watching an empty corridor. The closet lock takes less time than the camera did.*
+## spliced
+*The splice takes, and the lacquer on the line notes that something touched it.*
 → closet
 
-## swept
-*The lens stops on you for a moment too long before it moves on. You're in the closet, and you don't know who was watching.*
+## fed
+*{who} feeds the lens an empty corridor. It will watch that until someone tells it otherwise.*
+→ closet
+
+## on-four
+*You go on four. You make it, and somebody's door is open a hand's width when you look back.*
+→ closet
+
+## counted
+*{who} calls the count in your ear. Five. The lens goes over where you were.*
 → closet
 
 # closet
@@ -140,143 +187,206 @@ title: The Closet
 
 *Racks of recorders, each with its own small green eye. The footage is on the third one down, behind a login screen older than you are.*
 
-[complication=second-camera] *A second lens over the door, newer than the rest, pointed at whoever stands at the rack.*
-[tech 7] *The login is a maintenance build. Somebody left the word list in its memory.*
+- crack: Crack the login and wipe it clean. [short THE LOGIN]
+  · you: Type his nine characters and wipe it. → his-login [take 2] if login=yes
+  · you: Work the login until it gives. → last-try [take 1, alarm 1]
+  · runner: Stitch the gap and copy the night beside it. → stitched [take 2]
+- pull: Pull the drive and walk out with it. [short THE DRIVE]
+  · you: Pull it and pocket it. → warm [take 1, heat 2]
+  · muscle: Swap a dead drive from the next rack into its slot. → swapped [take 1, heat 1]
 
-- crack: Crack the login and wipe it clean. → clean / locked [crack 6 · if quiet +1 "you came up quiet" · if login +1 "you read his log-in"]
-- pull: Pull the drive and walk out with it. → taken / locked [check body 50 · ines +10, alarm +1]
-
-## clean
-*Forty seconds of nothing, stitched in so well the timestamps never stutter.*
+## his-login
+*You type his nine characters. Forty seconds of nothing, and the night next to it for whoever's buying.*
 → out
 
-## locked
-*The rack goes red and stays red. Somewhere downstairs a light on the clerk's board starts blinking. You get half of it and go.*
-take: part
+## last-try
+*It wipes on the last try. The login keeps a line about who asked.*
 → out
 
-## taken
-*The drive is warm in your pocket. It's done, but the gap in the footage will be noticed.*
+## stitched
+*{who} stitches forty seconds of nothing in so well the timestamps never stutter, and copies the night beside it.*
 → out
 
-# out if route=front and alarm>=2
+## warm
+*The drive is warm in your pocket. The gap in the rack will be noticed.*
+→ out
 
-title: The Way Out
-
-*The lift lets you out into the lobby. Two men in hotel blazers are at the glass with the clerk, not hurrying, talking into their collars. The street door is past all three.*
-
-- walk: Walk out past them like a man who's paid. → home / caught [check cool 50 · adebayo +10 · if post.desk=fit +10 "your face has the glass"]
-- loop: Loop the lobby camera on his screen and go behind it. → home / caught [check tech 50 · nix-direct +10]
+## swapped
+*{who} has the drive out and a dead one from the next rack in its slot. It buys a day.*
+→ out
 
 # out if route=front
 
 title: The Way Out
 
-*The lift lets you out into the lobby. The clerk is back behind his glass, and he signed you in: your name, the time, his own initials. The street door is past him.*
+*The lift lets you out into the lobby.*
 
-- walk: Walk out past him like a man who's paid. → home / caught [check cool 50 · adebayo +10 · if post.desk=fit +10 "your face has the glass"]
-- loop: Loop the lobby camera on his screen and go behind it. → home / caught [check tech 50 · nix-direct +10]
+[alarm<=1] *The clerk is back behind his glass, and he signed you in: your name, the time, his own initials. The street door is past him.*
+[alarm>=2] *Two men in hotel blazers are at the glass with the clerk, not hurrying, talking into their collars. The street door is past all three.*
+[door=held] *Tonight it's open, because someone you brought is standing in it.*
 
-# out if alarm>=2
-
-title: The Way Out
-
-*Back at the head of the stair. Two men in hotel blazers are coming up the main flight, not hurrying, talking into their collars. The service door at the bottom is the only way that isn't through them.*
-
-[post.door] *It's open, because someone you brought is standing in it.*
-
-- drop: Go down the service stair three steps at a time. → home / caught [check reflex 50 · ember +10]
-- door: Hit the bottom door before it knows you're coming. → home / caught [check body 50 · ines +10 · if post.door=fit +10 "your muscle has the door"]
+- walk: Walk out past the glass like someone who's paid. [short PAST THE GLASS]
+  · you: Walk to the street like you've paid. → home if door=held
+  · you: Walk to the street like you've paid. → stripped [lose 2] if alarm>=2
+  · you: Walk to the street like you've paid. → described [alarm 1]
+  · face: Settle the bill and complain about the towels. → towels if door=held
+  · face: Settle the bill and complain about the towels. → held [held] if alarm>=2
+  · face: Settle the bill and complain about the towels. → towels
+- loop: Loop the lobby camera on his screen and go behind it. [short HIS SCREEN]
+  · you: Loop it from your deck and go. → home if door=held
+  · you: Loop it from your deck and go. → searched [lose 1, heat 1] if alarm>=2
+  · you: Loop it from your deck and go. → deck-hand [heat 1]
+  · runner: Show him an empty lobby until the door shuts. → empty-lobby if door=held
+  · runner: Show him an empty lobby until the door shuts. → held [held] if alarm>=2
+  · runner: Show him an empty lobby until the door shuts. → empty-lobby
 
 # out
 
 title: The Way Out
 
-*Back at the head of the stair. Four flights down is the service door, the kind that locks itself from the street side.*
+*Back at the head of the stair.*
 
-[post.door] *Tonight it's open, because someone you brought is standing in it.*
+[alarm<=1] *Four flights down is the service door, the kind that locks itself from the street side.*
+[alarm>=2] *Two men in hotel blazers are coming up the main flight, not hurrying, talking into their collars. The service door at the bottom is the only way that isn't through them.*
+[door=held] *Tonight it's open, because someone you brought is standing in it.*
 
-- drop: Go down quiet and work the latch. → home / caught [check reflex 50 · ember +10]
-- door: Put your shoulder to it and be gone. → home / caught [check body 50 · ines +10 · if post.door=fit +10 "your muscle has the door"]
+- drop: Go down quiet and work the latch. [short THE LATCH]
+  · you: Go down quiet and work the latch. → home if door=held
+  · you: Go down quiet and work the latch. → stripped [lose 2] if alarm>=2
+  · you: Go down quiet and work the latch. → unwatched if blind=yes
+  · you: Go down quiet and work the latch. → stair-light [alarm 1]
+  · ears: Call the porter's rounds and go between them. → rounds if door=held
+  · ears: Call the porter's rounds and go between them. → held [held] if alarm>=2
+  · ears: Call the porter's rounds and go between them. → rounds
+- door: Go through it and be gone. [short THE DOOR]
+  · you: Hit it until it opens. → home if door=held
+  · you: Hit it until it opens. → searched [lose 1, heat 1] if alarm>=2
+  · you: Hit it until it opens. → third-hit [heat 1]
+  · muscle: Open it from the wrong side, once. → wrong-side if door=held
+  · muscle: Open it from the wrong side, once. → held [held] if alarm>=2
+  · muscle: Open it from the wrong side, once. → wrong-side
 
 ## home
 *Under the Cat the rain's still coming down. Nobody follows you out.*
 pay: full
 → end
 
-## caught if post.desk
-*His hand finds the handset, and it's the glass he's looking at, not you: whoever you left there, still talking. The blazers come for them. You're through the street door with half of what you came for, and one fewer.*
+## stripped
+*The blazers stop you, polite, and go through your coat. You're out in the rain with half of what you came for.*
 pay: full
-take: part
-post desk: held
 → end
 
-## caught if post.door
-*The door at the bottom is open, because someone is standing in it. They take what was coming down the stair after you. You're in the alley with half of what you came for.*
+## searched
+*The blazers stop you, polite, and go through your coat. You're out in the rain with less than you came for.*
 pay: full
-take: part
-post door: hurt
 → end
 
-## caught
-*The clerk has the handset to his ear, and the blazers are between you and the street. You leave fast, with nothing to show for the night.*
+## held
+*The blazers stop {who}, polite, a hand on each arm. You're out in the rain with what you came for, and one fewer.*
+pay: full
+→ end
+
+## described
+*You're out. Behind you he says a description to nobody in particular.*
+pay: full
+→ end
+
+## towels
+*{who} settles the bill, complains about the towels, and takes your arm.*
+pay: full
+→ end
+
+## deck-hand
+*It holds long enough. The lacquer has a note with your deck's hand on it.*
+pay: full
+→ end
+
+## empty-lobby
+*{who} shows him an empty lobby until the street door has closed on it.*
+pay: full
+→ end
+
+## unwatched
+*Nobody is watching the stair. You take your time with the latch.*
+pay: full
+→ end
+
+## stair-light
+*The latch goes, and so does the stairwell light, on a sensor you didn't see.*
+pay: full
+→ end
+
+## rounds
+*{who} calls it when the porter's on two. You're out between his rounds.*
+pay: full
+→ end
+
+## third-hit
+*It opens on the third hit. The alley has windows.*
+pay: full
+→ end
+
+## wrong-side
+*{who} opens it the way it was built to open, from the wrong side, once.*
+pay: full
+→ end
+
+# getaway
+
+title: The Blazers
+
+*Every light on the clerk's board is lit. There are blazers on the main stair and blazers at the street door, and the clerk has the handset to his ear with his back to the wall. There's a way out that keeps something, and a way out that keeps you.*
+
+- keep: Go out through them with what you can hold. [short WHAT YOU CAN HOLD]
+  · you: Go through them with it under your coat. → torn [lose 2, heat 1]
+- drop: Leave it all on the rack and walk. [short EMPTY HANDS]
+  · you: Leave it on the rack and walk out a guest. → empty-handed
+
+## torn
+*A blazer gets a hand in your coat and keeps what it closes on. You're in the rain with half of it, and a face the Cat will know.*
+pay: full
+→ end
+
+## empty-handed
+*You leave it on the rack and walk out past them with your hands where they can see them. Nobody stops a guest with nothing. Nobody pays one either.*
 take: none
 → end
 
 # push-1
 
-*Under the Cat, the service stair round the side is still unlocked. Upstairs, the recorder next to yours holds the same night, other rooms: a floor of other people's evenings, and some of them would pay to have theirs back.*
-
-- copy: Go back up, crack the next login and copy the night. → copied / wiped [crack 7]
-- swap: Go back up, pull its drive and leave a blank in the slot. → copied / wiped [check reflex 55 · ember +10 · rue +10]
-
-## copied
-*Two hours of corridor, a man going into a room that isn't his. Someone on the fifth floor will want this back by Friday.*
-pay: +120
-→ end
-
-## wiped
-*The recorder chirps once and eats its own drive. The clerk's board will show it by morning, and keeping him quiet about it costs a cut of your fee.*
-lost
-→ end
-
-# push-2
+title: One More Thing
 
 *Back past the glass, the clerk's screen shows tonight's register. One guest checked in under a name his face doesn't match: a Cortex auditor, from the cut of his coat.*
 
-- lean: Lean on the clerk for the real name. → named / scared-clerk [check cool 60 · adebayo +15 · soren +10 · cass +10]
-- read: Read the screen over his shoulder while you ask for a map. → named / scared-clerk [check wits 60 · nix-direct +15]
+- lean: Get the real name out of the clerk. [short THE CLERK]
+  · you: Lean on him until he gives it up. → leaned [alarm 1, heat 1]
+  · face: Ask him which room the husband is really in. → husband [alarm 1]
+  · muscle: Stand at the glass. That's all. → stood [alarm 2]
+- pread: Read the screen over his shoulder. [short THE REGISTER]
+  · you: Ask for a map and read it over his shoulder. → folded [heat 2]
+  · ears: Read it from the lobby chairs. → chairs [heat 1]
 
-## named
-*The clerk mouths it without meaning to. A name like that is worth a lot to the right people.*
+## leaned
+*He gives it up, and he'll remember who asked, and how.*
 pay: +160
 → end
 
-## scared-clerk
-*The clerk's hand goes to the handset and this time he dials. You're out the door before it connects, and a cut of your fee buys him a bad memory.*
-lost
+## husband
+*{who} asks which room the husband is really in. He mouths it without meaning to. He watches {who} all the way to the street door.*
+pay: +160
 → end
 
-# push-3 if alarm>=1
-
-*The manager's office behind the lobby logs every door every keycard opens. The blazers are still somewhere on the stairs.*
-
-- strip: Strip the log onto your deck before they come down. → door-log / blazers [check tech 70 grid · rue +15 · silas +15 · ember +10]
-- grab: Take the whole logger off the wall. → door-log / blazers [check body 70 · ines +15, alarm +1]
-
-# push-3
-
-*The manager's office behind the lobby logs every door every keycard opens. The office is dark and the door is on a latch.*
-
-- strip: Strip the log onto your deck. → door-log / blazers [check tech 65 grid · rue +15 · silas +15 · ember +10]
-- grab: Take the whole logger off the wall. → door-log / blazers [check body 65 · ines +15, alarm +1]
-
-## door-log
-*A month of doors, every one of them with a time and a name. The Cat would pay a fortune never to see this again.*
-pay: +200
+## stood
+*{who} stands at the glass. That's all. The clerk writes it down, and then he picks up the handset.*
+pay: +160
 → end
 
-## blazers
-*The light comes on. Two blazers fill the doorway, and the conversation that follows costs you everything you lifted on the way out, and a cut of your fee besides.*
-lost
+## folded
+*Third line. He folds your map slowly, watching you read.*
+pay: +160
+→ end
+
+## chairs
+*{who} has it from the chairs before he's finished the first fold. The lobby camera has had an hour of that face.*
+pay: +160
 → end

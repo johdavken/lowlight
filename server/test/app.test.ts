@@ -376,7 +376,7 @@ describe('buildApp / websocket hub', () => {
       persona: { character: 'hicks', name: 'Tester', description: 'secret-ish', sprite: { src: 'me.png' } },
     });
     expect(await (await fetch(`${base}/api/persona`)).json()).toEqual({
-      persona: { id: 'hicks', name: 'Hicks', sprite: { url: '/api/persona/sprite?as=hicks', crop: { top: 0, bottom: 0.5 } }, accent: '#7fe9ff' },
+      persona: { id: 'hicks', name: 'Hicks', sprite: { url: '/api/persona/sprite?as=hicks', crop: { top: 0, bottom: 0.5 }, face: expect.any(Object) }, accent: '#7fe9ff' },
     });
     const img = await fetch(`${base}/api/persona/sprite`);
     expect(img.headers.get('content-type')).toContain('image/png');
@@ -445,7 +445,7 @@ describe('buildApp / websocket hub', () => {
       pts.setActive(pts.create({ player: 'zed', startContact: 'nix', persona: { name: 'Vee', background: 'b' } }).id);
       const { baseUrl } = await start({ cast: ['zed'], dataDir });
       expect(await (await fetch(`${baseUrl}/api/persona`)).json()).toEqual({
-        persona: { id: 'zed', name: 'Vee', sprite: { url: '/api/persona/sprite?as=zed', crop: { top: 0, bottom: 0.5 } }, accent: '#7fe9ff', bio: ['b'] },
+        persona: { id: 'zed', name: 'Vee', sprite: { url: '/api/persona/sprite?as=zed', crop: { top: 0, bottom: 0.5 }, face: expect.any(Object) }, accent: '#7fe9ff', bio: ['b'] },
       });
       const img = await fetch(`${baseUrl}/api/persona/sprite?as=zed`);
       expect(img.status).toBe(200);
@@ -645,7 +645,7 @@ describe('buildApp / websocket hub', () => {
     // No playthrough: ?as= picks the visitor (in one, it is always the playthrough's player).
     const { baseUrl } = await start({ cast: ['cass'], autoPlaythrough: false });
     const body = (await (await fetch(`${baseUrl}/api/persona?as=cass`)).json()) as { persona: Record<string, unknown> };
-    expect(body).toEqual({ persona: { id: 'cass', name: 'Cass', sprite: { url: '/api/persona/sprite?as=cass', crop: expect.any(Object) }, accent: '#7fe9ff' } });
+    expect(body).toEqual({ persona: { id: 'cass', name: 'Cass', sprite: { url: '/api/persona/sprite?as=cass', crop: expect.any(Object), face: expect.any(Object) }, accent: '#7fe9ff' } });
     const img = await fetch(`${baseUrl}/api/persona/sprite?as=cass`);
     expect(img.status).toBe(200);
     expect(img.headers.get('content-type')).toContain('image/png');
@@ -1479,6 +1479,15 @@ describe('model routes', () => {
     expect(events.some((e) => e.type === 'message' && e.message.role === 'user')).toBe(false);
   });
 
+  it('no key: her off-screen beat call is a quiet skip, never a request (off-screen moves final review I1)', async () => {
+    const { app, or, settings } = await startModelApp();
+    settings.deleteKey('openrouter');
+    const rt = (await app.runtime('direct'))!;
+    const before = or.requests.length;
+    expect(await rt.beat!([{ role: 'user', content: 'x' }])).toBeNull();
+    expect(or.requests.length).toBe(before);
+  });
+
   it('deleting the key mid-session: the next send is refused with no-link', async () => {
     const { wsUrl, settings } = await startModelApp();
     const { opened, events, ws } = connectWs(wsUrl);
@@ -1660,5 +1669,55 @@ describe('bug report turns', () => {
     const report = strFromU8(unzipSync(fs.readFileSync(file))['report.txt']);
     expect(report).toContain('Where is the noodle stall?');
     expect(report).toContain(': Two blocks down.');
+  });
+});
+
+describe('normal maps on the figure routes (figure lighting spec §1)', () => {
+  const isPng = (b: Buffer) => b.subarray(1, 4).toString() === 'PNG';
+  const get = async (url: string) => {
+    const r = await fetch(url);
+    return { status: r.status, body: Buffer.from(await r.arrayBuffer()) };
+  };
+
+  it('?normal=1 on a sprite, an outfit, the comms figure, a resident and the persona returns a map, not the art', async () => {
+    const { baseUrl, cfg } = await start({ cast: ['zed'], dressed: ['zed'], hae: true, autoPlaythrough: false });
+    const dir = path.join(cfg.charactersDir, 'zed');
+    const json = JSON.parse(fs.readFileSync(path.join(dir, 'character.json'), 'utf8'));
+    fs.writeFileSync(path.join(dir, 'character.json'), JSON.stringify({ ...json, commsFigure: 'zed.png' }));
+    await fetch(`${baseUrl}/api/agents`); // re-reads the registry
+    for (const route of ['/api/agents/zed/sprite', '/api/agents/zed/outfit/indoors', '/api/agents/zed/comms', '/api/residents/hae/sprite', '/api/persona/sprite?as=zed']) {
+      const art = await get(`${baseUrl}${route}`);
+      const map = await get(`${baseUrl}${route}${route.includes('?') ? '&' : '?'}normal=1`);
+      expect(art.status, route).toBe(200);
+      expect(map.status, route).toBe(200);
+      expect(isPng(map.body), route).toBe(true);
+      expect(map.body.equals(art.body), route).toBe(false);
+    }
+  });
+
+  it('?normal=1 is 404 when the image is missing, and on an expression', async () => {
+    const { baseUrl } = await start({ cast: ['zed'], autoPlaythrough: false });
+    expect((await get(`${baseUrl}/api/agents/zed/outfit/nope?normal=1`)).status).toBe(404);
+    expect((await get(`${baseUrl}/api/agents/zed/comms?normal=1`)).status).toBe(404);
+    expect((await get(`${baseUrl}/api/agents/zed/sprite/happy?normal=1`)).status).toBe(404);
+  });
+
+  it('without ?normal the route still serves the art', async () => {
+    const { baseUrl, cfg } = await start({ cast: ['zed'], autoPlaythrough: false });
+    const art = await get(`${baseUrl}/api/agents/zed/sprite`);
+    expect(art.body.equals(fs.readFileSync(path.join(cfg.charactersDir, 'zed', 'zed.png')))).toBe(true);
+  });
+});
+
+describe('figures carry their face point (breath on the figures)', () => {
+  it("an agent's and the persona's sprite ref carry the face point", async () => {
+    const { baseUrl, cfg } = await start({ cast: ['zed'], hae: true, autoPlaythrough: false });
+    const file = path.join(cfg.charactersDir, 'zed', 'character.json');
+    fs.writeFileSync(file, JSON.stringify({ ...JSON.parse(fs.readFileSync(file, 'utf8')), face: { x: 0.42, y: 0.09 } }));
+    const body = await (await fetch(`${baseUrl}/api/agents`)).json();
+    const agents = (Array.isArray(body) ? body : body.agents) as { id: string; sprite: { face?: { x: number; y: number } } | null }[];
+    expect(agents.find((a) => a.id === 'zed')!.sprite!.face).toEqual({ x: 0.42, y: 0.09 });
+    const { persona } = await (await fetch(`${baseUrl}/api/persona?as=zed`)).json();
+    expect(persona.sprite.face).toEqual({ x: 0.42, y: 0.09 });
   });
 });

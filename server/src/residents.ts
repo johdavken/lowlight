@@ -114,6 +114,10 @@ export function residentInfo(rec: ResidentRecord): ResidentInfo {
       crop: rec.sprite.crop,
       ...(rec.sprite.waist !== undefined ? { waist: rec.sprite.waist } : {}),
       ...(rec.sprite.pixel ? { pixel: true } : {}),
+      // A place's resident faces the other way unless her file turns MIRROR off.
+      ...((rec.sprite.mirror ?? true) ? { mirror: true } : {}),
+      face: { x: rec.face.x, y: rec.face.y },
+      ...(rec.sprite.lights?.length ? { lights: rec.sprite.lights.map((l) => ({ ...l })) } : {}),
       ...(names.length > 0 ? { expressions: Object.fromEntries(names.map((n) => [n, `${base}/sprite/${n}`])) } : {}),
       ...(outfits.length > 0 ? { outfits: Object.fromEntries(outfits.map((n) => [n, `${base}/outfit/${n}`])) } : {}),
       ...(Object.keys(rec.sprite.outfitByScene).length > 0 ? { outfitByScene: rec.sprite.outfitByScene } : {}),

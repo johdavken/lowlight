@@ -210,6 +210,56 @@ describe('playthroughs', () => {
     expect(pts.save(pt.id, cp, fakeDbs({ nix: [4, 1], cass: [1, 0] }))).not.toBe('unchanged');
   });
 
+  it('moves and beat round-trip, and an empty list clears both (off-screen moves spec §3)', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const m = { beat: 1320, at: 1300, who: 'cass', line: 'x', place: 'tilt' };
+    pts.setMoves(pt.id, [m], 1320);
+    expect(pts.get(pt.id)).toMatchObject({ moves: [m], beat: 1320 });
+    pts.setMoves(pt.id, [], null);
+    const raw = JSON.parse(fs.readFileSync(path.join(pts.charsDir(pt.id), '..', 'playthrough.json'), 'utf8'));
+    expect('moves' in raw || 'beat' in raw).toBe(false);
+    pts.setSince(pt.id, { nix: 1300 });
+    expect(pts.get(pt.id)?.since).toEqual({ nix: 1300 });
+  });
+
+  it('a hand-broken moves, beat or since reads as none (minor M4)', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const file = path.join(pts.charsDir(pt.id), '..', 'playthrough.json');
+    const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify({ ...raw, moves: 'oops', beat: 'x', since: [1] }));
+    const read = pts.get(pt.id)!;
+    expect(read.moves).toBeUndefined();
+    expect(read.beat).toBeUndefined();
+    expect(read.since).toBeUndefined();
+    fs.writeFileSync(file, JSON.stringify({ ...raw, moves: [{ beat: 1320, at: 1300, who: 'rue', line: 'x', place: 'p' }, 'junk', { beat: 'no' }] }));
+    expect(pts.get(pt.id)!.moves).toEqual([{ beat: 1320, at: 1300, who: 'rue', line: 'x', place: 'p' }]);
+  });
+
+  it('a checkpoint is a new moment when the beat or the move count changed', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const cp = (o: Partial<SaveRequest>) => req({ kind: 'checkpoint', trigger: 'end', clock: 1400, ...o });
+    expect(pts.save(pt.id, cp({ beat: 1320, moveCount: 1 }), fakeDbs({ nix: [4, 1] }))).not.toBe('unchanged');
+    expect(pts.save(pt.id, cp({ beat: 1320, moveCount: 1 }), fakeDbs({ nix: [4, 1] }))).toBe('unchanged');
+    expect(pts.save(pt.id, cp({ beat: 1320, moveCount: 2 }), fakeDbs({ nix: [4, 1] }))).not.toBe('unchanged');
+    expect(pts.save(pt.id, cp({ beat: 1440, moveCount: 2 }), fakeDbs({ nix: [4, 1] }))).not.toBe('unchanged');
+  });
+
+  it('LOAD brings back the save\'s moves, beat and since', () => {
+    const { pts } = make();
+    const pt = pts.create({ player: 'hicks', startContact: 'nix' });
+    const m = { beat: 1320, at: 1300, who: 'cass', line: 'x', place: 'tilt' };
+    pts.setMoves(pt.id, [m], 1320);
+    pts.setSince(pt.id, { nix: 1300 });
+    const s = pts.save(pt.id, req({ name: 'Keep' }), fakeDbs({ nix: [1, 1] })) as SaveInfo;
+    pts.setMoves(pt.id, [], null);
+    pts.setSince(pt.id, {});
+    pts.restore(s.id);
+    expect(pts.get(pt.id)).toMatchObject({ moves: [m], beat: 1320, since: { nix: 1300 } });
+  });
+
   it('prune keeps 10 checkpoints and every manual save', () => {
     let t = NOW;
     const { pts } = make({ now: () => t });

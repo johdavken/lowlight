@@ -258,3 +258,26 @@ describe('her plan on the row (her plans spec §7)', () => {
     expect(document.querySelector('.solo-stranger .solo-name')?.textContent).toBe("PUMP HOUSE · HAE'S 21:00");
   });
 });
+
+describe('RECOMMENDED (Kroll\'s desk spec)', () => {
+  const kroll = contact({ id: 'kroll', name: 'Kroll', status: 'knows', recommended: { title: 'Come Up', pitch: 'A courier owes the floor a name.', from: '09:00', place: 'sdg-floor' } });
+  it('her row goes first, ahead of LAST WITH, tagged in red with the job\'s pitch on its second line', async () => {
+    await mount(fakeApi({ contacts: [...known, kroll] }));
+    expect(rows().map((r) => r.dataset.id)).toEqual(['kroll', 'cass', 'nix', 'hicks2']);
+    const row = rows()[0]!;
+    expect(row.querySelector('.solo-rec')?.textContent).toBe('RECOMMENDED · FROM 09:00');
+    expect(row.querySelector('.solo-line')?.textContent).toBe('A courier owes the floor a name.');
+    // Focus still lands on the one you left.
+    expect(document.activeElement).toBe(rows()[1]);
+  });
+  it('no FROM while she is at her place; no pitch keeps her usual line', async () => {
+    const here = { ...kroll, recommended: { title: 'Come Up', pitch: null, place: 'sdg-floor' } };
+    await mount(fakeApi({ contacts: [...known, here] }));
+    expect(rows()[0]!.querySelector('.solo-rec')?.textContent).toBe('RECOMMENDED');
+    expect(rows()[0]!.querySelector('.solo-line')?.textContent).toBe(lineFor(here));
+  });
+  it('no one recommended: no tag', async () => {
+    await mount();
+    expect(document.querySelector('.solo-rec')).toBeNull();
+  });
+});

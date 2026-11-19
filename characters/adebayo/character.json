@@ -47,6 +47,7 @@
     "trench": "adebayo-outfit-trench.png",
     "holding": "adebayo-outfit-holding.png"
   },
+  "commsFigure": "adebayo-comms.png",
   "outfitByScene": {
     "nexus/sdg-floor": "work",
     "spine/long-haul": "ivory",

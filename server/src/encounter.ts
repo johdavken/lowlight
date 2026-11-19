@@ -9,7 +9,7 @@ import { ENCOUNTER_LINE_MAX, ENCOUNTER_RECENT_LINES, encounterText, strangerAt, 
 import { speakerBeats } from '../../shared/beats';
 import { gigText } from '../../shared/gig/brief';
 import { diceText } from '../../shared/dice/text';
-import { questRowText } from '../../shared/quests';
+import { questRowOf, questRowText } from '../../shared/quests';
 import type { ChatMessage } from '../../shared/types';
 import type { CompletionMessage } from './turn';
 import { oneLine } from './persona';
@@ -37,7 +37,7 @@ export function recentLines(rows: ChatMessage[], names: { player: string; contac
     if (m.role === 'user' && m.mode === 'greet') continue;
     const text = m.text.trim();
     if (m.role === 'user' && m.mode === 'encounter') lines.push(cut(encounterText({ title: m.encounter?.title ?? '', text }, oneLine)));
-    else if (m.role === 'user' && m.mode === 'quest') lines.push(cut(questRowText({ title: m.quest?.title ?? '', text, run: m.quest?.run }, oneLine)));
+    else if (m.role === 'user' && m.mode === 'quest') lines.push(cut(questRowText(questRowOf(m, text), oneLine)));
     else if (text === '') continue;
     else if (m.role === 'user' && m.mode === 'travel') lines.push(cut(`[travel: ${oneLine(text)}]`));
     // A run reads as her own [gig] line, so a DRAW after a TRACED run knows how it went.

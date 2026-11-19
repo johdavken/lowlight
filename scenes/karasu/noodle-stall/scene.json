@@ -543,5 +543,8 @@
   "hours": {
     "open": "17:00",
     "close": "07:00"
+  },
+  "figureLight": {
+    "breath": true
   }
 }

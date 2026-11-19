@@ -1083,6 +1083,23 @@ describe('ChatRelay end scene mode', () => {
       expect(parsePlan(db.getMeta(planKey('hicks')))).toEqual(PLAN);
     });
 
+    it('onRewound fires only after the cut went through (Tasks 3–4 review M3)', async () => {
+      const db = makeDb();
+      db.insertMessage('hicks', { id: 'r0', role: 'agent', text: 'Bye.', toolLines: [], ts: 1, status: 'ok' });
+      db.insertMessage('hicks', { id: 'r1', role: 'agent', text: 'Back.', toolLines: [], ts: 2, status: 'ok' });
+      const rewound: string[] = [];
+      const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend('http://127.0.0.1:1'), db, room: makeRoom(), emit: () => {}, onRewound: () => rewound.push('yes') });
+      const cut = db.cutAfter.bind(db);
+      db.cutAfter = () => {
+        throw new Error('disk');
+      };
+      await expect(relay.rewind('hicks', 'r0')).rejects.toThrow('disk');
+      expect(rewound).toEqual([]);
+      db.cutAfter = cut;
+      expect(await relay.rewind('hicks', 'r0')).toMatchObject({ ok: true });
+      expect(rewound).toEqual(['yes']);
+    });
+
     it('rebuild re-sends the card state: a rewind past the reply takes the card away', async () => {
       const { relay, db, cards } = await setup();
       store(db);
@@ -3015,5 +3032,32 @@ describe('ChatRelay leads', () => {
     expect(db.writes().filter((w) => w.key === 'lead.hicks.teo-debt.followed')).toHaveLength(1);
     await relay.rewind('hicks', first.id);
     expect(db.getMeta('lead.hicks.teo-debt.followed')).toBeNull();
+  });
+});
+
+describe('off-screen moves in her turn (spec 2026-11-18 §4.3, §5)', () => {
+  const reply = (text = 'Mm.') =>
+    chatStreamEntry('s', [wireFrame('assistant.delta', { delta: text }), wireFrame('assistant.completed', { content: text }), wireFrame('run.completed'), wireFrame('done')]);
+  const lines = { movesSince: () => '[since you last saw Hicks: 23:40 Sold the drive.]', wordLine: () => '[word going round: Rue · lost a client, 23:10]' };
+
+  it('an in-person turn carries both lines', async () => {
+    const stub = await makeStub([reply()]);
+    const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend(stub.url), db: makeDb(), room: makeRoom(), emit: () => {}, ...lines });
+    await relay.send('hicks', 'hello');
+    const msg = asTurn(stub.requests[0].bodyJson).message;
+    expect(msg).toContain('[since you last saw Hicks: 23:40 Sold the drive.]');
+    expect(msg).toContain('[word going round: Rue · lost a client, 23:10]');
+  });
+
+  it('an OOC aside and a text carry neither', async () => {
+    const stub = await makeStub([reply(), reply()]);
+    const relay = new ChatRelay({ players: fakePlayers(), backend: wireBackend(stub.url), db: makeDb(), room: makeRoom(), emit: () => {}, ...lines });
+    await relay.send('hicks', 'brb', 'ooc');
+    await relay.send('hicks', 'you up?', 'text');
+    for (const r of stub.requests.filter((x) => x.url === '/v1/chat/completions')) {
+      const msg = asTurn(r.bodyJson).message;
+      expect(msg).not.toContain('[since you last saw');
+      expect(msg).not.toContain('[word going round');
+    }
   });
 });

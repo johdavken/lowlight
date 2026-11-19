@@ -9,6 +9,7 @@ import type { AccountsState } from './accounts';
 import { z } from 'zod';
 import { LORE_ID, LORE_ID_MAX, LORE_TITLE_MAX, oneLine, splitFrontMatter, zodProblems, type LoreProblem } from './lore';
 import { offTemplate } from './job-template';
+import { IMAGE_ID, imageMarkers, isCrewFace, SCENE_FILE, stripImageMarkers, type CastFace, type JobImage } from './narration-images';
 import type { Band } from './standing';
 import { hhmmOf, minuteOfDay, nextOccurrence, parseHhmm } from './clock';
 import type { Deck } from './gear';
@@ -16,9 +17,12 @@ import type { Check, KitEvent, Mod } from './mission';
 import type { CostId } from './costs';
 import type { DiceResult, Effect, NextRoll, Position } from './dice';
 import type { Call, Setup } from './hand';
+import type { CrewState } from './crew-rules';
 import { DEFAULT_STATS, STAT_KEYS, type StatKey, type Stats } from './stats';
 import { GUEST_NOTE_MAX } from './contract';
 import { GRADES, HIREABLE, normalSpec, SPECIALTIES, type Grade, type Specialty } from './crew-book';
+import { forms, type Pronoun } from './pronoun';
+import { dominatedOnBeat, parseWay, WAY_WORDS, wayKeyText, wayTags, type CardAt, type Dominance, type Way } from './crew-ways';
 
 export const QUEST_TEXT_MAX = 1800;
 /** A `hire-pitch:` line: what fits the HIRE card beside the stock pitches. */
@@ -45,7 +49,9 @@ export type Condition =
   | { kind: 'deck'; id: string | null; trait: string | null }
   | { kind: 'stat'; stat: StatKey; op: '=' | '>=' | '<='; value: number }
   // Small jobs spec §3: this run's ALARM, 0–3.
-  | { kind: 'alarm'; op: '=' | '>=' | '<='; value: number };
+  | { kind: 'alarm'; op: '=' | '>=' | '<='; value: number }
+  // Crew rules: one of the job's own clocks (`hears>=2`).
+  | { kind: 'count'; name: string; op: '=' | '>=' | '<='; value: number };
 
 export type Tag = { kind: 'set'; name: string; value: string } | { kind: 'needs'; all: Condition[] } | /** `unheard` (The Fourteenth): the contact doesn't see this card among the choices, or hear it picked. */ { kind: 'unheard' } | { kind: 'clock'; minutes: number } | { kind: 'check'; check: Check } | { kind: 'alarm'; delta: 1 } | { kind: 'effect'; effect: 'big' | 'small' } | CrackTag;
 
@@ -71,6 +77,10 @@ export interface Choice {
   /** A terminal to crack instead (small jobs spec §4); null: none. */
   crack: CrackTag | null;
   tags: Tag[];
+  /** Crew rules: a card's ways (`·` lines under it); `to` is then its first `you` way's outcome. Absent: a plain pick. */
+  ways?: Way[];
+  /** Crew rules: `[short <NAME>]`, the card's name on the board. */
+  short?: string;
 }
 
 export interface View {
@@ -312,14 +322,31 @@ export interface QuestEntry {
   for?: string;
   /** Jobs: `bars: <deck id>`, a deck that stays home: with it on you, you go in with none. */
   bars?: string;
+  /** Jobs: `district: <id>`, where its rep, HEAT and tier gate land, when that isn't the district of `starts` (Kroll's desk). */
+  district?: string;
+  /** Jobs: `hire-at: <place id>`, where a `gives: recruit` ending's free card sits, when that isn't `starts` (Kroll's desk). */
+  hireAt?: string;
   /** A rescue (crew spec §5): no `starts:`, `{recruit}` in its text, posted by SPRING THEM. */
   spring?: true;
   /** Rebuilt to its tier's template (tier template spec §4): the parse warns where it's off, and a no-roll pick fills no TAKE. */
   template?: true;
+  /** `rules: crew` (crew rules spec): cards list ways instead of checks. */
+  rules?: 'crew';
+  /**
+   * Crew rules: the job's own clocks (`clock <id>: <LABEL> · <size>`), at most two. One may judge
+   * (`· trust <contact>`, Kroll's desk): at the end it moves the job's with: contact's trust (`clockTrust`). A last
+   * quoted part is its note, what it is in a few words, printed under it on the board (`· "HE RUNS AT 3"`).
+   */
+  clocks?: { id: string; label: string; size: number; trust?: string; note?: string }[];
+  /** `image` lines (narration images spec 2026-11-18): faces its prose marks with `{img <id>}`, in file order. */
+  images?: JobImage[];
 }
 
 /** A job: a small one (mission) or a contract. */
 export const isJob = (q: Pick<QuestEntry, 'kind'>) => q.kind === 'mission' || q.kind === 'contract';
+
+/** A clock's note, at most this long: it sits under the clock, inside its column on the board. */
+export const CLOCK_NOTE_MAX = 32;
 
 /** Whether a job's `posts:` window holds at story-clock minute `clock` (null: always). */
 export function postsOpen(posts: [number, number] | null, clock: number): boolean {
@@ -348,6 +375,8 @@ export interface CondCtx {
   stats?: Stats;
   /** This run's ALARM (absent: 0). */
   alarm?: number;
+  /** Crew rules: the job's own clocks by id (absent: each 0). */
+  counts?: Record<string, number>;
 }
 
 /** A flag name or value; a dot is allowed for a contract's own flags (`angle.boat=yes`). */
@@ -375,6 +404,11 @@ export function parseCondition(s: string): Condition[] | QuestProblem {
     }
     if ((m = /^([a-z]+)\s*(=|≥|>=|≤|<=)\s*(\d+)$/.exec(part)) && (STAT_KEYS as readonly string[]).includes(m[1])) {
       out.push({ kind: 'stat', stat: m[1] as StatKey, op: op(m[2]), value: Number(m[3]) });
+      continue;
+    }
+    // Crew rules: a job clock, by an id that isn't heat, alarm, a stat or a band (`hears>=2`). `name=N` stays a flag.
+    if ((m = /^([a-z][a-z0-9_-]*)\s*(≥|>=|≤|<=)\s*(\d+)$/.exec(part)) && m[1] !== 'trust' && m[1] !== 'warmth') {
+      out.push({ kind: 'count', name: m[1], op: op(m[2]), value: Number(m[3]) });
       continue;
     }
     if ((m = /^(trust|warmth)\s*(=|≥|>=|≤|<=)\s*([a-z]+)$/.exec(part))) {
@@ -414,6 +448,8 @@ export function holds(all: Condition[] | null, ctx: CondCtx): boolean {
         return cmp(ctx.heat ?? 0, c.op, c.value);
       case 'alarm':
         return cmp(ctx.alarm ?? 0, c.op, c.value);
+      case 'count':
+        return cmp(ctx.counts?.[c.name] ?? 0, c.op, c.value);
       case 'stat':
         return cmp((ctx.stats ?? DEFAULT_STATS)[c.stat], c.op, c.value);
       case 'deck': {
@@ -469,8 +505,12 @@ const frontSchema = z.strictObject({
   once: z.boolean().nullish(),
   for: oneLine(LORE_ID_MAX).nullish(),
   bars: oneLine(LORE_ID_MAX).nullish(),
+  district: oneLine(LORE_ID_MAX).nullish(),
+  'hire-at': oneLine(LORE_ID_MAX).nullish(),
   spring: z.boolean().nullish(),
   template: z.boolean().nullish(),
+  /** Crew rules: cards list ways instead of checks. */
+  rules: z.enum(['crew']).nullish(),
   /** The panel's picture (spec 2026-10-19 quest art): a file in world/quests/art/. */
   art: z.string().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*\.(?:png|webp|jpg)$/, 'a file name in world/quests/art/: lowercase letters, digits and dashes, then .png, .webp or .jpg').nullish(),
   pay: z
@@ -489,6 +529,8 @@ const frontSchema = z.strictObject({
 const idOk = (id: string) => LORE_ID.test(id) && id.length <= LORE_ID_MAX;
 const VIEW = /^view ([a-z0-9]+(?:-[a-z0-9]+)*)(?: if (.+?))?:\s*(.+)$/;
 const CHOICE = /^- ([^:\s]+): (.+?) → (\S+)(?: \/ (\S+))?(?: \[(.+)\])?$/;
+/** Crew rules: a card with ways under it, `- id: The line. [tags]`, no arrow. */
+const CARD = /^- ([^:\s]+): (.+?)(?: \[(.+)\])?$/;
 const ARROW = /^→ (\S+)$/;
 
 /** A check's or crack's ` · <contact> +N` crew bonuses and ` · if <condition> ±N "label"` modifiers. */
@@ -567,8 +609,20 @@ export function beatText(beat: Beat, ctx: CondCtx): string {
   return tidy(beat.segments.filter((s) => s.when === null || holds(s.when, ctx)).map((s) => (s.when === null ? s.text : s.label ? `⟦${s.label}⟧ ${s.text}` : s.text)));
 }
 
-function parseBeat(id: string, when: Condition[] | null, lines: string[], problems: QuestProblem[]): Beat {
+/** Crew rules: a card's `[short <NAME>]` taken out of its tags. */
+function splitShort(raw: string | undefined): { short?: string; rest: string | undefined } {
+  if (!raw) return { rest: raw };
+  const parts = raw.split(',').map((x) => x.trim());
+  const at = parts.findIndex((x) => /^short .+$/.test(x));
+  if (at < 0) return { rest: raw };
+  const rest = parts.filter((_, i) => i !== at);
+  return { short: parts[at].slice('short '.length).trim(), rest: rest.length ? rest.join(', ') : undefined };
+}
+
+function parseBeat(id: string, when: Condition[] | null, lines: string[], problems: QuestProblem[], o: { crew: boolean; clockIds: readonly string[] } = { crew: false, clockIds: [] }): Beat {
   const p = (message: string) => problems.push({ field: id, message });
+  /** Crew rules: the card the `·` lines under it belong to; null once anything else comes between. */
+  let waysOf: Choice | null = null;
   const text: string[] = [];
   const views: View[] = [];
   const choices: Choice[] = [];
@@ -589,8 +643,20 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
   let first = true;
   /** The line before was `stranger:` (where `face:` goes). */
   let afterStranger = false;
+  /** Crew rules: the way on the line right above, which a `told:` line belongs to. */
+  let lastWay: Way | null = null;
   for (const line of lines) {
     const t = line.trim();
+    // Kroll's desk: `told: <text>` right under a way is all the contact hears of it.
+    if (/^told:/.test(t)) {
+      const body = t.slice('told:'.length).trim();
+      if (!lastWay) p(`told: goes on the line right under a way (· …): '${t}'`);
+      else if (lastWay.told !== undefined) p(`a way has one told: line ('${t}')`);
+      else if (!body) p('told: needs what the contact hears (told: <text>)');
+      else lastWay.told = body;
+      continue;
+    }
+    lastWay = null;
     // A title, a post and its promise (routes and posts spec): header lines, before or after a stranger.
     const head = /^title:\s*(.+)$/.exec(t);
     if (head) {
@@ -663,6 +729,22 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
       continue;
     }
     if (t !== '') afterStranger = false;
+    // Crew rules: a way under the card above it.
+    if (t.startsWith('·')) {
+      if (!o.crew) p(`way lines (·) go only in a job with rules: crew ('${t}')`);
+      else if (!waysOf) p(`a way goes right under a card with no → (- id: The line. [tags]): '${t}'`);
+      else {
+        const w = parseWay(t.slice(1).trim(), o.clockIds);
+        if (typeof w === 'string') p(`card ${waysOf.id}: ${w}`);
+        else {
+          if (w.line.length > QUEST_CHOICE_MAX) p(`card ${waysOf.id}, way ${wayKeyText(w.key)}: at most ${QUEST_CHOICE_MAX} characters (this is ${w.line.length})`);
+          waysOf.ways!.push(w);
+          lastWay = w;
+        }
+      }
+      continue;
+    }
+    if (t !== '') waysOf = null;
     let m: RegExpExecArray | null;
     if ((m = VIEW.exec(t)) || /^view any(?: if .+?)?:/.test(t)) {
       const any = /^view any( if (.+?))?:\s*(.+)$/.exec(t);
@@ -675,15 +757,20 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
       }
       if (body.length > QUEST_VIEW_MAX) p(`view ${contact}: at most ${QUEST_VIEW_MAX} characters (this is ${body.length})`);
       views.push({ contact, when, text: body });
-    } else if (t.startsWith('- ') && (m = CHOICE.exec(t))) {
-      const tags = parseTags(m[5]);
+    } else if (t.startsWith('- ') && ((m = CHOICE.exec(t)) || (o.crew && !t.includes('→') && (m = CARD.exec(t))))) {
+      // A plain pick (`→ outcome`), or in a crew-rules job a card whose ways follow.
+      const card = !t.includes('→');
+      const { short, rest } = o.crew ? splitShort(card ? m[3] : m[5]) : { short: undefined, rest: m[5] };
+      const tags = parseTags(rest);
       if (typeof tags === 'string') p(`choice ${m[1]}: ${tags}`);
       if (!idOk(m[1])) p(`'${m[1]}' isn't a choice id: lowercase letters, digits and dashes`);
       if (m[2].length > QUEST_CHOICE_MAX) p(`choice ${m[1]}: at most ${QUEST_CHOICE_MAX} characters (this is ${m[2].length})`);
       const all = typeof tags === 'string' ? [] : tags;
       const check = all.find((x): x is Extract<Tag, { kind: 'check' }> => x.kind === 'check')?.check ?? null;
       const crack = all.find((x): x is CrackTag => x.kind === 'crack') ?? null;
-      choices.push({ id: m[1], line: m[2], to: m[3], fail: m[4] ?? null, check, crack, tags: all.filter((x) => x.kind !== 'check' && x.kind !== 'crack') });
+      const c: Choice = { id: m[1], line: m[2], to: card ? '' : m[3], fail: card ? null : (m[4] ?? null), check, crack, tags: all.filter((x) => x.kind !== 'check' && x.kind !== 'crack'), ...(card ? { ways: [] } : {}), ...(short !== undefined ? { short } : {}) };
+      choices.push(c);
+      if (card) waysOf = c;
     } else if (t.startsWith('- ') && t.includes('→')) {
       p(`can't read the choice '${t}' (- id: The line. → outcome [tags])`);
     } else if ((m = /^\[(.+?)\]\s+(.+)$/.exec(t)) && passive(m[1])) {
@@ -694,6 +781,20 @@ function parseBeat(id: string, when: Condition[] | null, lines: string[], proble
       const said = spoken(line);
       text.push(said);
       segments.push({ when: null, label: null, text: said });
+    }
+  }
+  if (o.crew) {
+    if (posts.length > 0) p('no posts in a crew-rules job: HOLD THE DOOR and the ways that read door=held stand in for them');
+    for (const c of choices) {
+      if (c.check) p(`card ${c.id}: a crew-rules card has no check (its ways say who can do it)`);
+      if (c.fail !== null && !c.crack) p(`card ${c.id}: a crew-rules card has no fail outcome ('/ ${c.fail}')`);
+      if (!c.ways) continue;
+      if (c.crack) p(`card ${c.id}: a [crack] card takes no ways (write it - id: The line. → win / lockout [crack N])`);
+      else if (c.ways.length === 0) p(`card ${c.id}: needs ways (· lines right under it), or → an outcome`);
+      const you = c.ways.find((w) => w.key.kind === 'you');
+      if (c.ways.length > 0 && !you) p(`card ${c.id}: needs a you way (you can always do a card)`);
+      else if (you && !c.ways.some((w) => w.key.kind === 'you' && w.when === null)) p(`card ${c.id}: needs a you way with no if (you can always do a card, whatever holds)`);
+      c.to = (you ?? c.ways[0])?.to ?? '';
     }
   }
   if (here && room === undefined) p("here: needs a room: (a beat with no room is already where she is)");
@@ -851,13 +952,123 @@ export function rewardOutfits(quests: readonly QuestEntry[]): Set<string> {
   return out;
 }
 
+/** Every outcome a choice can play: its pass, its fail, each of its ways'. */
+const plays = (c: Choice): string[] => [c.to, ...(c.fail ? [c.fail] : []), ...(c.ways ?? []).map((w) => w.to)];
+
+/**
+ * A beat's dominated ways (crew rules: no best way), by `dominatedOnBeat`: its ways cards, each with its own `[alarm]`
+ * and `set` tags, each way's outcome read as written (its `take:` and the beat it goes on to).
+ */
+export function beatDominance(b: Beat, outcomes: ReadonlyMap<string, Outcome>): Dominance[] {
+  const cards: CardAt[] = b.choices.flatMap((c) => (c.ways?.length ? [{ id: c.id, ways: c.ways, alarm: c.tags.reduce((n, t) => n + (t.kind === 'alarm' ? t.delta : 0), 0), sets: c.tags.flatMap((t) => (t.kind === 'set' ? [{ name: t.name, value: t.value }] : [])) }] : []));
+  return dominatedOnBeat(cards, (w) => {
+    const o = outcomes.get(w.to);
+    const take = o?.effects.take;
+    return { leaves: take === 'none' || take === 'part' ? take : null, next: o?.to ?? null };
+  });
+}
+
 /** A `loot:` line's length (roll lifecycle spec): one short thing the GM can name. */
 export const LOOT_MAX = 80;
+
+/**
+ * A job's `image` lines (narration images spec 2026-11-18): `image <id>` or `image <id>: cast` (the shared cast list's
+ * face), `image <id>: <extra id>`, `image <id>: character <id>`, `image <id>: any <tag> [<tag>…]`.
+ */
+function parseImages(lines: readonly { id: string; raw: string }[], withIds: readonly string[], known: { roster: ReadonlySet<string> | null; extras?: { ids: ReadonlySet<string>; list?: readonly { id: string; tags: readonly string[] }[] } | null; cast?: ReadonlyMap<string, CastFace> | null }, problems: QuestProblem[]): JobImage[] {
+  const out: JobImage[] = [];
+  for (const l of lines) {
+    const field = `image ${l.id}`;
+    const bad = (message: string) => problems.push({ field, message });
+    if (l.id === 'who') {
+      bad("'who' is reserved ({who} fills a name)");
+      continue;
+    }
+    if (!IMAGE_ID.test(l.id)) {
+      bad('an image id is lowercase letters, digits and dashes');
+      continue;
+    }
+    if (out.some((x) => x.id === l.id)) {
+      bad('appears twice');
+      continue;
+    }
+    const words = l.raw.split(/\s+/).filter(Boolean);
+    const castFace = known.cast?.get(l.id);
+    let image: JobImage | null = null;
+    if (words.length === 0 || (words.length === 1 && words[0] === 'cast')) {
+      if (known.cast && !castFace) bad(`'${l.id}' isn't in the cast (world/cast.json): give it a face here or add it there`);
+      else image = { id: l.id, source: { kind: 'cast' } };
+    } else if (words[0] === 'character' && words.length === 2) {
+      if (known.roster && !known.roster.has(words[1])) bad(`no character '${words[1]}'`);
+      else if (withIds.includes(words[1])) bad("the job's own contact is on the comms strip, not an image");
+      else image = { id: l.id, source: { kind: 'character', id: words[1] } };
+    } else if (words[0] === 'any' && words.length > 1) image = { id: l.id, source: { kind: 'any', tags: words.slice(1) } };
+    else if (words[0] === 'scene') {
+      if (words.length !== 2 || !SCENE_FILE.test(words[1])) bad('a scene is scene <file>: a .webp, .png or .jpg in world/quests/art, lowercase letters, digits and dashes');
+      else image = { id: l.id, source: { kind: 'scene', file: words[1] } };
+    }
+    else if (words.length === 1 && /^[a-z0-9-]+$/.test(words[0])) {
+      if (isCrewFace(words[0])) bad(`'${words[0]}' is a crew portrait: recruits wear those`);
+      else if (known.extras && !known.extras.ids.has(words[0])) bad(`no extra '${words[0]}'`);
+      else image = { id: l.id, source: { kind: 'extra', id: words[0] } };
+    } else bad('an image is <extra id>, character <id>, any <tag> [<tag>…], scene <file>, or nothing (its face from the cast)');
+    if (!image) continue;
+    if (image.source.kind === 'cast' && castFace?.kind === 'character' && withIds.includes(castFace.id)) {
+      bad("the job's own contact is on the comms strip, not an image");
+      continue;
+    }
+    if (castFace && image.source.kind !== 'cast') {
+      bad(`'${l.id}' is in the cast list with its own face: write image ${l.id}: and nothing else`);
+      continue;
+    }
+    out.push(image);
+  }
+  // Every `any` draw must find a portrait once crew portraits and the job's other faces are out (drawImages).
+  const list = known.extras?.list;
+  if (list) {
+    const used = new Set<string>();
+    for (const i of out) {
+      const f = i.source.kind === 'cast' ? known.cast?.get(i.id) : i.source.kind === 'extra' ? i.source : undefined;
+      if (f?.kind === 'extra') used.add(f.id);
+    }
+    for (const i of out) {
+      if (i.source.kind !== 'any') continue;
+      const tags = i.source.tags;
+      const pool = list.filter((e) => !isCrewFace(e.id) && !used.has(e.id) && tags.every((t) => e.tags.includes(t)));
+      if (!pool.length) problems.push({ field: `image ${i.id}`, message: `any ${tags.join(' ')}: no portrait left once crew portraits and the job's other faces are out` });
+      else used.add(pool[0].id);
+    }
+  }
+  return out;
+}
+
+/**
+ * Where a job's {img} markers may sit: at the start of a paragraph of a beat's or an outcome's text, for an image the
+ * job declares. Anywhere else in the body is a problem; a declared image nothing marks is a warning.
+ */
+function checkImageMarkers(body: string, images: readonly JobImage[], prose: readonly { field: string; text: string }[], problems: QuestProblem[], warnings: string[], o: { front: string; passive: readonly { field: string; text: string }[] }): void {
+  const count = (t: string) => (t.match(/\{img [a-z0-9-]+\}/g) ?? []).length;
+  const ids = new Set(images.map((i) => i.id));
+  const marked = new Set<string>();
+  let inProse = 0;
+  for (const p of prose) {
+    const lead = imageMarkers(p.text);
+    inProse += count(p.text);
+    if (count(p.text) > lead.length) problems.push({ field: p.field, message: 'an {img} marker goes at the start of a paragraph' });
+    for (const m of lead) {
+      if (!ids.has(m.id)) problems.push({ field: p.field, message: `{img ${m.id}}: no image '${m.id}' (an image ${m.id}: line in the front matter)` });
+      marked.add(m.id);
+    }
+  }
+  if (count(body) > inProse || count(o.front) > 0) problems.push({ field: 'file', message: "an {img} marker goes only in a beat's or outcome's text, never in the front matter (pitch:, brief:…) or a view, told:, way or card line" });
+  for (const p of o.passive) if (count(p.text) > 0) problems.push({ field: p.field, message: 'an {img} marker never goes on a conditional ([…]) line: it could never head a paragraph' });
+  for (const i of images) if (!marked.has(i.id)) warnings.push(`image '${i.id}': no {img ${i.id}} marker uses it`);
+}
 
 export function parseQuestFile(
   id: string,
   text: string,
-  known: { roster: ReadonlySet<string> | null; places: ReadonlySet<string> | null; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string> } | null; decks?: ReadonlySet<string> | null; outfits?: ReadonlySet<string> | null; /** Guest files' ids (The Passenger spec, engine §2); null or absent: unchecked. */ guests?: ReadonlySet<string> | null; /** Deduction board cases: each case's card ids; null or absent: unchecked. */ cases?: ReadonlyMap<string, ReadonlySet<string>> | null; /** Each case's verdict outcome ids (`verdictsOf`), for board beats. */ caseVerdicts?: ReadonlyMap<string, readonly string[]> | null; /** Accounts files' ids (Two Stories spec §3); their cards come in through `cases`. */ accounts?: ReadonlySet<string> | null },
+  known: { roster: ReadonlySet<string> | null; places: ReadonlySet<string> | null; extras?: { ids: ReadonlySet<string>; tags: ReadonlySet<string>; /** Each portrait's tags, for `image … any` draws (narration images spec); absent: unchecked. */ list?: readonly { id: string; tags: readonly string[] }[] } | null; /** The shared cast list (`world/cast.json`): recurring people's one face. Null or absent: unchecked. */ cast?: ReadonlyMap<string, CastFace> | null; decks?: ReadonlySet<string> | null; outfits?: ReadonlySet<string> | null; /** Guest files' ids (The Passenger spec, engine §2); null or absent: unchecked. */ guests?: ReadonlySet<string> | null; /** Deduction board cases: each case's card ids; null or absent: unchecked. */ cases?: ReadonlyMap<string, ReadonlySet<string>> | null; /** Each case's verdict outcome ids (`verdictsOf`), for board beats. */ caseVerdicts?: ReadonlyMap<string, readonly string[]> | null; /** Accounts files' ids (Two Stories spec §3); their cards come in through `cases`. */ accounts?: ReadonlySet<string> | null; /** The map's district ids, for `district:`; null or absent: unchecked. */ districts?: ReadonlySet<string> | null },
 ): { ok: true; entry: QuestEntry; warnings: string[] } | { ok: false; problems: QuestProblem[] } {
   const problems: QuestProblem[] = idOk(id) ? [] : [{ field: 'id', message: `must be lowercase letters, digits and dashes, at most ${LORE_ID_MAX}` }];
   const s = splitFrontMatter(text);
@@ -866,8 +1077,22 @@ export function parseQuestFile(
   const draws: { name: string; values: string[] }[] = [];
   // `piece <id>: <line>` lines: what each piece of a contract's groundwork is, for CREW → ERRANDS.
   const pieceLines = new Map<string, string>();
+  // `clock <id>: <LABEL> · <size> [· trust <contact>] [· "<note>"]` lines (crew rules): a job's own clocks.
+  const clockLines: { id: string; raw: string }[] = [];
+  // `image <id>[: <source>]` lines (narration images spec 2026-11-18): the faces its prose's {img <id>} markers show.
+  const imageLines: { id: string; raw: string }[] = [];
   const front: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(s.front)) {
+    const im = /^image\s+(.+)$/.exec(k);
+    if (im) {
+      imageLines.push({ id: im[1].trim(), raw: v == null ? '' : String(v).trim() });
+      continue;
+    }
+    const cl = /^clock\s+(.+)$/.exec(k);
+    if (cl) {
+      clockLines.push({ id: cl[1].trim(), raw: String(v ?? '').trim() });
+      continue;
+    }
     const p = /^piece\s+(.+)$/.exec(k);
     if (p) {
       pieceLines.set(p[1].trim(), String(v ?? '').trim());
@@ -889,6 +1114,21 @@ export function parseQuestFile(
   if (front.kind === 'big') return { ok: false, problems: [...problems, { field: 'kind', message: 'big jobs are contracts now' }] };
   const parsed = frontSchema.safeParse(front);
   if (!parsed.success) problems.push(...zodProblems(parsed.error));
+  const crew = front.rules === 'crew';
+  const clocks: NonNullable<QuestEntry['clocks']> = [];
+  for (const c of clockLines) {
+    const m = /^(.+?)\s*·\s*(\d+)(?:\s*·\s*trust\s+([a-z0-9-]+))?(?:\s*·\s*"([^"]*)")?$/.exec(c.raw);
+    const reserved = [...WAY_WORDS, ...STAT_KEYS, 'trust', 'warmth'] as readonly string[];
+    if (!crew) problems.push({ field: `clock ${c.id}`, message: 'a clock line goes only in a job with rules: crew' });
+    else if (!idOk(c.id) || !/^[a-z]/.test(c.id) || reserved.includes(c.id)) problems.push({ field: `clock ${c.id}`, message: `a clock id is lowercase letters, digits and dashes, and not one of ${reserved.join(', ')}` });
+    else if (!m || Number(m[2]) < 1 || Number(m[2]) > 8) problems.push({ field: `clock ${c.id}`, message: 'a clock is <LABEL> · <size>, the size 1–8, like WHAT RUE HEARS · 3, and may judge: · trust <contact>, then a note: · "SHE HEARS THIS"' });
+    else if (m[4] !== undefined && (m[4].trim() === '' || m[4].length > CLOCK_NOTE_MAX)) problems.push({ field: `clock ${c.id}`, message: `a clock's note is a few words, 1–${CLOCK_NOTE_MAX} characters` });
+    else if (clocks.some((x) => x.id === c.id)) problems.push({ field: `clock ${c.id}`, message: 'appears twice' });
+    else clocks.push({ id: c.id, label: m[1], size: Number(m[2]), ...(m[3] ? { trust: m[3] } : {}), ...(m[4] ? { note: m[4].trim() } : {}) });
+  }
+  if (clocks.length > 2) problems.push({ field: 'clock', message: `at most two clock lines in a job (this has ${clocks.length})` });
+  if (clocks.filter((c) => c.trust).length > 1) problems.push({ field: 'clock', message: 'one clock judges at most (· trust <contact>)' });
+  const clockIds = clocks.map((c) => c.id);
 
   // The body's nodes in order: `# id` a beat, `## id` an outcome.
   const nodes: { kind: 'beat' | 'outcome'; id: string; cond: string | null; lines: string[] }[] = [];
@@ -902,7 +1142,8 @@ export function parseQuestFile(
     else lead.push(line);
   }
   if (lead.join('').trim() !== '') problems.push({ field: 'body', message: 'text before the first # heading' });
-  const nodesMax = front.kind === 'contract' ? CONTRACT_NODES_MAX : QUEST_NODES_MAX;
+  // A crew-rules job's ways each carry their own story in their own outcome, so it holds as many as a contract.
+  const nodesMax = front.kind === 'contract' || crew ? CONTRACT_NODES_MAX : QUEST_NODES_MAX;
   if (nodes.length > nodesMax) problems.push({ field: 'file', message: `at most ${nodesMax} beats and outcomes (this has ${nodes.length})` });
 
   const beats = new Map<string, Beat[]>();
@@ -922,7 +1163,7 @@ export function parseQuestFile(
       const vs = beats.get(n.id) ?? [];
       // Only the last version may be the default; a second default, or a default before a version, is a mistake.
       if (vs.length > 0 && vs[vs.length - 1].when === null) problems.push({ field: n.id, message: 'the version without `if` must be the last one, and there can be only one' });
-      vs.push(parseBeat(n.id, when ?? (n.cond !== null ? [] : null), n.lines, problems));
+      vs.push(parseBeat(n.id, when ?? (n.cond !== null ? [] : null), n.lines, problems, { crew, clockIds }));
       beats.set(n.id, vs);
     } else if (outcomes.has(n.id)) {
       problems.push({ field: n.id, message: n.cond !== null || outcomes.get(n.id)!.versions ? 'the version without `if` must be the last one, and there can be only one' : 'appears twice' });
@@ -963,8 +1204,26 @@ export function parseQuestFile(
     if (!Array.isArray(c)) problems.push({ field: 'after', message: c.message });
     else after = c;
   }
+  // Crew rules: a mission whose cards list ways; it writes its own getaway, and the tier template doesn't apply.
+  if (crew) {
+    if (f.kind !== 'mission') problems.push({ field: 'rules', message: 'rules: crew goes only on a job (kind: mission)' });
+    if (f.template) problems.push({ field: 'template', message: 'rules: crew replaces template: true: drop it' });
+    if (!beats.has('getaway')) problems.push({ field: 'body', message: 'a crew-rules job needs a # getaway beat, with ways like any other card' });
+  }
+  // A judging clock (Kroll's desk) moves the trust of the job's one contact, and replaces a trust: stake rather than adding to it.
+  for (const c of clocks) {
+    if (!c.trust) continue;
+    const own = ownedBy({ with: withIds });
+    if (c.trust !== own) problems.push({ field: `clock ${c.id}`, message: `trust ${c.trust}: a judging clock moves the job's one with: contact's trust (with: [${(withIds ?? []).join(', ')}])` });
+    if (f.trust != null) problems.push({ field: `clock ${c.id}`, message: 'a job has a trust: line or a judging clock, not both' });
+  }
   if (known.roster && withIds) for (const w of withIds) if (!known.roster.has(w)) problems.push({ field: 'with', message: `no character '${w}'` });
   if (known.roster) for (const w of f['known-by'] ?? []) if (!known.roster.has(w)) problems.push({ field: 'known-by', message: `no character '${w}'` });
+  const images = parseImages(imageLines, withIds ?? [], known, problems);
+  checkImageMarkers(s.body, images, [...[...beats.values()].flat().map((b) => ({ field: b.id, text: b.text })), ...[...outcomes.values()].map((o) => ({ field: o.id, text: o.text }))], problems, warnings, {
+    front: Object.values(s.front).filter((v): v is string => typeof v === 'string').join('\n'),
+    passive: [...beats.values()].flat().flatMap((b) => (b.segments ?? []).filter((g) => g.when !== null).map((g) => ({ field: b.id, text: g.text }))),
+  });
   // A spring file (crew spec §5) posts where the held recruit was hired: no starts: of its own.
   if (f.spring) {
     if (f.kind !== 'mission') problems.push({ field: 'spring', message: 'spring: true goes only in a job (kind: mission)' });
@@ -1003,7 +1262,13 @@ export function parseQuestFile(
     const covered = mission || b.views.some((v) => v.contact === 'any' && v.when === null) || (withIds !== null && withIds.every((w) => b.views.some((v) => v.contact === w && v.when === null)));
     if (!covered) problems.push({ field: b.id, message: "needs a 'view any:' line, or a view for each contact in with" });
     for (const c of b.choices) {
-      if (!outcomes.has(c.to)) problems.push({ field: b.id, message: `choice ${c.id} → '${c.to}': no ## outcome by that id` });
+      if (!c.ways && !outcomes.has(c.to)) problems.push({ field: b.id, message: `choice ${c.id} → '${c.to}': no ## outcome by that id` });
+      for (const w of c.ways ?? []) if (!outcomes.has(w.to)) problems.push({ field: b.id, message: `card ${c.id}, way ${wayKeyText(w.key)} → '${w.to}': no ## outcome by that id` });
+      if (c.ways) {
+        // A card is one step on the route: every way's outcome goes on to the same beat.
+        const nexts = [...new Set(c.ways.flatMap((w) => (outcomes.has(w.to) ? [outcomes.get(w.to)!.to] : [])))];
+        if (nexts.length > 1) problems.push({ field: b.id, message: `card ${c.id}: its ways lead to different beats (${nexts.join(', ')}); every way goes on to the same one` });
+      }
       if (c.fail !== null && !outcomes.has(c.fail)) problems.push({ field: b.id, message: `choice ${c.id} / '${c.fail}': no ## outcome by that id` });
       if (c.check && !mission) problems.push({ field: b.id, message: `choice ${c.id}: check goes only in a mission (kind: mission)` });
       if (c.crack && !mission) problems.push({ field: b.id, message: `choice ${c.id}: crack goes only in a mission (kind: mission)` });
@@ -1013,6 +1278,8 @@ export function parseQuestFile(
       if (!c.check && !c.crack && c.fail !== null) problems.push({ field: b.id, message: `choice ${c.id}: '/ ${c.fail}' is a fail outcome, which needs a check` });
       if (c.check?.red) reds.add(b.id);
     }
+    // No best way (crew rules): weighed across the beat's cards, at each ALARM.
+    for (const d of beatDominance(b, outcomes)) warnings.push(`${b.id}: at ALARM ${d.alarm}, card ${d.aCard} way ${wayKeyText(d.a.key)} (→ ${d.a.to}) is at least as good as card ${d.bCard} way ${wayKeyText(d.b.key)} (→ ${d.b.to}) on every count and spends nothing more`);
   }
   if (!contracted && pieceLines.size > 0) problems.push({ field: 'groundwork', message: 'piece lines go only in a contract' });
   if (!mission && f.trust != null) problems.push({ field: 'trust', message: 'trust: goes only on a job (kind: mission or contract)' });
@@ -1020,6 +1287,11 @@ export function parseQuestFile(
   if (!mission && f.for != null) problems.push({ field: 'for', message: 'for: goes only on a job (kind: mission or contract)' });
   if (!mission && f.bars != null) problems.push({ field: 'bars', message: 'bars: goes only on a job (kind: mission or contract)' });
   if (f.bars != null && known.decks && !known.decks.has(f.bars)) problems.push({ field: 'bars', message: `no deck '${f.bars}' in world/gear` });
+  if (!mission && f.district != null) problems.push({ field: 'district', message: 'district: goes only on a job (kind: mission or contract)' });
+  if (f.district != null && known.districts && !known.districts.has(f.district)) problems.push({ field: 'district', message: `no district '${f.district}' on the map` });
+  if (!mission && f['hire-at'] != null) problems.push({ field: 'hire-at', message: 'hire-at: goes only on a job (kind: mission or contract)' });
+  else if (f['hire-at'] != null && ![...outcomes.values()].some((o) => o.effects.recruit)) problems.push({ field: 'hire-at', message: 'hire-at: goes with gives: recruit on an ending' });
+  else if (f['hire-at'] != null && known.places && !known.places.has(f['hire-at'])) problems.push({ field: 'hire-at', message: `no place '${f['hire-at']}' on the map` });
   if (f.for != null && known.roster && !known.roster.has(f.for)) problems.push({ field: 'for', message: `no character '${f.for}'` });
   if ((f.opening == null) !== (f['opening-view'] == null)) problems.push({ field: f.opening == null ? 'opening' : 'opening-view', message: 'opening: and opening-view: go together' });
   else if (f.opening != null && (!mission || f.for == null || withIds?.length !== 1)) problems.push({ field: 'opening', message: 'opening: goes only on a job with for: and one with: contact' });
@@ -1039,7 +1311,7 @@ export function parseQuestFile(
       else if (beatId === 'getaway' || /^push-\d+$/.test(beatId)) warnings.push(`${c.id}: ${word} does nothing on a getaway or push beat`);
     }
   // A temper names a draw, or a flag some choice sets (small jobs spec §1).
-  const setFlags = new Set([...beats.values()].flat().flatMap((b) => b.choices.flatMap((c) => c.tags.flatMap((t) => (t.kind === 'set' ? [t.name] : [])))));
+  const setFlags = new Set([...beats.values()].flat().flatMap((b) => b.choices.flatMap((c) => [...c.tags.flatMap((t) => (t.kind === 'set' ? [t.name] : [])), ...(c.ways ?? []).flatMap((w) => w.sets.map((x) => x.name))])));
   for (const b of [...beats.values()].flat()) {
     const tf = b.stranger?.temper;
     if (tf && !draws.some((d) => d.name === tf) && !setFlags.has(tf)) problems.push({ field: b.id, message: `temper: '${tf}' isn't a draw or a flag set in this file` });
@@ -1049,14 +1321,14 @@ export function parseQuestFile(
   const postIds = [...new Set(postBeats.map((b) => b.post!.id))];
   if (postIds.length > 2) problems.push({ field: 'file', message: 'at most two posts in a job' });
   for (const b of postBeats) if (b.id === 'getaway' || /^push-\d+$/.test(b.id) || !b.choices.some((c) => c.check || c.crack)) problems.push({ field: b.id, message: 'a post goes on a rolled beat' });
-  const readFlags = new Set(
-    [
-      ...[...beats.values()].flat().flatMap((b) => [b.when ?? [], b.songWhen ?? [], ...b.segments.map((x) => x.when ?? []), ...b.views.map((x) => x.when ?? []), ...b.choices.flatMap((c) => [...c.tags.flatMap((t) => (t.kind === 'needs' ? [t.all] : [])), ...(c.check?.mods ?? []).map((m) => m.when), ...(c.crack?.mods ?? []).map((m) => m.when)])]),
-      ...[...outcomes.values()].flatMap((o) => (o.versions ?? []).map((v) => v.when)),
-    ]
-      .flat()
-      .flatMap((c) => (c.kind === 'flag' || c.kind === 'set' ? [c.name] : [])),
-  );
+  const read = [
+    ...[...beats.values()].flat().flatMap((b) => [b.when ?? [], b.songWhen ?? [], ...b.segments.map((x) => x.when ?? []), ...b.views.map((x) => x.when ?? []), ...b.choices.flatMap((c) => [...c.tags.flatMap((t) => (t.kind === 'needs' ? [t.all] : [])), ...(c.check?.mods ?? []).map((m) => m.when), ...(c.crack?.mods ?? []).map((m) => m.when), ...(c.ways ?? []).map((w) => w.when ?? [])])]),
+    ...[...outcomes.values()].flatMap((o) => (o.versions ?? []).map((v) => v.when)),
+  ].flat();
+  const readFlags = new Set(read.flatMap((c) => (c.kind === 'flag' || c.kind === 'set' ? [c.name] : [])));
+  // A count (`hears>=2`) reads one of the job's own clocks: any other name is a mistake, not a clock at 0.
+  const counted = [...read, ...(after ?? []), ...[...outcomes.values()].flatMap((o) => (o.effects.settles ?? []).flatMap((x) => x.when ?? []))];
+  for (const name of new Set(counted.flatMap((c) => (c.kind === 'count' ? [c.name] : [])))) if (!clockIds.includes(name)) problems.push({ field: 'file', message: `'${name}' isn't a clock in this job (a condition like ${name}>=2 reads a clock <id>: line)` });
   const harmed = new Set([...outcomes.values()].flatMap((o) => (o.effects.postHarm ? [o.effects.postHarm.post] : [])));
   for (const id of postIds) if (!readFlags.has(`post.${id}`) && !harmed.has(id)) problems.push({ field: 'file', message: `post ${id}: no later beat or outcome reads post.${id}` });
   for (const o of outcomes.values()) if (o.effects.postHarm && !postIds.includes(o.effects.postHarm.post)) problems.push({ field: o.id, message: `no post '${o.effects.postHarm.post}' in this file` });
@@ -1071,6 +1343,8 @@ export function parseQuestFile(
     const { arrangement, ...jobEffects } = o.effects;
     if (arrangement && missedTargets.has(o.id)) problems.push({ field: o.id, message: "arrangement: can't be reached by a wait's else (a deal is struck by a pick)" });
     if (!mission && Object.keys(jobEffects).length > 0) problems.push({ field: o.id, message: 'pay:, heat:, gives: and takes: go only in a mission (kind: mission)' });
+    // A crew-rules job's HEAT is only what its ways' `heat N` landed: an outcome's `heat:` would never land.
+    if (crew && o.effects.heat !== undefined) problems.push({ field: o.id, message: "heat: doesn't land on a crew-rules job: on crew rules HEAT comes from a way's `heat N`" });
     for (const s of o.effects.settles ?? []) {
       if (o.to !== 'end') problems.push({ field: o.id, message: 'settles: goes on an outcome that ends (→ end)' });
       if (s.text.length > SETTLES_MAX) problems.push({ field: o.id, message: `settles: at most ${SETTLES_MAX} characters (this is ${s.text.length})` });
@@ -1101,16 +1375,20 @@ export function parseQuestFile(
 
   // Push beats (pressing on spec §2): push-1…push-3, reached only by PRESS ON, every outcome back to the card.
   const pushBeats = [...beats.keys()].filter((id) => /^push-\d+$/.test(id));
-  const pushOutcomes = new Set(pushBeats.flatMap((id) => beats.get(id)!.flatMap((b) => b.choices.flatMap((c) => [c.to, ...(c.fail ? [c.fail] : [])]))));
+  const pushOutcomes = new Set(pushBeats.flatMap((id) => beats.get(id)!.flatMap((b) => b.choices.flatMap(plays))));
   if (pushBeats.length > 0 && !mission) problems.push({ field: 'body', message: 'push beats go only in a job (kind: mission or contract)' });
   for (const id of pushBeats) {
     const n = Number(id.slice(5));
     if (!PUSH_ID.test(id)) problems.push({ field: id, message: 'at most three push beats (push-1 to push-3)' });
     else if (n > 1 && !beats.has(pushBeatId(n - 1))) problems.push({ field: id, message: `${id} needs ${pushBeatId(n - 1)}` });
     for (const b of beats.get(id)!)
-      for (const c of b.choices) if ((c.check || c.crack) && c.fail !== null && !outcomes.get(c.fail)?.effects.lost) problems.push({ field: id, message: `choice ${c.id}: a push check fails to an outcome with lost` });
+      for (const c of b.choices) {
+        if ((c.check || c.crack) && c.fail !== null && !outcomes.get(c.fail)?.effects.lost) problems.push({ field: id, message: `choice ${c.id}: a push check fails to an outcome with lost` });
+        // The pay is settled before a push beat plays, so a cut there would take nothing and still show on the debrief.
+        for (const w of c.ways ?? []) if (w.cut > 0) problems.push({ field: id, message: `card ${c.id}, way ${wayKeyText(w.key)}: no cut on a push beat (the pay is settled by then)` });
+      }
   }
-  const otherOutcomes = new Set([...beats.entries()].filter(([id]) => !pushBeats.includes(id)).flatMap(([, vs]) => vs.flatMap((b) => b.choices.flatMap((c) => [c.to, ...(c.fail ? [c.fail] : [])]))));
+  const otherOutcomes = new Set([...beats.entries()].filter(([id]) => !pushBeats.includes(id)).flatMap(([, vs]) => vs.flatMap((b) => b.choices.flatMap(plays))));
   for (const o of outcomes.values()) {
     if (pushOutcomes.has(o.id)) {
       if (otherOutcomes.has(o.id)) problems.push({ field: o.id, message: `outcome '${o.id}' is used by a push beat and another beat` });
@@ -1125,8 +1403,9 @@ export function parseQuestFile(
   const getaway = beats.get('getaway');
   if (getaway) {
     if (!mission) problems.push({ field: 'getaway', message: 'a # getaway beat goes only in a job (kind: mission or contract)' });
-    const ends = new Set(getaway.flatMap((b) => b.choices.flatMap((c) => [c.to, ...(c.fail ? [c.fail] : [])])));
-    for (const id of ends) if (outcomes.get(id) && outcomes.get(id)!.to !== 'end') problems.push({ field: id, message: "a getaway's outcome ends the job (→ end)" });
+    const ends = new Set(getaway.flatMap((b) => b.choices.flatMap(plays)));
+    // A crew-rules job's getaway may go on to a beat of its own (Run Sheet's Grey Car); checked once `next` is known, below.
+    for (const id of ends) if (outcomes.get(id) && outcomes.get(id)!.to !== 'end' && !(crew && beats.has(outcomes.get(id)!.to))) problems.push({ field: id, message: "a getaway's outcome ends the job (→ end)" });
   }
   for (const o of outcomes.values()) if (o.to === 'getaway') problems.push({ field: o.id, message: "→ 'getaway': a getaway is reached only by a full ALARM" });
 
@@ -1134,7 +1413,7 @@ export function parseQuestFile(
   const next = (nid: string): string[] => {
     const vs = beats.get(nid);
     // A board beat leads to its verdicts' outcomes (deduction board spec §3).
-    if (vs) return vs.flatMap((b) => [...b.choices.flatMap((c) => [c.to, ...(c.fail ? [c.fail] : [])]), ...(b.board ? [...outcomes.keys()].filter(isVerdictId) : []), ...(b.accounts ? ['told'] : [])]).filter((t) => outcomes.has(t));
+    if (vs) return vs.flatMap((b) => [...b.choices.flatMap(plays), ...(b.board ? [...outcomes.keys()].filter(isVerdictId) : []), ...(b.accounts ? ['told'] : [])]).filter((t) => outcomes.has(t));
     const o = outcomes.get(nid);
     if (!o) return [];
     const to = o.to !== 'end' && beats.has(o.to) ? [o.to] : [];
@@ -1162,6 +1441,38 @@ export function parseQuestFile(
     else if (f.guest != null && !guest) problems.push({ field: 'guest', message: 'guest: is a contact and a grade, like ember VET' });
     else if (guest && known.guests && !known.guests.has(guest.id) && !known.roster?.has(guest.id)) problems.push({ field: 'guest', message: `no character or guest '${guest.id}'` });
   }
+  // `{who}` (crew rules): the first name of whoever did the way that plays it, so only an outcome nobody but a recruit, a
+  // program or the contact plays; you, a plain pick or a check never fills it.
+  for (const o of outcomes.values()) {
+    if (!o.text.includes('{who}')) continue;
+    const base = o.id.split('@')[0];
+    const by = [...beats.values()].flat().flatMap((b) => b.choices.flatMap((c) => (c.ways ? c.ways.filter((w) => w.to === base).map((w) => w.key.kind) : c.to === base || c.fail === base ? ['plain'] : [])));
+    if (!crew || by.length === 0 || by.some((k) => k === 'you' || k === 'plain')) problems.push({ field: o.id, message: "{who} goes only in a crew-rules outcome that no you way or plain pick plays (it's the name of the recruit, program or contact who did the way)" });
+  }
+  // A way's `told:` fills `{who}` the same way, so only on a way someone other than you does.
+  for (const b of [...beats.values()].flat())
+    for (const c of b.choices)
+      for (const w of c.ways ?? [])
+        if (w.key.kind === 'you' && w.told?.includes('{who}')) problems.push({ field: b.id, message: `card ${c.id}, way ${wayKeyText(w.key)}: {who} goes in a told: only on a way someone other than you does (it's the name of the recruit, program or contact who did it)` });
+  // Crew rules: a getaway's outcome that goes on to a beat must lead only to the job's end from there, never back into
+  // its ordinary beats, a push beat or the getaway itself.
+  if (crew && getaway) {
+    const walk = (from: string[]): Set<string> => {
+      const seen = new Set<string>(from);
+      for (const queue = [...from]; queue.length > 0; ) for (const t of next(queue.shift()!)) if (!seen.has(t) && seen.add(t)) queue.push(t);
+      return seen;
+    };
+    const ordinary = walk([first, ...arcBeats.filter((b) => beats.has(b))]);
+    for (const id of new Set(getaway.flatMap((b) => b.choices.flatMap(plays)))) {
+      const to = outcomes.get(id)?.to;
+      if (!to || to === 'end' || !beats.has(to)) continue;
+      const after = [...walk([to])].filter((n) => beats.has(n));
+      const back = after.find((n) => n === 'getaway' || pushBeats.includes(n) || ordinary.has(n));
+      if (back) problems.push({ field: id, message: `a getaway's outcome goes on to a beat that ends the job, never back into it ('${to}' leads to '${back}')` });
+      // Past the getaway nobody is sent: that beat's picks are plain.
+      for (const n of after) if ((beats.get(n) ?? []).some((b) => b.choices.some((c) => c.ways?.length))) problems.push({ field: n, message: `a beat after the getaway ('${n}') has plain picks only, no ways` });
+    }
+  }
   const roots = [first, ...arcBeats.filter((b) => beats.has(b)), ...pushBeats, ...(beats.has('getaway') ? ['getaway'] : [])];
   const reached = new Set<string>(roots);
   for (const queue = [...roots]; queue.length > 0; ) for (const t of next(queue.shift()!)) if (!reached.has(t) && reached.add(t)) queue.push(t);
@@ -1178,7 +1489,7 @@ export function parseQuestFile(
 
   if (problems.length > 0) return { ok: false, problems };
   const timed = [...outcomes.values()].some((o) => o.wait?.by != null);
-  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor!, ...(f.lead ? { lead: f.lead } : {}), ...(guest ? { guest } : {}) } } : {}), ...(!contracted && mission && guest ? { guest } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, ...(f['posted-by'] ? { postedBy: f['posted-by'] } : {}), ...(f.text ? { text: f.text } : {}), ...(f.brief ? { brief: f.brief } : {}), ...(f.opening && f['opening-view'] ? { opening: { text: f.opening, view: f['opening-view'] } } : {}), ...(f['known-by'] ? { knownBy: f['known-by'] } : {}), ...(f.people ? { people: f.people } : {}), timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.for ? { for: f.for } : {}), ...(f.bars ? { bars: f.bars } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}) };
+  const entry: QuestEntry = { id, title: f.title, ...(f.drops ? { drops: f.drops } : {}), kind: contracted ? 'contract' : mission ? 'mission' : 'quest', ...(contracted ? { contract: { night: span(f.night!)!, fallout: span(f.fallout!)!, pieces: pieces.map(([pid, spec]) => ({ id: pid, spec: spec as Specialty, line: pieceLines.get(pid) ?? '' })), postsAt: Number(f['posts-at']), rumor: f.rumor!, ...(f.lead ? { lead: f.lead } : {}), ...(guest ? { guest } : {}) } } : {}), ...(!contracted && mission && guest ? { guest } : {}), pay: payRange ? payRange[0] : null, tier: (f.tier != null ? Number(f.tier) : 1) as 1 | 2 | 3 | 4, payRange, minutes: f.minutes != null ? Number(f.minutes) : null, draws, art: f.art ?? null, with: withIds, starts: f.starts ?? '', after, pitch: f.pitch ?? null, ...(f['posted-by'] ? { postedBy: f['posted-by'] } : {}), ...(f.text ? { text: f.text } : {}), ...(f.brief ? { brief: f.brief } : {}), ...(f.opening && f['opening-view'] ? { opening: { text: f.opening, view: f['opening-view'] } } : {}), ...(f['known-by'] ? { knownBy: f['known-by'] } : {}), ...(f.people ? { people: f.people } : {}), timed, first, beats, outcomes, posts: f.posts ? (f.posts.split('-').map((t) => parseHhmm(t)!) as [number, number]) : null, commsAt: f.comms ?? null, trust: f.trust ? (f.trust.split('/').map((x) => Number(x.trim())) as [number, number]) : null, ...(f.once ? { once: true as const } : {}), ...(f.for ? { for: f.for } : {}), ...(f.bars ? { bars: f.bars } : {}), ...(f.district ? { district: f.district } : {}), ...(f['hire-at'] ? { hireAt: f['hire-at'] } : {}), ...(f.spring ? { spring: true as const } : {}), ...(f['take-size'] != null ? { takeSize: Number(f['take-size']) } : {}), ...(f.loot ? { loot: f.loot.trim() } : {}), ...(f.template || contracted ? { template: true as const } : {}), ...(crew ? { rules: 'crew' as const } : {}), ...(clocks.length > 0 ? { clocks } : {}), ...(images.length > 0 ? { images } : {}) };
   if (entry.template) warnings.push(...offTemplate(entry));
   return { ok: true, warnings, entry };
 }
@@ -1210,7 +1521,8 @@ export interface QuestRun {
   /** What it waits for before its next beat plays (quest waits spec §3); null: not waiting. */
   wait: RunWait | null;
   /** `take` / `alarm`: what a job's pick changed on those clocks (SO FAR on the table, 2026-11-15); absent on older runs and when nothing moved. */
-  picks: { beat: string; choice: string; roll?: Roll; crack?: CrackPick; take?: number; alarm?: number }[];
+  /** `told`: a crew-rules pick's line as the contact was told it (`crewPickLine`, a throw's line); absent on others and old picks. */
+  picks: { beat: string; choice: string; roll?: Roll; crack?: CrackPick; take?: number; alarm?: number; told?: string }[];
   flags: Record<string, string>;
   done: boolean;
   /** A job's draws (small jobs spec §1), made when it started; also in `flags`. */
@@ -1235,7 +1547,7 @@ export interface QuestRun {
   startDeck?: string | null;
   /** A blown ending waiting on the cover cards (plan ruling 5): the outcome, the row it will write, and that row's minutes. */
   /** `texts`: the parts `text` joins, kept apart so each can find its recorded clip (voiced job beats); absent on older saves. */
-  pendingCover?: { outcome: string; text: string; texts?: string[]; pick?: { choice: string; line: string; roll?: Roll }; minutes: number } | null;
+  pendingCover?: { outcome: string; text: string; texts?: string[]; pick?: { choice: string; line: string; roll?: Roll; cost?: string; toldAs?: string }; minutes: number } | null;
   /** A mission's changes to the kit (missions spec §1): folded with every other run's into sol, heat, deck and EDGE. */
   kit?: KitEvent[];
   /** A failed check waiting on REROLL or TAKE IT (missions spec §3); absent or null: none. */
@@ -1244,6 +1556,8 @@ export interface QuestRun {
   at: number;
   /** Each stranger's face in this run, name → extra id (stranger faces spec §5); absent: none drawn. */
   faces?: Record<string, string>;
+  /** Narration images (spec 2026-11-18): `any` faces drawn at the run's start, and the images shown so far (first time only). */
+  images?: { drawn: Record<string, string>; shown: string[] };
   /** Pressing on (spec 2026-10-29 §3): the push after the take; absent until one is offered. */
   push?: PushState;
   /** The deduction board on a board beat (deduction board spec §3). */
@@ -1260,6 +1574,8 @@ export interface QuestRun {
   settles?: Settled[];
   /** The hand (spec 2026-10-29-the-hand §1): the SETUP card GO IN took; absent on runs from before it, or sent without one. */
   setup?: Setup;
+  /** Crew rules (spec 2026-11-17): the hand's goes, the job's clocks, the beat's mods and what lands at the end; on, and only on, a crew-rules run. */
+  crew?: CrewState;
   /** Each card played on a roll, in order (§2). */
   calls?: Call[];
 }
@@ -1274,7 +1590,8 @@ export interface PushState {
   from: number;
   outcome: string;
   state: 'offer' | 'playing' | 'won' | 'walked' | 'lost';
-  log: { beat: string; choice: string; result: 'won' | 'lost'; sol: number }[];
+  /** `missed`: a crew-rules throw that failed on the push beat, so nothing was won (crew rules, last pass B1); absent on others. */
+  log: { beat: string; choice: string; result: 'won' | 'lost'; sol: number; missed?: true }[];
   /** The decks you owned as the push began: a lost push takes back only the others it gave. */
   had?: string[];
 }
@@ -1350,6 +1667,7 @@ export function diceAhead(q: QuestEntry, outcome: string | undefined): boolean {
         if (c.check) return true;
         follow(c.to);
         follow(c.fail);
+        for (const w of c.ways ?? []) follow(w.to);
       }
   }
   return false;
@@ -1476,6 +1794,8 @@ export const isLegacyPending = (p: DicePending | LegacyPending): p is LegacyPend
 export const stepMinutes = (q: Pick<QuestEntry, 'minutes' | 'tier'>): number => q.minutes ?? [20, 30, 45, 60][q.tier - 1];
 
 export const questKey = (player: string, id: string) => `quest.${player}.${id}`;
+/** Where a job's `gives: recruit` card sits (crew spec §5): its `hire-at:`, else where it starts. */
+export const hirePlace = (q: Pick<QuestEntry, 'starts' | 'hireAt'>): string => q.hireAt ?? q.starts;
 
 const runWaitSchema = z.object({
   to: z.string(),
@@ -1569,6 +1889,7 @@ const runSchema = z.object({
       roll: rollSchema.optional(),
       take: z.number().int().optional(),
       alarm: z.number().int().optional(),
+      told: z.string().optional(),
       crack: z.object({ moves: z.array(z.union([z.object({ word: z.string() }), z.object({ bracket: z.number().int() })])), state: z.enum(['granted', 'locked']), tries: z.number().int() }).optional(),
     }),
   ),
@@ -1611,7 +1932,7 @@ const runSchema = z.object({
       from: z.number().int().min(0),
       outcome: z.string(),
       state: z.enum(['offer', 'playing', 'won', 'walked', 'lost']),
-      log: z.array(z.object({ beat: z.string(), choice: z.string(), result: z.enum(['won', 'lost']), sol: z.number() })),
+      log: z.array(z.object({ beat: z.string(), choice: z.string(), result: z.enum(['won', 'lost']), sol: z.number(), missed: z.literal(true).optional() })),
       had: z.array(z.string()).optional(),
     })
     .optional(),
@@ -1625,13 +1946,33 @@ const runSchema = z.object({
     .optional()
     .catch(undefined),
   startDeck: z.string().nullable().optional(),
+  // A bad crew field falls back to its fresh value, and a bad crew to a fresh one: never dropped, or a crew-rules run
+  // would read as a Graft run (its cards have no checks).
+  crew: z
+    .object({
+      goes: z
+        .record(z.string(), z.unknown())
+        .transform((r) => Object.fromEntries(Object.entries(r).filter((e): e is [string, 'spent' | 'door' | 'hurt' | 'held'] => e[1] === 'spent' || e[1] === 'door' || e[1] === 'hurt' || e[1] === 'held')))
+        .catch({}),
+      clocks: z
+        .record(z.string(), z.unknown())
+        .transform((r) => Object.fromEntries(Object.entries(r).filter((e): e is [string, number] => Number.isInteger(e[1]))))
+        .catch({}),
+      mods: z.object({ noAlarm: z.literal(true).optional().catch(undefined), noHeat: z.literal(true).optional().catch(undefined), plusTake: z.literal(true).optional().catch(undefined), wall: z.literal(true).optional().catch(undefined) }).catch({}),
+      modsBeat: z.string().nullable().catch(null),
+      cut: z.number().catch(0),
+      heat: z.number().catch(0),
+    })
+    .optional()
+    .catch(() => ({ goes: {}, clocks: {}, mods: {}, modsBeat: null, cut: 0, heat: 0 })),
   spring: z.object({ recruit: z.string(), place: z.string(), tier: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]) }).optional(),
   recruit: z.object({ spec: z.preprocess(normalSpec, z.enum(HIREABLE as [Specialty, ...Specialty[]])), grade: z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]), sex: z.enum(['man', 'woman']).optional(), pitch: z.string().optional() }).optional(),
   guestNote: z.string().optional(),
   settles: z.array(z.object({ who: z.string(), text: z.string() })).optional(),
-  pendingCover: z.object({ outcome: z.string(), text: z.string(), pick: z.object({ choice: z.string(), line: z.string(), roll: rollSchema.optional() }).optional(), minutes: z.number() }).nullable().optional(),
+  pendingCover: z.object({ outcome: z.string(), text: z.string(), pick: z.object({ choice: z.string(), line: z.string(), roll: rollSchema.optional(), cost: z.string().optional(), toldAs: z.string().optional() }).optional(), minutes: z.number() }).nullable().optional(),
   at: z.number(),
   faces: z.record(z.string(), z.string()).optional(),
+  images: z.object({ drawn: z.record(z.string(), z.string()), shown: z.array(z.string()) }).optional(),
   kit: z
     .array(
       z.object({
@@ -1703,7 +2044,8 @@ export interface QuestStatus {
  * these, so an arc's acts can follow each other (The Fourteenth's nix4, House Glass's nix1, The Passenger's ear1).
  */
 export function storyFlagsOf(q: Pick<QuestEntry, 'beats'>, run: Pick<QuestRun, 'flags'>, also: Iterable<string> = []): Record<string, string> {
-  const set = new Set([...q.beats.values()].flat().flatMap((b) => b.choices.flatMap((c) => c.tags.flatMap((t) => (t.kind === 'set' ? [t.name] : [])))));
+  // A card's `[set]` and, on a crew-rules job, a way's own `set` (crew rules spec): an arc reads either.
+  const set = new Set([...q.beats.values()].flat().flatMap((b) => b.choices.flatMap((c) => [...c.tags.flatMap((t) => (t.kind === 'set' ? [t.name] : [])), ...(c.ways ?? []).flatMap((w) => w.sets.map((x) => x.name))])));
   for (const k of also) set.add(k);
   // Boards' verdicts: the deduction board's case.*, the accounts board's story.* (`also` is what its cards cost).
   return Object.fromEntries(Object.entries(run.flags).filter(([k]) => set.has(k) || k.startsWith('case.') || k.startsWith('story.')));
@@ -1731,6 +2073,42 @@ const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
 
 /** The pick row's line for a card click: "Stall him till morning." → "You stall him till morning." */
 export const pickLine = (line: string) => `You ${lowerFirst(line)}`;
+
+/**
+ * A crew-rules pick's line, as the row keeps it and the contact is told it (crew rules spec, The contact): the way's line
+ * (an imperative) and who did it. You read as yours ("You hunt and peck."), her own way as yours and done ("You ask her
+ * to take the lacquer off. She does it.", by `pronoun`); a recruit is sent ("You sent Kit: Lift his whole session."), a program run ("You ran FIREWALL: …").
+ * `name`: the recruit's first name or the program's name in capitals.
+ */
+export function crewPickLine(o: { by: 'you' | 'contact' | 'recruit' | 'program'; name?: string; line: string; pronoun?: Pronoun }): string {
+  if (o.by === 'recruit') return `You sent ${o.name}: ${o.line}`;
+  if (o.by === 'program') return `You ran ${o.name}: ${o.line}`;
+  // Her own way says she did it, not only that she was asked (live check: she said she could).
+  // By her pronoun ("She does it.", "He does it.", "They do it."); `they` when unknown.
+  if (o.by === 'contact') {
+    const f = forms(o.pronoun ?? 'they');
+    return `${pickLine(o.line)} ${f.she[0].toUpperCase()}${f.she.slice(1)} do${f.s ? 'es' : ''} it.`;
+  }
+  return pickLine(o.line);
+}
+
+/**
+ * What a crew-rules way cost, in story words for the contact (last pass C: told only the pick, she said "Nobody's
+ * looking at you twice" after a way that raised ALARM). One clause per kind that landed, in this order; '' when nothing
+ * did. Never a number or a game term. A job's own clock adds nothing: her view lines read it.
+ */
+export function crewCostWords(o: { alarm: number; heat: number; cut: number; lose: number; none: boolean; harm?: { name: string; loss: 'hurt' | 'held' } | null }): string {
+  return [
+    o.alarm > 0 ? 'It drew notice.' : null,
+    o.heat > 0 ? 'It left a trace.' : null,
+    o.cut > 0 ? 'It cost part of the fee.' : null,
+    o.lose > 0 ? 'Some of the take was lost.' : null,
+    o.none ? 'Nothing came away from it.' : null,
+    o.harm ? `${o.harm.name} was ${o.harm.loss}.` : null,
+  ]
+    .filter((x): x is string => x !== null)
+    .join(' ');
+}
 
 /** What the contact thinks at this beat: their own view, or `view any`, then whichever gated lines hold. */
 export function beatViews(beat: Beat, ctx: CondCtx): string {
@@ -1776,7 +2154,7 @@ export function questBlock(q: QuestEntry, beat: Beat, ctx: CondCtx, oneLine: (s:
   const knows = beat.stranger ? ` ${beat.stranger.name} knows only what is written above: give them no new facts, and they stay where they are, waiting.` : '';
   const tag = isJob(q) ? 'job' : 'quest';
   return (
-    `[${tag} — ${q.title}. Where it stands${!shown && player ? ` ${toldTo(player, beatAway(beat), beat.here === true)}` : ''}: ${shown ? `the [${tag} — ${q.title}: …] line at the end of this message, which they have just read` : oneLine(beatAway(beat) ? heardAt(beat) : beat.text)}\n` +
+    `[${tag} — ${q.title}. Where it stands${!shown && player ? ` ${toldTo(player, beatAway(beat), beat.here === true)}` : ''}: ${shown ? `the [${tag} — ${q.title}: …] line at the end of this message, which they have just read` : oneLine(beatAway(beat) ? heardAt(beat) : stripImageMarkers(beat.text))}\n` +
     // A board beat (deduction board spec §3): no choices, the board is the move; she talks it through and never names anyone.
     (beat.accounts !== undefined
       ? ` ${player ?? 'They'} is working out what to say about that night, to you and to the others asking: what to tell, and what to leave out. It's theirs to work.\n` +
@@ -1802,15 +2180,44 @@ export function questWaitBlock(title: string, line: string): string {
 /** A roll's result line in a row (`*COOL 3d · IN THE OPEN — 6 6, crit.*`, or a d100 one from before the table). */
 const ROLL_LINE = /\n*\*[A-Z]+ (?:\d+d · [A-Z ]+|\d+%) — [^*\n]*\.\*\n*/g;
 
-export function questRowText(row: { title: string; text: string; run?: string; heard?: string }, oneLine: (s: string) => string, player?: string): string {
+/**
+ * A row as she's told it, with a crew pick's cost words (`crewCostWords`) after its pick: in what she heard on the line,
+ * after the pick line it starts with; in the row's text, after its first paragraph (the pick, or a throw's line). The
+ * player's text never carries them.
+ */
+function toldText(row: { text: string; heard?: string; pick?: string; cost?: string; toldAs?: string; toldNext?: string }): string {
+  // A way's `told:` (Kroll's desk) stands in for the pick, its cost words and its outcome: she gets the told line and the
+  // beat it goes on to, never the row's text (what the player saw). What she heard on the line was built with it.
+  if (row.toldAs !== undefined) return row.heard ?? [row.toldAs, row.toldNext].filter(Boolean).join('\n\n');
+  if (!row.cost) return row.heard ?? row.text;
+  if (row.heard !== undefined) return row.pick && row.heard.startsWith(row.pick) ? `${row.pick} ${row.cost}${row.heard.slice(row.pick.length)}` : row.heard;
+  const i = row.text.indexOf('\n\n');
+  return i < 0 ? `${row.text} ${row.cost}` : `${row.text.slice(0, i)} ${row.cost}${row.text.slice(i)}`;
+}
+
+/**
+ * `pick` and `cost`: the row's pick line and a crew pick's cost words, told to her after it (last pass C). `toldAs`: a
+ * way's `told:`, told in place of the row's text, with `toldNext` (the next beat's text) after it.
+ */
+export function questRowText(row: { title: string; text: string; run?: string; heard?: string; pick?: string; cost?: string; toldAs?: string; toldNext?: string }, oneLine: (s: string) => string, player?: string): string {
   // Her history leaves out the roll's result line (the table): no dice, odds or game words for her to echo.
-  const text = (row.heard ?? row.text)
+  const text = toldText(row)
     .replace(ROLL_LINE, '\n\n')
     // The hand (spec 2026-10-29-the-hand §6): a call and a loss as her own bracketed lines.
     .replace(/⟦CALL⟧ ([^\n]*?)\.?(?=\n|$)/g, '[call: $1]')
     .replace(/⟦LOST⟧ ([^\n]*?)\.?(?=\n|$)/g, '[$1]')
     .trim();
   return `[${row.run ? 'job' : 'quest'} — ${row.title}${player ? ` ${toldTo(player, row.heard !== undefined)}` : ''}: ${oneLine(text.replace(/⟦([^⟧]+)⟧ /g, '($1) '))}]`;
+}
+
+/**
+ * A quest row's fields as `questRowText` reads them, from the stored row: the same for her history, this turn and the
+ * narrator's recent lines, so a way's `told:` is told the same everywhere. `text`: the row's text, or the part of it she
+ * reads now (a ride-along's, before the next beat: then the told line goes alone too).
+ */
+export function questRowOf(m: { text: string; quest?: { title: string; run?: string; heard?: string; pick?: { line: string; cost?: string; toldAs?: string; toldNext?: string } } }, text = m.text, beforeNext = false): Parameters<typeof questRowText>[0] {
+  const p = m.quest?.pick;
+  return { title: m.quest?.title ?? '', text, run: m.quest?.run, heard: m.quest?.heard, pick: p?.line, cost: p?.cost, toldAs: p?.toldAs, ...(beforeNext ? {} : { toldNext: p?.toldNext }) };
 }
 
 /** The pick check's instructions (spec §3, exact). */
@@ -1885,6 +2292,8 @@ export const condText = (c: Condition): string => {
       return c.id ? `deck=${c.id}` : c.trait ? `deck:${c.trait}` : 'deck';
     case 'alarm':
       return `alarm${opText(c.op)}${c.value}`;
+    case 'count':
+      return `${c.name}${opText(c.op)}${c.value}`;
   }
 };
 
@@ -1921,13 +2330,14 @@ export function waitText(w: Wait): string {
   return `${parts.join(' · ')}${w.else ? ` → ${w.else}` : ''}`;
 }
 
-export function questOutline(q: QuestEntry): { beat: string; push: boolean; choices: { id: string; line: string; to: string; next: string; tags: string[]; wait: string | null; waitNext: string | null; check: Check | null }[] }[] {
+export function questOutline(q: QuestEntry): { beat: string; push: boolean; choices: { id: string; line: string; to: string; next: string; tags: string[]; wait: string | null; waitNext: string | null; check: Check | null; /** Crew rules: each of a card's ways and where its outcome goes on to. */ ways?: { key: string; line: string; to: string; next: string; tags: string[] }[] }[] }[] {
   return [...q.beats.values()].flat().map((b) => ({
     beat: `${b.id}${b.when ? ` if ${b.when.map(condText).join(' and ')}` : ''}`,
     push: PUSH_ID.test(b.id),
     choices: b.choices.map((c) => {
       const o = q.outcomes.get(c.to);
-      return { id: c.id, line: c.line, to: c.to, next: o?.to ?? '?', tags: [...(c.check ? [checkText(c.check)] : []), ...c.tags.map(tagText)], wait: o?.wait ? waitText(o.wait) : null, waitNext: o?.next ?? null, check: c.check };
+      const ways = c.ways?.map((w) => ({ key: wayKeyText(w.key), line: w.line, to: w.to, next: q.outcomes.get(w.to)?.to ?? '?', tags: [...wayTags(w), ...(w.when ? [`if ${w.when.map(condText).join(' and ')}`] : [])] }));
+      return { id: c.id, line: c.line, to: c.to, next: o?.to ?? '?', tags: [...(c.check ? [checkText(c.check)] : []), ...c.tags.map(tagText)], wait: o?.wait ? waitText(o.wait) : null, waitNext: o?.next ?? null, check: c.check, ...(ways ? { ways } : {}) };
     }),
   }));
 }
@@ -2045,6 +2455,11 @@ export function fillRecruit(text: string, name: string | null): string {
   return name === null ? text : text.replaceAll('{recruit}', name);
 }
 
+/** `text` with `{who}` as the first name of whoever did a crew-rules way (a recruit, a program in capitals, the contact). */
+export function fillWho(text: string, name: string): string {
+  return text.replaceAll('{who}', name);
+}
+
 /** `text` with its time tokens read at story-clock minute `clock`, so a job says the hour it's played at. */
 export function fillTimes(text: string, clock: number): string {
   return text.replace(TIME_TOKEN, (_t, n?: string, unit?: string) => hhmmOf(minuteOfDay(clock + (n ? Number(n) * (unit === 'h' ? 60 : 1) : 0))));
@@ -2055,6 +2470,12 @@ export function fillTimes(text: string, clock: number): string {
  * modifier or a passive line. Crew prep's default bonuses apply only to jobs that don't.
  */
 export function mentionsFlag(q: QuestEntry, flag: string): boolean {
+  return readsFlag(q, flag);
+}
+
+/** Whether any part of `x` (a job, a beat's versions, an outcome) reads `flag` in a condition: `mentionsFlag`'s walk. */
+/** With `value`, only a condition on `flag=value` (either op) counts. */
+export function readsFlag(x0: unknown, flag: string, value?: string): boolean {
   const seen = new Set<object>();
   const walk = (x: unknown): boolean => {
     if (!x || typeof x !== 'object' || seen.has(x)) return false;
@@ -2063,10 +2484,10 @@ export function mentionsFlag(q: QuestEntry, flag: string): boolean {
     if (x instanceof Map) return [...x.values()].some(walk);
     const o = x as Record<string, unknown>;
     // A condition: `flag` (with an op) or `set` (no value; a `[set …]` tag carries one and writes, not reads).
-    if ((o.kind === 'flag' && 'op' in o && o.name === flag) || (o.kind === 'set' && !('value' in o) && o.name === flag)) return true;
+    if (value !== undefined ? o.kind === 'flag' && 'op' in o && o.name === flag && o.value === value : (o.kind === 'flag' && 'op' in o && o.name === flag) || (o.kind === 'set' && !('value' in o) && o.name === flag)) return true;
     return Object.values(o).some(walk);
   };
-  return walk(q);
+  return walk(x0);
 }
 
 /**
@@ -2119,9 +2540,10 @@ export const STOCK_GETAWAY: { beat: Beat; outcomes: Outcome[] } = (() => {
   return { beat: r.entry.beats.get('getaway')![0], outcomes: ['getaway-made', 'getaway-missed'].map((id) => r.entry.outcomes.get(id)!) };
 })();
 
-/** A job's book entry with the stock getaway in it, when its file has none of its own (the table spec §2). */
+/** A job's book entry with the stock getaway in it, when its file has none of its own (the table spec §2); never a crew-rules job's. */
 export function withGetaway(q: QuestEntry): QuestEntry {
-  if (q.beats.has('getaway')) return q;
+  // A crew-rules job writes its own getaway of ways (crew rules spec, Clocks): the stock one is checks.
+  if (q.beats.has('getaway') || q.rules === 'crew') return q;
   const beats = new Map(q.beats);
   beats.set('getaway', [STOCK_GETAWAY.beat]);
   const outcomes = new Map(q.outcomes);

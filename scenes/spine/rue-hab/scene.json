@@ -25,7 +25,7 @@
   "lights": [
     {
       "id": "monitors",
-      "label": "monitors",
+      "label": "her two monitors of green code",
       "pos": [
         715,
         355
@@ -37,7 +37,7 @@
     },
     {
       "id": "clamp_lamp",
-      "label": "clamp lamp",
+      "label": "the clamp lamp over the desk",
       "pos": [
         790,
         262
@@ -49,7 +49,7 @@
     },
     {
       "id": "heater",
-      "label": "space heater",
+      "label": "the space heater by the bunk",
       "pos": [
         140,
         528
@@ -61,7 +61,7 @@
     },
     {
       "id": "porthole",
-      "label": "porthole",
+      "label": "the next pylon's windows through the porthole",
       "pos": [
         1055,
         320
@@ -74,7 +74,7 @@
     },
     {
       "id": "city_above",
-      "label": "habs and deck above",
+      "label": "the lit windows of the habs and the deck above",
       "pos": [
         760,
         40
@@ -87,7 +87,7 @@
     },
     {
       "id": "city_right",
-      "label": "habs past the stair",
+      "label": "the hung habs' windows past the stair",
       "pos": [
         1450,
         350
@@ -487,14 +487,14 @@
   ],
   "sound": {
     "indoor": false,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
+    },
     "music": {
       "songs": [
         "Forty and Forty-One.ogg"
       ]
-    },
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.4
     }
   },
   "effects": [

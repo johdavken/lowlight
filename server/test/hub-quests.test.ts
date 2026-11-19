@@ -320,6 +320,11 @@ describe('quest events', () => {
     expect(validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: ['solvent'] } })).toEqual({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: ['solvent'] } });
     expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: ['a', 'b', 'c', 'd'] } })).toBe('string');
     expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...setup0, programs: [''] } })).toBe('string');
+    // A crew-rules job's GO IN (crew rules spec): people and programs only.
+    const crew0 = { crew: true, people: ['dez'], programs: ['firewall'] };
+    expect(validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...crew0, approach: 'hard' } })).toEqual({ type: 'quest_start', id: 'a', setup: crew0 });
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { ...crew0, people: ['a', 'b', 'c', 'd'] } })).toBe('string');
+    expect(typeof validateClientEvent({ type: 'quest_start', id: 'a', setup: { crew: true, people: [] } })).toBe('string');
     expect(validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', card: 'dez' })).toEqual({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', card: 'dez' });
     expect(typeof validateClientEvent({ type: 'quest_choose', id: 'a', beat: 'b', choice: 'c', card: '' })).toBe('string');
     const { tab, calls } = setup();

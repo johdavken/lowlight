@@ -608,5 +608,11 @@
         640
       ]
     }
-  ]
+  ],
+  "figureLight": {
+    "key": "auto",
+    "keyStrength": 0.85,
+    "depth": 310,
+    "rim": 1.15
+  }
 }

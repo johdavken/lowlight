@@ -115,6 +115,12 @@ function cond(s: string | undefined, where: string, p: (field: string, message: 
     p(where, c.message);
     return null;
   }
+  // A count (`hears>=2`) reads a crew-rules job's own clock; here it would silently read 0.
+  const count = c.find((x) => x.kind === 'count');
+  if (count) {
+    p(where, `can't read '${count.name}${count.op}${count.value}' (no clocks in an accounts file: a flag=value, a band or heat>=N)`);
+    return null;
+  }
   return c;
 }
 

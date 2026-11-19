@@ -11,6 +11,7 @@ import { PNG } from 'pngjs';
 import { DEFAULT_FIGURE_MODEL, FIGURE_FIELDS, figurePrompt, type FigureFields } from '../../shared/figure-prompt';
 import { parsePersonWho } from '../../shared/person';
 import { cleanTake } from './figure-clean';
+import { createNormalCache, type NormalCache } from './normal-cache';
 import { createPeople, PeopleError, type People } from './people';
 import { readFigure, TAKES_DIR } from './persona-figure';
 import { readSettingsKey } from './settings';
@@ -29,6 +30,8 @@ export interface PeopleRouteOptions {
   dir: string;
   /** Where settings.json (the OpenRouter key) lives. */
   dataDir: string;
+  /** Figure normal maps (the app's own cache); absent: one under `<dataDir>/cache/normals`. */
+  normals?: NormalCache;
   charactersDir: string;
   /** shared/cast-palette.json. */
   paletteFile: string;
@@ -38,6 +41,7 @@ export interface PeopleRouteOptions {
 
 export function registerPeopleRoutes(app: FastifyInstance, o: PeopleRouteOptions): People {
   const people = createPeople(o.dir);
+  const normals = o.normals ?? createNormalCache(path.join(o.dataDir, 'cache', 'normals'));
   /** People with a take on its way. */
   const busy = new Set<string>();
   const sameOrigin = {
@@ -203,6 +207,11 @@ export function registerPeopleRoutes(app: FastifyInstance, o: PeopleRouteOptions
       must(req.params.id);
       const fig = readFigure(people.dir(req.params.id));
       if (!fig) return reply.code(404).send({ error: 'no-figure' });
+      // `?normal=1`: its normal map (figure lighting spec §1); made figures are snapped, so per 2 px.
+      if ((req.query as { normal?: unknown } | undefined)?.normal !== undefined) {
+        const map = await normals.file(fig.file, { px: 2 });
+        return map ? png(reply, fs.readFileSync(map)) : reply.code(404).send({ error: 'no-normal-map' });
+      }
       return png(reply, fs.readFileSync(fig.file));
     } catch (err) {
       return fail(reply, err);

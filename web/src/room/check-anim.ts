@@ -12,6 +12,7 @@
 import { kindResult, type Effect } from '../../../shared/dice';
 import type { DiceRoll } from '../../../shared/quests';
 import { rollPixelDice, type PixelRoll } from './table/pixel-dice';
+import { isStoryTable } from './table/el';
 
 export const LOCK_MS = 180;
 export const RED_LOCK_MS = 450;
@@ -72,6 +73,45 @@ export function keptIndexes(faces: number[], keep: 'high' | 'low', kind: string)
   return [faces.indexOf(target)];
 }
 
+/** The dice's size on the story table's floor: landing, and parked while the costs are up. */
+export const FLOOR_LANDING = 1.15;
+export const FLOOR_PARKED = 0.72;
+/** The floor's width (the dice, the stamp and the line centred in it) and its foot over the table's own bottom (the key line). */
+const FLOOR_W = 420;
+const FLOOR_FOOT = 44;
+/** The floor's gutter from the margin and from the stage's edge. */
+const FLOOR_PAD = 12;
+
+/**
+ * The story table (mockup graft-margin.html): a tray on the floor in front of the contact, centred between the margin's
+ * right edge and the table's, its foot over the key line, at `scale`. Its place is in its zoomed pixels, as beside()'s.
+ * It stays where the table keeps it in the DOM (the deal, then the parked row), so saves and reloads find it as before;
+ * only its box stands on the floor (table-trace.css `.on-floor`).
+ */
+export function onFloor(tray: HTMLElement, scale: number): void {
+  const tb = tray.closest<HTMLElement>('.tb');
+  const mid = tb?.querySelector<HTMLElement>(':scope > .tb-middle');
+  if (!tb || !mid || !tb.offsetWidth) return;
+  const box = tb.getBoundingClientRect();
+  const k = box.width / tb.offsetWidth;
+  const from = (mid.getBoundingClientRect().right - box.left) / k;
+  const cx = (from + tb.offsetWidth) / 2;
+  // The canvas carries the dice's run-in at its right: five dice are wider than the floor. They shrink to fit between
+  // the margin and the stage's edge, and never start left of the margin.
+  const canvas = tray.querySelector<HTMLElement>('canvas');
+  const cw = canvas ? parseFloat(canvas.style.width) || 0 : 0;
+  const room = tb.offsetWidth - from - 2 * FLOOR_PAD;
+  const s = cw > 0 ? Math.min(scale, room / cw) : scale;
+  const w = Math.max(FLOOR_W, cw * s);
+  const left = Math.max(from + FLOOR_PAD, Math.min(cx - w / 2, tb.offsetWidth - FLOOR_PAD - w));
+  tray.classList.add('on-floor');
+  tray.style.zoom = String(s);
+  tray.style.width = `${Math.round(w / s)}px`;
+  tray.style.left = `${Math.round(left / s)}px`;
+  tray.style.top = 'auto';
+  tray.style.bottom = `${Math.round(FLOOR_FOOT / s)}px`;
+}
+
 /** Room kept right of the dice for the stamp (CLEAN, MISS) when the tray has to shrink to fit. */
 const STAMP_ROOM = 170;
 
@@ -81,6 +121,8 @@ const STAMP_ROOM = 170;
  * on what's beside the deal (the HUD's levers, playtest).
  */
 function beside(deal: HTMLElement, card: HTMLElement, roll: PixelRoll): void {
+  // The story table: the dice land on the floor in front of the contact, not beside the card.
+  if (isStoryTable(deal)) return onFloor(roll.root, FLOOR_LANDING);
   const canvas = roll.root.firstElementChild as HTMLElement;
   const gap = 12;
   const room = deal.clientWidth - card.offsetWidth - gap - STAMP_ROOM;

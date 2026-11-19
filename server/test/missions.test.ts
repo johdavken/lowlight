@@ -489,6 +489,10 @@ describe('boardBlock', () => {
     expect(boardBlock({ ...o, knows: 'heard' })).toBe("[board — Cold Freight: not your job, but you heard about it at work, so you know this. Posted by: A man in a grey coat. Look under the floor. If what Hicks tells you doesn't fit, you can say so.]");
   });
 
+  it('a bare posted-by name ends its sentence before the brief (playtest: "Posted by: Rue Rue has work…")', () => {
+    expect(boardBlock({ ...o, postedBy: 'Rue', brief: 'Rue has work.', knows: 'own' })).toBe('[board — Cold Freight: your own job, so you know this. Posted by: Rue. Rue has work.]');
+  });
+
   it('says what it has', () => {
     expect(boardBlock({ ...o, postedBy: null, knows: 'own' })).toBe('[board — Cold Freight: your own job, so you know this. Look under the floor.]');
   });

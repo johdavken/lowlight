@@ -67,6 +67,11 @@ export const MEDIUM_THINKING_ROOM = 4200;
 /** Models that refused to answer without thinking (or thought past the cap anyway), this run: auto skips the no-thinking try for them. */
 const mustThink = new Set<string>();
 
+/** Whether `model` refused to answer without thinking this run (off-screen moves spec §2): its one call goes straight to low. */
+export function thinksFirst(model: string): boolean {
+  return mustThink.has(model);
+}
+
 /** Tests: start with nothing remembered. */
 export function forgetThinkingRefusals(): void {
   mustThink.clear();

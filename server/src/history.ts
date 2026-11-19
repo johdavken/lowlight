@@ -9,7 +9,7 @@ import { GREET_PLACEHOLDER, endSceneText } from './instructions';
 import { encounterText } from '../../shared/encounter';
 import { gigText } from '../../shared/gig/brief';
 import { diceText } from '../../shared/dice/text';
-import { questRowText } from '../../shared/quests';
+import { questRowOf, questRowText } from '../../shared/quests';
 import { oneLine } from './persona';
 import { SUMMARY_LINE } from './summary';
 
@@ -47,7 +47,7 @@ export function toCompletion(m: ChatMessage, player?: string): CompletionMessage
   // An event that cut in: where it happened, in her history as an [event] line.
   if (m.role === 'user' && m.mode === 'encounter') return m.status === 'failed' ? null : { role: 'user', content: encounterText({ title: m.encounter?.title ?? '', text: m.text }, oneLine) };
   // A quest's beat or pick: its [quest] line, word for word as shown.
-  if (m.role === 'user' && m.mode === 'quest') return m.status === 'failed' ? null : { role: 'user', content: questRowText({ title: m.quest?.title ?? '', text: m.text, run: m.quest?.run, heard: m.quest?.heard }, oneLine, player) };
+  if (m.role === 'user' && m.mode === 'quest') return m.status === 'failed' ? null : { role: 'user', content: questRowText(questRowOf(m), oneLine, player) };
   // A finished gig run: its [gig] line, from the row's snapshot.
   if (m.role === 'user' && m.mode === 'gig') return m.status === 'failed' || !m.gig ? null : { role: 'user', content: gigText(m.gig) };
   // A finished liar's dice game: its [dice] line, from the row's snapshot.

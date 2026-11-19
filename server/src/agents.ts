@@ -3,7 +3,7 @@ import type { Photo } from '../../shared/photos';
 import fs from 'node:fs';
 import path from 'node:path';
 import { modelLabel } from '../../shared/model-label';
-import type { AgentInfo, Crop, SpriteRef } from '../../shared/types';
+import type { AgentInfo, Crop, FigureLightPoint, SpriteRef } from '../../shared/types';
 import type { OutfitUnlock } from '../../shared/standing';
 import { AGENT_ID_RE, characterFile, deckOf, diceSettings, loadCharacter, statsOf, resolveExpressions, resolveOutfitByScene, resolveOutfitUnlocks, resolveOutfitWears, resolveOutfits, resolveSprite, resolveCommsFigure, type Character } from './character';
 import { DEFAULT_FACE, resolveProfile, type CharacterProfile, type ProfileSource } from './character-profile';
@@ -185,6 +185,10 @@ export type SpriteRecord = {
   waist?: number;
   /** Snapped art (Studio SNAP): drawn with hard pixels. */
   pixel?: true;
+  /** Studio's MIRROR as her file says it (absent: on). */
+  mirror?: boolean;
+  /** Lights on her, placed in Studio (clicked lights). */
+  lights?: FigureLightPoint[];
   expressions: Record<string, string>;
   outfits: Record<string, string>;
   outfitByScene: Record<string, string>;
@@ -217,7 +221,7 @@ function selectFace(id: string, expressions: Record<string, string>, chosen: str
 }
 
 /** The public sprite ref for an agent's resolved sprite: each optional key is left out when it would be empty. */
-function spriteRef(id: string, sprite: Omit<SpriteRecord, 'file'>, select: string | undefined, warn: (msg: string) => void): SpriteRef {
+function spriteRef(id: string, sprite: Omit<SpriteRecord, 'file'>, select: string | undefined, warn: (msg: string) => void, face?: { x: number; y: number }): SpriteRef {
   const names = Object.keys(sprite.expressions);
   const outfits = Object.keys(sprite.outfits);
   return {
@@ -225,10 +229,14 @@ function spriteRef(id: string, sprite: Omit<SpriteRecord, 'file'>, select: strin
     crop: sprite.crop,
     ...(sprite.waist !== undefined ? { waist: sprite.waist } : {}),
     ...(sprite.pixel ? { pixel: true } : {}),
+    // A contact is mirrored unless her file turns MIRROR off (in the middle, beside a resident, the game flips her back).
+    ...((sprite.mirror ?? true) ? { mirror: true } : {}),
     ...(names.length > 0 ? { expressions: Object.fromEntries(names.map((n) => [n, `/api/agents/${id}/sprite/${n}`])) } : {}),
     ...(outfits.length > 0 ? { outfits: Object.fromEntries(outfits.map((n) => [n, `/api/agents/${id}/outfit/${n}`])) } : {}),
     ...(Object.keys(sprite.outfitByScene).length > 0 ? { outfitByScene: sprite.outfitByScene } : {}),
     ...(sprite.comms ? { comms: `/api/agents/${id}/comms` } : {}),
+    ...(face ? { face: { x: face.x, y: face.y } } : {}),
+    ...(sprite.lights?.length ? { lights: sprite.lights.map((l) => ({ ...l })) } : {}),
     // Without faces there's nothing to choose (an explicit `neutral` with faces is sent as null).
     ...(names.length > 0 || select !== undefined ? { selectFace: selectFace(id, sprite.expressions, select, warn) } : {}),
   };
@@ -336,7 +344,7 @@ function loadMindless(id: string, opts: LoadAgentsOptions): AgentRecord {
       stats: statsOf(own.stats !== undefined ? own : base, (m) => opts.warn(`character '${id}': ${m}`)),
       deck: deckOf(own.deck !== undefined ? own : base, opts.decks, (m) => opts.warn(`character '${id}': ${m}`)),
       connected: false,
-      sprite: look.sprite ? spriteRef(id, look.sprite, look.selectExpression, (m) => opts.warn(`character '${id}': ${m}`)) : null,
+      sprite: look.sprite ? spriteRef(id, look.sprite, look.selectExpression, (m) => opts.warn(`character '${id}': ${m}`), look.profile.face) : null,
       backend: 'none',
       modelLabel: null,
       connectionError: null,
@@ -456,7 +464,7 @@ function loadDirect(id: string, opts: LoadAgentsOptions): AgentRecord {
       ...look.rooms,
       ...selectFlags(own),
       connected: true,
-      sprite: look.sprite ? spriteRef(id, look.sprite, look.selectExpression, (m) => opts.warn(`character '${id}': ${m}`)) : null,
+      sprite: look.sprite ? spriteRef(id, look.sprite, look.selectExpression, (m) => opts.warn(`character '${id}': ${m}`), look.profile.face) : null,
       // Missions spec §1: her own stats and starting deck, else the extended character's.
       stats: statsOf(own.stats !== undefined ? own : base, (m) => opts.warn(`character '${id}': ${m}`)),
       deck: deckOf(own.deck !== undefined ? own : base, opts.decks, (m) => opts.warn(`character '${id}': ${m}`)),

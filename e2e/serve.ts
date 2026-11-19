@@ -232,9 +232,13 @@ async function main(): Promise<void> {
   for (const id of ['sdg-01', 'sdg-02']) fs.copyFileSync(`./world/extras/${id === 'sdg-01' ? 'sdg-07' : 'sdg-02'}.png`, path.join(extrasDir, `${id}.png`));
   // One local, for DRAW's stranger card (the courier is a young man).
   fs.copyFileSync('./world/extras/local-karasu-02.png', path.join(extrasDir, 'local-01.png'));
+  // The night clerk's face (Night Clerk, e2e/crew-rules.spec.ts), tagged only 'clerk', so DRAW's stranger never draws it.
+  fs.copyFileSync('./world/extras/local-08.png', path.join(extrasDir, 'local-08.png'));
+  // Come Up's and Run Sheet's narration faces (spec 2026-11-18), tagged only 'narration' so DRAW's stranger never draws them.
+  for (const id of ['local-karasu-03', 'coat-01', 'local-02']) fs.copyFileSync(`./world/extras/${id}.png`, path.join(extrasDir, `${id}.png`));
   fs.writeFileSync(
     path.join(extrasDir, 'extras.json'),
-    JSON.stringify([...['sdg-01', 'sdg-02'].map((id) => ({ id, file: `${id}.png`, tags: ['sdg'] })), { id: 'local-01', file: 'local-01.png', tags: ['local', 'man', 'young'] }]),
+    JSON.stringify([...['sdg-01', 'sdg-02'].map((id) => ({ id, file: `${id}.png`, tags: ['sdg'] })), { id: 'local-01', file: 'local-01.png', tags: ['local', 'man', 'young'] }, { id: 'local-08', file: 'local-08.png', tags: ['clerk'] }, ...['local-karasu-03', 'coat-01', 'local-02'].map((id) => ({ id, file: `${id}.png`, tags: ['narration'] }))]),
   );
   fs.writeFileSync(path.join(questsDir, 'ready-test.md'), READY);
   // The deduction board (e2e/deduction.spec.ts): a small case and a job only a Rue playthrough sees, so no other spec's
@@ -440,33 +444,19 @@ take: full
 → end
 `,
   );
-  // A STORY opening (e2e/arrival.spec.ts): Soren's job with Rue at her hab, which a new game for the pair opens on.
-  fs.writeFileSync(
-    path.join(questsDir, 'run-sheet.md'),
-    `---
-title: Run Sheet
-kind: mission
-tier: 1
-with: [rue]
-for: soren
-starts: rue-hab
-pay: 100
-pitch: A test of the STORY opening.
-opening: 'Her message came at six: three words, "Come up tonight."'
-opening-view: You asked Soren up tonight, the first time he's been inside.
----
-
-# ask
-*The heater ticks.*
-
-- go: Take it. → done
-- stay: Leave it. → done
-
-## done
-*Done.*
-→ end
-`,
-  );
+  // A STORY opening (e2e/arrival.spec.ts) and the crew rules' board (e2e/crew-rules.spec.ts): the real Run Sheet, Soren's
+  // job with Rue at her hab, which a new game for the pair opens on; and the real Night Clerk, a tier 2 board job under the
+  // Cat that only Silas's velvet rep sees (NIX_TEST_REP below), played with NIX_TEST_CREW's four recruits.
+  for (const id of ['run-sheet', 'night-clerk']) {
+    fs.copyFileSync(`./world/quests/${id}.md`, path.join(questsDir, `${id}.md`));
+    fs.mkdirSync(path.join(questsDir, 'art'), { recursive: true });
+    fs.copyFileSync(`./world/quests/art/${id}.webp`, path.join(questsDir, 'art', `${id}.webp`));
+  }
+  // Kroll's desk (e2e/krolls-desk.spec.ts): the real Come Up, Soren's standing order with Kroll at her floor (no art).
+  fs.copyFileSync('./world/quests/come-up.md', path.join(questsDir, 'come-up.md'));
+  // Come Up's scene pictures (narration images: the letter, the deck, the chip).
+  fs.mkdirSync(path.join(questsDir, 'art'), { recursive: true });
+  for (const n of ['letter', 'deck', 'chip']) fs.copyFileSync(`./world/quests/art/come-up-${n}.webp`, path.join(questsDir, 'art', `come-up-${n}.webp`));
   // A stranger with a face at the Ferry Stairs (e2e/comms.spec.ts): met on comms, for the speaker slot.
   fs.writeFileSync(
     path.join(questsDir, 'dock-clerk.md'),
@@ -495,7 +485,8 @@ opening-view: You asked Soren up tonight, the first time he's been inside.
   fs.writeFileSync(path.join(questsDir, 'two-step.md'), JOB.replace('title: Back Door', 'title: Two Step').replace('tier: 2', 'tier: 2\nfor: cass').replace('starts: haes-noodles', 'starts: lowlight-intake'));
   // A contract at the Intake (e2e/contracts.spec.ts): the same rep, with her.
   fs.writeFileSync(path.join(questsDir, 'test-contract.md'), CONTRACT.replace('kind: contract', 'kind: contract\nart: test-contract.webp').replace('with: [mother-rot]', `with: [${DIRECT.id}]`).replace('starts: haes-noodles', 'starts: lowlight-intake'));
-  process.env.NIX_TEST_REP = 'cass@karasu:50';
+  // Silas (e2e/crew-rules.spec.ts): Known in velvet, so Night Clerk (tier 2, under the Cat) lists for him.
+  process.env.NIX_TEST_REP = 'cass@karasu:50,silas@velvet:50';
   process.env.NIX_TEST_SOL = 'cass:1000';
   // One of Nix's own clients' jobs (e2e/intake.spec.ts), at Hae's so the Intake's pool stays as jobs.spec counts it:
   // trust is its stake, it posts all day, and its skim ends CLEAN without a roll (the roll list belongs to missions.spec).
@@ -661,6 +652,8 @@ opening-view: You asked Soren up tonight, the first time he's been inside.
   const mapFile = path.join(tmpDir, 'map.json');
   fs.writeFileSync(mapFile, JSON.stringify(crewMap));
   process.env.NIX_TEST_CREW_SEED = 'e2e-crew';
+  // The crew rules' board (e2e/crew-rules.spec.ts): Silas starts with one ready recruit of each trade, four to bring three of.
+  process.env.NIX_TEST_CREW = 'silas:face,muscle,runner,ears';
 
   const cfg: Config = {
     port: PORT,

@@ -38,6 +38,14 @@ export interface WrittenThreads {
   guests: string[];
 }
 
+/** The written quests and the guests as a run is shown them: `[written: …; people: …]`, `[guests: …]` (the off-screen beat uses them too). */
+export function writtenLines(w: WrittenThreads): string[] {
+  return [
+    ...w.threads.map((q) => `[written: ${q.title}${q.pitch ? ` — ${flat(q.pitch)}` : ''}${q.people?.length ? `; people: ${q.people.join(', ')}` : ''}]`),
+    ...(w.guests.length > 0 ? [`[guests: ${w.guests.join(', ')}]`] : []),
+  ];
+}
+
 /** The name words a truth may not use, the guests' and the quests' people, whole words only ("Noa" yes, "Noah" no). */
 const ownedWords = (w: WrittenThreads | undefined): string[] =>
   [...new Set([...(w?.guests ?? []), ...(w?.threads ?? []).flatMap((q) => q.people ?? [])].flatMap((g) => g.split(/\s+/)).filter((x) => x.length >= 3))];
@@ -83,8 +91,7 @@ export function cipherRunMessages(i: CipherRunInput): CompletionMessage[] {
       .join('\n'),
     `[you: ${you}]`,
     i.lore.length > 0 ? `[lore: ${i.lore.join(', ')}]` : null,
-    ...(i.written?.threads ?? []).map((q) => `[written: ${q.title}${q.pitch ? ` — ${flat(q.pitch)}` : ''}${q.people?.length ? `; people: ${q.people.join(', ')}` : ''}]`),
-    i.written && i.written.guests.length > 0 ? `[guests: ${i.written.guests.join(', ')}]` : null,
+    ...(i.written ? writtenLines(i.written) : []),
     i.summary ? `Earlier: ${flat(i.summary)}` : null,
     i.recent.length > 0 ? `What happened lately:\n${i.recent.map((r) => `${r.speaker}: ${flat(r.text)}`).join('\n')}` : null,
     i.state.truths.length > 0 ? `Truths already kept:\n${i.state.truths.map(kept).join('\n')}` : 'No truths yet.',

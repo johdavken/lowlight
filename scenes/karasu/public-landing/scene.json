@@ -570,6 +570,12 @@
       ]
     ]
   ],
+  "sound": {
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
+    }
+  },
   "effects": [
     {
       "kind": "screen",
@@ -600,10 +606,7 @@
       ]
     }
   ],
-  "sound": {
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.4
-    }
+  "figureLight": {
+    "breath": true
   }
 }

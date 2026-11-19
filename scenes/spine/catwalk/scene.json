@@ -432,5 +432,8 @@
       "to": "spine/rue-hab",
       "way": "down past the hangers to Rue's hab"
     }
-  ]
+  ],
+  "figureLight": {
+    "breath": true
+  }
 }

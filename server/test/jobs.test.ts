@@ -1347,6 +1347,24 @@ describe('jobs: the fixer', () => {
     expect(relay.carry('hicks', 'stall-build')).toMatch(/job/);
   });
 
+  it('the dev panel\'s +NERVE gives one back up to the most, mid-job too; rewind undoes it', async () => {
+    expect(relayWith({}).relay.devNerve('hicks')).toMatch(/full/);
+    const { relay, db, kit, events } = relayWith({ nerve: 0 });
+    expect(kit()).toMatchObject({ nerveLeft: 0, nerveGone: true });
+    await relay.send('hicks', 'one');
+    const before = db.recentMessages('hicks', 50).filter((m) => m.role === 'agent').at(-1)!;
+    await relay.send('hicks', 'two');
+    const emitted = events.length;
+    expect(relay.devNerve('hicks')).toEqual({ ok: true, text: 'ok' });
+    expect(kit()).toMatchObject({ nerveLeft: 1, nerveGone: false });
+    expect(events.slice(emitted).map((e) => e.type)).toContain('kit_changed');
+    await relay.startQuest('hicks', 'back-door');
+    expect(relay.devNerve('hicks')).toEqual({ ok: true, text: 'ok' });
+    expect(kit().nerveLeft).toBe(2);
+    await relay.rewind('hicks', before.id);
+    expect(kit()).toMatchObject({ nerveLeft: 0, nerveGone: true });
+  });
+
   it('rewind undoes a purchase', async () => {
     const { relay, db, kit } = relayWith({ sol: 2000 });
     await relay.send('hicks', 'one');
@@ -1688,6 +1706,21 @@ describe('repFromEnv (e2e)', async () => {
     expect(repFromEnv('nix', env)).toEqual([]);
     expect(repFromEnv('cass', {})).toEqual([]);
     expect(repFromEnv('cass', { NIX_TEST_REP: 'karasu:50' })).toEqual([]);
+  });
+});
+
+describe('crewFromEnv (e2e)', async () => {
+  const { crewFromEnv } = await import('../src/mission-run');
+  it('reads NIX_TEST_CREW=player:spec,… as one GREEN recruit per specialty for that player only; unset or bad is none', () => {
+    const env = { NIX_TEST_CREW: 'silas:face,ears' };
+    const crew = crewFromEnv('silas', env);
+    expect(crew.map((r) => [r.id, r.spec, r.grade])).toEqual([
+      ['e2e-face', 'face', 0],
+      ['e2e-ears', 'ears', 0],
+    ]);
+    expect(crewFromEnv('cass', env)).toEqual([]);
+    expect(crewFromEnv('silas', {})).toEqual([]);
+    expect(crewFromEnv('silas', { NIX_TEST_CREW: 'silas:face,pilot' })).toEqual([]);
   });
 });
 

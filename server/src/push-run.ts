@@ -6,6 +6,7 @@
 import { endHeat, type KitEvent } from '../../shared/mission';
 import { isJob, pushBeatId, type PushState, type QuestEntry, type QuestRun } from '../../shared/quests';
 import type { HeatPart } from '../../shared/types';
+import { crewHeatParts } from './crew-job';
 
 export type { PushState };
 
@@ -27,6 +28,7 @@ export function canOffer(q: QuestEntry, run: QuestRun, stage: number, nerveLeft 
 
 /** The heat a run would leave if it ended now (tier template spec §2), from its ALARM and its rolls. */
 export function heatLeft(run: QuestRun, blown: boolean): number {
+  if (run.crew) return crewHeatParts(run).reduce((n, p) => n + p.n, 0);
   const rolls = run.picks.flatMap((p) => (p.roll && 'faces' in p.roll ? [p.roll] : []));
   return endHeat({ alarm: run.alarm ?? 0, blown, deckHeat: Math.max(0, ...rolls.map((r) => r.deckHeat ?? 0)), scrubbed: rolls.some((r) => r.quiet) }) + (blown ? 0 : (run.setup?.endHeat ?? 0));
 }
@@ -36,6 +38,8 @@ export function heatLeft(run: QuestRun, blown: boolean): number {
  * END heat −1 abilities, which land beside it. Zero parts are left out.
  */
 export function heatParts(run: QuestRun, blown: boolean, deckName: string, cooled = 0): HeatPart[] {
+  // A crew-rules run (crew rules spec, Clocks, amended): the ways' HEAT alone; no blown floor, never the ALARM left or the deck's.
+  if (run.crew) return crewHeatParts(run);
   const rolls = run.picks.flatMap((p) => (p.roll && 'faces' in p.roll ? [p.roll] : []));
   const alarm = run.alarm ?? 0;
   const left = Math.max(alarm, blown ? 2 : 0);

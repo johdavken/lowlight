@@ -3,12 +3,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { QuestEntry } from '../../shared/quests';
-import { loadQuestVoice, voiceHash } from '../src/quest-voice';
+import { loadQuestVoice, sectionText, voiceHash } from '../src/quest-voice';
 
 const beat = (id: string, text: string, segments: { when: unknown; label: string | null; text: string }[] = []) => ({ id, when: null, stranger: null, text, segments, views: [], choices: [] });
 const quest = (): QuestEntry =>
   ({
     id: 'the-job',
+    pitch: 'A card on the bench.',
+    brief: 'A placement house wants a girl back.',
     beats: new Map([
       ['ask', [beat('ask', '*Silas lays the card down.*')]],
       ['trail', [beat('trail', '*The serial is a cart.*', [{ when: [{}], label: null, text: 'x' }])]],
@@ -18,6 +20,8 @@ const quest = (): QuestEntry =>
       ['bead', { id: 'bead', text: '*You put it in.*', to: 'trail', wait: null, next: null }],
       ['alone', { id: 'alone', text: '*Sure, she says.*', to: 'trail', wait: null, next: null }],
       ['kept', { id: 'kept', text: '*The kid gives a name: {hire}.*', to: 'end', wait: null, next: null }],
+      ['met', { id: 'met', text: '{img mirek} *Mirek is at the wok.*', to: 'trail', wait: null, next: null }],
+      ['sent', { id: 'sent', text: '*{who} takes the stool beside him.*', to: 'trail', wait: null, next: null }],
     ]),
   }) as unknown as QuestEntry;
 
@@ -61,6 +65,36 @@ describe('quest voice', () => {
     expect(v.clips('the-job', ['*The kid gives a name: {hire}.*', '*Old Town.*'])).toEqual([]);
     expect(warn.join('\n')).toMatch(/the-job\/kept: a \{hire\} name/);
     expect(warn.join('\n')).toMatch(/the-job\/wall: a beat with more than one version/);
+  });
+
+  it("a {who} section is voiced with a stand-in: its clip plays for the text whatever name fills it", () => {
+    expect(sectionText(quest(), 'sent')).toBe('*{who} takes the stool beside him.*');
+    const v = loadQuestVoice(dirWith({ sent: voiceHash('*{who} takes the stool beside him.*') }, ['sent.ogg']), [quest()], () => {});
+    expect(v.clips('the-job', ['*Ash takes the stool beside him.*'])).toEqual(['/api/quests/voice/the-job/sent.ogg']);
+    expect(v.clips('the-job', ['*Kit Vale takes the stool beside him.*'])).toEqual(['/api/quests/voice/the-job/sent.ogg']);
+    expect(v.clips('the-job', ['*Ash leaves.*'])).toEqual([]);
+  });
+
+  it('a beat with versions is voiced a version at a time: <beat>.1, <beat>.2 in file order', () => {
+    expect(sectionText(quest(), 'wall.1')).toBe('*Old Town, late.*');
+    expect(sectionText(quest(), 'wall.2')).toBe('*Old Town.*');
+    expect(sectionText(quest(), 'wall.3')).toEqual({ why: expect.stringContaining('no such section') });
+    expect(sectionText(quest(), 'wall')).toEqual({ why: expect.stringContaining('wall.1') });
+    const v = loadQuestVoice(dirWith({ 'wall.2': voiceHash('*Old Town.*') }, ['wall.2.ogg']), [quest()], () => {});
+    expect(v.clips('the-job', ['*Old Town.*'])).toEqual(['/api/quests/voice/the-job/wall.2.ogg']);
+  });
+
+  it("the GO IN page is the `setup` section: the pitch and the brief as the column shows them", () => {
+    expect(sectionText(quest(), 'setup')).toBe('A card on the bench.\n\nA placement house wants a girl back.');
+    const v = loadQuestVoice(dirWith({ setup: voiceHash('A card on the bench.\n\nA placement house wants a girl back.') }, ['setup.ogg']), [quest()], () => {});
+    expect(v.setup('the-job')).toBe('/api/quests/voice/the-job/setup.ogg');
+    expect(v.setup('another')).toBeNull();
+  });
+
+  it("reads a section without its {img} markers (narration images): what the recording says, and what a row's clip matches", () => {
+    expect(sectionText(quest(), 'met')).toBe('*Mirek is at the wok.*');
+    const v = loadQuestVoice(dirWith({ met: voiceHash('*Mirek is at the wok.*') }, ['met.ogg']), [quest()], () => {});
+    expect(v.clips('the-job', ['*Mirek is at the wok.*'])).toEqual(['/api/quests/voice/the-job/met.ogg']);
   });
 
   it('has nothing for a quest without a manifest, or no voice folder at all', () => {

@@ -11,11 +11,13 @@ import { guestArt, withGuest } from './guest';
 import { ALARM_MAX, jobTakeSize } from '../../shared/dice';
 import { abilityCardId, CONTACT_VERB, contactId, crewLines, jobShares } from '../../shared/hand';
 import { takeOf } from './take-run';
+import { crewTier } from './crew-job';
 import { heatLeft } from './push-run';
 import { END_COOL_HEAT, END_COOL_PAY, PAY_OFF_CUT, rollFills, SELL_PART_CUT } from './job-rules';
 import type { QuestDeps } from './chat-relay';
-/** A job's tier from its run (spec §3): the take its outcomes last set (else full), a blown line anywhere, its ALARM. */
+/** A job's tier from its run (spec §3): the take its outcomes last set (else full), a blown line anywhere, its ALARM; a crew-rules run's by `crewGrade`. */
 export function tierOf(run: QuestRun): Tier {
+  if (run.crew) return crewTier(run);
   return outcomeTier({ take: run.take ?? 'full', blown: run.blown === true, alarm: run.alarm ?? 0, paidOff: run.setup?.paidOff === true });
 }
 
@@ -156,6 +158,33 @@ export function contactLines(quests: QuestDeps | undefined, run: QuestRun): stri
 export function trustDelta(q: QuestEntry, tier: Tier): number | null {
   if (!q.trust) return null;
   return tier === 'clean' ? q.trust[0] : tier === 'blown' ? -q.trust[1] : 0;
+}
+
+/**
+ * Trust moved by a job's judging clock (Kroll's desk): −2 full; 0 between; at 0, +1 on a `once` job that isn't blown.
+ * A repeating job only loses trust, so a nightly run can't farm it. Null without a judging clock.
+ */
+export function clockTrust(q: QuestEntry, run: QuestRun, tier: Tier): { delta: number; reason: string } | null {
+  const c = q.clocks?.find((x) => x.trust);
+  if (!c) return null;
+  const v = run.crew?.clocks[c.id] ?? 0;
+  if (v >= c.size) return { delta: -2, reason: 'what the glass caught' };
+  if (v === 0 && q.once && tier !== 'blown') return { delta: 1, reason: 'nothing on the glass' };
+  return { delta: 0, reason: '' };
+}
+
+/**
+ * The debrief's judge (Kroll's desk): what a judging clock decided, said whatever her standing word does. Its label and
+ * end value, the move, and the verdict: NOTHING ON THE GLASS · TRUST ▲ (+1), WHAT THE GLASS CAUGHT · TRUST ▼▼ (−2),
+ * NOTED (no move), and nothing more on a repeating job at 0. Null without a judging clock.
+ */
+export function judgeOf(q: QuestEntry, run: QuestRun, tier: Tier): NonNullable<Debrief['judge']> | null {
+  const c = q.clocks?.find((x) => x.trust);
+  const moved = clockTrust(q, run, tier);
+  if (!c || !moved) return null;
+  const value = run.crew?.clocks[c.id] ?? 0;
+  const words = moved.delta > 0 ? 'NOTHING ON THE GLASS · TRUST ▲' : moved.delta < 0 ? 'WHAT THE GLASS CAUGHT · TRUST ▼▼' : value === 0 && !q.once ? '' : 'NOTED';
+  return { label: c.label, value, size: c.size, delta: moved.delta, words };
 }
 
 /** `CLUE · HAE`: the debrief's line for a clue card a job gave (deduction board spec §2). */

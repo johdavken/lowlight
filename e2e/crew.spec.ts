@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import type { CrewView } from '../shared/types';
-import { awaitGreeting, settleCostStep, DIRECT, goIn, questRow, send, skipSplash, startQuest, tipsOn } from './fixtures';
+import { awaitGreeting, settleCostStep, DIRECT, expectDiceOnFloor, goIn, questRow, send, skipSplash, startQuest, tipsOn, pickCard } from './fixtures';
 
 // Crew (spec 2026-10-19): hiring at the Intake (e2e/serve.ts gives it hires), errands, prep on a job, rewind.
 // Each test plays in a branch from her greeting (WAITs move a playthrough's clock for good, and Paper Trail has a
@@ -141,7 +141,7 @@ async function playToDebrief(page: Page, first?: string) {
     }
     const take = page.locator('.tb-deal > .tb-card[data-choice="!take"]');
     const card = first && i === 0 ? page.locator(`.tb-deal .tb-card[data-choice="${first}"]`) : (await take.count()) ? take : playable.first();
-    await card.click();
+    await pickCard(card);
     await page.waitForTimeout(400);
     await expect(page.locator('.tb-deal .tb-card, .tb-debrief .db').first()).toBeVisible({ timeout: 10_000 });
   }
@@ -172,7 +172,7 @@ async function goInWith(page: Page, job: string, rid: string) {
   await page.keyboard.press('Escape');
   await expect(page.locator('.feed-root.expanded')).toHaveCount(0);
   await expect(page.locator('.tb-setup')).toBeVisible();
-  await page.locator(`.ts-ready .tb-slot[data-id="${rid}"]`).click();
+  await page.locator(`.g-people .tb-slot.ts-wait[data-id="${rid}"]`).click();
   await expect(page.locator(`.g-people .tb-slot[data-id="${rid}"]`)).toBeVisible();
   await page.screenshot({ path: 'test-results/hand-setup.png' });
   // Enter goes in (GO IN's key), from the empty prompt too.
@@ -255,7 +255,7 @@ test('brings crew and plays a card: on a job, the preview, the call, a crew line
   await page.locator('#input textarea, #input input').first().click();
   // The roll: the pixel dice beside the card, landed with the stamp after them, clear of the hand. A roll that waits on
   // STEADY / TAKE IT keeps them up in its parked row.
-  await page.locator('.tb-deal .tb-card[data-choice="roof"]').click();
+  await pickCard(page.locator('.tb-deal .tb-card[data-choice="roof"]'));
   const roll = page.locator('.tb-deal .tb-roll');
   await expect(roll.locator('canvas')).toBeVisible({ timeout: 10_000 });
   await expect(roll.locator('canvas')).toHaveAttribute('data-lit', /\d/, { timeout: 5_000 });
@@ -268,9 +268,7 @@ test('brings crew and plays a card: on a job, the preview, the call, a crew line
     await page.waitForTimeout(900);
     await page.screenshot({ path: 'test-results/roll-parked.png' });
   }
-  const dice = (await roll.locator('canvas').boundingBox())!;
-  const hand = (await page.locator('.tb-hand').boundingBox())!;
-  expect(dice.y + dice.height).toBeLessThanOrEqual(hand.y);
+  await expectDiceOnFloor(page, roll.locator('canvas'), 'the call');
   const debrief = await playToDebrief(page);
   await expect(debrief.locator('.db-crew-line')).toContainText([shout]);
   await expect(debrief.locator('.db-mate img')).toHaveCount(1);
@@ -334,7 +332,8 @@ test("abilities: the hire's ability on the file, UNSLOT and SLOT, bring them, pr
   // The ability is a chip under the recruit's row (the table in the trace), inside their rail's width and clear of their name and status.
   const [cardBox, miniBox, stackBox] = await Promise.all([page.locator(`.tb-crew-stack[data-stack="${rid}"] > .tb-slot .tbc-body`).boundingBox(), mini.boundingBox(), page.locator(`.tb-crew-stack[data-stack="${rid}"]`).boundingBox()]);
   expect(miniBox!.height).toBeGreaterThan(8);
-  expect(miniBox!.y).toBeGreaterThanOrEqual(cardBox!.y + cardBox!.height - 1);
+  // The story table (mockup graft-margin.html): the ability is a tag at the right of its recruit's row.
+  expect(miniBox!.x).toBeGreaterThanOrEqual(cardBox!.x + cardBox!.width - 1);
   expect(miniBox!.x).toBeGreaterThanOrEqual(stackBox!.x - 1);
   expect(miniBox!.x + miniBox!.width).toBeLessThanOrEqual(stackBox!.x + stackBox!.width + 1);
   await mini.click();
@@ -371,7 +370,7 @@ test('effect and NERVE: BOLD on a card, an ability pressed for 1 NERVE, the reco
   await page.screenshot({ path: 'test-results/effect-bold.png' });
   const nerve = async () => Number(/NERVE (\d+)/.exec((await page.locator('.tb-nerve').getAttribute('aria-label')) ?? '')?.[1]);
   const before = await nerve();
-  await roof.click();
+  await pickCard(roof);
   await expect.poll(nerve).toBe(before - 1);
   await expect(page.locator('.tb-trade .tb-bold')).not.toHaveClass(/\bon\b/);
   await expect(page.locator('#feed')).toContainText('· BOLD');
@@ -422,7 +421,7 @@ test('a press beside a call: both cards lift, one roll, both on the record', asy
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Night Shift');
   await expect(page.locator('.tb-setup')).toBeVisible();
-  for (const id of [first, second]) await page.locator(`.ts-ready .tb-slot[data-id="${id}"]`).click();
+  for (const id of [first, second]) await page.locator(`.g-people .tb-slot.ts-wait[data-id="${id}"]`).click();
   await page.locator('#input textarea, #input input').first().focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('.tb-setup')).toBeHidden();
@@ -434,7 +433,7 @@ test('a press beside a call: both cards lift, one roll, both on the record', asy
   await expect(call).toHaveClass(/\blifted\b/);
   await expect(press).toHaveClass(/\blifted\b/);
   await page.screenshot({ path: 'test-results/press-beside-call.png' });
-  await page.locator('.tb-deal .tb-card[data-choice="roof"]').click();
+  await pickCard(page.locator('.tb-deal .tb-card[data-choice="roof"]'));
   await expect(page.locator('#feed')).toContainText('Steady Hand');
   await send(page, { type: 'rewind', messageId: greetingId });
   await expect.poll(async () => (await crew(page)).roster.length).toBe(0);

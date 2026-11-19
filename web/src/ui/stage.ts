@@ -1,4 +1,4 @@
-import type { Crop } from '../../../shared/types';
+import type { Crop, FigureLightPoint } from '../../../shared/types';
 import { WAIST_PULL, figureBox, figureDrop } from './figure';
 import { DISSOLVE_STEPS, DISSOLVE_STEP_MS, ditherMask, ditherTile } from './face-dither';
 import { FLAT_LIGHT, lightFilter } from './stage-light';
@@ -7,14 +7,38 @@ import { FLAT_LIGHT, lightFilter } from './stage-light';
 export type FigureSource =
   /** `waist`: where her waist is on the sprite, as a share of its height from the top (absent: she stands as drawn). */
   /** `pixel`: snapped art (Studio SNAP), drawn with hard pixels. */
-  | { kind: 'sprite'; url: string; crop: Crop; waist?: number; pixel?: boolean; expressions?: Record<string, string>; outfits?: Record<string, string> }
+  | { kind: 'sprite'; url: string; crop: Crop; waist?: number; pixel?: boolean; expressions?: Record<string, string>; outfits?: Record<string, string>; face?: { x: number; y: number }; lights?: FigureLightPoint[] }
   | { kind: 'portrait'; url: string }
   | { kind: 'monogram'; letter: string }
   | { kind: 'silhouette' };
 
-/** Where a figure stands: you on the left, your contact on the right (everyone else is in the who's-here strip). */
-export type Side = 'left' | 'right';
-const SIDES: Side[] = ['left', 'right'];
+/**
+ * What a sprite figure shows, for the figure light (figure lighting spec §2): her base (outfit or sprite),
+ * the face coming in (null: the plain face) and, mid-dissolve, the face going out at `step` of `steps`
+ * (settled: `from` null, `step === steps`). `pixel`: snapped art.
+ */
+export interface FigureArt {
+  base: string;
+  face: string | null;
+  from: string | null;
+  step: number;
+  steps: number;
+  pixel: boolean;
+  /** Her waist (share from the top; null: none), where her chest swell ends. */
+  waist: number | null;
+  /** Her face point (shares of the sprite; null: none), where her breath leaves her. */
+  facePoint: { x: number; y: number } | null;
+  /** Lights on her (clicked lights; null: none), which glow. */
+  lights: FigureLightPoint[] | null;
+}
+
+/**
+ * Where a figure stands: you on the left, your contact on the right, and the place's resident (Hae at the
+ * noodle stall) when her room is up: then she takes the right and your contact steps to the middle (style.css
+ * `.three-up`). Everyone else is in the who's-here strip.
+ */
+export type Side = 'left' | 'right' | 'resident';
+const SIDES: Side[] = ['left', 'right', 'resident'];
 
 /** The outfit a scene puts her in: its entry in her scene map, or null (her plain sprite). */
 export function outfitFor(byScene: Record<string, string> | undefined, sceneId: string | null): string | null {
@@ -79,34 +103,47 @@ function setLayer(layer: HTMLElement, image: string, mask: string): void {
 
 export class Stage {
   private readonly figures: Record<Side, HTMLElement>;
-  private readonly tokens: Record<Side, number> = { left: 0, right: 0 };
+  private readonly tokens: Record<Side, number> = { left: 0, right: 0, resident: 0 };
   private readonly probe: (url: string) => Promise<Probed | null>;
   /** Each sprite's own width / height, so a live re-crop keeps it. */
-  private readonly aspects: Record<Side, number> = { left: MASTER_ASPECT, right: MASTER_ASPECT };
+  private readonly aspects: Record<Side, number> = { left: MASTER_ASPECT, right: MASTER_ASPECT, resident: MASTER_ASPECT };
   /** Each sprite's waist (null: none, or not a sprite), so a live change of pull can move it. */
-  private readonly waists: Record<Side, number | null> = { left: null, right: null };
+  private readonly waists: Record<Side, number | null> = { left: null, right: null, resident: null };
+  /** Each sprite's face point (null: none), for the figure light's breath. */
+  private readonly facePoints: Record<Side, { x: number; y: number } | null> = { left: null, right: null, resident: null };
+  /** Each sprite's lights (null: none), for the figure light's glow. */
+  private readonly lightPoints: Record<Side, FigureLightPoint[] | null> = { left: null, right: null, resident: null };
   private pull = WAIST_PULL;
   private readonly faces: Record<Side, Faces> = {
     left: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null, shown: null, timer: null },
     right: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null, shown: null, timer: null },
+    resident: { sprite: null, loaded: new Map(), wanted: null, outfits: new Map(), wantedOutfit: null, shown: null, timer: null },
   };
   /** Each figure's face layers over its art: the face coming in, and the one going out while it dissolves. */
   private readonly faceLayers: Record<Side, { in: HTMLElement; out: HTMLElement }>;
   /** Faces cut instead of dissolving (prefers-reduced-motion). */
   private readonly reducedMotion: boolean;
+  private readonly onArt: ((fig: HTMLElement, art: FigureArt | null) => void) | null;
 
   constructor(
     private readonly root: HTMLElement,
-    opts: { probe?: (url: string) => Promise<Probed | null>; flatLight?: boolean; reducedMotion?: boolean } = {},
+    opts: {
+      probe?: (url: string) => Promise<Probed | null>;
+      flatLight?: boolean;
+      reducedMotion?: boolean;
+      /** What a sprite figure shows, on every change and dissolve step (null: not a sprite), for the figure light. */
+      onArt?: (fig: HTMLElement, art: FigureArt | null) => void;
+    } = {},
   ) {
     this.probe = opts.probe ?? probeImage;
+    this.onArt = opts.onArt ?? null;
     this.reducedMotion = opts.reducedMotion ?? globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
     const layer = (which: 'in' | 'out') => {
       const el = document.createElement('div');
       el.className = `stage-face stage-face-${which}`;
       return el;
     };
-    this.faceLayers = { left: { in: layer('in'), out: layer('out') }, right: { in: layer('in'), out: layer('out') } };
+    this.faceLayers = { left: { in: layer('in'), out: layer('out') }, right: { in: layer('in'), out: layer('out') }, resident: { in: layer('in'), out: layer('out') } };
     const flat = opts.flatLight ?? FLAT_LIGHT;
     root.classList.add('stage');
     const make = (side: Side) => {
@@ -128,8 +165,10 @@ export class Stage {
       fig.append(art, light.svg);
       return fig;
     };
-    this.figures = { left: make('left'), right: make('right') };
-    root.append(this.figures.left, this.figures.right);
+    this.figures = { left: make('left'), right: make('right'), resident: make('resident') };
+    this.figures.resident.hidden = true;
+    // The resident stands behind your contact where they overlap (DOM order is paint order).
+    root.append(this.figures.left, this.figures.resident, this.figures.right);
   }
 
   setLeft(src: FigureSource | FigureSource[], name: string, accent: string): void {
@@ -138,6 +177,23 @@ export class Stage {
 
   setRight(src: FigureSource | FigureSource[], name: string, accent: string): void {
     this.set('right', Array.isArray(src) ? src : [src], name, accent);
+  }
+
+  /**
+   * The place's resident on the right, your contact stepping to the middle (`.three-up`); null takes her off
+   * and your contact back to the right.
+   */
+  setResident(src: FigureSource[] | null, name = '', accent = ''): void {
+    const fig = this.figures.resident;
+    const on = src !== null;
+    this.root.classList.toggle('three-up', on);
+    fig.hidden = !on;
+    if (on) return this.set('resident', src, name, accent);
+    this.tokens.resident++;
+    this.stopDissolve('resident');
+    this.faces.resident.sprite = null;
+    delete fig.dataset.kind;
+    this.onArt?.(fig, null);
   }
 
   /**
@@ -225,6 +281,8 @@ export class Stage {
       if (token !== this.tokens[side]) return;
       this.aspects[side] = aspect;
       this.waists[side] = src.kind === 'sprite' ? (src.waist ?? null) : null;
+      this.facePoints[side] = src.kind === 'sprite' ? (src.face ?? null) : null;
+      this.lightPoints[side] = src.kind === 'sprite' && src.lights?.length ? src.lights : null;
       this.render(side, src, aspect);
       this.cutFace(side, null);
       fig.style.setProperty('--face-tile', ditherTile(width ?? MASTER_WIDTH, (width ?? MASTER_WIDTH) / aspect));
@@ -262,8 +320,11 @@ export class Stage {
     const base = (wantedOutfit !== null && outfits.get(wantedOutfit)) || sprite;
     setArt(this.figures[side], cssUrl(base));
     const face = (wanted !== null && loaded.get(wanted)) || null;
-    // The same face again (her line re-reported as she types) lets a dissolve run on.
-    if (face === faces.shown) return;
+    // The same face again (her line re-reported as she types) lets a dissolve run on (its next step reports the new base).
+    if (face === faces.shown) {
+      if (faces.timer === null) this.emitArt(side, null, DISSOLVE_STEPS);
+      return;
+    }
     if (!dissolve || this.reducedMotion) this.cutFace(side, face);
     else this.dissolveFace(side, face);
   }
@@ -275,6 +336,16 @@ export class Stage {
     setLayer(incoming, face ? cssUrl(face) : '', '');
     setLayer(out, '', '');
     this.faces[side].shown = face;
+    this.emitArt(side, null, DISSOLVE_STEPS);
+  }
+
+  /** Tells `onArt` what she shows: her base, the face coming in and, mid-dissolve, the one going out at `step`. */
+  private emitArt(side: Side, from: string | null, step: number): void {
+    const faces = this.faces[side];
+    if (!this.onArt || faces.sprite === null) return;
+    const fig = this.figures[side];
+    const base = (faces.wantedOutfit !== null && faces.outfits.get(faces.wantedOutfit)) || faces.sprite;
+    this.onArt(fig, { base, face: faces.shown, from, step, steps: DISSOLVE_STEPS, pixel: fig.hasAttribute('data-pixel'), waist: this.waists[side], facePoint: this.facePoints[side], lights: this.lightPoints[side] });
   }
 
   /**
@@ -297,10 +368,12 @@ export class Stage {
         faces.timer = null;
         setLayer(incoming, toImage, '');
         setLayer(out, '', '');
+        this.emitArt(side, null, DISSOLVE_STEPS);
         return;
       }
       setLayer(incoming, toImage, ditherMask(step, true));
       setLayer(out, fromImage, ditherMask(step, false));
+      this.emitArt(side, from, step);
       faces.timer = setTimeout(tick, DISSOLVE_STEP_MS);
     };
     tick();
@@ -332,6 +405,7 @@ export class Stage {
     art.append(this.faceLayers[side].in, this.faceLayers[side].out);
     setArt(fig, '');
     art.style.removeProperty('--portrait');
+    if (src.kind !== 'sprite') this.onArt?.(fig, null);
     if (src.kind === 'sprite') {
       setArt(fig, cssUrl(src.url));
       this.applyCrop(fig, src.crop, aspect);

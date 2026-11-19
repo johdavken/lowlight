@@ -3,7 +3,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DISSOLVE_STEPS, DISSOLVE_STEP_MS, ditherMask, ditherTile } from '../src/ui/face-dither';
 import { figureDrop } from '../src/ui/figure';
-import { Stage, outfitFor, type FigureSource } from '../src/ui/stage';
+import { Stage, outfitFor, type FigureArt, type FigureSource } from '../src/ui/stage';
 
 let stages: Stage[] = [];
 afterEach(() => {
@@ -244,6 +244,38 @@ describe('Stage', () => {
       expect(layer(root, 'out').style.backgroundImage).toBe('');
     });
 
+    it('reports her base, face and each dissolve step to onArt (figure lighting)', async () => {
+      document.body.innerHTML = '<div id="stage-figures"></div>';
+      const root = document.getElementById('stage-figures')!;
+      const seen: (FigureArt | null)[] = [];
+      const stage = new Stage(root, { probe: async () => ({ aspect: 2 / 3 }), reducedMotion: false, onArt: (_fig, a) => seen.push(a) });
+      stages.push(stage);
+      const lights = [{ x: 0.6, y: 0.08, r: 0.012, color: '#ff8800' }];
+      stage.setRight([{ ...faced, pixel: true, waist: 0.4, face: { x: 0.45, y: 0.1 }, lights }], 'Nix', '#fff');
+      await settle();
+      expect(seen.at(-1)).toEqual({ base: '/s.png', face: null, from: null, step: DISSOLVE_STEPS, steps: DISSOLVE_STEPS, pixel: true, waist: 0.4, facePoint: { x: 0.45, y: 0.1 }, lights });
+      seen.length = 0;
+      stage.setExpression('right', 'happy');
+      expect(seen.at(-1)).toMatchObject({ base: '/s.png', face: '/h.png', from: null, step: 1, steps: DISSOLVE_STEPS, pixel: true });
+      vi.advanceTimersByTime(DISSOLVE_STEP_MS);
+      expect(seen.at(-1)).toMatchObject({ face: '/h.png', step: 2 });
+      vi.advanceTimersByTime(DISSOLVE_STEP_MS * DISSOLVE_STEPS);
+      expect(seen.at(-1)).toEqual({ base: '/s.png', face: '/h.png', from: null, step: DISSOLVE_STEPS, steps: DISSOLVE_STEPS, pixel: true, waist: 0.4, facePoint: { x: 0.45, y: 0.1 }, lights });
+      stage.setExpression('right', 'sad');
+      expect(seen.at(-1)).toMatchObject({ face: '/sad.png', from: '/h.png', step: 1 });
+    });
+
+    it('reports null to onArt for a figure that isn\'t a sprite', async () => {
+      document.body.innerHTML = '<div id="stage-figures"></div>';
+      const root = document.getElementById('stage-figures')!;
+      const seen: (FigureArt | null)[] = [];
+      const stage = new Stage(root, { probe: async () => ({ aspect: 2 / 3 }), onArt: (_fig, a) => seen.push(a) });
+      stages.push(stage);
+      stage.setRight([{ kind: 'portrait', url: '/p.png' }], 'Nix', '#fff');
+      await settle();
+      expect(seen).toEqual([null]);
+    });
+
     it('going back to the plain face dissolves the old one out', async () => {
       const { root, stage } = faceSetup();
       stage.setRight([faced], 'Nix', '#fff');
@@ -470,10 +502,28 @@ describe('Stage: no centre figure (the others are in the who\'s-here strip)', ()
     expect(css).not.toMatch(/mask-image: var\(--fig-mask/);
   });
 
-  it('has only the two side figures', () => {
+  it('shows only the two side figures until a resident is set', () => {
     const { root } = setup();
     expect(root.querySelector('.stage-centre')).toBeNull();
-    expect(root.querySelectorAll('.stage-figure')).toHaveLength(2);
+    expect(root.querySelectorAll('.stage-figure:not([hidden])')).toHaveLength(2);
+    expect(root.querySelector<HTMLElement>('.stage-resident')!.hidden).toBe(true);
+    expect(root.classList.contains('three-up')).toBe(false);
+  });
+
+  it('a resident stands on the right and moves the contact to the middle (three-up), and leaves again', async () => {
+    const { root, stage } = setup();
+    stage.setResident([sprite('/hae.png')], 'Hae', '#f90');
+    await flush();
+    const fig = root.querySelector<HTMLElement>('.stage-resident')!;
+    expect(fig.hidden).toBe(false);
+    expect(fig.dataset.kind).toBe('sprite');
+    expect(fig.getAttribute('aria-label')).toBe('Hae');
+    expect(root.classList.contains('three-up')).toBe(true);
+    stage.setResident(null);
+    expect(fig.hidden).toBe(true);
+    expect(root.classList.contains('three-up')).toBe(false);
+    const css = readFileSync(path.resolve('web/src/ui/style.css'), 'utf8');
+    expect(css).toMatch(/#stage-figures\.three-up \.stage-right\[data-kind='sprite'\] \{ right: var\(--fig-mid-x\); \}/);
   });
 
   it('null marks neither side (someone else here is speaking)', () => {

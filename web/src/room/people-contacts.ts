@@ -48,6 +48,11 @@ export function lineFor(c: ContactEntry): string {
   return `${where} · ${who}"${c.lastLine.text}"`;
 }
 
+/** RECOMMENDED's tag (Kroll's desk spec): `RECOMMENDED`, or `RECOMMENDED · FROM 09:00` (`FROM MON 09:00` past a day) while she's away from her place. */
+export function recommendedTag(r: NonNullable<ContactEntry['recommended']>): string {
+  return r.from ? `RECOMMENDED · FROM ${r.from.toUpperCase()}` : 'RECOMMENDED';
+}
+
 /** `T+3 W−1 · last: "paid on time"`: the dev panel's look at her values (a real minus sign; — with no moves). */
 export function standingHover(s: NonNullable<ContactEntry['standing']>): string {
   const n = (v: number) => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : '0');

@@ -64,20 +64,20 @@ test("new game as Soren with Rue: Run Sheet's STORY is the default; ENTER opens 
   await dialIn(page, 'rue', 'soren');
   await expect(page.locator('.ar-name')).toHaveText("RUE'S HAB");
   await expect(page.locator('.ar-label span').first()).toHaveText('STORY');
-  await expect(page.locator('.ar-story-text')).toContainText('Come up tonight.');
+  await expect(page.locator('.ar-story-text')).toContainText('Her message came at six');
   await expect(page.locator('.ar-flip')).toContainText('CUSTOM');
   await shot(page, 'story');
   await page.waitForFunction(() => window.__nixRoom?.intro() === 'ready');
   await page.keyboard.press('Enter');
   await expect(page.locator('.ar-root')).toHaveCount(0);
   await awaitGreeting(page);
-  await expect(page.locator('.scene-entry .sb-text')).toContainText('Come up tonight.');
+  await expect(page.locator('.scene-entry .sb-text')).toContainText('Her message came at six');
   // The job is said in the chat, under her greeting; no pop-up for it.
   await expect(page.locator('.tool').filter({ hasText: '// RUN SHEET · NOW ON JOBS (ALT+Q)' })).toHaveCount(1);
   await expect(page.locator('.feed-notice')).toHaveCount(0);
   await shot(page, 'story-greeting');
   const greeting = JSON.stringify((await completions()).at(-1)!.body.messages);
-  expect(greeting).toContain('[why Soren is here tonight, to raise now, in your own words: You asked Soren up tonight');
+  expect(greeting).toContain('[why Soren is here tonight, to raise now, in your own words: You messaged Soren at six');
 });
 
 test('new game: an empty box is the plain greeting', async ({ page }) => {

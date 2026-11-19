@@ -1325,5 +1325,13 @@
       "neve"
     ],
     "note": "Neve Oda, The Subtraction: wet short hair, worn coveralls, tide tattoo"
+  },
+  {
+    "id": "coat-01",
+    "file": "coat-01.png",
+    "tags": [
+      "man"
+    ],
+    "note": "greying man in an expensive charcoal rain shell, roll-neck, patient"
   }
 ]

@@ -9,17 +9,20 @@ import { foldWithCrew, type CrewEvent, type CrewState, type FoldJob } from '../.
 import { parseCrewEvents } from './crew-view';
 import type { LeadEntry } from '../../shared/leads';
 import type { Extra } from '../../shared/extras';
-import { fillRecruit, parseRun, rewardOutfits, type QuestEntry, type QuestStatus } from '../../shared/quests';
-import { outcomeTier, type Kit, type KitEvent } from '../../shared/mission';
+import { fillRecruit, flagsOf, ownedBy, parseRun, toldKey, rewardOutfits, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { heatIn, repTier, type Kit, type KitEvent } from '../../shared/mission';
+import { tierOf } from './job-end';
+import { recommendedFrom, recommendedJob } from './job-views';
 import { fixerKey, parseFixer } from '../../shared/stock';
-import { bookId, repFromEnv, solFromEnv, trustFromEnv } from './mission-run';
+import { bookId, crewFromEnv, repFromEnv, solFromEnv, trustFromEnv } from './mission-run';
 import { DEFAULT_STATS, nerveMax, type Stats } from '../../shared/stats';
-import { DEFAULT_SHARED_STANDING, parseStored, peakOf, standingKey, startValues, unlockMet, wordFor, type OutfitUnlock, type SharedStanding, type StoredStanding, type StandingConfig, type StandingValues } from '../../shared/standing';
+import { bandOf, DEFAULT_SHARED_STANDING, parseStored, peakOf, standingKey, startValues, unlockMet, wordFor, type OutfitUnlock, type SharedStanding, type StoredStanding, type StandingConfig, type StandingValues } from '../../shared/standing';
 import { readHeldLeads } from './leads-held';
 import fs from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
 import { awakeAt, blockStartedBetween, DAY, fixedBlockDuring, hhmmOf, minuteOfDay, nextBlock, nextBlockStart, nextOccurrence, parseHhmm, scheduledRoom, START, weekdayName, weekdayOf, type Block } from '../../shared/clock';
+import { beatStanding, forBranch, goingAt, lastGoing, sinceLine, undoBeats, wordLine, type Move } from '../../shared/moves';
 import type { AroundEntry, ChatMessage, ChatMode, ContactEntry, HeldLead, LeadView, Location, PlaythroughInfo, Present, SaveInfo, SaveTrigger } from '../../shared/types';
 import { strangerAt } from '../../shared/encounter';
 import { speakerBeats } from '../../shared/beats';
@@ -61,6 +64,12 @@ export interface CheckpointPort {
   clockNow(): number | null;
   /** The clock moved: every open room's tabs hear it. */
   clockChanged(): void;
+  /** A REWIND just cut lines: the next clockChanged undoes off-screen beats later than the clock (off-screen moves spec §3). */
+  rewound(): void;
+  /** How many REWINDs went through since start: a beat's call that saw one doesn't write (off-screen moves minor M1). */
+  rewinds(): number;
+  /** Off-screen moves were written: places and who's-here follow. */
+  movesChanged(): void;
   /** The story moved the clock live with contact `id` (story moods spec §3): her room follows it if you're with her. */
   storyClock(id: string): void;
   /** The active playthrough's player (null in the lobby). */
@@ -178,6 +187,12 @@ export interface CheckpointPort {
   cipherOf(player: string): CipherState | null;
   /** What `contactId` was there for in other contacts' rooms, as her `[you were there: …]` line (witness lines spec §3); null with nothing, or for anyone but the playthrough's player. */
   witnessedLine(player: string, contactId: string, clock: number): string | null;
+  /** Her `[since you last saw …]` line (off-screen moves spec §5); null: none. */
+  movesSince(contactId: string, clock: number): string | null;
+  /** `[word going round: …]` she'd have heard (spec §4.3); null: none. */
+  wordFor(contactId: string, clock: number): string | null;
+  /** Her meeting with you in story minutes (her stored plan's meet, for MEET_WAIT); null: none. */
+  meetWindow(contactId: string): { from: number; to: number } | null;
   /** The scene behind her newest entry, word for word, for a night after it; null with none, or for anyone but the playthrough's player. */
   witnessedScene(player: string, contactId: string, clock: number): string | null;
   /** Who a cipher run may give a truth to (cipher spec §2.2): the contacts met, never the player, with a line on each and her authored standing secret. */
@@ -501,6 +516,9 @@ export function createWorld(deps: {
       participants: [...dbs.keys()],
       ...(pt.solo ? { solo: true } : {}),
       clock: clockOf(pt),
+      // A beat changes no database: it's still a later moment (off-screen moves spec §3).
+      ...(pt.beat !== undefined ? { beat: pt.beat } : {}),
+      moveCount: pt.moves?.length ?? 0,
       lastLine: db
         ? lastLine(db.allMessages(pt.player), { player: playerName(pt), contact: deps.contactName(contactId), residents: speakerNames(pt).filter((n) => n !== deps.contactName(contactId)) })
         : null,
@@ -562,7 +580,8 @@ export function createWorld(deps: {
       const parted = moved || pt.parted?.[contactId] !== undefined ? { ...(pt.parted ?? {}) } : null;
       if (parted && moved) parted[prev!] = clockOf(pt);
       if (parted) delete parted[contactId];
-      playthroughs.touch(pt.id, { contactId, sceneId: room.state.sceneId }, parted ? { parted } : {});
+      const since = sinceOnWalkIn(pt, contactId);
+      playthroughs.touch(pt.id, { contactId, sceneId: room.state.sceneId }, { ...(parted ? { parted } : {}), ...(since ? { since } : {}) });
       // You're with her now: her room takes the city's weather, once the change in progress has reached everyone.
       queueMicrotask(() => runtimeOf(contactId)?.takeCityWeather());
       // Someone moved (or was left somewhere): every room's strip may change.
@@ -593,6 +612,9 @@ export function createWorld(deps: {
    * runtime (each tab's strip, the prompt, the tools) at the same clock.
    */
   let placesMemo: { key: string; places: Map<string, string> } | null = null;
+  /** A REWIND cut lines; the next clockChanged undoes later beats (off-screen moves spec §3). */
+  let rewindPending = false;
+  let rewindCount = 0;
   /** Closed rooms' plans, read once per tick: every list asks after every contact. */
   let closedPlans: { pt: string; metas: Map<string, { plan: string | null; seen: string | null }> } | null = null;
   /** The last kitOf: the same playthrough, clock and database fingerprints fold the same (crew spec §3). */
@@ -613,6 +635,7 @@ export function createWorld(deps: {
   function namesOf(pt: PlaythroughInfo, at?: number) {
     let clock: number | null = at ?? null;
     const now = () => (clock ??= clockOf(pt));
+    const quests: Parameters<typeof recommendedOf>[4] = {};
     return {
       placeName: deps.placeName,
       hasScene: deps.hasScene,
@@ -640,7 +663,53 @@ export function createWorld(deps: {
       },
       // Where she is now: her schedule's place (when it has her), else her open room's scene.
       liveScene: (id: string) => scheduledPlace(pt, id, now) ?? runtimeOf(id)?.room.state.sceneId ?? null,
+      recommended: (id: string, standing: { trust: number; warmth: number } | null) => recommendedOf(pt, id, standing, now, quests),
     };
+  }
+
+  /**
+   * RECOMMENDED (Kroll's desk spec): her open once-only job for `pt`'s player, and `FROM` when her schedule has her away
+   * from her start room now; null: none. Its gate reads what her room's would (runtime.ts quests.ctx): the story flags,
+   * her bands, your heat and stats; a text: job once told and a tier your rep reaches, as her desk lists; no deck (world has no deck catalog), so a deck-gated job never recommends.
+   * Only for the active playthrough: the runs and the kit are read from its databases. `memo` holds the runs and kit
+   * for one list.
+   */
+  function recommendedOf(pt: PlaythroughInfo, id: string, standing: { trust: number; warmth: number } | null, now: () => number, memo: { runs?: QuestStatus[]; kit?: ReturnType<typeof api.kitOf>; six?: ReturnType<typeof api.kitOf> }): NonNullable<ContactEntry['recommended']> | null {
+    if (playthroughs.active()?.id !== pt.id) return null;
+    const book = deps.questBook?.() ?? [];
+    // Most contacts have no job of their own for you: skip the reads.
+    const mine = book.filter((q) => q.for === pt.player && q.once && ownedBy(q) === id);
+    if (mine.length === 0) return null;
+    const runs = (memo.runs ??= api.questStatus(pt.player) ?? []);
+    const kit = memo.kit !== undefined ? memo.kit : (memo.kit = api.kitOf(pt.player));
+    // Heat is read in the district her first such job starts in (her desk's).
+    const district = mine[0]!.district ?? deps.districtOf?.(mine[0]!.starts) ?? null;
+    const ctx = {
+      flags: flagsOf(runs),
+      trust: standing ? bandOf(standing.trust) : null,
+      warmth: standing ? bandOf(standing.warmth) : null,
+      with: id,
+      ...(kit ? { heat: heatIn(kit.kit, district), stats: kit.stats } : {}),
+    };
+    const q = recommendedJob(mine, {
+      player: pt.player,
+      contact: id,
+      ctx,
+      started: runs,
+      withNow: !pt.solo ? (pt.location?.contactId ?? null) : null,
+      // As her desk lists them (job-runner openJobs): a text: job once she has told you, by text or in any room…
+      heard: (qid) => api.metaAnywhere?.(toldKey(pt.player, qid)) ?? false,
+      // …and a job for you only up to your rep's tier in its district (`district:`, else where it starts), as it stood
+      // at this morning's 06:00 (the board posted then: rep won tonight lists nothing until tomorrow).
+      tier: (j) => {
+        const six = memo.six !== undefined ? memo.six : (memo.six = api.kitOf(pt.player, 360 + storyDay(now()) * 1440));
+        return repTier(six?.kit.rep[j.district ?? deps.districtOf?.(j.starts) ?? 'unknown'] ?? 0);
+      },
+    });
+    if (!q) return null;
+    const home = deps.roster().find((c) => c.id === id)?.startRoom;
+    const from = home ? recommendedFrom(deps.schedule?.(id) ?? [], home, now()) : null;
+    return { title: q.title, pitch: q.pitch, ...(from ? { from } : {}), place: q.starts };
   }
 
   /**
@@ -659,14 +728,22 @@ export function createWorld(deps: {
     const plan = planOf(pt, contactId);
     const planned = plan ? planPlaceAt(plan, clock) : null;
     if (planned) return planned;
+    // A parting later than the clock was rewound away: it never happened.
+    const parted = pt.parted?.[contactId];
+    const left = parted !== undefined && parted <= clock ? parted : undefined;
+    // Where an off-screen move sent her (off-screen moves spec §4.1): after her plan with you, before anyone's meeting.
+    const went = goingAt(pt.moves ?? [], contactId, clock, left);
+    if (went) return went.place;
     // Someone else's meeting that names her (shared plans spec §3): there for the hour, over her habits.
     for (const { plan: asked } of invitations(pt, contactId, clock)) {
       const place = planPlaceAt({ ...asked, going: null }, clock);
       if (place) return place;
     }
+    // A move's going over: she stays where it took her until a block of hers starts, as where you left her does.
+    // A block that started while she was away counts (review M2): she was sent from the beat.
+    const ended = lastGoing(pt.moves ?? [], contactId, clock, left);
+    if (ended && !blockStartedBetween(blocks, ended.beat, clock)) return ended.place;
     if (blocks.length === 0) return null;
-    // A parting later than the clock was rewound away: it never happened.
-    const parted = pt.parted?.[contactId];
     if (parted !== undefined && parted <= clock && !blockStartedBetween(blocks, parted, clock)) return null;
     return scheduledRoom(blocks, clock);
   }
@@ -837,10 +914,17 @@ export function createWorld(deps: {
     const prev = pt.location?.contactId;
     if (prev && prev !== contactId && !pt.solo) parted[prev] = clockOf(pt);
     delete parted[contactId];
-    playthroughs.touch(pt.id, location, { ...(pt.solo ? { solo: false as const } : {}), parted });
+    const since = sinceOnWalkIn(pt, contactId);
+    playthroughs.touch(pt.id, location, { ...(pt.solo ? { solo: false as const } : {}), parted, ...(since ? { since } : {}) });
     // Joining her where her room already is (no move): it takes the city's weather (Task 3 review I1).
     queueMicrotask(() => runtimeOf(contactId)?.takeCityWeather());
     return location;
+  }
+
+  /** Walking in on her ends a parting: kept as `since`, where her `[since you last saw them]` starts (off-screen moves spec §5). */
+  function sinceOnWalkIn(pt: PlaythroughInfo, contactId: string): Record<string, number> | null {
+    const left = pt.parted?.[contactId];
+    return left === undefined ? null : { ...(pt.since ?? {}), [contactId]: left };
   }
 
   /** The playthrough as blackouts read it: with the always-dark districts of a live check (never written). */
@@ -897,6 +981,8 @@ export function createWorld(deps: {
         // No city weather: the branch is as of its line, so its room (cut and rebuilt there) gives it, as a rewind would.
         // Who you'd left where, as of the line (partings after it never happened in the branch).
         ...(pt.parted ? { parted: Object.fromEntries(Object.entries(pt.parted).filter(([, t]) => t <= (at.clock ?? Infinity))) } : {}),
+        // What the city did by the line (off-screen moves spec §3).
+        ...forBranch(pt, at.clock ?? Infinity),
       });
       try {
         let location: Location | null = null;
@@ -1145,7 +1231,8 @@ export function createWorld(deps: {
       const home = new Map<KitEvent, string | null>();
       // Jobs played with the hand (spec 2026-10-29-the-hand): who went, the calls, the end; cut at `at` like the rest.
       const jobs: FoldJob[] = [];
-      const crewLists = new Map<string, CrewEvent[]>();
+      // Test-only (e2e): NIX_TEST_CREW's recruits, hired free at the start (rows written for them later fold on).
+      const crewLists = new Map<string, CrewEvent[]>(crewFromEnv(player).map((recruit) => [recruit.id, [{ type: 'hire', at: START, recruit, place: 'lowlight-intake', cost: 0 }]]));
       const prints: string[] = [];
       const events = withDbs(pt, (dbs) =>
         [...dbs.entries()].flatMap(([id, db]) => {
@@ -1158,9 +1245,10 @@ export function createWorld(deps: {
             ...db.metaWithPrefix(prefix).flatMap(({ k, v }) => {
               const q = book.find((x) => x.id === bookId(k.slice(prefix.length)));
               const run = parseRun(v);
-              // A rescue (crew spec §5) plays where its recruit was hired: its heat lands there.
+              // A rescue (crew spec §5) plays where its recruit was hired: its heat lands there. Else a job's
+              // `district:` (Kroll's desk), else where it starts, as the job runner's districtOf has it.
               const starts = run?.spring?.place ?? q?.starts;
-              const district = starts ? (deps.districtOf?.(starts) ?? null) : null;
+              const district = run?.spring ? (deps.districtOf?.(run.spring.place) ?? null) : (q?.district ?? (starts ? (deps.districtOf?.(starts) ?? null) : null));
               const evs = (run?.kit ?? []) as KitEvent[];
               const s = run?.setup;
               if (run && s && (at === undefined || s.at <= at)) {
@@ -1172,7 +1260,7 @@ export function createWorld(deps: {
                   district,
                   setup: s,
                   calls: (run.calls ?? []).filter((c) => at === undefined || c.at <= at),
-                  end: ended ? { at: s.endAt!, tier: outcomeTier({ take: run.take ?? 'full', blown: run.blown === true, alarm: run.alarm ?? 0, paidOff: run.setup?.paidOff === true }), getOut: run.getaway === true } : null,
+                  end: ended ? { at: s.endAt!, tier: tierOf(run), getOut: run.getaway === true } : null,
                   ...(run.spring ? { spring: run.spring.recruit } : {}),
                   ...(q?.drops ? { drops: q.drops } : {}),
                 });
@@ -1218,7 +1306,7 @@ export function createWorld(deps: {
             book: crewBook,
             districtOfJob: (j) => {
               const q = job(j);
-              return q ? (deps.districtOf?.(q.starts) ?? null) : null;
+              return q ? (q.district ?? deps.districtOf?.(q.starts) ?? null) : null;
             },
             placeOfJob: (j) => job(j)?.starts ?? null,
           }),
@@ -1230,6 +1318,28 @@ export function createWorld(deps: {
       const value = { kit: r.kit, stats: start.stats, crew: r.crew };
       kitMemo = { key, value };
       return value;
+    },
+    movesSince(contactId, clock) {
+      const pt = playthroughs.active();
+      if (!pt?.moves) return null;
+      return sinceLine(pt.moves, contactId, pt.since?.[contactId] ?? null, START, clock, playerName(pt));
+    },
+    wordFor(contactId, clock) {
+      const pt = playthroughs.active();
+      if (!pt?.moves) return null;
+      const district = (scene: string | null) => (scene ? powerHere(scene).district : null);
+      const room = runtimeOf(contactId)?.room.state.sceneId ?? null;
+      const tied = (a: string, b: string) => Object.hasOwn(deps.ties?.(a) ?? {}, b);
+      // She'd have heard: in the move's district now or when it happened, or her file ties her to the mover.
+      const heard = (m: Move) =>
+        m.who !== contactId &&
+        (tied(contactId, m.who) || tied(m.who, contactId) || [room, scheduledPlace(pt, contactId, () => m.at) ?? room].some((s) => s !== null && district(s) === district(m.place)));
+      return wordLine(pt.moves, heard, clock, deps.contactName);
+    },
+    meetWindow(contactId) {
+      const pt = playthroughs.active();
+      const meet = pt ? planOf(pt, contactId)?.meet : null;
+      return meet ? { from: meet.at, to: meet.at + MEET_WAIT } : null;
     },
     witnessedLine(player, contactId, clock) {
       const pt = playthroughs.active();
@@ -1374,14 +1484,38 @@ export function createWorld(deps: {
       const pt = playthroughs.active();
       return pt ? clockOf(pt) : null;
     },
+    rewound() {
+      rewindPending = true;
+      rewindCount++;
+    },
+    rewinds() {
+      return rewindCount;
+    },
+    movesChanged() {
+      placesMemo = null;
+      for (const rt of registry.all()) {
+        rt.refreshOthers();
+        rt.relay.emitQuestState();
+      }
+    },
     clockChanged() {
       placesMemo = null;
       const pt = playthroughs.active();
       if (!pt) return;
       const clock = clockOf(pt);
+      // Only a rewind undoes a beat (off-screen moves spec §3): a regenerate's moves wait for the clock to come back.
+      if (rewindPending) {
+        rewindPending = false;
+        const kept = undoBeats(pt.moves ?? [], clock);
+        const ranLater = pt.beat !== undefined && pt.beat > clock;
+        // The beats before the clock ran, moves or not (review I1): the newest of them stands, so none runs again.
+        if (kept.moves.length !== (pt.moves?.length ?? 0) || ranLater) playthroughs.setMoves(pt.id, kept.moves, ranLater ? beatStanding(clock, START) : (pt.beat ?? null));
+      }
       // A parting later than the clock was cut away (rewind, delete): it never happened.
       const later = Object.entries(pt.parted ?? {}).filter(([, at]) => at > clock);
       if (later.length > 0) playthroughs.setParted(pt.id, Object.fromEntries(Object.entries(pt.parted!).filter(([, at]) => at <= clock)));
+      // So is a since later than the clock (off-screen moves spec §5).
+      if (Object.values(pt.since ?? {}).some((at) => at > clock)) playthroughs.setSince(pt.id, Object.fromEntries(Object.entries(pt.since!).filter(([, at]) => at <= clock)));
       for (const rt of registry.all()) {
         rt.hub.emit({ type: 'clock', clock });
         rt.hub.emit({ type: 'power', ...powerNow(rt.room.state.sceneId) });

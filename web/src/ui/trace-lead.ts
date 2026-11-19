@@ -41,7 +41,7 @@ export function traceLead(host: HTMLElement, key: string, from: Pt, to: Pt): voi
  * Draws `key`'s line through given corners (whole pixels), ring at the first, dot at the last; replaces the last.
  * `color` sets the line's colour on this one svg (default: the hovers' `--hv-c`).
  */
-export function traceVia(host: HTMLElement, key: string, pts: Pt[], color?: string): void {
+export function traceVia(host: HTMLElement, key: string, pts: Pt[], color?: string, o: { ring?: boolean } = {}): void {
   const svg = svgOf(host, key, true)!;
   if (color) svg.style.setProperty('--hv-c', color);
   if (pts.length < 2) {
@@ -64,7 +64,8 @@ export function traceVia(host: HTMLElement, key: string, pts: Pt[], color?: stri
   dot.setAttribute('y', String(y2 - 1));
   dot.setAttribute('width', '3');
   dot.setAttribute('height', '3');
-  svg.replaceChildren(path, ring, dot);
+  // A line that hangs from another's ring (the table's rail under the head line's) draws none of its own.
+  svg.replaceChildren(path, ...(o.ring === false ? [] : [ring]), dot);
 }
 
 /** Takes `key`'s line off `host`. */

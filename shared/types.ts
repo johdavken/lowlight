@@ -1,6 +1,7 @@
 import type { BoardMove, BoardView } from './deduction';
 import type { AccountsMove, AccountsView } from './accounts';
 import type { CipherState } from './cipher';
+import type { Move } from './moves';
 import type { Pronoun } from './pronoun';
 import type { ChairCheck } from './arrangement';
 import type { Band, Grade, JobEffect, Risk, Specialty, Timing } from './crew-book';
@@ -101,6 +102,22 @@ export interface PresetDef extends Partial<Atmosphere> {
   lights?: Record<string, Partial<Pick<LightDef, 'color' | 'intensity' | 'flicker'>>>;
 }
 
+/** A room's key light on the stage figures (figure lighting spec §3): automatic, off, or set by hand. */
+export type FigureKey = 'auto' | 'off' | { side: 'left' | 'right'; height: number; color?: Hex; strength: number };
+
+/** How a room lights the stage figures (scene.json `figureLight`, figure lighting spec §3); every field optional. */
+export interface FigureLightDef {
+  key?: FigureKey;
+  /** With an automatic key: how hard it shapes her, 0..1. */
+  keyStrength?: number;
+  /** Stage px the room's lamps stand behind her, 0..600. */
+  depth?: number;
+  /** How much of a lamp's colour lands on her edges, 0..2. */
+  rim?: number;
+  /** An open-air room: each out-breath leaves a puff of breath fog (breath on the figures). */
+  breath?: boolean;
+}
+
 export interface SceneDef {
   /** The scene's folder in a district's own scene.json; the full room name (`<district>/<folder>`) in the city's registry. */
   id: string;
@@ -133,6 +150,8 @@ export interface SceneDef {
   entry?: boolean;
   /** Rooms reached from this one without the map: whoever you're with can take you (room exits spec §2). */
   exits?: ExitDef[];
+  /** How the room lights the stage figures (figure lighting spec §3); absent: the defaults. */
+  figureLight?: FigureLightDef;
   /** A venue's hours, HH:MM (story moods spec §5): last call, closing and closed moods follow them. */
   hours?: { open: string; close: string };
   /** Small things that happen or can be noticed here: one comes with every other turn, in rotation (shared/room-details.ts). */
@@ -236,6 +255,8 @@ export interface GuestCard extends ContactCard {
 
 /** A job's SETUP card (the hand spec §1): its district, your tier and heat there, the favour (null: allowed, else why not) and your ready crew. */
 export interface SetupOffer {
+  /** A crew-rules job (spec 2026-11-17): GO IN on the board, people and programs only. Absent: Graft's SETUP. */
+  rules?: 'crew';
   district: string;
   tier: string;
   heat: number;
@@ -305,7 +326,7 @@ export interface QuestState {
   /** NERVE ran out (the table spec §3): no new job until the next 06:00. */
   nerveGone?: { back: string };
   /** `checks`: a locked Tier 2 Chair's requirements (Tier 2 spec 2026-11-01 §1). */
-  open: { id: string; title: string; pitch: string | null; /** Who posted it and what's involved (a job's `posted-by:` and `brief:`). */ postedBy?: string; brief?: string; timed: boolean; checks?: ChairCheck[]; /** Its quest art (the file's banner). */ art?: string; /** Why a job can't start now (NERVE GONE). */ locked?: string; mission?: { pay: number | null; tier?: number; range?: [number, number]; scouted?: { draws: Record<string, string>; pay: number | null }; cased?: true; /** A contact's own job (Intake board spec §3): her display name. */ own?: string; /** The player's own job (`for:`): the contact rides along, so it's no one's client. */ yours?: true; /** Its stake is trust, not rep. */ trust?: true; /** The arrangement's nights are used up tonight (spec 2026-10-20 §2): her name. */ capped?: string; /** A desk job (comms spec §3): the place it's played at, on comms. */ comms?: string }; /** A job's SETUP card (spec 2026-10-29-the-hand §1). */ setup?: SetupOffer; /** A one-off job (once: true): it never posts again after it ends. */ once?: true; /** An outfit an ending can give, until earned (`NIX · COAT`). */ outfit?: string }[];
+  open: { id: string; title: string; pitch: string | null; /** Who posted it and what's involved (a job's `posted-by:` and `brief:`). */ postedBy?: string; brief?: string; timed: boolean; checks?: ChairCheck[]; /** Its quest art (the file's banner). */ art?: string; /** Why a job can't start now (NERVE GONE). */ locked?: string; mission?: { pay: number | null; tier?: number; range?: [number, number]; scouted?: { draws: Record<string, string>; pay: number | null }; cased?: true; /** A contact's own job (Intake board spec §3): her display name. */ own?: string; /** The player's own job (`for:`): the contact rides along, so it's no one's client. */ yours?: true; /** Its stake is trust, not rep. */ trust?: true; /** The arrangement's nights are used up tonight (spec 2026-10-20 §2): her name. */ capped?: string; /** A desk job (comms spec §3): the place it's played at, on comms. */ comms?: string }; /** A job's SETUP card (spec 2026-10-29-the-hand §1). */ setup?: SetupOffer; /** Its GO IN page read aloud (voiced job beats: the pitch and brief, `setup.ogg`). */ voice?: string; /** A one-off job (once: true): it never posts again after it ends. */ once?: true; /** An outfit an ending can give, until earned (`NIX · COAT`). */ outfit?: string }[];
   /** A checked choice's card carries its odds (missions spec §3); during a reroll the cards are `!reroll` and `!take`. */
   active: {
     /** Who posted the job, kept in the JOB column through the run for when the contact asks. */
@@ -361,7 +382,7 @@ export interface QuestState {
     /** A waiting roll: the card that rolled and its faces (the browser animates them); an old save's parked REROLL keeps its d100s. */
     rolled?: { choice: string; faces: number[]; keep: 'high' | 'low'; kind: 'crit' | 'clean' | 'cost' | 'miss'; /** The ALARM and heat it will land (after a deck or ALARM −1), for the line under its stamp; absent from older servers. */ cost?: { alarm: number; heat: number }; /** The TAKE it will fill when it lands (the clock's blinking pips); absent: none, or an older server. */ take?: number; saved?: true; /** A gamble on it: the die, and what it was (ability pass spec §2). */ gamble?: { die: number; from: 'cost' | 'miss' }; /** Run It Twice rolled it again (tier 3 beat play spec §2). */ rerun?: true; /** TAKE a trade gave up, and a greed press's risk (ability pass spec §2). */ lessTake?: number; missTake?: true; /** Not FAIR: how much it fills TAKE (effect and NERVE spec §1). */ effect?: Effect } | { choice: string; chance: number; rolls: number[] };
     /** A blown job waiting on its cover cards: the row it will write (the pick and its roll) and the debrief as it stands. */
-    blown?: { text: string; pick?: { choice: string; line: string; roll?: Roll }; debrief: Debrief };
+    blown?: { text: string; pick?: { choice: string; line: string; roll?: Roll; cost?: string; toldAs?: string }; debrief: Debrief };
     /** A job on its WALK / PRESS ON card (pressing on spec §4): push beats played, the pot won, what WALK keeps. */
     push?: { stage: number; pot: number; walk: { sol: number; heat: number } };
     /** A board beat (deduction board spec §3): the board in place of the cards. */
@@ -370,6 +391,8 @@ export interface QuestState {
     accounts?: AccountsView;
     /** The hand (spec 2026-10-29-the-hand §2): what was brought and what can still be played. */
     hand?: HandView;
+    /** A crew-rules run (spec 2026-11-17 crew rules): the board's hand, cards and clocks; absent on a Graft run. */
+    crew?: CrewJobView;
   } | null;
   /** A run here whose quest file no longer has its beat: the notice to show; null otherwise. */
   changed: string | null;
@@ -387,15 +410,76 @@ export interface QuestState {
   fixer?: { place: string; items: { id: string; name: string; kind: 'deck' | 'cover' | 'program'; price: number; tier: number; /** A deck's quality, 1–4. */ quality?: 1 | 2 | 3 | 4; /** A deck's heat and traits. */ heat?: number; traits?: DeckTrait[]; /** A program's stat, kind and card line. */ stat?: string; programKind?: ProgramKind; line?: string; state: 'ok' | 'locked' | 'short' | 'owned' }[] };
 }
 
+/**
+ * A crew-rules run as the board shows it (spec 2026-11-17 crew rules). `ways[].by` is a hand id (`you`, a recruit's id,
+ * `p:<program id>`, `contact`); a `you` way's `name` is its name. Costs are after the beat's mods.
+ */
+export interface CrewJobView {
+  /** The beat's title as the board heads it (`THE HUNDRED`): a plain beat is on no route, so the route can't name it. */
+  title?: string;
+  /** `note`: what the clock is, in a few words, printed under it (the job file's quoted part). */
+  clocks: { id: string; label: string; size: number; value: number; note?: string }[];
+  hand: {
+    id: string;
+    kind: 'you' | 'recruit' | 'program' | 'contact';
+    name: string;
+    spec?: Specialty;
+    grade?: Grade;
+    art: string | null;
+    state: 'ready' | 'spent' | 'door' | 'hurt' | 'held';
+    move?: { id: string; name: string; line: string; art: string; can: boolean };
+    /** FIREWALL and SCRUB: usable on any beat, and whether now. */
+    play?: { line: string; can: boolean };
+  }[];
+  cards: {
+    id: string;
+    short: string;
+    line: string;
+    leads?: string;
+    plain?: true;
+    crack?: true;
+    /** `leaves`: what the way's outcome does to your take (`take: none` / `take: part`), printed as a cost. */
+    ways: { by: string; name?: string; line: string; take: number; alarm: number; heat: number; clocks: Record<string, number>; cut: number; lose: number; harm?: 'hurt' | 'held'; leaves?: 'none' | 'part' }[];
+    /** Hand ids with no way here (a throw). */
+    throws: string[];
+  }[];
+  mods: { label: string; art?: string }[];
+  /** Beat id → names of unspent recruits with a way there. */
+  ahead: Record<string, string[]>;
+  /** The job's one contact (`with:`), whether or not a card gives her a way: the board's comms strip shows only then. */
+  contact?: { id: string; name: string };
+}
+
+/** GO IN's setup: Graft's SETUP card, or a crew-rules job's people and programs (spec 2026-11-17 crew rules). */
+export type QuestSetup = { approach: Approach; people: string[]; favour: boolean; contacts?: string[]; programs?: string[] } | { crew: true; people: string[]; programs: string[] };
+
 /** No quest lines to show. */
 export const EMPTY_QUEST_STATE: QuestState = { open: [], active: null, changed: null, waiting: null, elsewhere: [] };
 
 /** A quest row's snapshot (mode 'quest'; its text is what was shown): the quest, the beat it moved to (null: it ended), the pick that moved it, and the beat's stranger. */
+/**
+ * A narration image on a quest row (spec 2026-11-18): it heads paragraph `para` of the row's text (paragraphs split on a
+ * blank line). `url` a stranger portrait or a contact's figure; `crop` that figure's head crop (a contact only).
+ */
+export interface RowImage {
+  para: number;
+  name: string;
+  url: string;
+  crop?: Crop;
+  /** A scene picture: a band across the column, not a face beside the text. */
+  wide?: true;
+}
+
 export interface QuestRow {
   id: string;
   title: string;
   beat: string | null;
-  pick?: { choice: string; line: string; roll?: Roll };
+  /**
+   * `cost`: a crew-rules pick's cost words (`crewCostWords`), told to the contact after the pick, never shown (last pass C).
+   * `toldAs`: the way's `told:` (Kroll's desk), told to her in place of the pick and its cost words, never shown.
+   * `toldNext`: with `toldAs`, the next beat's text: all she gets of the row after it (the outcome's own text is left out).
+   */
+  pick?: { choice: string; line: string; roll?: Roll; cost?: string; toldAs?: string; toldNext?: string };
   /** The row parked the quest on a wait: no next beat yet (not an ending). */
   waiting?: true;
   stranger?: { name: string; voice: string; face?: string };
@@ -414,6 +498,8 @@ export interface QuestRow {
   heard?: string;
   /** A job's run key (`<id>@<day>`, small jobs plan ruling 2): which run this row belongs to. */
   run?: string;
+  /** Narration images (spec 2026-11-18): faces this row shows for the first time in its run, each heading a paragraph of `text`. */
+  images?: RowImage[];
   /** A job's ending (small jobs spec §6): the debrief card. */
   debrief?: Debrief;
   /** An ending with no debrief (a contract's fallout): what it gave, `OUTFIT · HICKS · TIE`, shown on the end card. */
@@ -428,8 +514,10 @@ export interface HeatPart {
 }
 
 export interface Debrief {
+  /** A crew-rules job's debrief (spec 2026-11-17): the board shows it, not the table. Absent: Graft's. */
+  rules?: 'crew';
   tier: 'clean' | 'messy' | 'blown';
-  /** Crew spec §5: a `gives: recruit` ending's line, `RECRUIT · SAIDA RAHM · FREE AT THE LONG HAUL UNTIL 06:00`. */
+  /** Crew spec §5: a `gives: recruit` ending's line, `RECRUIT · SAIDA RAHM · FREE AT THE LONG HAUL UNTIL 06:00 · HIRE ON CREW` (a once job's has no UNTIL: its card waits). */
   recruit?: string;
   /** Outfits as rewards: a `gives: outfit` ending's line, `OUTFIT · HICKS · TIE`. */
   outfit?: string;
@@ -442,7 +530,7 @@ export interface Debrief {
   /** Each check: a d100 roll (before the table), the table's dice (spec 2026-10-29), or a crack. */
   checks: { line: string; stat?: string; chance?: number; rolls?: number[]; dice?: number; position?: 'dark' | 'open' | 'wire'; faces?: number[]; keep?: 'high' | 'low'; kind?: 'crit' | 'clean' | 'cost' | 'miss'; steadied?: true; pushed?: true; crack?: { tries: number; state: string } }[];
   /** Pressing on (spec 2026-10-29 §1): each push played, its roll, and what it won or that it lost; absent with none. */
-  pushes?: { line: string; stat?: string; chance?: number; rolls?: number[]; dice?: number; position?: 'dark' | 'open' | 'wire'; faces?: number[]; keep?: 'high' | 'low'; kind?: 'crit' | 'clean' | 'cost' | 'miss'; steadied?: true; pushed?: true; result: 'won' | 'lost'; sol: number }[];
+  pushes?: { line: string; stat?: string; chance?: number; rolls?: number[]; dice?: number; position?: 'dark' | 'open' | 'wire'; faces?: number[]; keep?: 'high' | 'low'; kind?: 'crit' | 'clean' | 'cost' | 'miss'; steadied?: true; pushed?: true; result: 'won' | 'lost'; sol: number; /** A crew-rules throw that failed there: nothing won, nothing lost. */ missed?: true }[];
   /** How the push ended, when the card came up. */
   push?: 'walked' | 'won' | 'lost';
   /** The TAKE clock as the job ended (the table spec §4); absent before the table. */
@@ -461,10 +549,14 @@ export interface Debrief {
   trust?: { name: string; before: string; after: string } | null;
   /** Which way a trust job moved her trust, when it did (her closing line hears it even when the word held). */
   trustMoved?: 'up' | 'down';
+  /** A judging clock's verdict (Kroll's desk): its label, end value and size, the trust move, and the words for it; absent without one. */
+  judge?: { label: string; value: number; size: number; delta: number; words: string };
   /** The arrangement's retainer (spec 2026-10-20 §2), on the night's first job with her: paid, or not (short). */
   retainer?: { name: string; amount: number; paid: boolean };
   /** Her cut of this job (Tier 2 spec §2): her share, in percent, and the sol it took. */
   cut?: { name: string; pct: number; amount: number };
+  /** A crew-rules job's ways' `cut` (crew rules spec, The end): the percent off the pay after TAKE scaled it, and the sol it took; `sol` is already after it. */
+  waysCut?: { pct: number; amount: number };
   /** The crew brought (the hand spec §4): a line each, `DEZ · CLEAN RUN · 2 TO HAND`; absent with none. */
   crew?: string[];
   /** Who those lines are about, for their cards (graft results 2026-11-04): the first name as the lines have it, a recruit's face or a contact's card art. */
@@ -633,13 +725,15 @@ export type ControlRejection = 'busy' | 'not-latest' | 'unknown' | 'empty';
 export type ClientEvent =
   | { type: 'user_message'; text: string; mode?: ChatMode; leave?: boolean; talk?: boolean }
   /** QUEST: start a quest open here (quest lines spec §3). */
-  | { type: 'quest_start'; id: string; setup?: { approach: Approach; people: string[]; favour: boolean; contacts?: string[]; programs?: string[] } }
+  | { type: 'quest_start'; id: string; setup?: QuestSetup }
   /** A card, or CONFIRM on a held line (`said`): the pick at `beat`. */
   /** A move on the deduction board (spec 2026-11-09 §3). */
   | { type: 'quest_board'; id: string; move: BoardMove }
+  /** Crew rules: a recruit's move (their hand id), or `p:firewall` / `p:scrub`, played on this beat. */
+  | { type: 'quest_move'; id: string; beat: string; card: string }
   /** A move on the accounts board (Two Stories spec §3). */
   | { type: 'quest_accounts'; id: string; move: AccountsMove }
-  | { type: 'quest_choose'; id: string; beat: string; choice: string; /** PUSH (effect and NERVE spec §1): `true` from older clients is dice. */ push?: true | 'dice' | 'effect'; trade?: 'safe' | 'bold'; card?: string; /** An ON A ROLL ability beside `card` (ability pass spec §1). */ press?: string; /** A recruit sent to this beat's post with the pick (routes and posts spec §2). */ post?: string; /** Programs to load and to run on this roll (programs spec §2.2). */ programs?: { load: string[]; run: string[] }; said?: string; moves?: ({ word: string } | { bracket: number })[]; }
+  | { type: 'quest_choose'; id: string; beat: string; choice: string; /** Crew rules: who does the card, a hand id (`you:<name>` for one of your ways). */ by?: string; /** PUSH (effect and NERVE spec §1): `true` from older clients is dice. */ push?: true | 'dice' | 'effect'; trade?: 'safe' | 'bold'; card?: string; /** An ON A ROLL ability beside `card` (ability pass spec §1). */ press?: string; /** A recruit sent to this beat's post with the pick (routes and posts spec §2). */ post?: string; /** Programs to load and to run on this roll (programs spec §2.2). */ programs?: { load: string[]; run: string[] }; said?: string; moves?: ({ word: string } | { bracket: number })[]; }
   | { type: 'quest_walk'; id: string }
   | { type: 'fixer_buy'; item: string }
   /** CARRY on the YOU sheet: another deck you own. */
@@ -718,6 +812,19 @@ export interface Crop {
 }
 
 /** A full-body sprite and the band of it the stage shows. */
+/** A light on a figure (`sprite.lights`): centre as shares of the sprite image, radius as a share of its width, its colour. */
+export interface FigureLightPoint {
+  x: number;
+  y: number;
+  r: number;
+  color: Hex;
+}
+
+/** At most this many lights on a figure, and their radius's bounds (shares of the sprite's width). */
+export const FIGURE_LIGHTS_MAX = 6;
+export const FIGURE_LIGHT_R_MIN = 0.004;
+export const FIGURE_LIGHT_R_MAX = 0.06;
+
 export interface SpriteRef {
   url: string;
   crop: Crop;
@@ -725,10 +832,19 @@ export interface SpriteRef {
   waist?: number;
   /** Her art is on the cast's pixel grid (Studio SNAP): draw it with hard pixels. Absent: smooth. */
   pixel?: boolean;
+  /**
+   * She faces the other way on the stage by default (Studio MIRROR; on unless her file turns it off). SYS → MIRROR
+   * overrides it per browser. A contact stepped to the middle beside a resident shows the other way from this.
+   */
+  mirror?: boolean;
   /** Her other faces, name → `/api/agents/<id>/sprite/<name>`; absent when she has none. */
   expressions?: Record<string, string>;
   /** Her outfits, name → `/api/agents/<id>/outfit/<name>`; absent when she has none. The sprite is the fallback outfit. */
   outfits?: Record<string, string>;
+  /** Her face point on the sprite, as shares (the select tile's): where her breath leaves her (breath on the figures). */
+  face?: { x: number; y: number };
+  /** Lights on her (cyberware, LEDs, a lens), placed in Studio: they glow on the stage (clicked lights). */
+  lights?: FigureLightPoint[];
   /** Scene id → outfit name; a scene not listed shows the sprite. Absent when empty. */
   outfitByScene?: Record<string, string>;
   /** The face shown over the sprite when she's locked in at character select (null: none). */
@@ -832,6 +948,12 @@ export interface PlaythroughInfo {
   weather?: { weather: Weather; level: number };
   /** When you last left each contact (the story clock): she stays where you left her until her next scheduled block starts. */
   parted?: Record<string, number>;
+  /** Off-screen moves (spec 2026-11-18): what contacts did while not with you. */
+  moves?: Move[];
+  /** The newest beat that ran (story minutes), moves or not. */
+  beat?: number;
+  /** At each walk-in, the parting it ended: `[since you last saw them]` reads moves after it. */
+  since?: Record<string, number>;
   /** What seeds the blackout schedule (blackouts phase 3 §1): its first id, kept by loads and branches so they keep the same nights. */
   seed?: string;
   /** The narrator's power cuts (blackouts phase 3 §2), each tied to its encounter row; the schedule's are worked out from the clock, never kept. */
@@ -873,6 +995,11 @@ export interface ContactEntry {
   placeName: string;
   /** Her plan's tail, `home · Hae's 21:00` (her plans spec §7); absent or null: none. */
   planTail?: string | null;
+  /**
+   * RECOMMENDED (Kroll's desk spec): her once-only job for this player, hers alone, open and not started, while you're
+   * not with her. `place` is the map place it starts at; `from` the `HH:MM` she's next there, when she isn't now.
+   */
+  recommended?: { title: string; pitch: string | null; from?: string; place: string };
   /** Her room's time of day (null: no database yet). */
   timeOfDay: string | null;
   /** The newest roleplay line with her, first 120 characters. */
@@ -914,6 +1041,9 @@ export interface SaveInfo {
   solo?: boolean;
   /** The story clock when saved. */
   clock?: number;
+  /** The newest off-screen beat and how many moves stood (off-screen moves spec §3): a beat changes no database. */
+  beat?: number;
+  moveCount?: number;
   /** Per contact database: [last message rowid, last write seq, sum of shown takes] (older saves: two numbers); equal means nothing changed. */
   fingerprint: Record<string, number[]>;
 }

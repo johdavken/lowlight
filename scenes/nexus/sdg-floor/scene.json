@@ -549,10 +549,15 @@
   ],
   "sound": {
     "indoor": true,
-    "hum": 0.15,
     "bed": {
       "src": "sound/bed.ogg",
       "level": 0.3
+    },
+    "hum": 0.15,
+    "music": {
+      "songs": [
+        "Sixty-One.ogg"
+      ]
     }
   },
   "effects": [

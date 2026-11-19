@@ -1,0 +1,412 @@
+/* The board (crew rules spec 2026-11-17; mockup docs/mockups/crew-board.html, CARD BEHIND): a crew-rules run on the
+   whole 1600×900 stage. Positions, sizes and colours are the mockup's. The story page is the JOB column, placed here
+   through the shell's log region (job-column.css reads --hud-log-*). */
+
+/* The room's chrome steps out while the board is up: her figure, the keys bar, the map, TEXTS, the chat box, the party
+   window, the doors and a stranger's bust. Esc still reaches the pause menu (its own layer). */
+#game.crew-board > :is(#stage-figures, #hud, #map, #input, #whos-here, #doors, .sp-layer) { display: none !important; }
+/* The chat box steps out too, all but the box's settings key and its panel (box-settings.ts lives in it), which stand
+   on the page as at the story table. Hidden by visibility, so they can stay. */
+#game.crew-board > #feed { visibility: hidden !important; }
+#game.crew-board > #feed > :is(.bs-key, .bs-panel) { visibility: visible; }
+/* The hidden chat box still types her reply, and DECODE's noise sets itself visible (style.css), which showed it through
+   the hidden box over the deck's cards (playtest). Under the board nothing of the chat box's text shows. */
+#game.crew-board > #feed .unshown.noise { visibility: hidden !important; }
+
+/* The page (playtest: "old styling, not red trace, and no panel settings button"): the JOB column as the story table
+   draws it (table-trace.css takes `.tb-crew` with its job table: no glass, no plate, the text at 16px), in the board's
+   own 400px place. The head line and the rail are the story table's trace (board.ts drawPageTrace); the words stand
+   20px in from the rail. */
+.tb.hud.tb-crew { --hv-c: var(--ui-red, #ff4d4d); }
+.tb.hud.tb-crew > svg.hv-lead path { stroke-opacity: 0.9; filter: drop-shadow(0 0 2px var(--hv-c)); }
+.tb.hud.tb-crew > svg.hv-lead[data-lead='head'] .dot { display: none; }
+#game.crew-board > .jc-layer .jc { padding-left: 20px; }
+/* The page ends over the comms strip: its last line fades out there rather than being sliced, and the end of the text
+   scrolls clear of the fade (the top fades too once scrolled, as everywhere). */
+#game.crew-board > .jc-layer .jc-body { padding-bottom: 20px; -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(180deg, #000 calc(100% - 22px), transparent); }
+#game.crew-board > .jc-layer .jc.jc-more .jc-body { -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(180deg, transparent 0, #000 28px, #000 calc(100% - 22px), transparent); }
+/* No amber on the page (playtest): new words don't pulse its edge (the story table keeps the pulse). Hidden rather than
+   removed, so its animation still ends and job-column.ts takes `jc-new` off as ever. The scrollbar in the trace's red. */
+#game.crew-board > .jc-layer .jc.jc-new::before { opacity: 0 !important; }
+/* New words type in (ui/type-in.ts, as her comms line): DECODE's noise ahead of the cursor in the trace's red (playtest), and a
+   line's label (NARRATOR, her name) waits with its words until the first of them is out. */
+#game.crew-board > .jc-layer .jc-body { --hf-c: var(--ui-red, #ff4d4d); }
+/* NARRATOR in the trace's red, and the job's text a step brighter than the story table's (playtest). */
+#game.crew-board > .jc-layer { --jc-narrator: var(--ui-red, #ff4d4d); }
+#game.crew-board > .jc-layer :is(.jc-story, .jc-story em) { color: #bcb5c9; }
+#game.crew-board > .jc-layer .tw-wait::before { visibility: hidden; }
+#game.crew-board > .jc-layer .jc-body { scrollbar-color: color-mix(in srgb, var(--ui-red, #ff4d4d) 55%, transparent) transparent; }
+/* Another's name in the talk, at the board's floor of 14px (the story table keeps its 13). */
+#game.crew-board > .jc-layer .jc-t-who { font-size: 14px; }
+/* The TEXT key on the head line's right end, its ring where the line runs in (board.ts PAGE_HEAD_LIFT: 16px over the
+   page, the key 26px tall). Its panel opens beside the page; the beat, the panels and the hand step back behind it, as
+   the story table's margin does, so nothing of the board shows through or takes a click. */
+#game.crew-board:has(> .tb.hud.tb-crew:not([hidden])) > .feed-root.feed-stage:not(.expanded) .bs-key { top: calc(var(--hud-log-y) - 29px); }
+#game.crew-board:has(> .tb.hud.tb-crew:not([hidden])) > .feed-root.feed-stage:not(.expanded) .bs-panel:not([hidden]) { left: calc(var(--hud-log-x) + var(--hud-log-w) + 23px); top: calc(var(--hud-log-y) - 29px); }
+#game.crew-board:has(> .tb.hud.tb-crew:not([hidden])) > .feed-root.feed-stage:not(.expanded) .bs-panel { & .bs-sec, & .bs-foot { font-size: 14px; } }
+#game.crew-board:has(> #feed .bs-panel:not([hidden])) .bw > :is(.bw-beatrow, .bw-held, .bw-note, .bw-panels, .bw-lab, .bw-hand, .bw-mode) { visibility: hidden; }
+/* The model menu from SETTINGS (main.ts mounts it on the stage while the board is up, since the board hides the HUD it
+   lives in): in the middle, over the board, which steps back behind it as it does for the box settings. */
+#game.crew-board > .model-menu { top: 150px; right: auto; left: 50%; transform: translateX(-50%); z-index: 30; }
+#game.crew-board:has(> .model-menu:not([hidden])) .bw > :is(.bw-beatrow, .bw-held, .bw-note, .bw-panels, .bw-lab, .bw-hand, .bw-mode) { visibility: hidden; }
+
+/* The shell, as the board: the whole stage, under the JOB column (z 24) and over the room's dim (z 18–19). */
+.tb.hud.tb-crew { display: block; inset: 0; padding: 0; z-index: 23; color: #d9e4ea; }
+.tb.hud.tb-crew[hidden] { display: none; }
+.tb.tb-crew > :is(.tb-top, .tb-middle, .tb-levers, .tb-bottom) { display: none !important; }
+/* The table's HUD makes its grandchildren take the pointer (table.css `.tb.hud:not(.phone) > * > *`): the board's
+   full-stage layers stay see-through to it, or the last of them (GO IN's and the debrief's box) eats every click. */
+.tb.hud.tb-crew > .bw > :is(.bw-wash, .bw-mode, .bw-hand, .bw-rise) { pointer-events: none; }
+/* The page's region: the column stands 16px above the log's top (job-column.css), so this puts it at the mockup's 108. */
+.tb.tb-crew > .tb-log { position: absolute; left: 26px; top: 124px; width: 400px; height: 452px; visibility: hidden; pointer-events: none; }
+
+.bw {
+  --amber: #ffc56b;
+  --ok: #3dff7a;
+  --miss: #ff4fa3;
+  --text: #d9e4ea;
+  --dim: #8fa3ad;
+  --ink: #05020a;
+  --cyan: #7fe9ff;
+  --pink: #ff4f8b;
+  --cream: #f1e6cf;
+  --teko: 'Teko', var(--pixel);
+  --serif: 'Libre Baskerville', Georgia, serif;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-family: var(--pixel);
+}
+.bw.shake { animation: bw-shake 0.28s linear; }
+@keyframes bw-shake { 20% { transform: translate(-5px, 2px); } 40% { transform: translate(4px, -3px); } 60% { transform: translate(-3px, 1px); } 80% { transform: translate(2px, 0); } }
+/* The room shows through, dimmed (the table's dim), with the mockup's darker wash under the left column and the floor. */
+.bw-wash { position: absolute; inset: 0; pointer-events: none; background: linear-gradient(90deg, rgba(5, 2, 10, 0.9), rgba(5, 2, 10, 0.8) 26%, rgba(5, 2, 10, 0.35) 34%, rgba(5, 2, 10, 0.25) 100%), linear-gradient(0deg, rgba(5, 2, 10, 0.75), transparent 45%); }
+.bw::after { content: ''; position: absolute; inset: 0; z-index: 60; pointer-events: none; background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0 2px, transparent 2px 4px); }
+
+/* Top: the job, the route, the clocks. */
+/* The job's name and its meta line as the story table draws its title and TIER · HEAT line (table-trace.css .tb-beat,
+   .tb-role): the cream in Teko, then grey pixel caps with the values in the text's white (playtest). */
+.bw-job { position: absolute; left: 24px; top: 16px; max-width: 430px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 600 46px/1 var(--teko); letter-spacing: 0.02em; color: var(--c, #efe6cf); text-transform: uppercase; text-shadow: 0 0 18px color-mix(in srgb, var(--c, #efe6cf) 35%, transparent), 0 2px 3px #000; }
+.bw-sub { position: absolute; left: 26px; top: 68px; max-width: 430px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 15px/1.35 var(--pixel); letter-spacing: 0.16em; color: var(--t-dim, #8fa3ad); text-transform: uppercase; text-shadow: 0 1px 2px #000; }
+.bw-sub b { font-weight: normal; color: var(--t-text, #d9e4ea); }
+.bw-route { position: absolute; left: 470px; top: 18px; width: 540px; color: var(--ui-red, #ff4d4d); }
+.bw-route .rt { display: block; overflow: visible; }
+.bw-route .rt .lit { color: var(--ui-red, #ff4d4d); }
+.bw-route .rt .dim { color: rgba(230, 238, 247, 0.4); }
+.bw-route .rt .gone { color: rgba(230, 238, 247, 0.17); }
+.bw-route .rt path { fill: none; stroke: currentColor; stroke-width: 1; }
+.bw-route .rt path.lit { stroke-width: 2; filter: drop-shadow(0 0 3px currentColor); }
+.bw-route .rt path.gone { stroke-dasharray: 3 4; }
+.bw-route .rt text { font: 14px var(--pixel); letter-spacing: 0.12em; fill: currentColor; }
+.bw-route .rt .cur text { fill: #fff; }
+.bw-route .rt .tick { fill: currentColor; }
+.bw-route .rt .now { fill: var(--ink); stroke: currentColor; }
+.bw-route .rt .pst { fill: var(--ink); stroke: currentColor; }
+.bw-route .rt text.bw-ahead { font-size: 14px; fill: var(--cyan); }
+.bw-route .rt .gone text.bw-ahead { display: none; }
+.bw-route .rt-ladder { display: flex; margin-top: 8px; }
+.bw-route .rt-ladder > span { position: relative; flex: 1 1 0; min-width: 0; padding-top: 9px; border-top: 1px solid rgba(255, 77, 77, 0.55); font: 15px/1.1 var(--pixel); letter-spacing: 0.16em; color: var(--dim); white-space: nowrap; }
+.bw-route .rt-ladder > span::before { content: ''; position: absolute; left: 0; top: -5px; width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--ui-red, #ff4d4d); background: var(--ink); }
+.bw-route .rt-ladder > span.f { color: #fff; }
+.bw-route .rt-ladder > span.f::before { background: rgba(255, 77, 77, 0.6); }
+.bw-route .rt-ladder > span.on { color: #fff; }
+.bw-route .rt-ladder > span.on::before { background: var(--ui-red, #ff4d4d); box-shadow: 0 0 9px var(--ui-red, #ff4d4d); }
+/* The board's fork (route.ts): two rows of cells, the branch below in the fork's frame; the way not taken struck out. */
+.bw-route .bw-rt { position: relative; height: 86px; }
+.bw-rt-b { position: absolute; box-sizing: border-box; padding: 9px 4px 0 12px; border-top: 1px solid rgba(255, 77, 77, 0.55); white-space: nowrap; overflow: hidden; color: var(--dim); }
+.bw-rt-b::before { content: ''; position: absolute; left: 0; top: -5px; width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%; border: 1px solid var(--ui-red, #ff4d4d); background: var(--ink); }
+.bw-rt-t { display: block; font: 15px/15px var(--pixel); letter-spacing: 0.1em; }
+.bw-rt-b small.bw-ahead { display: block; margin-top: 3px; font: 14px/14px var(--pixel); letter-spacing: 0.1em; color: var(--cyan); }
+.bw-rt-b.lit { color: #e6eef7; border-top-color: var(--ui-red, #ff4d4d); }
+.bw-rt-b.f { color: #fff; border-top: 2px solid var(--ui-red, #ff4d4d); }
+.bw-rt-b.f::before { background: rgba(255, 77, 77, 0.6); }
+.bw-rt-b.on { color: #fff; border-top: 2px solid var(--ui-red, #ff4d4d); }
+.bw-rt-b.on::before { background: var(--ui-red, #ff4d4d); box-shadow: 0 0 9px var(--ui-red, #ff4d4d); }
+.bw-rt-b.gone { color: rgba(230, 238, 247, 0.3); border-top: 1px dashed rgba(230, 238, 247, 0.25); }
+.bw-rt-b.gone::before { border-color: rgba(230, 238, 247, 0.3); }
+.bw-rt-b.gone .bw-rt-t { text-decoration: line-through; text-decoration-color: rgba(255, 77, 77, 0.7); }
+.bw-rt-fork, .bw-rt-run { position: absolute; top: 0; box-sizing: border-box; pointer-events: none; }
+.bw-rt-fork { border: 1px solid rgba(255, 77, 77, 0.55); border-top: 0; }
+.bw-rt-fork.open { border-right: 0; }
+.bw-rt-fork.lit { border-color: var(--ui-red, #ff4d4d); border-width: 0 2px 2px; }
+.bw-rt-fork.gone { border-style: dashed; border-color: rgba(230, 238, 247, 0.25); }
+.bw-rt-run { height: 0; border-top: 1px solid rgba(255, 77, 77, 0.55); }
+.bw-rt-run.gone { border-top-style: dashed; border-top-color: rgba(230, 238, 247, 0.25); }
+.bw-route .rt-ladder small.bw-ahead { display: block; margin-top: 3px; font: 14px/1 var(--pixel); letter-spacing: 0.1em; color: var(--cyan); }
+
+.bw-clocks { position: absolute; right: 28px; top: 22px; display: flex; gap: 34px; font: 16px/1 var(--pixel); letter-spacing: 0.3em; }
+.bw-clocks.tight { gap: 24px; letter-spacing: 0.16em; }
+.bw-clocks.tight .bw-clk:is(.k-take, .k-alarm) i { width: 26px; }
+.bw-clk b { display: flex; gap: 5px; margin-top: 9px; }
+.bw-clk i { width: 34px; height: 17px; border: 1px solid currentColor; opacity: 0.55; transition: background 0.2s, box-shadow 0.4s; }
+.bw-clk i.on { background: currentColor; opacity: 1; }
+.bw-clk i.pop { box-shadow: 0 0 18px 4px currentColor; animation: bw-pop 1.2s ease-out; }
+@keyframes bw-pop { from { box-shadow: 0 0 26px 8px currentColor; } }
+.bw-clk.moved .bw-clk-label { text-shadow: 0 0 10px currentColor; animation: bw-pop 1.2s ease-out; }
+.bw-clk.k-take { color: var(--amber); }
+.bw-clk.k-alarm { color: var(--ui-red, #ff4d4d); }
+.bw-clk.k-job { color: var(--cyan); }
+.bw-clk.k-job i { width: 26px; }
+/* What a clock is, on hover (board.ts CLOCK_TIPS and the job's notes): a HUD trace panel under it, after a beat. */
+.bw-clocks:hover { z-index: 50; }
+.bw-clk { position: relative; }
+.bw-clk.k-take { --hv-c: var(--amber); }
+.bw-clk.k-alarm { --hv-c: var(--ui-red, #ff4d4d); }
+.bw-clk.k-job { --hv-c: var(--cyan); }
+:is(.bw-clk-tip, .bw-offer-tip) { z-index: 50; width: 280px; letter-spacing: normal; pointer-events: none; opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0s linear 0.15s; }
+:is(.bw-clk-tip, .bw-offer-tip) .hv-head { font-size: 16px; }
+:is(.bw-clk-tip, .bw-offer-tip) .hv-gist { font-size: 14px; }
+.bw-clk-tip { top: calc(100% + 12px); right: 0; }
+:where(.bw:not(.fresh)) :is(.bw-clk:hover .bw-clk-tip, .bw-offer:hover .bw-offer-tip) { opacity: 1; visibility: visible; transition: opacity 0.15s 0.35s, visibility 0s linear 0.35s; }
+
+/* Centre: the beat's head (its name, the moves played on it), then its cards. */
+.bw-beatrow { position: absolute; left: 470px; top: 108px; right: 28px; display: flex; gap: 34px; align-items: center; height: 22px; }
+.bw-beat { font: 16px/1 var(--pixel); letter-spacing: 0.3em; color: var(--ui-red, #ff4d4d); white-space: nowrap; }
+.bw-mods { display: flex; gap: 22px; font: 16px/1 var(--pixel); letter-spacing: 0.2em; color: var(--cyan); }
+.bw-mod { display: inline-flex; align-items: center; white-space: nowrap; }
+.bw-mod img { width: 22px; height: 28px; object-fit: cover; margin-right: 8px; border: 1px solid var(--cyan); }
+.bw-held { position: absolute; right: 28px; top: 108px; font: 16px/1 var(--pixel); letter-spacing: 0.24em; color: var(--cyan); animation: bw-blink 1.4s steps(2) infinite; }
+.bw-held[hidden] { display: none; }
+.bw-note { position: absolute; left: 470px; top: 524px; width: 1102px; font: 16px/1 var(--pixel); letter-spacing: 0.2em; color: var(--amber); }
+.bw-note[hidden] { display: none; }
+@keyframes bw-blink { 50% { opacity: 0.45; } }
+
+.bw-panels { position: absolute; left: 470px; top: 138px; width: 1102px; height: 380px; display: flex; gap: 16px; }
+.bw-panel { position: relative; flex: 0 1 536px; min-width: 0; height: 380px; box-sizing: border-box; border: 1px solid rgba(255, 77, 77, 0.5); background: linear-gradient(180deg, rgba(5, 2, 10, 0.72), rgba(5, 2, 10, 0.88)); cursor: pointer; transition: border-color 0.15s, transform 0.15s; overflow: hidden; }
+/* Hover lights nothing until the pointer moves after a new beat, GO IN or the debrief draws (`.fresh`, board.ts): a
+   panel or card under the resting pointer would read as marked before the player aims. */
+:where(.bw:not(.fresh)) .bw-panel:hover { border-color: var(--amber); }
+:where(.bw:not(.fresh)) .bw-panel.armed:hover, :where(.bw:not(.fresh)) .bw-panel.plain:hover { transform: translateY(-3px); box-shadow: 0 0 26px rgba(255, 197, 107, 0.2); }
+.bw-panel.at { border-color: var(--amber); }
+.bw-panel.done { border-color: var(--ok); cursor: default; }
+.bw-panel.off { opacity: 0.3; pointer-events: none; }
+.tb-crew.busy .bw-panel, .tb-crew.held .bw-panel { cursor: default; }
+.tb-crew.held .bw-panel:hover { transform: none; box-shadow: none; }
+.bw-panel .bw-art { position: absolute; inset: 0 0 auto 0; height: 150px; opacity: 0.4; background: radial-gradient(ellipse at 30% 20%, rgba(255, 77, 77, 0.22), transparent 70%); }
+.bw-panel h2 { position: absolute; left: 22px; top: 70px; right: 200px; margin: 0; white-space: nowrap; overflow: hidden; font: 500 46px/1 var(--teko); letter-spacing: 0.06em; color: #fff; text-shadow: 0 2px 0 #000; }
+.bw-panel .bw-line { position: absolute; left: 22px; top: 126px; width: 300px; font: 15px/1.5 var(--mono); }
+.bw-panel .bw-leads { position: absolute; left: 22px; top: 22px; font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: var(--cyan); }
+.bw-panel .bw-who { position: absolute; left: 22px; bottom: 16px; width: 300px; font: 15px/1.5 var(--pixel); letter-spacing: 0.14em; color: var(--dim); }
+.bw-panel .bw-pre { position: absolute; left: 22px; top: 196px; width: 300px; bottom: 12px; display: flex; flex-direction: column; gap: 10px; }
+.bw-way, .bw-throw { padding: 4px 6px 4px 0; border-left: 2px solid transparent; }
+.bw-pre.many .bw-way { padding-left: 8px; border-left-color: rgba(255, 255, 255, 0.18); cursor: pointer; }
+:where(.bw:not(.fresh)) .bw-pre.many .bw-way:hover, .bw-way.at { border-left-color: var(--amber); background: rgba(255, 197, 107, 0.06); }
+.bw-way .bw-n, .bw-throw .bw-n { font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: var(--pink); }
+.bw-way.bw-by-you .bw-n { color: var(--cyan); }
+.bw-way .bw-fx, .bw-throw .bw-fx { font: 500 30px/1 var(--teko); letter-spacing: 0.06em; margin-top: 6px; color: var(--text); }
+.bw-pre.many .bw-fx { font-size: 24px; margin-top: 3px; }
+/* Two of your ways on one card: the name and line move up, so both rows fit the panel (380px). */
+.bw-panel:has(.bw-pre.many) h2 { top: 44px; }
+.bw-panel:has(.bw-pre.many) .bw-line { top: 98px; }
+.bw-panel .bw-pre.many { top: 160px; gap: 8px; }
+.bw-way .bw-t, .bw-throw .bw-t { font: italic 14px/1.5 var(--serif); margin-top: 4px; color: var(--text); }
+.bw-pre.many .bw-t { font-size: 14px; line-height: 1.35; }
+.bw-throw .bw-throw-head { color: var(--miss); }
+.bw-none { font: 15px/1.4 var(--pixel); letter-spacing: 0.16em; color: var(--dim); }
+/* Each cost in its kind's colour (never by how good the way is). */
+.bw-c.c-take { color: var(--amber); }
+.bw-c.c-alarm { color: var(--ui-red, #ff4d4d); }
+.bw-c.c-heat { color: var(--miss); }
+.bw-c.c-clock { color: var(--cyan); }
+.bw-c.c-gain { color: var(--ok); }
+.bw-c.c-cut, .bw-c.c-lose, .bw-c.c-leaves { color: var(--cream); }
+.bw-c.c-harm { color: var(--miss); }
+.bw-c.c-none { color: var(--dim); }
+.bw-slot { position: absolute; right: 20px; top: 92px; width: 168px; height: 226px; box-sizing: border-box; border: 1px dashed rgba(255, 255, 255, 0.28); border-radius: 10px; display: grid; place-items: center; align-content: center; font: 15px/1.3 var(--pixel); letter-spacing: 0.2em; color: rgba(255, 255, 255, 0.35); text-align: center; }
+.bw-panel.armed .bw-slot, .bw-panel.plain .bw-slot { border-color: var(--amber); color: var(--amber); }
+.bw-panel.armed .bw-slot { animation: bw-pulse 1.1s ease-in-out infinite; }
+@keyframes bw-pulse { 50% { box-shadow: inset 0 0 22px rgba(255, 197, 107, 0.25); } }
+/* Three cards: narrower panels, no slot (the card that's sent still flies to where it stood). */
+.bw-panels.n3 .bw-panel h2 { right: 16px; font-size: 38px; }
+.bw-panels.n3 .bw-slot { visibility: hidden; }
+.bw-panels.n3 .bw-panel :is(.bw-line, .bw-pre, .bw-who) { width: auto; right: 16px; }
+.bw-stamp { position: absolute; right: 16px; bottom: 14px; z-index: 3; font: 500 40px/1 var(--teko); letter-spacing: 0.1em; padding: 4px 14px 0; border: 3px solid currentColor; transform: rotate(-6deg); background: rgba(5, 2, 10, 0.6); }
+.bw-stamp.s-clean { color: var(--ok); }
+.bw-stamp.s-price { color: var(--amber); }
+.bw-stamp.s-hurt, .bw-stamp.s-held { color: var(--miss); }
+.bw-stamp.in { opacity: 0; transform: rotate(-6deg) scale(2.2); animation: bw-stamp 0.32s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+@keyframes bw-stamp { to { transform: rotate(-6deg) scale(1); opacity: 1; } }
+.bw-flash { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+.bw-flash.in { animation: bw-flash 0.4s ease-out; }
+@keyframes bw-flash { 0% { opacity: 0.5; } 100% { opacity: 0; } }
+
+/* Bottom: the hand. The printed card: art to the edge, a dark rounded border, the name in serif capitals. */
+.bw-lab { position: absolute; left: 470px; top: 560px; font: 16px/1 var(--pixel); letter-spacing: 0.3em; color: var(--pink); }
+.bw-lab.deck { color: var(--amber); }
+.bw-lab[hidden] { display: none; }
+.bw-hand { position: absolute; inset: 0; pointer-events: none; }
+.bw-hand > * { pointer-events: auto; }
+.bw-pc { position: absolute; width: 204px; height: 272px; box-sizing: border-box; border-radius: 12px; background: #17151c; padding: 7px; cursor: pointer; transition: transform 0.16s ease-out, box-shadow 0.16s, filter 0.2s; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7); z-index: 5; }
+.bw-pc .bw-in, .bw-prog .bw-in, .bw-ab .bw-in, .bw-rise .bw-in { position: relative; width: 100%; height: 100%; box-sizing: border-box; border-radius: 7px; overflow: hidden; border: 1px solid rgba(241, 230, 207, 0.5); background: #0b0910; }
+.bw-pc .bw-face { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.bw-mono { display: grid; place-items: center; font: 700 96px/1 var(--serif); color: rgba(241, 230, 207, 0.22); background: radial-gradient(circle at 50% 35%, #2a2233, #0b0910 70%); }
+.bw-pc .bw-in::after { content: ''; position: absolute; inset: 45% 0 0 0; background: linear-gradient(transparent, rgba(5, 2, 10, 0.92) 60%); }
+.bw-pc .tbc-mark { position: absolute; z-index: 2; color: var(--pink); }
+.bw-pc .tbc-symbol { left: 9px; top: 8px; width: 26px; height: 26px; }
+.bw-pc .tbc-rank { right: 9px; top: 8px; width: 24px; height: 28px; display: flex; justify-content: center; }
+.bw-pc .tbc-mark svg { width: 100%; height: 100%; display: block; }
+.bw-pc .tbc-spec { position: absolute; z-index: 2; left: 9px; top: 8px; font: 14px/1 var(--pixel); letter-spacing: 0.16em; color: var(--pink); }
+.bw-pc .bw-nm { position: absolute; z-index: 2; left: 4px; right: 4px; bottom: 34px; text-align: center; font: 700 24px/1 var(--serif); letter-spacing: 0.04em; color: var(--cream); text-shadow: 0 2px 3px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-pc .bw-nm.long { font-size: 19px; }
+.bw-pc .bw-l1 { position: absolute; z-index: 2; left: 0; right: 0; bottom: 12px; text-align: center; font: 15px/1 var(--pixel); letter-spacing: 0.2em; color: var(--pink); }
+.bw-pc.you .tbc-mark, .bw-pc.you .bw-l1 { color: var(--cyan); }
+:where(.bw:not(.fresh)) .bw-pc:hover { transform: translateY(-10px); }
+.bw-pc.sel { transform: translateY(-22px); box-shadow: 0 0 0 2px var(--amber), 0 14px 30px rgba(0, 0, 0, 0.8), 0 0 34px rgba(255, 197, 107, 0.35); z-index: 6; }
+.bw-pc.spent, .bw-prog.spent { filter: grayscale(0.9) brightness(0.45); pointer-events: none; transform: none; }
+.bw-st { position: absolute; z-index: 3; left: -4px; right: -4px; top: 44%; padding: 5px 0 2px; text-align: center; font: 18px/1 var(--pixel); letter-spacing: 0.3em; color: var(--ink); background: var(--cream); transform: rotate(-8deg); }
+.bw-prog .bw-st { top: 40%; font-size: 14px; letter-spacing: 0.2em; }
+/* The card flying to its panel; under reduced motion it's placed there. */
+.bw-pc.bw-flying, .bw-prog.bw-flying { transition: left 0.3s cubic-bezier(0.5, 0, 0.2, 1), top 0.3s cubic-bezier(0.5, 0, 0.2, 1), transform 0.3s; z-index: 30; pointer-events: none; }
+.bw-pc.bw-placed, .bw-prog.bw-placed { transition: none; z-index: 30; pointer-events: none; }
+
+/* A recruit's move: its own card tucked behind theirs, its name and the top of its art showing; hover raises it whole. */
+.bw-ab { position: absolute; width: 176px; height: 236px; box-sizing: border-box; border-radius: 10px; background: #17151c; padding: 6px; cursor: pointer; z-index: 3; transition: transform 0.2s ease-out; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7); }
+.bw-ab .bw-in, .bw-rise .bw-in { border-color: rgba(255, 79, 139, 0.7); }
+.bw-ab .bw-art, .bw-rise .bw-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bw-ab .bw-top, .bw-rise .bw-top { position: absolute; left: 0; right: 0; top: 0; padding: 7px 0 14px; text-align: center; font: 16px/1 var(--pixel); letter-spacing: 0.18em; color: var(--cream); background: linear-gradient(rgba(5, 2, 10, 0.9), transparent); }
+.bw-ab .bw-mfx, .bw-rise .bw-mfx { position: absolute; left: 0; right: 0; bottom: 0; padding: 26px 10px 9px; text-align: center; font: 14px/1.4 var(--mono); color: var(--text); background: linear-gradient(transparent, rgba(5, 2, 10, 0.95) 45%); }
+.bw-ab.lift { transform: translateY(-22px); }
+:where(.bw:not(.fresh)) .bw-ab:hover { transform: translateY(-200px); z-index: 20; }
+.tb-crew.busy .bw-ab, .tb-crew.held .bw-ab { pointer-events: none; }
+
+/* The deck's programs, smaller. */
+.bw-prog { position: absolute; width: 126px; height: 168px; box-sizing: border-box; border-radius: 10px; background: #17151c; padding: 6px; cursor: pointer; transition: transform 0.16s; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.7); z-index: 5; }
+.bw-prog .bw-in { border-radius: 6px; border-color: rgba(255, 197, 107, 0.5); }
+.bw-prog .bw-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.bw-prog .bw-nm { position: absolute; left: 0; right: 0; bottom: 8px; text-align: center; font: 500 20px/1 var(--teko); letter-spacing: 0.08em; color: var(--cream); text-shadow: 0 2px 3px #000, 0 0 8px #000; }
+:where(.bw:not(.fresh)) .bw-prog:hover { transform: translateY(-8px); }
+.bw-prog.sel { transform: translateY(-16px); box-shadow: 0 0 0 2px var(--cyan), 0 0 26px rgba(127, 233, 255, 0.4); z-index: 6; }
+.bw-play { position: absolute; z-index: 7; right: -4px; top: -10px; padding: 5px 9px 3px; font: 15px/1 var(--pixel); letter-spacing: 0.16em; color: var(--ink); background: var(--cyan); border: 0; cursor: pointer; }
+
+/* Bottom left: the contact on comms, her line, her offer. */
+/* Her name, her line and her offer stack beside the portrait (a grid; the portrait and model stay placed), so a long
+   offer takes room from her line, which scrolls, never from the model under her portrait or the keys below
+   (playtest: Come Up's terminal offer ran over both). Ends 8px above .bw-keys. */
+.bw-comms { position: absolute; left: 26px; top: 590px; width: 400px; height: 258px; box-sizing: border-box; padding-left: 146px; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; row-gap: 8px; }
+.bw-comms[hidden] { display: none; }
+.bw-comms.sel .bw-pic { box-shadow: 0 0 0 2px var(--amber), 0 0 26px rgba(255, 197, 107, 0.35); }
+.bw-comms.sel .bw-offer { border-color: var(--amber); }
+.bw-pic { position: absolute; left: 0; top: 0; width: 132px; height: 176px; overflow: hidden; border: 1px solid var(--cyan); box-shadow: 0 0 16px rgba(127, 233, 255, 0.25); background: #06131a; }
+.bw-pic img.bw-pic-img { position: absolute; width: 330px; left: -98px; top: -34px; image-rendering: pixelated; filter: saturate(0.5) brightness(0.9) sepia(0.3) hue-rotate(150deg); }
+.bw-pic .bw-pic-img.bw-mono { position: absolute; inset: 0; font-size: 72px; color: rgba(127, 233, 255, 0.4); background: #06131a; }
+.bw-pic::after { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(127, 233, 255, 0.16) 0 1px, transparent 1px 3px); animation: bw-roll 5s linear infinite; }
+@keyframes bw-roll { to { background-position: 0 60px; } }
+.bw-cwho { font: 16px/1 var(--pixel); letter-spacing: 0.22em; color: var(--cyan); white-space: nowrap; }
+/* Her model under her portrait (board.ts setModel): the one her next reply answers on, by the HUD's short name. */
+.bw-model { position: absolute; left: 0; top: 184px; width: 132px; text-align: center; font: 16px/1 var(--pixel); letter-spacing: 0.08em; color: var(--cyan); text-shadow: 0 0 8px rgba(127, 233, 255, 0.35); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bw-model[hidden] { display: none; }
+/* Her whole line, scrolled in place when it runs long (playtest: a clamped line hid most of her pitch); with no offer
+   under it, it takes the column's full height. */
+.bw-say { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 6px; box-sizing: content-box; scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.5) transparent; font: 15px/1.5 var(--mono); color: var(--cyan); text-shadow: 0 0 8px rgba(127, 233, 255, 0.35); }
+/* Her line takes the box settings as the page does (say-line.ts): TEXT SIZE and FONT through the stage's --text-scale
+   and --chat-font, scaling all the way down with the page (playtest: a 14px floor stopped it at 85% while the page went
+   to 50%); her *actions* in italics; DECODE's noise in the strip's cyan. */
+.bw-say { --hf-c: var(--cyan); font-family: var(--chat-font, var(--mono)); font-size: calc(15px * var(--text-scale, 1)); }
+.bw-say .act { font-style: italic; }
+.bw-offers { display: flex; flex-direction: column; gap: 6px; }
+.bw-offer { position: relative; padding: 8px 12px; border: 1px solid rgba(127, 233, 255, 0.5); font: 15px/1.2 var(--pixel); letter-spacing: 0.14em; color: var(--cyan); cursor: pointer; background: rgba(6, 19, 26, 0.7); }
+:where(.bw:not(.fresh)) .bw-offer:hover { background: rgba(127, 233, 255, 0.14); }
+.tb-crew.busy .bw-offer, .tb-crew.held .bw-offer { cursor: default; opacity: 0.5; }
+.bw-offer .bw-fx { display: inline; margin-left: 10px; font: 15px/1.2 var(--pixel); }
+.bw-offer-head { display: inline; }
+.bw-offer { --hv-c: var(--cyan); }
+/* Her line over the offer's top edge, beside the portrait's column (room above, none below the strip). */
+.bw-offer-tip { left: 0; bottom: calc(100% + 10px); }
+.bw-keys { position: absolute; left: 26px; top: 856px; font: 14px/1 var(--pixel); letter-spacing: 0.18em; color: var(--dim); }
+
+/* A move played: its card rises to the middle over a dimmed board, holds, and goes into the beat's head. */
+.bw-rise { position: absolute; z-index: 40; left: 838px; top: 150px; width: 300px; height: 404px; box-sizing: border-box; border-radius: 14px; background: #17151c; padding: 9px; pointer-events: none; opacity: 0; box-shadow: 0 0 80px rgba(255, 79, 139, 0.5), 0 0 0 2000px rgba(5, 2, 10, 0.55); }
+.bw-rise .bw-top { font-size: 30px; padding-top: 16px; }
+.bw-rise .bw-mfx { font-size: 17px; padding-bottom: 16px; }
+.bw-rise.in { animation: bw-rise 1.5s cubic-bezier(0.2, 0.9, 0.3, 1) forwards; }
+@keyframes bw-rise { 0% { opacity: 0; transform: translateY(240px) scale(0.5) rotate(-8deg); } 18% { opacity: 1; transform: none; } 78% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-190px) scale(0.2); } }
+.bw-rise.still { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bw-pc, .bw-prog, .bw-ab, .bw-panel { transition: none; }
+  .bw-panel.armed .bw-slot, .bw-pic::after, .bw-held, .bw-clk i.pop, .bw-clk.moved .bw-clk-label { animation: none; }
+}
+
+/* GO IN and the debrief (crew rules spec, The board → GO IN; The end): the same frame, the run's own pieces down. */
+.bw[data-mode='goin'] > :is(.bw-lab, .bw-comms), .bw[data-mode='end'] > :is(.bw-lab, .bw-comms) { display: none; }
+.bw-mode { position: absolute; inset: 0; pointer-events: none; }
+.bw-mode > * { position: absolute; inset: 0; }
+.bw-mode :is(.bw-pc, .bw-prog, .bw-dslot, .bw-go, .bw-back, .bw-close) { pointer-events: auto; }
+.bw-goin-head { position: absolute; left: 470px; top: 108px; font: 16px/1 var(--pixel); letter-spacing: 0.3em; color: var(--ui-red, #ff4d4d); white-space: nowrap; }
+.bw-goin .bw-lab, .bw-end .bw-lab { top: 140px; }
+.bw-goin .bw-lab.deck { left: 1180px; }
+.bw-goin .bw-lab.bw-owned { top: 362px; }
+.bw-deck-note { position: absolute; left: 1180px; top: 362px; font: 14px/1 var(--pixel); letter-spacing: 0.2em; color: var(--dim); }
+.bw-deck-note:not(.bw-owned) { top: 158px; }
+/* Where the keys stand (←→): an outline, not the picked look (a pick is raised and lit amber, as in the hand). */
+.bw-mode .bw-pc.at, .bw-mode .bw-prog.at { outline: 2px dashed var(--cyan); outline-offset: 4px; }
+.bw-goin .bw-pc.sel { transform: translateY(-10px); }
+.bw-goin .bw-prog.sel { transform: translateY(-6px); }
+.bw-bring.small .bw-pc { width: 164px; height: 218px; }
+.bw-bring.small .bw-pc .bw-nm { font-size: 21px; bottom: 32px; }
+.bw-bring.small .bw-pc .bw-l1 { font-size: 14px; letter-spacing: 0.14em; }
+.bw-goin .bw-pc.guest .bw-in { border-color: rgba(127, 233, 255, 0.7); }
+.bw-dslot { position: absolute; width: 126px; height: 168px; box-sizing: border-box; border: 1px dashed rgba(255, 197, 107, 0.45); border-radius: 10px; display: grid; place-items: center; font: 14px/1 var(--pixel); letter-spacing: 0.2em; color: rgba(255, 197, 107, 0.45); }
+.bw-dslot > .bw-prog { left: -1px !important; top: -1px !important; }
+.bw-go, .bw-back, .bw-close { position: absolute; top: 600px; box-sizing: border-box; border: 2px solid var(--amber); background: rgba(5, 2, 10, 0.8); color: var(--amber); font: 500 40px/1 var(--teko); letter-spacing: 0.1em; padding: 10px 26px 4px; cursor: pointer; }
+.bw-go { left: 470px; }
+.bw-endcol .bw-close { position: static; align-self: flex-start; }
+.bw-back { left: 690px; border-color: rgba(255, 255, 255, 0.3); color: var(--dim); }
+:is(.bw-go, .bw-back, .bw-close) small { display: block; margin-top: 2px; font: 14px/1 var(--pixel); letter-spacing: 0.2em; opacity: 0.8; }
+:where(.bw:not(.fresh)) :is(.bw-go, .bw-close):hover { background: rgba(255, 197, 107, 0.14); }
+
+/* The debrief: the grade, the sums, the heat and rep down the middle; who came back and what it gave on the right. */
+.bw-grade { position: absolute; left: 466px; top: 138px; font: 500 128px/1 var(--teko); letter-spacing: 0.08em; text-shadow: 0 3px 0 #000; }
+.bw-end.t-clean .bw-grade { color: var(--ok); }
+.bw-end.t-messy .bw-grade { color: var(--amber); }
+.bw-end.t-blown .bw-grade { color: var(--miss); }
+.bw-end-take { position: absolute; left: 470px; top: 262px; display: flex; gap: 14px; align-items: center; font: 16px/1 var(--pixel); letter-spacing: 0.3em; color: var(--amber); }
+.bw-end-take b { display: flex; gap: 5px; }
+.bw-end-take i { width: 34px; height: 17px; border: 1px solid currentColor; opacity: 0.55; }
+.bw-end-take i.on { background: currentColor; opacity: 1; }
+.bw-endcol { position: absolute; left: 470px; top: 300px; width: 440px; bottom: 60px; display: flex; flex-direction: column; gap: 22px; }
+.bw-sums { width: 420px; display: flex; flex-direction: column; gap: 6px; }
+.bw-sum { display: flex; justify-content: space-between; align-items: baseline; font: 16px/1 var(--pixel); letter-spacing: 0.2em; color: var(--text); }
+.bw-sum b { font: 500 34px/1 var(--teko); letter-spacing: 0.06em; font-weight: 500; }
+.bw-sum.bw-cut, .bw-sum.bw-unpaid { color: var(--cream); }
+.bw-sum.bw-push { color: var(--cyan); }
+.bw-sum.bw-push.lost, .bw-sum.bw-push-end.lost { color: var(--miss); }
+.bw-sum.bw-push.missed { color: var(--dim); }
+.bw-sum.bw-push-end { font-size: 14px; letter-spacing: 0.16em; color: var(--dim); }
+.bw-sum.bw-keep { margin-top: 6px; padding-top: 8px; border-top: 1px solid rgba(255, 197, 107, 0.4); color: var(--amber); }
+.bw-after { width: 440px; display: flex; flex-direction: column; gap: 7px; font: 15px/1.3 var(--pixel); letter-spacing: 0.16em; }
+.bw-heat { color: var(--miss); }
+.bw-heat-why, .bw-heat-now { color: var(--dim); }
+.bw-rep { color: var(--cyan); }
+.bw-judge { color: var(--cream); }
+.bw-judge.up { color: var(--ok); }
+.bw-judge.down { color: var(--miss); }
+.bw-end .bw-lab.bw-crew-lab { left: 940px; }
+.bw-end .bw-mate { cursor: default; }
+.bw-end .bw-mate:hover { transform: none; }
+.bw-end .bw-mate.harmed { filter: grayscale(0.6) brightness(0.6); }
+.bw-end .bw-mate .bw-l1 { font-size: 14px; letter-spacing: 0.1em; }
+.bw-gave { position: absolute; left: 940px; top: 470px; width: 632px; display: flex; flex-direction: column; gap: 8px; }
+.bw-gave-line { font: 15px/1.3 var(--pixel); letter-spacing: 0.16em; color: var(--amber); }
+.bw-gave-line.prog { color: var(--cyan); }
+.bw-gave-line.crew { color: var(--text); }
+
+/* The scene moment (board.ts sceneMoment): a beat in another room. Everything of the board's that covers the room steps
+   back, the room's dim with it: the board (wash, route, clocks, beat row, panels, hand, comms strip, the page's trace),
+   the page (the JOB column), the TEXT key and its panel, the model menu. Faded by opacity, then hidden, so nothing of
+   it takes a click or reads as there. Back in a little slower. Under reduced motion, no fades either way. */
+#game.crew-board.bw-scene > :is(.tb.tb-crew, .jc-layer, #feed, .model-menu) { opacity: 0; visibility: hidden !important; pointer-events: none; transition: opacity 0.2s ease-out, visibility 0s linear 0.2s; }
+#game.crew-board.bw-scene > #feed > :is(.bs-key, .bs-panel) { visibility: hidden; transition: visibility 0s linear 0.2s; }
+#game.crew-board.bw-scene.tb-dim::after { opacity: 0; transition: opacity 0.2s ease-out; }
+#game.crew-board.bw-scene-back > :is(.tb.tb-crew, .jc-layer, #feed, .model-menu) { transition: opacity 0.3s ease-in; }
+#game.crew-board.bw-scene-back.tb-dim::after { transition: opacity 0.3s ease-in; }
+#game.crew-board.bw-scene-snap > :is(.tb.tb-crew, .jc-layer, #feed, .model-menu),
+#game.crew-board.bw-scene-snap > #feed > :is(.bs-key, .bs-panel),
+#game.crew-board.bw-scene-snap.tb-dim::after { transition: none !important; }
+/* The room's name across the lower stage, on a short dark band in the board's pixel caps. */
+#game > .bw-scene-band { position: absolute; left: 0; right: 0; top: 712px; z-index: 26; display: flex; justify-content: center; pointer-events: none; }
+#game > .bw-scene-band[hidden] { display: none; }
+#game > .bw-scene-band > span { padding: 13px 46px 11px; background: rgba(5, 2, 10, 0.86); border-top: 1px solid rgba(255, 77, 77, 0.55); border-bottom: 1px solid rgba(255, 77, 77, 0.55); font: 24px/1 var(--pixel); letter-spacing: 0.3em; color: #e6eef7; text-transform: uppercase; white-space: nowrap; text-shadow: 0 1px 2px #000; animation: bw-band-in 0.25s ease-out; }
+#game.bw-scene-snap > .bw-scene-band > span { animation: none; }
+@keyframes bw-band-in { from { opacity: 0; } }

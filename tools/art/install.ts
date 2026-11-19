@@ -92,12 +92,31 @@ export async function installScene(
   }
   if (errors.length > 0) return errors;
 
+  // The staging folder can be on another drive (Studio's work folder is in the art store), where a
+  // rename into the pack fails (EXDEV). So the room is copied into the pack first, under `_` names
+  // the registry skips, and the swap itself is two renames on the pack's own drive.
   const dest = path.join(scenesDir, target);
-  const old = path.join(stagingDir, `${target}.previous`);
+  const incoming = path.join(scenesDir, `_${target}.incoming`);
+  const old = path.join(scenesDir, `_${target}.previous`);
+  fs.rmSync(incoming, { recursive: true, force: true });
+  fs.rmSync(old, { recursive: true, force: true });
+  moveDir(staged, incoming);
   if (fs.existsSync(dest)) fs.renameSync(dest, old);
-  fs.renameSync(staged, dest);
+  fs.renameSync(incoming, dest);
+  fs.rmSync(old, { recursive: true, force: true });
   fs.rmSync(stagingDir, { recursive: true, force: true });
   return [];
+}
+
+/** A rename, or a copy and delete when `to` is on another drive. */
+function moveDir(from: string, to: string): void {
+  try {
+    fs.renameSync(from, to);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EXDEV') throw err;
+    fs.cpSync(from, to, { recursive: true, verbatimSymlinks: true });
+    fs.rmSync(from, { recursive: true, force: true });
+  }
 }
 
 /**

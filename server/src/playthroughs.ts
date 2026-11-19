@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { CityWeather } from '../../shared/city-weather';
+import type { Move } from '../../shared/moves';
 import type { Outage } from '../../shared/outage';
 import type { Location, PlaythroughInfo, SaveInfo } from '../../shared/types';
 import { copyFigure, PERSONA_DIR } from './persona-figure';
@@ -32,9 +33,13 @@ export interface Playthroughs {
   /** Throws for the active one. */
   remove(id: string): void;
   /** Location and updatedAt; `solo: false` also ends solo, in the same write. */
-  touch(id: string, location: Location, o?: { solo?: false; parted?: Record<string, number> }): void;
+  touch(id: string, location: Location, o?: { solo?: false; parted?: Record<string, number>; since?: Record<string, number> }): void;
   /** Records the clock when you left each contact (schedules). */
   setParted(id: string, parted: Record<string, number>): void;
+  /** Off-screen moves and the newest beat (spec 2026-11-18 §3); an empty list and a null beat clear them. */
+  setMoves(id: string, moves: Move[], beat: number | null): void;
+  /** Where each walk-in's `[since …]` starts (spec §5); empty clears it. */
+  setSince(id: string, since: Record<string, number>): void;
   /** Sets or clears go solo (cleared: the key goes); updatedAt stays. */
   setSolo(id: string, solo: boolean): void;
   /** Sets the outfit the player wears (null: back to the plain sprite, the key goes); updatedAt stays. */
@@ -134,7 +139,23 @@ function asPlaythrough(v: unknown, folder: string, onBadPersona: () => void = ()
     }
   }
   currentLocation(v);
+  offScreenFields(v);
   return v as unknown as PlaythroughInfo;
+}
+
+/** Off-screen moves' fields (spec 2026-11-18 §3) as only a game could have written them: a broken one reads as none (minor M4). */
+function offScreenFields(v: Record<string, unknown>): void {
+  const num = (x: unknown) => typeof x === 'number' && Number.isFinite(x);
+  if (v.beat !== undefined && !num(v.beat)) delete v.beat;
+  if (v.since !== undefined) {
+    if (!isRecord(v.since) || Array.isArray(v.since)) delete v.since;
+    else v.since = Object.fromEntries(Object.entries(v.since).filter(([, t]) => num(t)));
+  }
+  if (v.moves !== undefined) {
+    const ok = (m: unknown) => isRecord(m) && num(m.beat) && num(m.at) && typeof m.who === 'string' && typeof m.line === 'string' && typeof m.place === 'string';
+    if (!Array.isArray(v.moves)) delete v.moves;
+    else v.moves = v.moves.filter(ok);
+  }
 }
 
 function asSave(v: unknown, folder: string): SaveInfo | null {
@@ -362,6 +383,7 @@ export function createPlaythroughs(
         info.location = location;
         if (o.solo === false) delete info.solo;
         if (o.parted) info.parted = o.parted;
+        if (o.since) info.since = o.since;
         info.updatedAt = now();
       });
     },
@@ -369,6 +391,22 @@ export function createPlaythroughs(
     setParted(id, parted) {
       update(id, (info) => {
         info.parted = parted;
+      });
+    },
+
+    setMoves(id, moves, beat) {
+      update(id, (info) => {
+        if (moves.length > 0) info.moves = moves.map((m) => ({ ...m }));
+        else delete info.moves;
+        if (beat !== null) info.beat = beat;
+        else delete info.beat;
+      });
+    },
+
+    setSince(id, since) {
+      update(id, (info) => {
+        if (Object.keys(since).length > 0) info.since = { ...since };
+        else delete info.since;
       });
     },
 
@@ -438,7 +476,7 @@ export function createPlaythroughs(
         const newest = saves(id)[0];
         // Walking out or back in changes nothing in the databases, but it is still a different moment.
         // A WAIT changes no database but is still a later moment (its clock).
-        if (newest && sameFingerprint(newest.fingerprint, fingerprint) && !!newest.solo === !!o.solo && newest.clock === o.clock) return 'unchanged';
+        if (newest && sameFingerprint(newest.fingerprint, fingerprint) && !!newest.solo === !!o.solo && newest.clock === o.clock && newest.beat === o.beat && (newest.moveCount ?? 0) === (o.moveCount ?? 0)) return 'unchanged';
       }
 
       const saveId = freshId('sv', savesDir(id));

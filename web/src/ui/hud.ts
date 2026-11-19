@@ -124,12 +124,14 @@ export class Hud {
   private sound: SoundControl | null = null;
   private tips: { onTips(on: boolean): void; onTipsAgain(): void } | null = null;
   private intro: ((skip: boolean) => void) | null = null;
+  private worldMoves: ((on: boolean) => void) | null = null;
   private mirror: ((on: boolean) => void) | null = null;
   private frameRate: ((r: FrameRate) => void) | null = null;
   private renderScale: ((s: RenderScale) => void) | null = null;
   private effects: ((l: EffectsLevel) => void) | null = null;
   private blur: ((on: boolean) => void) | null = null;
   private post: ((on: boolean) => void) | null = null;
+  private figureLight: ((on: boolean) => void) | null = null;
   private onModel: (() => void) | null = null;
   private thinking: ((t: NarratorThinking) => void) | null = null;
   private replyPrefs: { onReplyLength(l: ReplyLength): void; onChatThinking(t: ChatThinking): void } | null = null;
@@ -187,12 +189,14 @@ export class Hud {
       onTips: (on) => this.tips?.onTips(on),
       onTipsAgain: () => this.tips?.onTipsAgain(),
       onIntro: (skip) => this.intro?.(skip),
+      onWorldMoves: (on) => this.worldMoves?.(on),
       onMirror: (on) => this.mirror?.(on),
       onFrameRate: (r) => this.frameRate?.(r),
       onRenderScale: (r) => this.renderScale?.(r),
       onEffects: (l) => this.effects?.(l),
       onBlur: (on) => this.blur?.(on),
       onPost: (on) => this.post?.(on),
+      onFigureLight: (on) => this.figureLight?.(on),
       onModel: () => this.onModel?.(),
       onThinking: (t) => this.thinking?.(t),
       onReplyLength: (l) => this.replyPrefs?.onReplyLength(l),
@@ -686,6 +690,15 @@ export class Hud {
     this.menu.showTips(on);
   }
 
+  /** SYS → WORLD MOVES (off-screen moves spec §6): what a pick does (main.ts saves it on the server). */
+  setWorldMovesControl(onPick: (on: boolean) => void): void {
+    this.worldMoves = onPick;
+  }
+
+  showWorldMoves(on: boolean): void {
+    this.menu.showWorldMoves(on);
+  }
+
   /** SYS → INTRO: what a pick does (main.ts saves it; the next start up reads it). */
   setIntroControl(onPick: (skip: boolean) => void): void {
     this.intro = onPick;
@@ -713,12 +726,17 @@ export class Hud {
     this.menu.showFrameRate(r);
   }
 
-  /** SYS → RENDER SCALE, EFFECTS, BLUR and POST EFFECTS: what a pick does (main.ts saves it and tells the renderer). */
-  setGraphicsControl(o: { onRenderScale(s: RenderScale): void; onEffects(l: EffectsLevel): void; onBlur(on: boolean): void; onPost(on: boolean): void }): void {
+  /** SYS → RENDER SCALE, EFFECTS, BLUR, POST EFFECTS and FIGURE LIGHT: what a pick does (main.ts saves it and tells the renderer). */
+  setGraphicsControl(o: { onRenderScale(s: RenderScale): void; onEffects(l: EffectsLevel): void; onBlur(on: boolean): void; onPost(on: boolean): void; onFigureLight(on: boolean): void }): void {
     this.renderScale = o.onRenderScale;
     this.effects = o.onEffects;
     this.blur = o.onBlur;
     this.post = o.onPost;
+    this.figureLight = o.onFigureLight;
+  }
+
+  showFigureLight(on: boolean): void {
+    this.menu.showFigureLight(on);
   }
 
   showBlur(on: boolean): void {

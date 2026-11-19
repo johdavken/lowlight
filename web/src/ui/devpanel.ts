@@ -164,6 +164,12 @@ export class DevPanel {
     powerOut.type = 'button';
     powerOut.addEventListener('click', () => this.send({ type: 'dev_action', tool: 'power_out', args: {} }));
     atmoSection.append(this.weatherSelect, this.weatherLevel.wrap, this.fogLevel.wrap, powerOut);
+    // Graft, for testing: one NERVE back (up to the most you hold), mid-job too.
+    const nerveUp = el('button', 'dp-nerve-up', '+NERVE');
+    nerveUp.type = 'button';
+    nerveUp.addEventListener('click', () => this.send({ type: 'dev_action', tool: 'nerve_up', args: {} }));
+    const graftSection = el('div', 'dp-section dp-graft');
+    graftSection.append(el('label', 'dp-label', 'GRAFT'), nerveUp);
 
     this.soundSection = el('div', 'dp-section dp-sound');
     this.soundSection.hidden = true;
@@ -241,6 +247,7 @@ export class DevPanel {
       lightsSection,
       ambientSection,
       atmoSection,
+      graftSection,
       this.soundSection,
       this.stageSection,
       stateSection,

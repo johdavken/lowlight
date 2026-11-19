@@ -1,5 +1,5 @@
 /**
- * SYS → RENDER SCALE, EFFECTS, BLUR and POST EFFECTS (2026-11-16), kept per browser like FRAME RATE.
+ * SYS → RENDER SCALE, EFFECTS, BLUR, POST EFFECTS and FIGURE LIGHT (2026-11-16), kept per browser like FRAME RATE.
  * BLUR off: the bars beside the room go black, and the panels' frosted glass keeps its darkening without the blur.
  * POST EFFECTS off: no scanlines or vignette over the room (glitches and signal drops still play).
  * RENDER SCALE draws the room's canvas at a share of the screen's pixel density: on a high-DPI screen 100 % is
@@ -14,6 +14,7 @@ export type EffectsLevel = (typeof EFFECTS_LEVELS)[number];
 
 const SCALE_KEY = 'lowlight.renderScale';
 const EFFECTS_KEY = 'lowlight.effects';
+const FIGURE_LIGHT_KEY = 'lowlight.figureLight';
 const BLUR_KEY = 'lowlight.blur';
 const POST_KEY = 'lowlight.post';
 
@@ -46,6 +47,10 @@ export const loadBlur = (): boolean => load(BLUR_KEY, ['on', 'off'], 'on') === '
 export const saveBlur = (on: boolean): void => save(BLUR_KEY, on ? 'on' : 'off');
 export const loadPost = (): boolean => load(POST_KEY, ['on', 'off'], 'on') === 'on';
 export const savePost = (on: boolean): void => save(POST_KEY, on ? 'on' : 'off');
+
+/** FIGURE LIGHT (figure lighting spec §2): on unless saved off; off, the figures take the flat tint. */
+export const loadFigureLight = (): boolean => load(FIGURE_LIGHT_KEY, ['on', 'off'], 'on') === 'on';
+export const saveFigureLight = (on: boolean): void => save(FIGURE_LIGHT_KEY, on ? 'on' : 'off');
 
 /** BLUR on the page: every panel's backdrop blur is a multiple of `--ui-blur` (0 with BLUR off). */
 export function applyUiBlur(on: boolean, root: HTMLElement = document.documentElement): void {

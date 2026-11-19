@@ -31,7 +31,8 @@
   "sprite": {
     "src": "ember-outfit-indoors.png",
     "pixel": true,
-    "waist": 0.363
+    "waist": 0.363,
+    "lights": [{ "x": 0.478, "y": 0.073, "r": 0.008, "color": "#ff4070" }]
   },
   "commsFigure": "ember-comms.png",
   "selectExpression": "happy",

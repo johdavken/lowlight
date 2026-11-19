@@ -210,13 +210,6 @@
       }
     }
   },
-  "sound": {
-    "reverb": 0.3,
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.4
-    }
-  },
   "weatherArea": [
     [
       [
@@ -249,6 +242,13 @@
       ]
     ]
   ],
+  "sound": {
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
+    },
+    "reverb": 0.3
+  },
   "effects": [
     {
       "kind": "plume",
@@ -284,5 +284,8 @@
       "to": "karasu/noodle-stall",
       "way": "round the corner to Hae's counter"
     }
-  ]
+  ],
+  "figureLight": {
+    "breath": true
+  }
 }

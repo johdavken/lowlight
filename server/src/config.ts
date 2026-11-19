@@ -28,6 +28,8 @@ export interface Config {
   accountsDir?: string;
   /** Stranger faces: world/extras/ (extras.json and its PNGs; read once at startup). Default ./world/extras. */
   extrasDir?: string;
+  /** The shared cast list (narration images spec 2026-11-18). */
+  castFile?: string;
   /** The deck catalog: world/gear/decks.md (missions spec §1; read once at startup). Default ./world/gear. */
   gearDir?: string;
   /** The crew tables: world/crew/*.md (crew spec §1–§2; read once at startup). Default ./world/crew. */
@@ -116,6 +118,7 @@ export function loadConfig(env: NodeJS.ProcessEnv, opts: { generatedToken?: () =
     casesDir: env.CASES_DIR ?? './world/cases',
     accountsDir: env.ACCOUNTS_DIR ?? './world/accounts',
     extrasDir: env.EXTRAS_DIR ?? './world/extras',
+    castFile: env.CAST_FILE ?? './world/cast.json',
     gearDir: env.GEAR_DIR ?? './world/gear',
     crewDir: env.CREW_DIR ?? './world/crew',
     standingFile: env.STANDING_FILE ?? './world/standing.json',

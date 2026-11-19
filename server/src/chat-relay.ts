@@ -1,3 +1,5 @@
+import type { CastFace } from '../../shared/narration-images';
+import type { Crop } from '../../shared/types';
 import { roomDetail, roomDetailLine } from '../../shared/room-details';
 import type { CaseFile } from '../../shared/cases';
 import type { AccountsFile } from '../../shared/accounts';
@@ -21,7 +23,7 @@ import { readSummary } from './summary';
 import type { Backend } from './backend';
 import { NO_LINK_NOTICE, TurnError, STREAM_OPEN_EVENT, type CompletionMessage, type ModelPair } from './turn';
 import { wearingLine, type WearEntry } from './wearing';
-import { whoIsYou, TEXT_HEADING, TEXT_INSTRUCTIONS, promisedLine, jobTextLine, jobRoomLine, storyLine, storyJobLine, textPlanLine, textWhereLine, herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, COMMS_BACK_INSTRUCTIONS, COMMS_DROP_LINE, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, commsLine, beatLine, RP_HEADING, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, ENCOUNTER_INSTRUCTIONS, QUEST_INSTRUCTIONS, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, endSceneText, othersBlock, strangerBlock, type OtherVoice } from './instructions';
+import { whoIsYou, turnCue, TEXT_HEADING, TEXT_INSTRUCTIONS, promisedLine, jobTextLine, moveTextLine, MOVE_TEXT_MARK, jobRoomLine, storyLine, storyJobLine, textPlanLine, textWhereLine, herLeaveInstructions, END_SCENE_INSTRUCTIONS, LEAVE_INSTRUCTIONS, COMMS_BACK_INSTRUCTIONS, COMMS_DROP_LINE, COMMS_HANGUP_INSTRUCTIONS, COMMS_TRAVEL_INSTRUCTIONS, commsLine, beatLine, RP_HEADING, GREET_INSTRUCTIONS, SCENE_GREET_INSTRUCTIONS, GREET_PLACEHOLDER, LIGHTS_LINE, OOC_INSTRUCTIONS, ROLEPLAY_GUIDE, ROOM_INSTRUCTIONS, TRAVEL_INSTRUCTIONS, TRAVEL_LINE, ENCOUNTER_INSTRUCTIONS, QUEST_INSTRUCTIONS, GIG_INSTRUCTIONS, DICE_INSTRUCTIONS, endSceneText, othersBlock, strangerBlock, type OtherVoice } from './instructions';
 import { echoLine, propWords } from './echoes';
 import { habitsLine, readHabits } from './habits';
 import { parsePlan, parseSay, planKey, planSayKey, planSeenKey } from '../../shared/plan';
@@ -37,7 +39,7 @@ import { leadsBlock, leadsLogLine, type LeadEntry, type LeadsForTurn } from '../
 import { sceneBlock, WRITTEN_SCENE_TITLE } from '../../shared/scenario';
 import { moveLine } from '../../shared/arrival';
 import type { Extra } from '../../shared/extras';
-import { questRowText, toldKey, toldOf, type Told, type CondCtx, type QuestEntry, type QuestStatus } from '../../shared/quests';
+import { questRowOf, questRowText, toldKey, toldOf, type Told, type CondCtx, type QuestEntry, type QuestStatus } from '../../shared/quests';
 import { oneLine } from './persona';
 import { type CostId } from '../../shared/costs';
 import { type GmComplete } from './gm';
@@ -81,6 +83,10 @@ export interface ChatRelayDeps {
   cityLine?: (clock: number) => string | null;
   /** Her `[you were there: …]` line (witness lines spec §3): what she was in the room for elsewhere. Absent: none. */
   witnessedLine?: (player: string) => string | null;
+  /** Her off-screen moves since you last saw her (off-screen moves spec §5); null: none. */
+  movesSince?: (player: string) => string | null;
+  /** Word going round she'd have heard (spec §4.3); null: none. */
+  wordLine?: (player: string) => string | null;
   /** The scene behind that line, word for word (witness lines, 2026-11-06). Absent: none. */
   witnessedScene?: (player: string) => string | null;
   /**
@@ -156,11 +162,17 @@ export interface ChatRelayDeps {
     book(): QuestEntry[];
     /** The extras library, for strangers' faces (stranger faces spec §5); absent: none. */
     extras?(): Extra[];
+    /** The shared cast list (narration images spec 2026-11-18): recurring people's one face. */
+    cast?(): ReadonlyMap<string, CastFace>;
+    /** A contact's figure for a narration image: its URL and the head crop. Null: no figure. */
+    figureOf?(id: string): { url: string; crop: Crop } | null;
     status(player: string): QuestStatus[];
     ctx(player: string): CondCtx | null;
     placeId(): string | null;
     /** Names for the panel: a contact's, a map place's. */
     contactName(id: string): string;
+    /** A contact's pronoun, for lines that name what she did ("She does it."); absent: `they`. */
+    contactPronoun?(id: string): Pronoun;
     placeName(id: string): string;
     /** The ids of the leads `player` holds; absent: none. */
     heldLeads?(player: string): string[];
@@ -211,6 +223,8 @@ export interface ChatRelayDeps {
     districtName?(id: string): string;
     /** Voiced job beats (2026-11-08): the recorded clips for a row's texts, in order; absent: none. */
     clips?(quest: string, texts: readonly string[]): string[];
+    /** A job's GO IN page clip (its pitch and brief, voiced), or null. */
+    setupVoice?(quest: string): string | null;
   };
   /** A check's dice (the table spec §1): `n` d6 faces for a roll keeping `keep`. Default: random; tests and e2e pass their own. */
   rollDice?: (n: number, keep: 'high' | 'low') => number[];
@@ -238,6 +252,8 @@ export interface ChatRelayDeps {
   onTakeReplaced?(messageId: string): void;
   /** Lines are about to be cut (rewind): work reading them stops. */
   onRewind?(): void;
+  /** A rewind's cut went through (off-screen moves spec §3): later off-screen beats can go. */
+  onRewound?(): void;
   /** A reply's shown take `keep` just became its only take (take 0): work reading it follows. */
   onTakesCollapsed?(messageId: string, keep: number): void;
   /** The story tables were rebuilt from the write log (rewind, swipe, a take opening or failing, delete, undo): show what changed. */
@@ -391,6 +407,9 @@ export class ChatRelay {
   carry(...a: Parameters<JobRunner['carry']>) {
     return this.jobs.carry(...a);
   }
+  devNerve(...a: Parameters<JobRunner['devNerve']>) {
+    return this.jobs.devNerve(...a);
+  }
   crew(...a: Parameters<JobRunner['crew']>) {
     return this.jobs.crew(...a);
   }
@@ -408,6 +427,9 @@ export class ChatRelay {
   }
   chooseQuest(...a: Parameters<JobRunner['chooseQuest']>) {
     return this.jobs.chooseQuest(...a);
+  }
+  crewMove(...a: Parameters<JobRunner['crewMove']>) {
+    return this.jobs.crewMove(...a);
   }
   questWaitStop(...a: Parameters<JobRunner['questWaitStop']>) {
     return this.jobs.questWaitStop(...a);
@@ -626,6 +648,25 @@ export class ChatRelay {
     this.emitPair({ type: 'message', message: userMessage });
     const r = await this.runTurn(userMessage);
     // The turn tells the job under her reply's take (runTurn's finally), so a REGEN tells it again.
+    if (!r.ok) {
+      this.deps.db.deleteMessage(this.pair(), userMessage.id);
+      this.emitPair({ type: 'messages_removed', ids: [userMessage.id] });
+    }
+    return r;
+  }
+
+  /**
+   * Her move text (off-screen moves spec §4.2): something she did off-screen that involves you. A hidden line stamped at
+   * the beat stands in for yours, as a job text's does; marked so it tells no job and spends no promise.
+   */
+  async sendMoveText(player: string, o: { about: string; due: number }): Promise<Result> {
+    if (this.turnActive) return { ok: false, error: 'busy' };
+    this.enter(player);
+    const you = this.deps.players.resolve(this.pid).name;
+    const userMessage: ChatMessage = { id: crypto.randomUUID(), role: 'user', text: moveTextLine({ you, about: o.about }), toolLines: [], ts: Date.now(), status: 'ok', mode: 'text', promised: true, jobText: `${MOVE_TEXT_MARK}${o.due}`, clock: o.due };
+    this.deps.db.insertMessage(this.pair(), userMessage);
+    this.emitPair({ type: 'message', message: userMessage });
+    const r = await this.runTurn(userMessage);
     if (!r.ok) {
       this.deps.db.deleteMessage(this.pair(), userMessage.id);
       this.emitPair({ type: 'messages_removed', ids: [userMessage.id] });
@@ -976,7 +1017,7 @@ export class ChatRelay {
         this.deps.db.deleteMeta(promiseTriesKey(this.pid));
       }
       // Her job text (job texts spec §3), or the job she raised in the room (§4): told, under the take that said it.
-      const told = ok && reply ? (userMessage.jobText ? { job: userMessage.jobText, how: 'text' as const } : this.jobRoom ? { job: this.jobRoom, how: 'room' as const } : null) : null;
+      const told = ok && reply ? (userMessage.jobText && !userMessage.jobText.startsWith(MOVE_TEXT_MARK) ? { job: userMessage.jobText, how: 'text' as const } : this.jobRoom ? { job: this.jobRoom, how: 'room' as const } : null) : null;
       if (told && reply) {
         const at = told.how === 'text' ? (userMessage.clock ?? this.deps.clockNow?.() ?? 0) : (this.deps.clockNow?.() ?? 0);
         this.deps.db.withStamp({ messageId: reply.id, take: reply.take }, () => this.deps.db.setMeta(toldKey(this.pid, told.job), JSON.stringify({ how: told.how, at } satisfies Told)));
@@ -1211,6 +1252,7 @@ export class ChatRelay {
     const all = this.deps.db.allMessages(this.pair());
     const later = all.slice(all.findIndex((m) => m.id === id) + 1);
     const { ids, rebuilt } = this.deps.db.cutAfter(this.pair(), id);
+    this.deps.onRewound?.();
     if (ids.length > 0) this.emitPair({ type: 'messages_removed', ids });
     this.spendCutPromise(later);
     this.deps.onRebuild?.(rebuilt);
@@ -1461,7 +1503,11 @@ export class ChatRelay {
     const arrangement = deal ? arrangementLine({ player: player.name, ...deal }) : null;
     const witnessed = inCharacter ? (this.deps.witnessedLine?.(player.id) ?? null) : null;
     const witnessedScene = inCharacter ? (this.deps.witnessedScene?.(player.id) ?? null) : null;
-    const you = [player.line, kit, jobsWith, witnessed, witnessedScene, ...this.jobs.settledLines(), job, board, clients, arrangement].filter((x): x is string => Boolean(x)).join('\n') || null;
+    // Off-screen moves (spec 2026-11-18 §4.3, §5): in person only, not a text, not on comms.
+    const inPerson = inCharacter && userMessage.mode !== 'text' && this.jobs.commsNow(this.pid)?.on !== true;
+    const moved = inPerson ? (this.deps.movesSince?.(player.id) ?? null) : null;
+    const word = inPerson ? (this.deps.wordLine?.(player.id) ?? null) : null;
+    const you = [player.line, kit, jobsWith, witnessed, witnessedScene, moved, word, ...this.jobs.settledLines(), job, board, clients, arrangement].filter((x): x is string => Boolean(x)).join('\n') || null;
     // On comms you didn't arrive together, and walking back to her she greets you (comms review I4): no TRAVEL_LINE for either.
     const commsTravel = userMessage.mode === 'travel' && (this.jobs.commsNow(this.pid)?.on === true || this.hungUpBy(userMessage.id));
     const arrival = userMessage.mode === 'greet' ? this.arrival(userMessage) : userMessage.mode === 'travel' && !commsTravel ? TRAVEL_LINE : null;
@@ -1631,6 +1677,12 @@ export class ChatRelay {
     return scene ? [...recent, { text: scene.text, by: 'you' }] : recent;
   }
 
+  /** Her display name, for the turn cue: her self, the room's agent name, or her contact name in the quest book. */
+  private herName(): string {
+    const q = this.deps.quests;
+    return this.deps.self?.().name ?? this.deps.agentName ?? (q ? q.contactName(q.contact) : 'yourself');
+  }
+
   /** Who is in the scene, for lore (spec §2): her and the turn's player. A scene adds its others; a text has none. */
   private lorePresent(player: string): string[] {
     return [this.deps.self?.().name ?? this.deps.agentName, player].filter((n): n is string => typeof n === 'string' && n !== '');
@@ -1753,7 +1805,7 @@ export class ChatRelay {
           : userMessage.mode === 'encounter'
             ? encounterText({ title: userMessage.encounter?.title ?? '', text: userMessage.text }, oneLine)
             : userMessage.mode === 'quest'
-              ? questRowText({ title: userMessage.quest?.title ?? '', text: held !== null ? userMessage.text.slice(0, held) : userMessage.text, run: userMessage.quest?.run, heard: userMessage.quest?.heard }, oneLine, player.name)
+              ? questRowText(questRowOf(userMessage, held !== null ? userMessage.text.slice(0, held) : userMessage.text, held !== null), oneLine, player.name)
             : userMessage.mode === 'gig' && userMessage.gig
               ? gigText(userMessage.gig)
               : userMessage.mode === 'dice' && userMessage.dice
@@ -1811,7 +1863,9 @@ export class ChatRelay {
             // contextLines first: it sets this turn's room detail, which heads the turn.
             contextLines: this.contextLines(userMessage, player, presence, recentText, wearing),
             head: this.headLines(wearing),
-            text: turnText,
+            // A job or quest row ends on the cue, after its line (Run Sheet, playtest): read last, the row's narration
+            // about the player was what she carried on. Not in turnText: lore and leads read that.
+            text: userMessage.mode === 'quest' ? `${turnText}\n\n${turnCue(this.herName(), player.name)}` : turnText,
             blocks,
           };
     return buildMessages({ instructions, history: this.turnHistory(userMessage), turn, summary: readSummary(db, this.pair()), player: player.name });

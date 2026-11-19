@@ -157,6 +157,16 @@ export function registerLinkRoutes(
     return reply.code(204).send();
   });
 
+  // SYS → WORLD MOVES (off-screen moves spec §6): whether off-screen beats spend the player's key.
+  app.get('/api/world-moves', async (): Promise<{ on: boolean }> => ({ on: o.settings.worldMoves() }));
+
+  app.put('/api/world-moves', sameOrigin, async (req, reply) => {
+    const on = typeof req.body === 'object' && req.body !== null ? (req.body as Record<string, unknown>).on : undefined;
+    if (typeof on !== 'boolean') return reply.code(400).send({ error: 'bad-on' });
+    o.settings.setWorldMoves(on);
+    return { on: o.settings.worldMoves() };
+  });
+
   app.get('/api/narrator-thinking', async (): Promise<{ thinking: NarratorThinking }> => ({ thinking: o.settings.narratorThinking() }));
 
   app.put('/api/narrator-thinking', sameOrigin, async (req, reply) => {

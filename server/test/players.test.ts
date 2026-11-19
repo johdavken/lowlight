@@ -89,7 +89,7 @@ describe('createPlayers', () => {
     expect(p.name).toBe('Cass');
     expect(p.line).toBe('[you: Cass (she) — Late shift, Ribbon bar. Remembers everything.]');
     expect(p.whosHere).toBe("[who's here: Cass (she) — Late shift, Ribbon bar.]\nRemembers everything.\nTELL: the mug");
-    expect(p.sprite).toEqual({ file: '/abs/cass.png', crop: { top: 0, bottom: 1 } });
+    expect(p.sprite).toEqual({ file: '/abs/cass.png', crop: { top: 0, bottom: 1 }, face: expect.any(Object) });
   });
 
   it('resolve never includes identity/instructions/ooc text', () => {
@@ -124,19 +124,19 @@ describe('createPlayers', () => {
       name: 'Hicks',
       line: '[you: Hicks (he) — Runs the crew. Production work by day.]',
       whosHere: "[who's here: Hicks (he) — Runs the crew.]\nProduction work by day.",
-      sprite: { file: '/abs/hicks.png', crop: { top: 0, bottom: 1 } },
+      sprite: { file: '/abs/hicks.png', crop: { top: 0, bottom: 1 }, face: expect.any(Object) },
       tagline: 'Runs the crew.',
     });
   });
 
   it("the player's figure keeps her waist", () => {
     const rec = record({ id: 'ember', name: 'Ember', description: '', tagline: '', bio: [], facts: [] }, { sprite: { file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, waist: 0.36, expressions: {}, outfits: {}, outfitByScene: {}, outfitWears: {} } });
-    expect(createPlayers({ records: () => [rec], characterId: 'ember' }).resolve(undefined).sprite).toEqual({ file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, waist: 0.36 });
+    expect(createPlayers({ records: () => [rec], characterId: 'ember' }).resolve(undefined).sprite).toEqual({ file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, waist: 0.36, face: expect.any(Object) });
   });
 
   it("the player's figure keeps her pixel flag", () => {
     const rec = record({ id: 'ember', name: 'Ember', description: '', tagline: '', bio: [], facts: [] }, { sprite: { file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, pixel: true, expressions: {}, outfits: {}, outfitByScene: {}, outfitWears: {} } });
-    expect(createPlayers({ records: () => [rec], characterId: 'ember' }).resolve(undefined).sprite).toEqual({ file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, pixel: true });
+    expect(createPlayers({ records: () => [rec], characterId: 'ember' }).resolve(undefined).sprite).toEqual({ file: '/abs/e.png', crop: { top: 0, bottom: 0.5 }, pixel: true, face: expect.any(Object) });
   });
 
   it('resolve accepts the default id even when it is not in the roster', () => {

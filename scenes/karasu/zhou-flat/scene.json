@@ -105,8 +105,8 @@
         520
       ],
       "color": "#fff2d0",
-      "intensity": 0.22,
-      "radius": 130,
+      "intensity": 0.97,
+      "radius": 900,
       "flicker": 0
     }
   ],
@@ -412,6 +412,10 @@
   ],
   "sound": {
     "indoor": true,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    },
     "hum": 0.3,
     "music": {
       "songs": [
@@ -425,11 +429,7 @@
         "level": 0.6,
         "onEntry": true
       }
-    ],
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.3
-    }
+    ]
   },
   "effects": [
     {
@@ -490,8 +490,8 @@
     {
       "kind": "screen",
       "rect": [
-        968,
-        255,
+        975,
+        261,
         72,
         62
       ],
@@ -519,5 +519,12 @@
         570
       ]
     }
-  ]
+  ],
+  "figureLight": {
+    "key": {
+      "side": "right",
+      "height": 0.1,
+      "strength": 0.6
+    }
+  }
 }

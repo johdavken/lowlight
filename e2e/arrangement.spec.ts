@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { awaitGreeting, DIRECT, goIn, send, skipSplash, startQuest } from './fixtures';
+import { awaitGreeting, DIRECT, goIn, send, skipSplash, startQuest, pickCard } from './fixtures';
 
 // The arrangement (spec 2026-10-20): a cut-down Chair, then a job with Nix at the Tilt (e2e/serve.ts), in a playthrough of
 // its own as Cass, who starts at high trust with Nix (NIX_TEST_TRUST). Her fee is a cut of the job (Tier 2 spec 2026-11-01).
@@ -51,9 +51,9 @@ test('the Chair strikes a deal; a job with her shows her cut, the next job is ca
   await startQuest(page, 'Chair Job');
   await goIn(page);
   await expect(replies).toHaveCount(afterDeal + 1, { timeout: 10_000 });
-  await page.locator('.tb-card[data-choice="wait"]').click();
-  await page.locator('.tb-card[data-choice="go"]').click();
-  await page.locator('.tb-card[data-choice="skim"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="wait"]'));
+  await pickCard(page.locator('.tb-card[data-choice="go"]'));
+  await pickCard(page.locator('.tb-card[data-choice="skim"]'));
   await expect(page.locator('.db .db-tier')).toHaveText('CLEAN', { timeout: 10_000 });
   await expect(page.locator('.db .db-cut')).toContainText("NIX'S CUT · 25%");
   await expect(replies).toHaveCount(afterDeal + 2, { timeout: 10_000 });

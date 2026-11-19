@@ -25,6 +25,8 @@ export interface EngineState {
   thunders?: number;
   /** Voiced job beats: the clip speaking now (its url), or null. */
   speaking?: string | null;
+  /** The narrator is paused (the JOB column's ❚❚). */
+  paused?: boolean;
 }
 
 /** How long rolling thunder fades out when the room changes. */
@@ -78,6 +80,9 @@ function defaultContext(): AudioContext | null {
 /** The signal coming back on, after it dropped (picked with the CRT cues: going off at the collapse, on 0.8 s later). */
 const SIGNAL_ON_AFTER_MS = 800;
 
+/** The pause between two voiced clips played back to back (narration sections of one row). */
+export const CLIP_GAP_MS = 800;
+
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private available = true;
@@ -89,7 +94,10 @@ export class AudioEngine {
   private duckRoom!: GainNode;
   private duckMusic!: GainNode;
   /** The clip speaking now; `speechToken` bumps on every speak/hush so a clip still loading never plays. */
-  private speech: { src: AudioBufferSourceNode; out: GainNode; url: string } | null = null;
+  private speech: { src: AudioBufferSourceNode; out: GainNode; url: string; buffer: AudioBuffer; startedAt: number; offset: number; ended: boolean; again: (offset: number) => void } | null = null;
+  /** The narrator's pause (the JOB column's ❚❚): the reading holds; `resumeSpeech` carries it on. */
+  private speechPaused = false;
+  private resumeSpeech: (() => void) | null = null;
   private speechToken = 0;
   /** While a reading is still going: adds clips to its end (a ride-along beat held back, 2026-11-08). */
   private speechMore: ((urls: readonly string[]) => void) | null = null;
@@ -466,6 +474,10 @@ export class AudioEngine {
       const b = await loads[k];
       if (!live()) return;
       if (!b) return next(k + 1);
+      play(k, b, 0);
+    };
+    /** Clip `k` from `offset` seconds in: what a reading plays, and what play after a pause plays again. */
+    const play = (k: number, b: AudioBuffer, offset: number): void => {
       try {
         const out = ctx.createGain();
         out.connect(this.channel('voice'));
@@ -475,13 +487,30 @@ export class AudioEngine {
         src.onended = () => {
           src.disconnect();
           out.disconnect();
-          if (this.speech?.src !== src) return; // hushed: hush() already let it go
-          this.speech = null;
-          void next(k + 1);
+          // Hushed (hush() already let it go), or stopped for a pause: the reading doesn't move on.
+          if (this.speech?.src !== src || this.speechPaused) return;
+          this.speech.ended = true;
+          // A breath before the next clip (a row's sections read apart: an outcome, then the next beat). The voice
+          // stays "speaking" through it, so the room stays ducked; a hush in the gap drops the rest (live()), and a
+          // pause holds it until play.
+          const go = () => {
+            if (!live()) return;
+            this.speech = null;
+            void next(k + 1);
+          };
+          if (k + 1 < loads.length) {
+            setTimeout(() => {
+              if (!live()) return;
+              if (this.speechPaused) this.resumeSpeech = go;
+              else go();
+            }, CLIP_GAP_MS);
+            return;
+          }
+          go();
         };
-        this.speech = { src, out, url: all[k] };
+        this.speech = { src, out, url: all[k], buffer: b, startedAt: ctx.currentTime, offset, ended: false, again: (at) => play(k, b, at) };
         this.duck(true);
-        src.start();
+        src.start(0, offset);
       } catch (err) {
         // The context went away under it (or refused the clip): no reading, and the room comes back up.
         this.warn(`voice ${all[k]} failed to play (${err instanceof Error ? err.message : String(err)})`);
@@ -493,10 +522,36 @@ export class AudioEngine {
     void next(0);
   }
 
+  /** The narrator's pause: the clip stops where it is (the room stays ducked); `playVoice` plays on from there. */
+  pauseVoice(): void {
+    const s = this.speech;
+    if (!s || this.speechPaused || !this.ctx) return;
+    this.speechPaused = true;
+    if (s.ended) return; // in the gap between clips: the next waits for resume
+    const at = Math.min(s.buffer.duration ?? Infinity, this.ctx.currentTime - s.startedAt + s.offset);
+    this.resumeSpeech = () => s.again(Math.max(0, at));
+    try {
+      s.src.stop();
+    } catch {
+      // already stopped
+    }
+  }
+
+  /** Plays on from where the pause held it. */
+  playVoice(): void {
+    if (!this.speechPaused) return;
+    this.speechPaused = false;
+    const go = this.resumeSpeech;
+    this.resumeSpeech = null;
+    go?.();
+  }
+
   /** Stops the speaking clip (a short fade) and drops the clips after it; the room and the music come back up. */
   hush(): void {
     this.speechToken++;
     this.speechMore = null;
+    this.speechPaused = false;
+    this.resumeSpeech = null;
     const s = this.speech;
     this.speech = null;
     if (s && this.ctx) {
@@ -753,6 +808,7 @@ export class AudioEngine {
       musicStarts: this.musicStarts,
       thunders: this.thunderCount,
       speaking: this.speech?.url ?? null,
+      paused: this.speechPaused,
     };
   }
 

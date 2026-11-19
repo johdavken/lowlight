@@ -4,6 +4,7 @@
  * choice to roll it with the card (and PUSH, if it's on). STEADY / TAKE IT, the getaway, the cover cards, WALK /
  * PRESS ON and the debrief deal here too. Story quests stay on the quest panel.
  */
+import { stripImageTokens } from '../narration-image';
 import { mountDeduction, type DeductionBoard } from './deduction';
 import type { BoardMove } from '../../../../shared/deduction';
 import { mountAccounts, type AccountsBoard } from './accounts';
@@ -11,12 +12,12 @@ import type { AccountsMove } from '../../../../shared/accounts';
 import { CARRY_ON, deckNotes, EFFECT_NAMES, POOL_MAX, POSITION_NAMES, PRESS_NERVE, PUSH_NERVE, tradeRefusal, type Effect, type Pool, type Position, type PushMode, type Trade } from '../../../../shared/dice';
 import type { Debrief, ProgramPreview, QuestState } from '../../../../shared/types';
 import { debriefEl } from '../debrief';
-import { landedTray, settleParked } from '../check-anim';
+import { FLOOR_PARKED, landedTray, onFloor, settleParked } from '../check-anim';
 import { parkedLine } from '../job-moment';
 import { passiveLabels } from '../../ui/passive';
 import { markLore } from '../../ui/lore-hover';
 import { cardEl, mountDeal, trayHead, type TableCard } from './deal';
-import { el, graftCue, isPhone, type TableCue } from './el';
+import { el, graftCue, isPhone, isStoryTable, type TableCue, wheelSteps } from './el';
 import { decodeIn, noise, scrambleIn, WAIT_CHARS } from './decode';
 import { mountHand, type HandGroup } from './hand';
 import { abilityFace, artFace, backFace, contactFace, crewFace, deckLabel, programFace, slotFace, statPicture } from './faces';
@@ -456,6 +457,11 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
   let dealtFor: string | null = null;
   let lit: { choice: string; text: string } | null = null;
   let ended = false;
+  /** The job's over (its debrief is up): the table steps out of the story layout (`tb-ended`, STORY_TABLE). */
+  const setEnded = (on: boolean) => {
+    ended = on;
+    shell.root.classList.toggle('tb-ended', on);
+  };
   // Who's speaking while the moment holds (ride-along replies): no pick, cost or ability goes until they're done.
   let heldBy: string | null = null;
   const heldNote = el('div', 'tb-held-note');
@@ -583,6 +589,12 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
   const extra = el('div', 'tb-extra');
   // The deal stays quiet: the job moment already sounds a new beat (main.ts).
   const deal = mountDeal(shell.middle, { reduced: o.reduced(), cue: (n) => n !== 'beat' && o.cue?.(n), onPick: (id) => choose(id) });
+  // The story table's choices stay a fixed list (playtest 2026-11-17: an open card growing in place made the rows and the
+  // hand jump each step); what the picked one rolls, its odds, its results and its key stand in this block under the list.
+  const detail = el('div', 'tb-detail');
+  detail.hidden = true;
+  detail.setAttribute('aria-hidden', 'true');
+  shell.middle.append(detail);
   // HUD (mockup graft-layouts.html A): the title and its strip lead the top bar; the picture and the prose open the log.
   const title = el('div', 'tb-top-l');
   title.append(head, strip);
@@ -612,12 +624,62 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       }),
     );
   };
+  /**
+   * The detail block (story table): the open card's foot copied under the list, headed by what it rolls; its key rolls it.
+   * Each row's clean chance goes on its dice count. Hidden off the story table, on a waiting roll and for a card with no foot.
+   */
+  const showDetail = (open: HTMLElement | null) => {
+    for (const sum of deal.root.querySelectorAll<HTMLElement>(':scope > .tb-card .tb-sum')) {
+      const clean = sum.closest('.tb-card')?.querySelector('.tb-oddsbar .clean span')?.textContent?.match(/\d+/)?.[0];
+      if (clean) sum.dataset.pct = `${clean}%`;
+      else delete sum.dataset.pct;
+    }
+    const foot = open && !active?.costs && !deal.root.querySelector(':scope > .tb-parked') ? open.querySelector<HTMLElement>(':scope > .tb-face .tb-foot') : null;
+    detail.hidden = !foot;
+    if (!foot || !open) return detail.replaceChildren();
+    const face = open.querySelector<HTMLElement>(':scope > .tb-face')!;
+    const stat = face.querySelector('.tb-statname')?.textContent;
+    const dice = face.querySelector('.tb-sum')?.firstChild?.textContent;
+    const eff = face.querySelector('.tb-eff')?.textContent;
+    const head = el('div', 'tb-detail-head', stat ? [stat, dice ? `${dice}D` : '', eff ?? ''].filter(Boolean).join(' · ') : 'NO ROLL');
+    const body = el('div', `tb-detail-body ${face.className}`);
+    body.dataset.pos = face.dataset.pos ?? '';
+    for (const c of foot.children) if (!c.matches('.tb-tray')) body.append(c.cloneNode(true));
+    for (const k of body.querySelectorAll<HTMLElement>('.tb-key')) {
+      k.setAttribute('role', 'presentation');
+      k.addEventListener('click', () => {
+        if (sel) choose(sel);
+      });
+    }
+    detail.replaceChildren(head, body);
+  };
+  /** The trace's redraw (queueTrace, below), for what runs before it is defined. */
+  let traceSoon = () => {};
+  const queueTraceSoon = () => traceSoon();
   // The choice Enter rolls (keys.ts): the first card until the pointer or the arrows move it.
   let sel: string | null = null;
   const showSel = () => {
     const ids = active?.choices.map((c) => c.id) ?? [];
     if (!sel || !ids.includes(sel)) sel = ids[0] ?? null;
-    for (const b of deal.root.querySelectorAll<HTMLElement>(':scope > .tb-card')) b.classList.toggle('sel', b.dataset.id === sel);
+    const story = isStoryTable(shell.root);
+    for (const b of deal.root.querySelectorAll<HTMLElement>(':scope > .tb-card')) {
+      b.classList.toggle('sel', b.dataset.id === sel);
+      // The story table opens one card at a time: say which (a closed one opens on the first press).
+      if (story && active?.choices.some((c) => c.id === b.dataset.id)) b.setAttribute('aria-expanded', String(b.dataset.id === sel));
+      else b.removeAttribute('aria-expanded');
+    }
+    // The story table: the open card scrolls into the margin's view whole (never the stage: no scrollIntoView), and the
+    // leaders follow the cards it moved.
+    const open = story ? deal.root.querySelector<HTMLElement>(':scope > .tb-card.sel') : null;
+    showDetail(story ? open : null);
+    if (story) queueTraceSoon();
+    if (open && deal.root.scrollHeight > deal.root.clientHeight) {
+      const d = deal.root.getBoundingClientRect();
+      const r = open.getBoundingClientRect();
+      const k = deal.root.offsetHeight ? d.height / deal.root.offsetHeight : 1;
+      if (r.top < d.top) deal.root.scrollTop -= (d.top - r.top) / k;
+      else if (r.bottom > d.bottom - 14 * k) deal.root.scrollTop += Math.min(r.top - d.top, r.bottom - d.bottom + 14 * k) / k;
+    }
   };
   /**
    * The trace's lines (mockup graft-trace.html): the head line from its ring under the job's name and the clocks, climbing
@@ -648,25 +710,40 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       const hb = hostRect(root, boardHand);
       // It turns in at the hand's head (CLUES, YOUR ACCOUNTS), which stands 22px over the cards.
       const hy = Math.round(hb.top - 14);
-      traceVia(root, 'rail', [[x, y + 6], [x, hy], [Math.round(hb.left - 8), hy]]);
+      traceVia(root, 'rail', [[x, y + 4], [x, hy], [Math.round(hb.left - 8), hy]], undefined, { ring: false });
       return;
     }
     const bottom = hostRect(root, shell.bottom);
     const railY = Math.round(bottom.top + 2);
     const ends = [...shell.bottom.children].map((c) => hostRect(root, c)).filter((r) => r.width > 0).map((r) => r.right);
-    traceVia(root, 'rail', [[x, y + 6], [x, railY], [Math.round(Math.max(bottom.left + 200, ...ends)), railY]]);
+    // The story table: the rail runs down the page's left; the hand sits under the choices in the margin, and its
+    // leaders climb the margin's left gutter to the cards they change.
+    const story = isStoryTable(root);
+    const gutter = Math.round(hostRect(root, shell.middle).left - 10);
+    if (story) traceVia(root, 'rail', [[x, y + 4], [x, Math.round(hostRect(root, shell.log!).bottom)]], undefined, { ring: false });
+    else traceVia(root, 'rail', [[x, y + 4], [x, railY], [Math.round(Math.max(bottom.left + 200, ...ends)), railY]], undefined, { ring: false });
     // Leaders: what's lifted (a call, a press) and each program marked to run or load, to the cards they change.
     const next: string[] = [];
     const a = active;
     const cardOf = (id: string) => deal.root.querySelector<HTMLElement>(`:scope > .tb-card[data-id="${CSS.escape(id)}"]`);
     /** A leader from a hand slot up to the rail, along it, and up into the foot of each target; `name`: its keys' stem. */
     const from = (slot: HTMLElement | null, color: string, hits: (HTMLElement | null)[], lane: number, name = 'lift') => {
-      if (!slot || !hits.length) return;
+      // The story table's hand steps out while a roll waits: no leader from a row that isn't there.
+      if (!slot || !hits.length || (story && slot.offsetWidth === 0)) return;
       const s = hostRect(root, slot.querySelector('.tbc-pic, .tbc') ?? slot);
       const p: Pt = [Math.round(s.left + s.width / 2), Math.round(s.top - 4)];
       hits.forEach((card, i) => {
         if (!card) return;
         const c = hostRect(root, card);
+        if (story) {
+          const gx = gutter - lane * 4;
+          const sy = Math.round(s.top + s.height / 2);
+          const cy = Math.round(c.top + Math.min(c.height / 2, 40) + lane * 4);
+          const key = `${name}-${lane}-${i}`;
+          traceVia(root, key, [[Math.round(s.left - 4), sy], [gx, sy], [gx, cy], [Math.round(c.left - 2), cy]], color);
+          next.push(key);
+          return;
+        }
         const q: Pt = [Math.round(c.left + c.width * (0.16 + 0.14 * lane)), Math.round(c.bottom + 3)];
         const rail = railY - 4 - lane * 4;
         const sx = q[0] >= p[0] ? 1 : -1;
@@ -692,7 +769,9 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       const mark = node?.querySelector('.pst') ?? node;
       // From the POST key while it's up (the post's own beat); later, from whoever holds it, on their row.
       const holder = held?.post?.by ? a.hand?.people.find((p) => p.name === held.post!.by) : undefined;
-      const start = postEl.isConnected && postEl.offsetWidth > 0 ? postEl : holder ? (slotOf(holder.id)?.querySelector<HTMLElement>('.tbc-pic, .tbc') ?? null) : null;
+      const row = holder ? (slotOf(holder.id)?.querySelector<HTMLElement>('.tbc-pic, .tbc') ?? null) : null;
+      // (The story table's hand steps out while a roll waits: no leader from a row that isn't laid out.)
+      const start = postEl.isConnected && postEl.offsetWidth > 0 ? postEl : row && row.offsetWidth > 0 ? row : null;
       if (mark && start) {
         const f = hostRect(root, start);
         const t = hostRect(root, mark);
@@ -700,7 +779,12 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
         const q: Pt = [Math.round((t.left + t.right) / 2), Math.round(t.bottom + 4)];
         const lx = x + 10;
         const ry = railY - 10;
-        if (q[0] > lx && ry > q[1] + (q[0] - lx) && p[1] >= ry) {
+        if (story) {
+          // Up the margin's gutter and in to the post's mark from its right.
+          const my = Math.round((t.top + t.bottom) / 2);
+          traceVia(root, 'post', [[Math.round(f.left - 4), Math.round(f.top + f.height / 2)], [gutter, Math.round(f.top + f.height / 2)], [gutter, my], [Math.round(t.right + 4), my]], 'var(--k-people)');
+          next.push('post');
+        } else if (q[0] > lx && ry > q[1] + (q[0] - lx) && p[1] >= ry) {
           traceVia(root, 'post', [p, [p[0], ry], [lx, ry], [lx, q[1] + (q[0] - lx)], q], 'var(--k-people)');
           next.push('post');
         }
@@ -710,12 +794,35 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     leads = next;
   };
   let traceRaf = 0;
+  traceSoon = () => queueTrace();
   const queueTrace = () => {
     if (typeof requestAnimationFrame !== 'function') return;
     cancelAnimationFrame(traceRaf);
     traceRaf = requestAnimationFrame(drawTrace);
   };
   if (typeof ResizeObserver === 'function') new ResizeObserver(queueTrace).observe(shell.root);
+  // The story table's margin scrolls its choices: the leaders follow.
+  deal.root.addEventListener('scroll', queueTrace, { passive: true });
+  // A card reached by Tab on the story table opens, so Enter rolls the card the player is on (a click opens on its own).
+  deal.root.addEventListener('focusin', (e) => {
+    const b = e.target instanceof Element ? e.target.closest<HTMLElement>('.tb-card') : null;
+    if (!b?.dataset.id || b.parentElement !== deal.root || b.dataset.id === sel || !b.matches(':focus-visible') || !isStoryTable(shell.root) || !active?.choices.some((c) => c.id === b.dataset.id)) return;
+    sel = b.dataset.id;
+    showSel();
+    showRoute();
+    showKeys();
+  });
+  // The wheel over the position cards steps the open one along, as ↑↓ (←→ on the classic table) do; not while costs are up.
+  wheelSteps(deal.root, {
+    over: (e) => {
+      const b = e.target instanceof Element ? e.target.closest('.tb-card') : null;
+      return b?.parentElement === deal.root && !isPhone(host) && !active?.costs && (active?.choices.length ?? 0) > 1;
+    },
+    step: (dir) => {
+      const story = isStoryTable(shell.root);
+      key(dir > 0 ? (story ? 'ArrowDown' : 'ArrowRight') : story ? 'ArrowUp' : 'ArrowLeft', true);
+    },
+  });
   const hudTrace = host.querySelector('.hud-trace');
   if (hudTrace && typeof MutationObserver === 'function') new MutationObserver(queueTrace).observe(hudTrace, { childList: true });
   // The table's own key line (mockup graft-trace.html), over the input's: only the keys that do something now.
@@ -739,7 +846,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       } else if (pickable().length) parts.push('[↑↓] COST', '[ENTER] PICK IT');
     } else if (a.choices.length) {
       const picked = a.choices.find((c) => c.id === sel);
-      if (a.choices.length > 1) parts.push('[←→] CHOICE');
+      if (a.choices.length > 1) parts.push(isStoryTable(shell.root) ? '[↑↓] CHOICE' : '[←→] CHOICE');
       const crew = a.hand?.people.filter((p) => !p.down && !p.at && (p.free > 0 || p.risk !== null)).length ?? 0;
       if (crew && a.choices.some((c) => c.pool)) parts.push(`[1${crew > 1 ? `–${crew}` : ''}] CALL CREW`);
       if (!pushBtn.hidden) parts.push('[P] PUSH');
@@ -786,10 +893,11 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       return k === 'Enter' ? press(list[costAt % list.length]) : false;
     }
     if (!a.choices.length) return false;
-    if (k === 'ArrowLeft' || k === 'ArrowRight') {
+    // The story table stacks its choices, so ↑ ↓ move along them too.
+    if (k === 'ArrowLeft' || k === 'ArrowRight' || ((k === 'ArrowUp' || k === 'ArrowDown') && isStoryTable(shell.root))) {
       if (a.choices.length < 2) return false;
       const i = Math.max(0, a.choices.findIndex((c) => c.id === sel));
-      sel = a.choices[(i + (k === 'ArrowRight' ? 1 : a.choices.length - 1)) % a.choices.length].id;
+      sel = a.choices[(i + (k === 'ArrowRight' || k === 'ArrowDown' ? 1 : a.choices.length - 1)) % a.choices.length].id;
       o.cue?.('move');
       showSel();
       showRoute();
@@ -833,7 +941,8 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       const lead = a.choices.find((c) => c.id === sel)?.leads;
       const pick = lead ? a.route.ways.findIndex((w) => w.beats.some((b) => b.title === lead)) : -1;
       const harm = a.choices.find((c) => c.on?.harm)?.on;
-      parts.push(routeEl(a.route, a.beat, { pick: pick < 0 ? null : pick, hot: Boolean(harm) }));
+      // The story table (table-trace.css): the route beside the job's line, wider; a phone hides it.
+      parts.push(routeEl(a.route, a.beat, { pick: pick < 0 ? null : pick, hot: Boolean(harm), ...(isStoryTable(shell.root) ? { width: 340 } : {}) }));
       const note = el('div', 'rt-note');
       const held = a.route.ways.flatMap((w) => w.beats).find((b) => b.post?.by)?.post;
       const way = wayOf(a.route, a.beat);
@@ -883,7 +992,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
   const close = el('button', 'tb-close', 'CLOSE');
   close.type = 'button';
   close.addEventListener('click', () => {
-    ended = false;
+    setEnded(false);
     o.tips?.clear();
     shell.close();
     o.onUp?.(false);
@@ -1049,6 +1158,15 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     if (!a || ended || heldBy !== null || id.startsWith('!debrief') || performance.now() - trayShutAt < TRAY_GUARD_MS) return;
     const c = a.choices.find((x) => x.id === id);
     if (!c) return;
+    // The story table's margin opens one card at a time: a click on a closed one opens it; the open one rolls.
+    if (said === undefined && id !== sel && isStoryTable(shell.root)) {
+      sel = id;
+      o.cue?.('move');
+      showSel();
+      showRoute();
+      showKeys();
+      return;
+    }
     const lifted = hand.lifted();
     const card = lifted && playOn(c) ? lifted : undefined;
     const press = card ? hand.press() : null;
@@ -1231,6 +1349,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     const line = parkedLine(rolled);
     if (kept?.dataset.choice === rolled.choice) {
       settleParked(kept, { ...rolled, line });
+      floorParked(kept);
       return kept;
     }
     kept?.remove();
@@ -1250,9 +1369,19 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       tray.style.top = '';
       row.append(tray);
     } else if (!card?.querySelector('.qc-dice')) row.append(landedTray({ ...rolled, line }));
-    queueMicrotask(() => glide([card ?? null, tray], before));
+    // The story table: the dice stay on the floor in front of the contact, smaller, and only the card glides.
+    if (isStoryTable(shell.root)) {
+      queueMicrotask(() => glide([card ?? null, null], before));
+      floorParked(row);
+    } else queueMicrotask(() => glide([card ?? null, tray], before));
     return row;
   };
+  /** A parked roll's dice on the story table's floor (check-anim.ts onFloor), once its row is on the table. */
+  const floorParked = (row: HTMLElement) =>
+    queueMicrotask(() => {
+      const t = row.querySelector<HTMLElement>(':scope > .tb-roll');
+      if (t && row.isConnected && isStoryTable(shell.root)) onFloor(t, FLOOR_PARKED);
+    });
   /** FLIP: each node starts where it was (`before`) and slides to where it is now. */
   const glide = (nodes: (HTMLElement | null)[], before: (DOMRect | undefined)[]) => {
     if (o.reduced()) return;
@@ -1291,7 +1420,8 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
         if (pos) b.dataset.pos = pos;
         b.addEventListener('mouseenter', () => o.onHover?.());
         b.addEventListener('pointerenter', () => {
-          if (sel === b.dataset.id) return;
+          // Not on the story table: a card opening under the pointer would move the one it came from.
+          if (sel === b.dataset.id || isStoryTable(shell.root)) return;
           sel = b.dataset.id ?? null;
           showSel();
           showRoute();
@@ -1549,7 +1679,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       if (!a.costs) costAt = 0;
       pickSent = false;
       active = a;
-      ended = false;
+      setEnded(false);
       costSent = false;
       lit = null;
       close.remove();
@@ -1557,7 +1687,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
         deal.clear();
         o.tips?.clear();
       }
-      shell.prose(story ?? '');
+      shell.prose(stripImageTokens(story ?? ''));
       const prose = shell.root.querySelector<HTMLElement>('.tb-prose')!;
       passiveLabels(prose);
       markLore(prose);
@@ -1566,13 +1696,16 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       render();
       showBoard(a);
       showAccounts(a);
+      // Off a board, the story table is back only now (its classes just left): the route and the key line again.
+      showRoute();
+      showKeys();
       shell.publishLog();
       publishHand();
       o.tips?.offer(tipsFor(a), shell.root);
     },
     end(title, story, node, clocks) {
       info.hide();
-      ended = true;
+      setEnded(true);
       // The post goes with the beat (routes and posts spec §2): nothing to send anyone to at a debrief.
       showPost();
       showBoard(null);
@@ -1588,7 +1721,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
       head.replaceChildren(el('span', 'tb-title', title.toUpperCase()), el('span', 'tb-flag', 'THE END'));
       strip.replaceChildren();
       art.hidden = true;
-      shell.prose(story);
+      shell.prose(stripImageTokens(story));
       pushBtn.hidden = true;
       tradeBox.hidden = true;
       hand.root.hidden = true;
@@ -1620,7 +1753,7 @@ export function mountJobTable(host: HTMLElement, o: { onChoose(choice: string, o
     close() {
       if (!shell.root.hidden) o.cue?.('clear');
       active = null;
-      ended = false;
+      setEnded(false);
       showBoard(null);
       showAccounts(null);
       fan = null;

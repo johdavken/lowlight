@@ -7,7 +7,7 @@ import { rng } from '../../shared/rng';
 const rowsOf = (letters: number[], h = 30): RowGeom[] => letters.map((n, i) => ({ top: i * h, h, letters: n }));
 
 describe('scroll window geometry', () => {
-  it('reads a row at 40 ms a letter, never under the minimum', () => {
+  it('reads a row at READ_MS_PER_CHAR a letter, never under the minimum', () => {
     expect(readMs(100)).toBe(100 * READ_MS_PER_CHAR);
     expect(readMs(0)).toBe(READ_MIN_MS);
   });

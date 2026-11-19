@@ -25,7 +25,11 @@ export function buildFileStrip(o: FileStripOpts): HTMLElement {
   const strip = el('div', 'map-strip');
   strip.addEventListener('click', (e) => e.stopPropagation());
   const body = el('div', 'body');
-  body.append(el('div', 't', o.place.name.toUpperCase()), el('div', 's', o.district.name.toUpperCase()));
+  body.append(el('div', 't', o.place.name.toUpperCase()));
+  // RECOMMENDED (Kroll's desk spec): a contact you know has a job for you here.
+  const rec = o.who.recommended?.[o.place.id];
+  if (rec) body.append(el('div', 'rec', rec));
+  body.append(el('div', 's', o.district.name.toUpperCase()));
   // Its dossier lines (world/readouts/<id>.md): a label, then the line.
   if (o.place.readout?.length) {
     const dl = el('dl', 'readout');

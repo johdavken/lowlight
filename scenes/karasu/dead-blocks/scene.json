@@ -162,6 +162,12 @@
       }
     }
   },
+  "sound": {
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.4
+    }
+  },
   "effects": [
     {
       "kind": "lightning",
@@ -194,10 +200,7 @@
       "way": "up the open stairwell, six floors"
     }
   ],
-  "sound": {
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.4
-    }
+  "figureLight": {
+    "breath": true
   }
 }

@@ -98,6 +98,20 @@ export const whoIsYou = (player: string): string =>
 export const MISSION_OPEN =
   "The job is setting out, whether you're going along or staying on the line. The [job — …: …] line at the end of this message is how it starts, and the user has just read it. Say one short line in character as it starts: one or two sentences, no more. Don't describe the scene again, don't repeat anything it already has you say, don't decide anything for the user, and never mention odds, rolls or numbers. The [mission] block's deck and heat are the user's own kit, not anything the job is about: don't mix them up with what you're carrying or chasing. Talk like a person, not a game: never say heat, heat score, rep, tier, ALARM or EDGE.";
 
+/**
+ * Her own crew-rules job opening in her own room (Run Sheet, playtest: told not to pitch or describe, she narrated the player):
+ * she puts it to them herself. Graft jobs keep MISSION_OPEN (on-the-stairs, playtest: this retold the client in paragraphs). MISSION_OPEN's trailing rules on kit and game words hold here too.
+ */
+export const MISSION_OPEN_HERS =
+  "This is your scene: you asked them here for this, and the [job — …: …] line at the end of this message is where it stands, as they see it. Put it to them now. Say it in your own voice, in the first person, in two to four short sentences: what you want and why it matters to you. Stop before they answer. Don't describe the room or what they do, don't retell the line, and don't decide anything for them. Talk like a person, not a game: no odds, rolls or numbers. The [mission] block's deck and heat are the user's own kit, not anything the job is about: don't mix them up with what you're carrying or chasing. Never say heat, heat score, rep, tier, ALARM or EDGE.";
+
+/**
+ * The last line of every job or quest row's turn (Run Sheet, playtest): the row's text read last, so she carried on
+ * its narration about the player in his voice. Nothing follows this line.
+ */
+export const turnCue = (her: string, player: string): string =>
+  `[your turn: you are ${her}. Speak to ${player} now, in your own voice, from where you are. Write nothing ${player} does, says, thinks or notices.]`;
+
 /** A mission's end (missions spec §3): her one line on how it went; the run is in [mission summary]. */
 export const MISSION_CLOSE =
   "The job is over. The [job — …: …] line at the end of this message is how it ended, and the [mission summary] says how it went. Say one short line in character about how it went: one or two sentences, no more. Don't retell it, and don't make it sound better or worse than the summary says. Talk like a person, not a game: no odds, rolls or numbers, and never say clean, messy, blown, heat, rep, tier, ALARM or EDGE.";
@@ -230,6 +244,14 @@ export function textPlanLine(plan: { going: { place: string; until: string } | n
 
 /** The line a promised text answers (promised texts spec §5): what she said she'd text, and where things stand now. */
 /** Her job text's hidden line (job texts spec §3): she texts first, about what she needs; never the job's name. */
+/** Her move text (off-screen moves spec §4.2): something she did while you were apart, and she'd tell you. */
+export function moveTextLine(o: { you: string; about: string }): string {
+  return `[you're texting ${o.you} about something you did while you were apart: ${o.about}. Text them now.]`;
+}
+
+/** A hidden line's `jobText` for a move text: no job is told by it, and it spends no promise. */
+export const MOVE_TEXT_MARK = 'move:';
+
 export function jobTextLine(o: { you: string; text: string }): string {
   return `[you're texting ${o.you} first, about something you need from them: ${o.text} Text them now.]`;
 }

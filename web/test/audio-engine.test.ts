@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { AudioEngine } from '../src/audio/engine';
+import { AudioEngine, CLIP_GAP_MS } from '../src/audio/engine';
 import { SILENT, type Mix } from '../src/audio/mix';
 import { flickerFactor } from '../src/renderer/flicker';
 import { FakeAudioContext, type FakeParam } from './fixtures/fake-audio';
@@ -267,7 +267,7 @@ describe('AudioEngine: state', () => {
     engine.unlock();
     const mix = rainMix(0.4, { wind: { level: 0.15, gust: 0.3, crackle: 0, indoor: false } });
     engine.apply(mix, 0);
-    expect(engine.state()).toEqual({ available: true, unlocked: true, context: 'running', voices: ['rain', 'wind'], mix, rain: 'synth', music: null, musicUrl: null, musicStarts: 0, thunders: 0, speaking: null });
+    expect(engine.state()).toEqual({ available: true, unlocked: true, context: 'running', voices: ['rain', 'wind'], mix, rain: 'synth', music: null, musicUrl: null, musicStarts: 0, thunders: 0, speaking: null, paused: false });
   });
 });
 
@@ -793,7 +793,7 @@ describe('AudioEngine: speech (voiced job beats)', () => {
     expect(engine.speaking()).toBe(true);
     expect(engine.state().speaking).toBe('/a.ogg');
     (first[0] as any).onended();
-    await flush();
+    await new Promise((r) => setTimeout(r, CLIP_GAP_MS + 20));
     const second = ctx.of('buffer-source').slice(before + 1);
     expect(second).toHaveLength(1);
     expect((second[0] as any).buffer).toEqual(clip('/b.ogg'));
@@ -805,6 +805,80 @@ describe('AudioEngine: speech (voiced job beats)', () => {
     expect(p(engine.debug().voiceOut).last).toBeCloseTo(0.6);
     engine.setMaster(0.6, true);
     expect(p(engine.debug().voiceOut).last).toBe(0);
+  });
+
+  it("leaves a breath between clips (a row's sections read apart), and none after the last", async () => {
+    vi.useFakeTimers();
+    try {
+      const { engine, ctx } = setup({ fetchBuffer: vi.fn((_ctx: AudioContext, url: string) => Promise.resolve(clip(url))) });
+      engine.unlock();
+      const before = ctx.of('buffer-source').length;
+      engine.speak(['/a.ogg', '/b.ogg']);
+      await vi.advanceTimersByTimeAsync(0);
+      (ctx.of('buffer-source')[before] as any).onended();
+      await vi.advanceTimersByTimeAsync(CLIP_GAP_MS - 1);
+      expect(ctx.of('buffer-source')).toHaveLength(before + 1);
+      expect(engine.speaking()).toBe(true);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(ctx.of('buffer-source')).toHaveLength(before + 2);
+      // A hush in the gap drops the rest.
+      engine.speak(['/c.ogg', '/d.ogg']);
+      await vi.advanceTimersByTimeAsync(0);
+      (ctx.of('buffer-source').at(-1) as any).onended();
+      engine.hush();
+      await vi.advanceTimersByTimeAsync(CLIP_GAP_MS * 2);
+      expect(ctx.of('buffer-source').map((x: any) => x.buffer?.name).includes('/d.ogg')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('pause holds the clip where it is, play goes on from there; the room stays ducked, and a hush clears it', async () => {
+    const { engine, ctx } = setup({ fetchBuffer: vi.fn((_c: AudioContext, url: string) => Promise.resolve(clip(url))) });
+    engine.unlock();
+    ctx.currentTime = 100;
+    engine.speak(['/a.ogg', '/b.ogg']);
+    await flush();
+    const a = ctx.of('buffer-source').at(-1) as any;
+    ctx.currentTime = 103.5;
+    engine.pauseVoice();
+    expect(a.stopped).toBe(true);
+    expect(engine.state().paused).toBe(true);
+    expect(engine.speaking()).toBe(true);
+    // Stopping it for the pause doesn't move the reading on.
+    await flush();
+    expect(ctx.of('buffer-source').at(-1)).toBe(a);
+    engine.playVoice();
+    await flush();
+    const again = ctx.of('buffer-source').at(-1) as any;
+    expect(again).not.toBe(a);
+    expect(again.buffer).toEqual(clip('/a.ogg'));
+    expect(again.startOffset).toBeCloseTo(3.5);
+    expect(engine.state().paused).toBe(false);
+    engine.pauseVoice();
+    engine.hush();
+    expect(engine.state().paused).toBe(false);
+    expect(engine.speaking()).toBe(false);
+  });
+
+  it('a pause in the gap between clips holds the next until play', async () => {
+    vi.useFakeTimers();
+    try {
+      const { engine, ctx } = setup({ fetchBuffer: vi.fn((_c: AudioContext, url: string) => Promise.resolve(clip(url))) });
+      engine.unlock();
+      engine.speak(['/a.ogg', '/b.ogg']);
+      await vi.advanceTimersByTimeAsync(0);
+      const n = ctx.of('buffer-source').length;
+      (ctx.of('buffer-source').at(-1) as any).onended();
+      engine.pauseVoice();
+      await vi.advanceTimersByTimeAsync(CLIP_GAP_MS * 3);
+      expect(ctx.of('buffer-source')).toHaveLength(n);
+      engine.playVoice();
+      await vi.advanceTimersByTimeAsync(CLIP_GAP_MS);
+      expect((ctx.of('buffer-source').at(-1) as any).buffer).toEqual(clip('/b.ogg'));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('ducks the room and the music while it speaks, and lets them back after', async () => {
@@ -852,7 +926,8 @@ describe('AudioEngine: speech (voiced job beats)', () => {
     expect(a.stopped).toBeFalsy();
     expect(engine.state().speaking).toBe('/a.ogg');
     a.onended();
-    await flush();
+    // The clip that follows waits out the breath between clips.
+    await new Promise((r) => setTimeout(r, CLIP_GAP_MS + 20));
     const b = ctx.of('buffer-source').at(-1) as any;
     expect(b.buffer).toEqual(clip('/b.ogg'));
     b.onended();

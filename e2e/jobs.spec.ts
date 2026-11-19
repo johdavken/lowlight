@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { buyAtFixer, fixerItem, firstPlaythrough, settleCostStep, goIn, nixAt, questRow, questTab, send, skipSplash, startQuest } from './fixtures';
+import { buyAtFixer, fixerItem, firstPlaythrough, settleCostStep, goIn, nixAt, questRow, questTab, send, skipSplash, startQuest, pickCard } from './fixtures';
 
 // Small jobs (spec 2026-10-19): Back Door at the Intake (e2e/serve.ts), played without dice — the roll list belongs to missions.spec.
 test.describe.configure({ mode: 'serial' });
@@ -43,10 +43,10 @@ test('a job with a drawn complication, a red check and a crack ends in a debrief
   await page.screenshot({ path: 'test-results/jobs-cards.png' });
 
   // Waiting out the shift costs no roll; the ledger is a crack.
-  await page.locator('.tb-card[data-choice="wait"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="wait"]'));
   const grab = page.locator('.tb-card[data-choice="grab"]');
   await expect(grab.locator('.tb-flag')).toContainText('CRACK · 6 LETTERS', { timeout: 10_000 });
-  await grab.click();
+  await pickCard(grab);
   await expect(page.locator('.ct-window')).toBeVisible();
   await expect(page.locator('.ct-dump .ct-row')).toHaveCount(32);
   // A corporate terminal (deck skins spec §3): the CORP look, the deck it linked (the pocket deck everyone owns), the job's ALARM.
@@ -96,7 +96,7 @@ test('buy a burner, blow a job, use the burner: the halved loss and the tier lin
   await goIn(page);
   await expect(replies).toHaveCount(before + 1, { timeout: 10_000 });
   // Kicking the door in blows it: the cover cards come up before any row.
-  await page.locator('.tb-card[data-choice="kick"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="kick"]'));
   await expect(page.locator('.tb-card[data-choice="!burner"] .tb-line')).toHaveText('USE BURNER (−5 INSTEAD OF −10)', { timeout: 10_000 });
   await expect(page.locator('.tb-head .tb-flag.red')).toHaveText('BLOWN');
   // The hand steps away while cover is the only choice: the BLOWN preview under the cards isn't drawn over (playtest).
@@ -108,7 +108,7 @@ test('buy a burner, blow a job, use the burner: the halved loss and the tier lin
     expect(await page.evaluate(([x, y]) => !!document.elementFromPoint(x, y)?.closest('.tb-extra'), [b.x + b.width / 2, b.y + b.height - 12])).toBe(true);
   }
   await page.screenshot({ path: 'test-results/jobs-cover.png' });
-  await page.locator('.tb-card[data-choice="!burner"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="!burner"]'));
 
   await expect(page.locator('.db .db-tier')).toHaveText('BLOWN', { timeout: 10_000 });
   await expect(page.locator('.db .db-cover')).toHaveText('A BURNER TOOK HALF');
@@ -157,19 +157,19 @@ test('press on twice: the pot shows, the second push loses it, the debrief shows
   await expect(replies).toHaveCount(before + 1, { timeout: 10_000 });
 
   // Two quiet beats and the take fill TAKE (3), then the card: WALK with what it keeps, and PRESS ON.
-  await page.locator('.tb-card[data-choice="duck"]').click();
-  await page.locator('.tb-card[data-choice="listen"]').click();
-  await page.locator('.tb-card[data-choice="take"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="duck"]'));
+  await pickCard(page.locator('.tb-card[data-choice="listen"]'));
+  await pickCard(page.locator('.tb-card[data-choice="take"]'));
   await expect(page.locator('.tb-head .tb-flag')).toHaveText('PRESS ON?', { timeout: 10_000 });
   await expect(page.locator('.tb-card[data-choice="!walk"] .tb-panel-sub')).toHaveText('400 SOL · HEAT +0');
-  await page.locator('.tb-card[data-choice="!press"]').click();
-  await page.locator('.tb-card[data-choice="lift"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="!press"]'));
+  await pickCard(page.locator('.tb-card[data-choice="lift"]'));
   // A won push: the pot on the strip, and WALK keeps it.
   await expect(page.locator('.tb-strip .tb-pot')).toHaveText('POT +100 SOL', { timeout: 10_000 });
   await expect(page.locator('.tb-card[data-choice="!walk"] .tb-panel-sub')).toHaveText('500 SOL · HEAT +0');
   await page.screenshot({ path: 'test-results/jobs-push-card.png' });
-  await page.locator('.tb-card[data-choice="!press"]').click();
-  await page.locator('.tb-card[data-choice="grab"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="!press"]'));
+  await pickCard(page.locator('.tb-card[data-choice="grab"]'));
 
   // Lost: the pot gone, half the pay back, the take down a tier.
   await expect(page.locator('.db .db-tier')).toHaveText('MESSY', { timeout: 10_000 });
@@ -202,7 +202,7 @@ test('a full ALARM: GET OUT with RUN and WALK IT OFF on the wire; the job ends e
   // Every beat's cards share their ids: wait for each beat's own text before its click.
   for (const beat of ['door', 'hall', 'stairs', 'office']) {
     await expect(page.locator('.tb-prose')).toContainText(`The ${beat}.`, { timeout: 10_000 });
-    await page.locator('.tb-card[data-choice="bang"]').click();
+    await pickCard(page.locator('.tb-card[data-choice="bang"]'));
   }
   // The stock getaway (the table spec §2).
   await expect(page.locator('.tb-head .tb-flag.red')).toHaveText('GET OUT', { timeout: 10_000 });
@@ -210,14 +210,14 @@ test('a full ALARM: GET OUT with RUN and WALK IT OFF on the wire; the job ends e
   await expect(page.locator('.tb-card[data-choice="run"] .tb-odds')).toContainText('ON THE WIRE');
   await expect(page.locator('.tb-card[data-choice="walk"] .tb-line')).toHaveText('Walk it off like you belong here.');
   await page.screenshot({ path: 'test-results/jobs-getaway.png' });
-  await page.locator('.tb-card[data-choice="run"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="run"]'));
   // A costly roll's costs (picked and taken), or TAKE IT on the cover cards of a blown job (a burner from an earlier
   // spec in this worker), until her closing line ends the job.
   const take = page.locator('.tb-card[data-choice="!take"]');
   await expect
     .poll(
       async () => {
-        if (!(await settleCostStep(page)) && (await take.isVisible())) await take.click();
+        if (!(await settleCostStep(page)) && (await take.isVisible())) await pickCard(take);
         return replies.count();
       },
       { timeout: 15_000, intervals: [500] },
@@ -276,8 +276,17 @@ test('a mood landing after her reply joins the footer in the box, and her line i
   // The box's settings key stands on the JOB column's top edge near its right end, and opens there (playtest 2026-11-11).
   const bsKey = page.locator('.bs-key');
   await expect(bsKey).toBeVisible();
-  const [kb, cb] = await Promise.all([bsKey.boundingBox(), page.locator('.jc').boundingBox()]);
-  expect(Math.abs(kb!.y + kb!.height / 2 - cb!.y)).toBeLessThanOrEqual(3);
+  // The story table (mockup graft-margin.html): the key ends the beat's line, the line running into its ring (playtest 2026-11-17).
+  const [kb, cb, beat, ring] = await Promise.all([bsKey.boundingBox(), page.locator('.jc').boundingBox(), page.locator('.tb-route > .tb-beat').boundingBox(), page.locator('.bs-key .bs-ring').boundingBox()]);
+  const line = await page.locator('.tb-route > .tb-beat').evaluate((n) => {
+    const r = n.getBoundingClientRect();
+    const k = r.width / (n as HTMLElement).offsetWidth;
+    const a = getComputedStyle(n, '::after');
+    return { y: r.bottom - parseFloat(a.bottom) * k, end: r.right - parseFloat(a.right) * k };
+  });
+  expect(Math.abs(ring!.y + ring!.height / 2 - line.y)).toBeLessThanOrEqual(2);
+  expect(Math.abs(ring!.x - line.end)).toBeLessThanOrEqual(2);
+  expect(beat!.y).toBeLessThan(ring!.y);
   expect(kb!.x + kb!.width).toBeLessThanOrEqual(cb!.x + cb!.width);
   expect(kb!.x).toBeGreaterThan(cb!.x + cb!.width / 2);
   await bsKey.click();
@@ -300,7 +309,7 @@ test('a mood landing after her reply joins the footer in the box, and her line i
   const n = await replies.count();
   await send(page, { type: 'user_message', text: 'len:1400' });
   await expect(replies).toHaveCount(n + 1, { timeout: 10_000 });
-  const said = page.locator('.jc-body .jc-reply').last();
+  const said = page.locator('.jc-body .jc-reply:not(.jc-scripted)').last();
   await expect(said).toBeVisible();
   await expect(page.locator('#feed .msg:not(.hidden-collapsed)')).toHaveCount(0);
   await expect(page.locator('button.continue')).toHaveCount(0);
@@ -310,7 +319,7 @@ test('a mood landing after her reply joins the footer in the box, and her line i
   const m = await replies.count();
   await send(page, { type: 'user_message', text: 'act and speak' });
   await expect(replies).toHaveCount(m + 1, { timeout: 10_000 });
-  await expect(page.locator('.jc-body .jc-reply').last()).toHaveText(
+  await expect(page.locator('.jc-body .jc-reply:not(.jc-scripted)').last()).toHaveText(
     /^I'm on the daybed, taping paper to the wall\. “You knocked twice\. Good\.”\s*I climb down\. “Intake's shut Sundays\.”/,
     { timeout: 5_000 },
   );

@@ -7,9 +7,10 @@ import { cameraFor } from './camera';
 import { flickerFactor } from './flicker';
 import { idSeed, lightGlowAlpha } from './glow-alpha';
 import { destroyLayers, frameAfterLoad, loadLayers, placeLayer, type Layer } from './layers';
+import type { LightingFrame } from './lighting';
 import { LightingFilter, lightAt, MAX_LIGHTS, shadedAtmosphere, type ShaderLight } from './lighting';
 import { createFrameTexture, setSmooth } from './frame-texture';
-import { Atmospherics, bloomBlur, createBloom, FRAME, Grade, WeatherLayer } from './post';
+import { Atmospherics, bloomBlur, createBloom, FRAME, Grade, tintRgb, WeatherLayer } from './post';
 import { BACKDROP_BRIGHTNESS, backdropBlurStrength, backdropView, devicePixels, parallaxTarget, RENDER_H, RENDER_W, screenToRender, stageView } from './stage';
 import type { StageRect } from '../ui/game-stage';
 import { Transitions, type SceneTransition } from './transitions';
@@ -19,6 +20,18 @@ import { weatherBoundsFor, weatherLightsFor } from './weather-frame';
 import { drawArea, isMasked, maskFor } from './weather-mask';
 import { EffectsLayer, type EffectsArt, type EffectsState, type Strike } from './effects';
 import { FrameCounter } from './frame-counter';
+
+/** A LightingFrame with the lamps in window CSS px (figure lighting spec §2). */
+export type ScreenLights = LightingFrame;
+
+/** What the room's picture is finished with, so the figures can be finished the same (the room's finish on the figures). */
+export interface RoomFinish {
+  fog: { rgb: [number, number, number]; alpha: number };
+  crt: { on: boolean; lineWidth: number; lineContrast: number; vignetting: number; vignettingAlpha: number; vignettingBlur: number };
+  /** The room's frame on screen, window css px. */
+  frame: { left: number; top: number; width: number; height: number };
+  dpr: number;
+}
 
 export interface Renderer {
   /** `base` is where the scene's pack is served (default '/scenes/'). */
@@ -50,6 +63,10 @@ export interface Renderer {
   onStrike(fn: (s: Strike) => void): void;
   /** The room's light at a point on screen (CSS px), from what was shaded last frame; null before a room state is shaded. */
   lightAt(cssX: number, cssY: number): [number, number, number] | null;
+  /** What was shaded last frame, with the lamps' positions and radii in window CSS px (figure lighting spec §2); null before a room state is shaded. */
+  screenLights(): ScreenLights | null;
+  /** What the room's picture is finished with (its fog and CRT pass) and where its frame is, for the figures to wear the same; null before a room loads. */
+  finish(): RoomFinish | null;
   /** Runs `fn` after each frame is shaded; returns the remover. */
   onFrame(fn: () => void): () => void;
   /** The room's effects this frame, whether weather particles were drawn and whether they're clipped to the room's window shapes (test hook). */
@@ -423,6 +440,27 @@ export class PixiRenderer implements Renderer {
     if (!f || !this.current) return null;
     const v = this.viewFit;
     return lightAt(screenToRender(cssX, cssY, v.dpr, v), f);
+  }
+
+  finish(): RoomFinish | null {
+    if (!this.current) return null;
+    const fog = this.atmospherics.fog;
+    return {
+      fog: { rgb: tintRgb(fog.tint as number), alpha: fog.visible ? fog.alpha : 0 },
+      crt: this.grade.crtState(),
+      frame: this.roomRect(),
+      dpr: this.viewFit.dpr,
+    };
+  }
+
+  screenLights(): ScreenLights | null {
+    const f = this.lighting.frame;
+    if (!f || !this.current) return null;
+    const { scale, x, y, dpr } = this.viewFit;
+    return {
+      ambient: f.ambient,
+      lights: f.lights.map((l) => ({ pos: [(l.pos[0] * scale + x) / dpr, (l.pos[1] * scale + y) / dpr], radius: (l.radius * scale) / dpr, rgb: l.rgb })),
+    };
   }
 
   onFrame(fn: () => void): () => void {

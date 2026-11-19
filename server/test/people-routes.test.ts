@@ -166,6 +166,19 @@ describe('people routes', () => {
     expect((await req('GET', `/api/people/${id}/thumb`)).status).toBe(200);
   });
 
+  it('figure.png?normal=1 is the kept figure\'s normal map; none before a figure is kept', async () => {
+    const id = await draft();
+    expect((await req('GET', `/api/people/${id}/figure.png?normal=1`)).status).toBe(404);
+    const { take } = (await req('POST', `/api/people/${id}/generate`, { fields })).body;
+    await req('PUT', `/api/people/${id}`, WHO);
+    await req('POST', `/api/people/${id}/keep`, { take, face: { x: 0.5, y: 0.1 }, waist: 0.4, fields });
+    const art = await app.inject({ method: 'GET', url: `/api/people/${id}/figure.png` });
+    const map = await app.inject({ method: 'GET', url: `/api/people/${id}/figure.png?normal=1` });
+    expect(map.statusCode).toBe(200);
+    expect(map.headers['content-type']).toContain('image/png');
+    expect(map.rawPayload.equals(art.rawPayload)).toBe(false);
+  });
+
   it('DELETE takes drops the unkept takes; DELETE removes the person', async () => {
     const id = await draft();
     await req('POST', `/api/people/${id}/generate`, { fields });

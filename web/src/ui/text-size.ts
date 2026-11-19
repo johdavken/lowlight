@@ -1,5 +1,5 @@
 /** The reading text's size (spec 2026-10-16 fixed stage §6): SYS → TEXT SIZE, kept per browser. */
-const SIZES = [85, 100, 115, 130, 150] as const;
+const SIZES = [50, 60, 70, 85, 100, 115, 130, 150] as const;
 export type TextSize = (typeof SIZES)[number];
 const SIZE_KEY = 'lowlight.textSize';
 

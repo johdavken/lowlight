@@ -69,6 +69,9 @@ const fixerSchema = z.array(
     keep: z.literal(true).optional(),
     cover: z.object({ id: z.enum(['burner', 'fall-guy']), delta: z.number() }).optional(),
     program: z.object({ id: z.string() }).optional(),
+    /** The dev panel's +NERVE (job-runner devNerve): one back, and NERVE GONE lifted. */
+    nerve: z.number().optional(),
+    lift: z.literal(true).optional(),
   }),
 );
 

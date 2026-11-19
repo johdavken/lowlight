@@ -7,14 +7,14 @@
    boards-trace.html, 2026-11-15) and SETUP (its own section after the table's); the papers desk and a phone keep
    table.css. */
 
-/* The JOB column at the job table: no glass and no plate (the job's name is on the head line); its words stand on the
-   left rail under the route, and scroll there. */
-:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .hf, :has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .hf-gb, :has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .jc-top { display: none; }
-:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .jc { top: var(--hud-log-y); padding: 0; background: none; border: 0; box-shadow: none; clip-path: none; -webkit-mask-image: none; mask-image: none; backdrop-filter: none; }
-:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .jc-layer .jc-body { padding: 0 8px 0 0; }
+/* The JOB column at the job table (and on the crew rules' board, board.css): no glass and no plate (the job's name is
+   on the head line); its words stand on the left rail under the route, and scroll there. */
+:has(> .tb.hud:is(.tb-job, .tb-setup, .tb-crew):not([hidden]):not(.phone)) > .jc-layer .hf, :has(> .tb.hud:is(.tb-job, .tb-setup, .tb-crew):not([hidden]):not(.phone)) > .jc-layer .hf-gb, :has(> .tb.hud:is(.tb-job, .tb-setup, .tb-crew):not([hidden]):not(.phone)) > .jc-layer .jc-top { display: none; }
+:has(> .tb.hud:is(.tb-job, .tb-setup, .tb-crew):not([hidden]):not(.phone)) > .jc-layer .jc { top: var(--hud-log-y); padding: 0; background: none; border: 0; box-shadow: none; clip-path: none; -webkit-mask-image: none; mask-image: none; backdrop-filter: none; }
+:has(> .tb.hud:is(.tb-job, .tb-setup, .tb-crew):not([hidden]):not(.phone)) > .jc-layer .jc-body { padding: 0 8px 0 0; }
 
 /* The box's settings key stands on the column's top edge at its right end (style.css), which is the region's own top here. */
-#game:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { left: calc(var(--hud-log-x) + var(--hud-log-w) - 30px); top: calc(var(--hud-log-y) - 14px); }
+#game:has(> .tb.hud:is(.tb-job, .tb-setup):not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { left: calc(var(--hud-log-x) + var(--hud-log-w)); top: calc(var(--hud-log-y) - 13px); }
 
 /* What a phone and SETUP never show of the trace's parts. */
 .tb.phone .tb-oddsbar, .tb.phone .tb-res, .tb.phone .tb-go, .tb.phone .tb-pos, .tb.phone .tb-statname, .tb.phone .tb-of, .tb.phone .tb-leads-post, .tb.phone .tb-route, .tb.phone .tb-keys { display: none; }
@@ -23,7 +23,8 @@
 .tb.tb-deduction :is(.tb-route, .tb-keys, .tb-onroll), .tb.tb-accounting :is(.tb-route, .tb-keys, .tb-onroll) { display: none; }
 .tb.phone.tb-deduction .tb-log-at, .tb.phone.tb-accounting .tb-log-at { display: none; }
 
-.tb.hud:is(.tb-job, .tb-setup):not(.phone) {
+/* The trace's tokens, shared with the crew rules' board (board.css reads them for its title and meta line). */
+.tb.hud:is(.tb-job, .tb-setup, .tb-crew):not(.phone) {
   /* The one red (2026-11-15): --ui is the UI's own (the head line, the job's name, section heads, cut keys, the key line), so red can't mean
      trouble here. ALARM and a cost are amber (they need you); the worst position and a miss are magenta; NERVE is yours, so cyan with your
      own stat's dice; the crew are lilac; green is the take. --c stays the cream of the job's own words (the beat's name, the route). */
@@ -32,6 +33,8 @@
   --k-stat: #7fe9ff; --k-people: #b89cff; --k-pocket: #ffc56b; --k-setup: #a8ff60;
   --teko: var(--cs-teko, 'Teko', var(--pixel));
   --hv-c: var(--ui);
+}
+.tb.hud:is(.tb-job, .tb-setup):not(.phone) {
   padding: 84px 24px 30px 92px;
   color: var(--t-text);
 }
@@ -487,6 +490,25 @@
   /* The contact on the line. */
   & .tb-held-note { font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-hud); }
 }
+/* A guest's foil on the trace (table.css's sheen, playtest 2026-11-17): the trace keeps a face's ::after for its 1px
+   outline at inset 0, which squeezed the sheen to the face and slid its hard edge across it. The sheen moves to
+   ::before, over the picture and under the outline; ::after is the outline alone. */
+.tb.hud:not(.phone) .tb-foil .tbc-pic::after { animation: none; transform: none; background: none; mix-blend-mode: normal; z-index: 2; }
+/* A lifted row's face lets its ring out past the edge (overflow visible): the sheen rests until it's put back. */
+.tb.hud:not(.phone) .tb-slot.lifted .tb-foil .tbc-pic::before, .tb.hud:not(.phone) .tb-foil.lifted .tbc-pic::before { display: none; }
+.tb.hud:not(.phone) .tb-foil .tbc-pic::before {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset: -40%;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 38%, rgba(255, 240, 200, 0.28) 46%, rgba(160, 230, 255, 0.34) 52%, rgba(255, 170, 230, 0.26) 58%, transparent 66%);
+  mix-blend-mode: screen;
+  animation: tb-foil 5.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb.hud:not(.phone) .tb-foil .tbc-pic::before { animation: none; }
+}
 /* ---------- SETUP on the trace (2026-11-16): the job's name on the head line, how you go in as three cut cards with
    GO IN and BACK as keys under them, the hand and the ready crew as rows on the rail. ---------- */
 .tb.hud.tb-setup:not(.phone) {
@@ -754,4 +776,521 @@
   & .ac-tell:focus-visible { box-shadow: inset 0 0 0 2px #fff; }
   & .ac-card.sel { box-shadow: inset 0 0 0 1px var(--t-nerve), 0 0 14px color-mix(in srgb, var(--t-nerve) 35%, transparent); }
   & .ac-card.pressed::after { color: var(--t-miss); }
+}
+
+/* ── The story in front (mockup docs/mockups/graft-margin.html, route BY THE JOB, playtest pick 2026-11-17) ──
+   The desktop job table only (not a phone, SETUP, a board or the debrief): the JOB column is the page, 640px wide at
+   16px; the choices are short cut cards in a 360px margin beside it, the crew and the deck at the margin's foot; the
+   route stands beside the job's line over the beat's name; the dice land on the floor in front of the contact
+   (check-anim.ts). The room shows through behind the margin; only the page is dark. */
+:has(> :is(.tb.hud.tb-job:not(.phone):not(.tb-deduction):not(.tb-accounting):not(.tb-ended), .tb.hud.tb-setup:not(.phone), .tb.hud.tb-crew:not(.phone)):not([hidden])) > .jc-layer .jc-body { font-size: calc(16px * var(--text-scale, 1)); line-height: 1.62; }
+/* The text settings key on the beat's line, at its right end (the line is 10px over the column, 38px tall). */
+#game:has(> :is(.tb.hud.tb-job:not(.phone):not(.tb-deduction):not(.tb-accounting):not(.tb-ended), .tb.hud.tb-setup:not(.phone)):not([hidden])) > .feed-root.feed-stage:not(.expanded) .bs-key { left: calc(var(--hud-log-x) + var(--hud-log-w)); top: calc(var(--hud-log-y) - 30px); }
+#game.tb-dim:has(> :is(.tb.hud.tb-job:not(.phone):not(.tb-deduction):not(.tb-accounting):not(.tb-ended), .tb.hud.tb-setup:not(.phone)):not([hidden]))::after {
+  background: linear-gradient(180deg, transparent 50%, rgba(6, 2, 12, 0.35) 78%, rgba(6, 2, 12, 0.6)),
+    linear-gradient(90deg, rgba(5, 2, 12, 0.84), rgba(5, 2, 12, 0.8) 45%, rgba(5, 2, 12, 0.42) 48.5%, rgba(5, 2, 12, 0.36) 70%, rgba(5, 2, 12, 0.2) 86%, rgba(5, 2, 12, 0.32));
+}
+:is(.tb.hud.tb-job:not(.phone):not(.tb-deduction):not(.tb-accounting):not(.tb-ended), .tb.hud.tb-setup:not(.phone)) {
+  /* The code reads this (el.ts isStoryTable): clicks open a card, ↑↓ move, the dice go to the floor. */
+  --story-table: 1;
+  grid-template-columns: 640px 360px minmax(0, 1fr);
+  grid-template-rows: 46px minmax(0, 1fr) auto;
+  grid-template-areas: 'top top top' 'log middle .' 'log bottom .';
+  column-gap: 40px;
+
+  /* ---------- the route beside the job's line, the beat's name under both ---------- */
+  & .tb-route { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'role rt' 'note rt' 'beat beat'; column-gap: 18px; align-items: start; }
+  & .tb-route > .tb-role { grid-area: role; font-size: 14px; letter-spacing: 0.08em; white-space: normal; }
+  & .tb-route > .rt, & .tb-route > .rt-ladder { grid-area: rt; margin: 0; }
+  & .tb-route > .rt-ladder { width: 340px; margin-top: 2px; font-size: 12px; letter-spacing: 0.06em; }
+  & .tb-route > .rt-note { grid-area: note; margin-top: 6px; white-space: normal; }
+  & .tb-route > .tb-beat { grid-area: beat; position: relative; margin-top: 10px; padding-right: calc(var(--bs-key-w, 62px) + 10px); font-size: 46px; }
+  /* The beat's name keeps its ellipsis; the rule runs the line's width behind it and into the TEXT key's ring (style.css .bs-ring). */
+  & .tb-route > .tb-beat::after { content: ''; position: absolute; left: 0; right: var(--bs-key-w, 62px); bottom: 6px; z-index: -1; height: 1px; background: linear-gradient(90deg, transparent 30%, color-mix(in srgb, var(--ui) 55%, transparent) 55%, color-mix(in srgb, var(--ui) 70%, transparent)); }
+
+  /* ---------- the margin: the choices, stacked ---------- */
+  & > .tb-middle { padding-top: 15px; min-height: 0; overflow: hidden; }
+  /* Past the margin's height (a third choice, a full crew), the choices scroll rather than run under the hand. */
+  & .tb-deal { max-height: 100%; overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ui) 40%, transparent) transparent; }
+  & .tb-deal:not(:has(> .tb-parked)) { flex-direction: column; flex-wrap: nowrap; gap: 10px; }
+  & .tb-deal > .tb-card:not(.tb-debrief) { flex: none; width: 100%; max-width: none; min-height: 0; clip-path: polygon(9px 0, 100% 0, 100% calc(100% - 9px), calc(100% - 9px) 100%, 0 100%, 0 9px); }
+  /* The head: the stat's name and the position with its badge on one line; the picture only behind the lit card. */
+  & .tb-card .tb-side { height: 44px; }
+  & .tb-card .tb-side .tb-art { opacity: 0; }
+  & .tb-card.sel .tb-side { height: 54px; }
+  & .tb-card.sel .tb-side .tb-art, & .tb-card:hover .tb-side .tb-art { opacity: 0.55; filter: none; -webkit-mask-image: linear-gradient(#000 25%, transparent); mask-image: linear-gradient(#000 25%, transparent); }
+  & .tb-card:not(.sel):hover .tb-side .tb-art { opacity: 0.3; }
+  & .tb-pos { right: 12px; top: 9px; gap: 6px; font-size: 15px; }
+  & .tb-pos-piece { width: 26px; height: 26px; }
+  & .tb-statname { left: 13px; bottom: 4px; font-size: 34px; }
+  & .tb-card .tb-main { padding: 4px 13px 11px; }
+  & .tb-card .tb-line { -webkit-line-clamp: 2; line-clamp: 2; font-size: 13.5px; }
+  & .tb-card.sel .tb-line { -webkit-line-clamp: 3; line-clamp: 3; color: #fff; }
+  & .tb-leads { margin-top: 4px; font-size: 22px; }
+  & .tb-card .tb-tray { margin-top: 8px; min-height: 22px; gap: 5px; }
+  & .tb-cells i { width: 16px; height: 16px; }
+  & .tb-card .tb-sum { font-size: 30px; }
+  & .tb-card .tb-sum small { font-size: 16px; }
+  & .tb-card .tb-names { margin-top: 3px; min-height: 0; }
+  & .tb-oddsbar { height: 15px; margin: 8px 3px 0; }
+  & .tb-oddsbar i { font-size: 13px; }
+  /* What each result does, EFFECT and the key: the lit card's alone. */
+  & .tb-card:not(.sel) :is(.tb-res, .tb-act, .tb-flags:empty, .tb-names) { display: none; }
+  /* An unlit card is a strip: its stat and position on the head, what you'd do in a line, its dice and odds in a row. */
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-side { height: 30px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-statname { font-size: 26px; bottom: 1px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-pos { top: 6px; font-size: 13px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-pos-piece { width: 20px; height: 20px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-main { padding: 2px 12px 8px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-line { -webkit-line-clamp: 1; line-clamp: 1; font-size: 13px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-flags { display: none; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-foot { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; column-gap: 12px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-tray { margin-top: 5px; min-height: 0; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-cells i { width: 13px; height: 13px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-sum { font-size: 24px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-oddsbar { height: 13px; margin-top: 5px; }
+  & .tb-card:not(.sel):not(:has(> .tb-plain)) .tb-oddsbar i { font-size: 12px; }
+  /* Past the margin, the choices scroll; a fade at the foot says there's more. */
+  & .tb-deal:not(:has(> .tb-parked, > .tb-roll)) { -webkit-mask-image: linear-gradient(#000 calc(100% - 8px), transparent); mask-image: linear-gradient(#000 calc(100% - 8px), transparent); padding-bottom: 8px; }
+  /* (A mask clips its absolute descendants too: off while the dice are in the deal, so they show on the floor as they land.) */
+  & .tb-card.sel .tb-res { margin-top: 8px; }
+  & .tb-act { padding-top: 8px; }
+  & .tb-key { padding: 5px 10px 3px; font-size: 16px; }
+  /* A choice that rolls nothing: what you do, where it leads and what it does for certain; no NO ROLL, no SURE bar. */
+  & .tb-card.tb-plain .tb-main, & .tb-card > .tb-face.tb-plain .tb-main { padding-top: 11px; }
+  & .tb-plain .tb-line { -webkit-line-clamp: 3; line-clamp: 3; font-size: 14px; }
+  & .tb-sure .tb-noroll, & .tb-sure .tb-oddsbar { display: none; }
+  & .tb-plain:not(.tb-sure) .tb-noroll { margin-top: 6px; font-size: 14px; }
+  & .tb-sure .tb-res { margin-top: 6px; gap: 2px; }
+  & .tb-sure .tb-res-row { grid-template-columns: 52px 1fr; font-size: 12.5px; }
+  & .tb-sure .tb-res-k { min-width: 52px; font-size: 14px; }
+  & .tb-card:not(.sel):has(> .tb-plain) .tb-res { display: grid; }
+  /* A closed no-roll card says where it leads (THEN) and how long; what it costs is on the open one. */
+  & .tb-card:not(.sel):has(> .tb-plain) .tb-res-row:is(.r6, .r4, .r1) { display: none; }
+  & .tb-plain .tb-go { margin-top: 8px; }
+  & .tb-card:not(.sel):has(> .tb-plain) .tb-go { display: none; }
+  /* The lit card's foot: the dice with its key beside them, then the names, the odds and the three results. */
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 12px; grid-template-areas: 'flags flags' 'tray act' 'names names' 'bar bar' 'res res'; }
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-flags { grid-area: flags; }
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-tray { grid-area: tray; }
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-act { grid-area: act; align-self: end; margin: 0; padding: 0 0 2px; }
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-names { grid-area: names; }
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-oddsbar { grid-area: bar; }
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-res { grid-area: res; }
+  & .tb-card.sel:not(:has(> .tb-plain)) .tb-say::before { content: none; }
+  & .tb-res-k { font-size: 20px; }
+  /* WALK and PRESS ON: the word smaller in the narrow margin. */
+  & .tb-panel-word { font-size: 46px; }
+  & .tb-card.art-panel > .tb-face, & .tb-card.pic > .tb-face, & .tb-card.cover > .tb-face { min-height: 120px; padding: 14px 13px 12px; }
+
+  /* ---------- a roll waiting: the rolled card a line, its costs and answers under it, in the margin ---------- */
+  & .tb-deal:has(> .tb-parked) { display: flex; flex-direction: column; align-items: stretch; gap: 12px; }
+  & .tb-deal > .tb-parked { width: 100%; }
+  & .tb-parked .tb-card .tb-side { height: 46px; }
+  & .tb-parked .tb-card .tb-side .tb-art { opacity: 0.5; }
+  & .tb-parked .tb-card .tb-statname { font-size: 34px; }
+  & .tb-parked .tb-card .tb-main { padding-top: 2px; }
+  /* The rolled card is a line: its stat, its position and what you did; the dice and the verdict are on the floor. */
+  & .tb-deal > .tb-parked > .tb-card .tb-foot, & .tb-deal > .tb-parked > .tb-card.sel .tb-foot { display: none; }
+  & .tb-deal > .tb-parked > .tb-card .tb-side, & .tb-deal > .tb-parked > .tb-card.sel .tb-side { height: 40px; }
+  & .tb-deal > .tb-parked > .tb-card .tb-statname { font-size: 30px; }
+  /* Four or more dice hid the rolled card beside a wide tray; here the tray is on the floor, so the card stays. */
+  & .tb-parked.many > .tb-card { display: block; }
+  & .tb-deal > .tb-parked > .tb-card .tb-line { -webkit-line-clamp: 2; line-clamp: 2; color: var(--t-dim); }
+  /* While a roll waits on its costs the margin is the costs': the hand steps out (an offer names whose it is). */
+  &:has(> .tb-middle :is(.tb-parked, .tb-costs)) > .tb-bottom { display: none; }
+  & > .tb-middle:has(.tb-parked, .tb-costs) { grid-row: 2 / span 2; }
+  & .tb-deal > .tb-costs, & .tb-deal > .tb-costs-leaving, & .tb-deal:not(:has(> .tb-parked)) > .tb-costs { max-width: none; margin-left: 18px; }
+  & .tb-deal > .tb-offers { margin: 0 0 0 18px; }
+  /* The room shows behind the margin: what's said there (the costs, an offer) stands on a dark glass of its own. */
+  & .tb-deal > :is(.tb-costs, .tb-costs-leaving, .tb-offers) { padding: 10px 12px 12px; background: rgba(5, 2, 10, 0.62); box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.08); }
+  & .tb-costs::before { left: -14px; }
+  & .tb-costs-head::before, & .tb-cost::before { left: -26px; }
+  & .tb-cost { margin-top: 10px; }
+  & .tb-cost-tag { font-size: 28px; }
+  & .tb-costs-row.focus::after { margin-top: 12px; }
+  & .tb-cost-btn.tb-cost-panel { grid-template-columns: 126px minmax(0, 1fr); column-gap: 10px; margin-top: 8px; }
+  & .tb-cost-panel-word { font-size: 17px; letter-spacing: 0.14em; padding: 6px 6px 4px; }
+  & .tb-offer-words { margin-right: 84px; }
+
+  /* ---------- the hand at the margin's foot: crew as rows, the deck and its programs a row of thumbs ---------- */
+  & > .tb-bottom { flex-direction: column; align-items: stretch; gap: 8px; padding: 8px 0 0; min-height: 0; max-width: none; }
+  & .tb-hand { flex-direction: column; align-items: stretch; gap: 6px; width: 100%; }
+  & .tb-group { width: 100%; }
+  & .tb-group-label, & .tb-onroll-head { height: 18px; margin-bottom: 5px; font-size: 14px; }
+  & .g-people .tb-slots { flex-direction: column; gap: 3px; }
+  & .tb-crew-stack { display: grid; grid-template-columns: minmax(0, 1fr) 128px; align-items: center; column-gap: 8px; width: 100%; flex: none; min-width: 0; }
+  & .tb-crew-stack > .tb-slot { max-width: none; }
+  & .tb-hand .tb-slot .tbc { grid-template-columns: 36px minmax(0, 1fr); column-gap: 9px; align-items: center; }
+  & .tb-hand .tbc-pic { width: 36px; height: 36px; }
+  & .tb-crew-stack > .tb-slot .tbc-pic { margin-bottom: 0; }
+  & .tb-hand .tbc-name { font-size: 19px; }
+  & .tb-hand .tbc-note, & .tb-hand .tbc-tr, & .tb-hand .tbc-ab { margin-top: 2px; font-size: 13px; white-space: nowrap; text-overflow: ellipsis; }
+  /* One line under the name: the first note; a trait and the rest are on the row's hover card. */
+  & .tb-hand .tbc-note ~ .tbc-note, & .tb-hand .tbc-tr ~ .tbc-note, & .tb-hand .tbc-tr { display: none; }
+  & .tb-hand .tbc-back { padding-left: 45px; min-height: 36px; }
+  & .tb-hand .tbc-back::before { width: 36px; height: 36px; }
+  & .tb-abil { flex-direction: column; align-items: stretch; gap: 2px; margin: 0; min-width: 0; }
+  /* Their abilities: small tags stacked at the row's right, at most two. */
+  & .tb-hand .tb-abil > .tb-slot.tb-mini { width: 100%; max-width: none; }
+  & .tb-hand .tb-slot.tb-mini .tbc, & .tb-hand .tb-slot.tb-mini .tbc-back { padding: 1px 6px 0; }
+  & .tb-hand .tb-slot.tb-mini .tbc-name { font-size: 13px; letter-spacing: 0.08em; }
+  & .tb-hand .tb-slot.lifted { translate: 4px 0; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slots { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot { width: auto; max-width: 168px; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot .tbc { grid-template-columns: 30px minmax(0, 1fr); column-gap: 7px; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-pic { width: 30px; height: 30px; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-name { font-size: 16px; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-note { display: none; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-back { padding-left: 37px; min-height: 30px; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-back::before { width: 30px; height: 30px; }
+  & .tb-post-note { white-space: normal; }
+  & .tb-onroll { display: flex; align-items: center; gap: 12px; }
+  /* ON THE ROLL's keys say what they are: no head, the keys and PUSH's price in one row. */
+  & .tb-onroll .tb-onroll-head { display: none; }
+  & .tb-onroll-keys { display: flex; flex-wrap: nowrap; align-items: center; gap: 7px; }
+  & .tb-onroll .tb-push, & .tb-onroll .tb-trade button { padding: 4px 9px 2px; font-size: 14px; letter-spacing: 0.14em; }
+  & .tb-onroll-note { font-size: 12px; letter-spacing: 0.08em; white-space: nowrap; }
+  & .tb-onroll-note { align-self: center; }
+
+  /* ---------- the dice on the floor in front of the contact (check-anim.ts onFloor) ----------
+     They stay in the deal, then the parked row; those step out of being their box, so the tray stands on the table. */
+  & .tb-deal, & .tb-deal > .tb-parked, & > .tb-middle { position: static; }
+  /* A deck slot's program fan mid-job stands over the margin, not the whole table (no dice are up while it's open). */
+  & > .tb-middle:has(> .tb-load-tray:not([hidden])) { position: relative; }
+  & .tb-roll.on-floor { position: absolute; display: flex; flex-direction: column; align-items: center; margin: 0; max-width: none; z-index: 3; }
+  & .tb-roll.on-floor::after { content: ''; position: absolute; z-index: -1; left: 6%; right: 6%; top: -18%; bottom: -14%; background: radial-gradient(closest-side, rgba(5, 2, 10, 0.78), rgba(5, 2, 10, 0.45) 62%, transparent); pointer-events: none; }
+  & .tb-roll.on-floor .tb-roll-dice { max-width: none; }
+  & .tb-roll.on-floor .qc-stamp, & .tb-parked .tb-roll.on-floor .qc-stamp { position: static; margin: 8px 0 0; font: 600 54px/0.8 var(--teko); letter-spacing: 0.04em; text-align: center; text-transform: uppercase; transform: none; rotate: none; text-shadow: 0 0 22px color-mix(in srgb, currentColor 45%, transparent), 0 2px 3px #000; }
+  & .tb-roll.on-floor.is-pass .qc-stamp { color: var(--t-ok); }
+  & .tb-roll.on-floor.is-cost .qc-stamp { color: var(--t-amber); }
+  & .tb-roll.on-floor.is-fail .qc-stamp { color: var(--t-miss); }
+  & .tb-roll.on-floor .qc-says, & .tb-parked .tb-roll.on-floor .qc-says { position: static; margin: 10px 0 0; max-width: 100%; font: 16px/1.3 var(--pixel); letter-spacing: 0.16em; text-align: center; white-space: normal; color: var(--t-text); text-shadow: 0 1px 2px #000, 0 0 6px #000; }
+
+  /* A crew row's hover panel: their face at portrait size beside the head (card-info.ts). */
+  & .tb-info:has(> .tb-info-face) { display: grid; grid-template-columns: 104px minmax(0, 1fr); column-gap: 12px; align-items: start; width: 380px; }
+  & .tb-info-face { grid-row: 1 / span 4; width: 104px; height: 132px; object-fit: cover; object-position: center 12%; image-rendering: pixelated; box-shadow: inset 0 0 0 1px var(--k-people); }
+  & .tb-info:has(> .tb-info-face) > :not(.tb-info-face) { grid-column: 2; }
+
+  /* The key line under the page, running on under the margin when it's long (playtest: [ENTER] ROLL was cut off). */
+  & .tb-keys { right: auto; width: max-content; max-width: calc(640px + 40px + 360px); }
+}
+
+/* ── GO IN on the story table (2026-11-17): SETUP lays out as the job's table above (the page, the margin, the key line),
+   so the first beat doesn't rearrange the screen. The ways in are the margin's strips, the chosen one open with its
+   picture and what goes wrong; GO IN and BACK under them; the crew one list of rows, who comes lit.
+   The second, never-matching selector only lifts this block's weight over the shared block's :is() above. ── */
+:is(.tb.hud.tb-setup:not(.phone), .tb.hud.tb-setup.tb-job:not(.phone):not(.tb-deduction):not(.tb-accounting):not(.tb-ended)) {
+  /* table.css shrinks SETUP's cards (0.875, the tray 0.7): here they're the job table's rows, at its size. */
+  & .ts-hand .tb-slot, & .ts-tray .tb-slot { zoom: 1; }
+  & > .tb-middle { padding-top: 12px; }
+  & .ts-mid { gap: 12px; }
+  & .ts-approach .tb-deal { gap: 8px; padding-bottom: 0; -webkit-mask-image: none; mask-image: none; overflow: visible; }
+  & .ts-approach .tb-deal > .tb-card { flex: none; width: 100%; max-width: none; }
+  /* A closed way in: its name, then what it rolls and its rule, right. */
+  & .ts-approach .tb-card:not(.chosen) .tbc-pic { display: none; }
+  & .ts-approach .tb-card:not(.chosen) .tbc-body { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 14px; align-items: center; margin: 0; padding: 9px 13px 7px; }
+  & .ts-approach .tb-card:not(.chosen) .tbc-name { grid-row: 1 / span 3; margin: 0; font-size: 38px; line-height: 0.8; }
+  & .ts-approach .tb-card:not(.chosen) :is(.tbc-wrong, .tbc-first) { display: none; }
+  & .ts-approach .tb-card:not(.chosen) .tbc-note { grid-column: 2; font-size: 13px; letter-spacing: 0.1em; text-align: right; }
+  /* The chosen one open: its picture faded behind its head, what goes wrong, its lines. */
+  & .ts-approach .tb-card.chosen .tbc-pic { height: 78px; }
+  & .ts-approach .tb-card.chosen .tbc-body { align-items: stretch; margin-top: -30px; padding-bottom: 12px; }
+  & .ts-approach .tb-card.chosen .tbc-name { font-size: 46px; }
+  & .ts-approach .tb-card.chosen .tbc-note { font-size: 14px; }
+  & .ts-buttons button { padding: 7px 14px 4px; font-size: 18px; }
+  /* The crew: one list (setup.ts crewRows). Who's ready and not coming is dim with a +; who comes is lit. */
+  & .ts-ready[hidden] { display: none; }
+  & .tb-hand .g-people .tb-slot { position: relative; width: 100%; max-width: none; }
+  & .tb-hand .g-people .tb-slot:not(.ts-wait) { box-shadow: inset 2px 0 0 var(--k-people); }
+  & .tb-hand .g-people .tb-slot.ts-wait { opacity: 0.55; }
+  & .tb-hand .g-people .tb-slot.ts-wait:hover { opacity: 0.9; }
+  & .tb-hand .g-people .tb-slot.ts-wait::after { content: '+'; position: absolute; right: 8px; top: 50%; translate: 0 -50%; font: 22px/1 var(--pixel); color: var(--k-people); }
+  & .tb-hand .g-people .tb-slot.locked { opacity: 0.3; cursor: default; }
+  & .tb-hand .g-people .tb-slot.locked::after { content: none; }
+  & .tb-hand .g-people .tbc-pic { margin: 0 0 0 6px; }
+  /* LOAD's programs open over the ways in, at the margin's head, a row each with what it does. */
+  & .ts-stage { height: 100%; align-content: start; }
+  & .ts-tray:not([hidden]) { display: flex; flex-direction: column; align-self: start; align-items: stretch; gap: 6px; width: 100%; }
+  & .ts-tray-head { justify-content: space-between; }
+  & .ts-tray .tb-slots { display: flex; flex-direction: column; gap: 6px; }
+  & .ts-tray .tb-slot { width: 100%; max-width: none; padding: 6px 8px; background: rgba(5, 2, 10, 0.62); box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.1); }
+  & .ts-tray .tb-slot:hover { box-shadow: inset 0 0 0 1px var(--k-pocket); }
+  & .ts-tray .tb-slot .tbc { grid-template-columns: 44px minmax(0, 1fr); column-gap: 10px; align-items: center; }
+  & .ts-tray .tbc-pic { width: 44px; height: 44px; }
+  & .ts-tray .tbc-name { font-size: 20px; }
+  & .ts-tray .tbc-note { font-size: 13px; }
+  & .ts-tierline { margin: -2px 0 5px; font: 12px/1.2 var(--pixel); letter-spacing: 0.1em; color: var(--t-dim); }
+}
+
+/* The choice detail block (job-table.ts showDetail) is the story table's alone. */
+.tb-detail { display: none; }
+
+/* ── The margin in the trace's own language (mockup docs/mockups/graft-trace-margin.html, playtest 2026-11-17: "the only
+   part I'm really happy with is the mission/chat panel"). No boxes in the margin: the choices and the hand hang off one
+   rail down its left, a tick to each row, a ring on the open one, as the trace panels do. Two typefaces as on the page:
+   pixel caps for labels (the stat, its position, the odds, the levers), the column's own voice for what you'd do.
+   `#game >` lifts these over the shared blocks above without a pile of :not()s; the hand's rules hold for SETUP too, the
+   choices' for the job table only (SETUP's ways in keep their strips). ── */
+#game > :is(.tb.hud.tb-job:not(.phone, .tb-deduction, .tb-accounting, .tb-ended), .tb.hud.tb-setup:not(.phone)) {
+  /* The hand right under the choices, not at the margin's foot: the choices' row takes what they need of what the hand
+     leaves (and scrolls past it), the hand's row the rest. */
+  grid-template-rows: 46px minmax(0, max-content) minmax(min-content, 1fr);
+  /* The rail: down the margin's left edge, from the choices through the hand, fading as it goes. */
+  & > .tb-middle { background: linear-gradient(color-mix(in srgb, var(--ui) 75%, transparent), color-mix(in srgb, var(--ui) 45%, transparent)) 0 0 / 1px 100% no-repeat; }
+  & > .tb-bottom { align-self: start; padding-left: 18px; background: linear-gradient(color-mix(in srgb, var(--ui) 45%, transparent), color-mix(in srgb, var(--ui) 20%, transparent)) 0 0 / 1px 100% no-repeat; }
+  /* A label: pixel caps in the trace red on a hairline that fades, a tick back to the rail. */
+  & .tb-group-label { position: relative; display: flex; align-items: center; gap: 10px; height: auto; margin: 0 0 8px; font: 14px/1 var(--pixel); letter-spacing: 0.26em; color: var(--ui); white-space: nowrap; }
+  & .tb-group-label::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--ui) 55%, transparent), transparent); }
+  & .tb-group-label::before { content: ''; position: absolute; left: -18px; top: 50%; width: 10px; height: 1px; background: var(--ui); opacity: 0.55; }
+  /* (table.css offsets SETUP's HOW YOU GO IN by left/top for the old cards: reset, the tick stays on its line.) */
+  & .ts-approach > .tb-group-label { position: relative; inset: auto; }
+  /* The deck's slots and the pockets: a row of words, each after a small square, no card. */
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slots { gap: 6px 18px; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot { background: none; box-shadow: none; clip-path: none; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot::before { content: none; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc { background: none; border: 0; box-shadow: none; grid-template-columns: 22px minmax(0, 1fr); column-gap: 8px; align-items: center; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-pic { width: 22px; height: 22px; margin: 0; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-body { margin: 0; padding: 0; background: none; text-align: left; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-name { font: 15px/1 var(--pixel); letter-spacing: 0.18em; color: var(--t-text); text-align: left; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot.s-empty .tbc-name { color: color-mix(in srgb, var(--t-dim) 75%, transparent); }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot.s-empty .tbc-pic { box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.25); background: repeating-linear-gradient(135deg, transparent 0 4px, color-mix(in srgb, var(--k-pocket) 14%, transparent) 4px 5px); }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot.s-empty .tbc-pic img { display: none; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tb-slot:hover .tbc-name { color: #fff; }
+}
+
+#game > .tb.hud.tb-job:not(.phone, .tb-setup, .tb-deduction, .tb-accounting, .tb-ended) {
+  /* ---------- the choices: a fixed list on the rail (playtest 2026-11-17: an open card growing in place made the rows
+     and the hand jump each step). Every row is a line and a line; the one you're on is ringed on a soft band; what it
+     rolls, its odds, results and key stand in the detail block under the list (job-table.ts showDetail). ---------- */
+  /* The deal scrolls (and so clips sideways): it starts 6px left of the rail, so the ring sits whole on it. */
+  & > .tb-middle { padding-left: 0; overflow: visible; }
+  & .tb-deal { box-sizing: border-box; flex: 0 1 auto; min-height: 0; width: calc(100% + 6px); margin-left: -6px; padding-left: 24px; }
+  & .tb-deal:not(:has(> .tb-parked)) { gap: 2px; }
+  /* A row: its band reaches 8px left of its words; the tick runs from the rail to the band. */
+  & .tb-deal > .tb-card:not(.tb-debrief) {
+    position: relative; overflow: visible; min-height: 0; margin-left: -8px; padding: 7px 8px 8px; width: calc(100% + 8px);
+    clip-path: none; box-shadow: none; background: none; transition: background 120ms;
+  }
+  & .tb-deal > .tb-card:not(.tb-debrief)::before { content: ''; position: absolute; left: -10px; top: 18px; width: 10px; height: 1px; background: var(--ui); opacity: 0.8; }
+  & .tb-deal > .tb-card.sel:not(.tb-debrief) { background: linear-gradient(90deg, color-mix(in srgb, var(--ui) 18%, transparent), color-mix(in srgb, var(--ui) 6%, transparent) 70%, transparent); }
+  & .tb-deal > .tb-card.sel:not(.tb-debrief)::before { left: -14px; top: 14px; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid var(--ui); border-radius: 50%; background: var(--t-ink); box-shadow: 0 0 6px var(--ui); opacity: 1; }
+  & .tb-deal > .tb-card:not(.sel):not(.tb-debrief):hover { background: linear-gradient(90deg, color-mix(in srgb, var(--ui) 8%, transparent), transparent 70%); }
+  & .tb-deal > .tb-card:focus-visible { outline: none; }
+  & .tb-deal > .tb-card:focus-visible .tb-statname { text-decoration: underline; text-underline-offset: 5px; }
+
+  /* The face is one grid: its wrappers step aside, so the stat, its dice and its position share the head line. */
+  & .tb-deal > .tb-card:not(.pic, .art-panel) > .tb-face:is(.tb-call, .tb-plain) { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: baseline; column-gap: 12px; height: auto; min-height: 0; padding: 0; }
+  & .tb-deal > .tb-card > .tb-face :is(.tb-side, .tb-main, .tb-foot) { display: contents; }
+  & .tb-deal > .tb-card .tb-side :is(.tb-art, .tbc-mark), & .tb-deal > .tb-card .tb-pos-piece { display: none; }
+  & .tb-deal > .tb-card > .tb-face :is(.tb-line, .tb-leads, .tb-leads-post, .tb-said, .tb-sub, .tb-actions, .tb-odds) { grid-row: auto; grid-column: 1 / -1; }
+  & .tb-deal > .tb-card .tb-statname { grid-column: 1; grid-row: 1; position: static; font: 21px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-text); text-shadow: 0 1px 2px #000; }
+  & .tb-deal > .tb-card .tb-pos { grid-column: 3; grid-row: 1; position: static; justify-self: end; font: 13px/1 var(--pixel); letter-spacing: 0.14em; color: var(--pc); text-shadow: 0 1px 2px #000; }
+  & .tb-deal > .tb-card .tb-line { margin-top: 4px; font: 13px/1.45 var(--mono); color: var(--t-dim); text-shadow: 0 1px 2px #000; -webkit-line-clamp: 2; line-clamp: 2; display: -webkit-box; overflow: hidden; }
+  & .tb-deal > .tb-card .tb-leads { margin-top: 4px; font: 13px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); text-shadow: none; }
+  & .tb-deal > .tb-card .tb-leads-post { font-size: 12px; }
+  /* The dice beside the stat, small, their count and the clean chance after them (showDetail sets data-pct). */
+  & .tb-deal > .tb-card .tb-tray { grid-column: 2; grid-row: 1; display: inline-flex; align-items: center; gap: 3px; min-height: 0; margin: 0; }
+  & .tb-deal > .tb-card .tb-cells { gap: 3px; }
+  & .tb-deal > .tb-card .tb-cells i { width: 10px; height: 10px; clip-path: none; background: color-mix(in srgb, var(--k) 55%, transparent); box-shadow: inset 0 0 0 1px var(--k); }
+  & .tb-deal > .tb-card .tb-cells i.minus { background: none; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.3); }
+  & .tb-deal > .tb-card .tb-sum { margin: 0 0 0 5px; font: 13px/1 var(--pixel); letter-spacing: 0.12em; color: var(--t-dim); text-shadow: none; }
+  & .tb-deal > .tb-card .tb-sum small { font: inherit; margin: 0; color: inherit; }
+  & .tb-deal > .tb-card .tb-sum[data-pct]::after { content: attr(data-pct); margin-left: 8px; color: var(--t-ok); opacity: 0.85; }
+  /* What the detail block shows is never on the row. */
+  & .tb-deal > .tb-card :is(.tb-flags, .tb-names, .tb-oddsbar, .tb-res, .tb-act, .tb-go, .tb-noroll) { display: none; }
+  /* The one you're on: its words lit, its line whole. */
+  & .tb-deal > .tb-card.sel .tb-statname { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--ui) 40%, transparent), 0 1px 2px #000; }
+  /* (Every row's line keeps two lines, lit or not, so stepping moves nothing.) */
+  & .tb-deal > .tb-card.sel .tb-line { color: #fff; }
+  & .tb-deal > .tb-card.sel .tb-leads { color: var(--c); }
+  & .tb-deal > .tb-card.sel .tb-sum { color: var(--t-text); }
+  & .tb-deal > .tb-card:not(.sel):hover .tb-line { color: var(--t-text); }
+  /* A choice that rolls nothing: what you do on the head line, NO ROLL where the position goes. */
+  & .tb-deal > .tb-card > .tb-face.tb-plain .tb-line { grid-column: 1 / 3; grid-row: 1; margin: 0; font-size: 14px; color: var(--t-text); -webkit-line-clamp: 2; line-clamp: 2; }
+  & .tb-deal > .tb-card.sel > .tb-face.tb-plain .tb-line { color: #fff; }
+  & .tb-deal > .tb-card > .tb-face.tb-plain::after { content: 'NO ROLL'; grid-column: 3; grid-row: 1; justify-self: end; font: 13px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); }
+  & .tb-deal > .tb-card > .tb-face.tb-plain:not(:has(.tb-noroll))::after { content: none; }
+
+  /* ---------- the detail block: what the row you're on does, under the list, on the rail ---------- */
+  & .tb-detail:not([hidden]) { display: block; flex: none; position: relative; margin-top: 14px; padding-left: 24px; min-height: 196px; }
+  & .tb-detail-head { position: relative; display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font: 14px/1 var(--pixel); letter-spacing: 0.26em; color: var(--ui); white-space: nowrap; }
+  & .tb-detail-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--ui) 55%, transparent), transparent); }
+  & .tb-detail-head::before { content: ''; position: absolute; left: -24px; top: 50%; width: 14px; height: 1px; background: var(--ui); opacity: 0.8; }
+  & .tb-detail-body { display: flex; flex-direction: column; padding: 0; margin: 0; background: none; box-shadow: none; font: 13px/1.45 var(--mono); color: var(--t-text); }
+  & .tb-detail .tb-flags { display: flex; flex-wrap: wrap; gap: 5px; margin: 6px 0 0; }
+  & .tb-detail .tb-names { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 6px 0 0; min-height: 0; }
+  & .tb-detail .tb-names .tb-src { padding: 0; font: 13px/1 var(--pixel); letter-spacing: 0.12em; color: var(--t-text); background: none; border: 0; box-shadow: none; }
+  & .tb-detail .tb-names .tb-src.k-stat { color: var(--k-stat); }
+  & .tb-detail .tb-names .tb-src.k-people { color: var(--k-people); }
+  & .tb-detail .tb-names .tb-src.k-push { color: var(--t-nerve); }
+  & .tb-detail .tb-names .tb-src.k-pocket { color: var(--k-pocket); }
+  & .tb-detail .tb-names .tb-src.k-setup { color: var(--k-setup); }
+  & .tb-detail .tb-names .tb-src.minus { color: var(--t-dim); }
+  & .tb-detail .tb-names .tb-src.lift { animation: tt-blink 0.9s steps(2) infinite; }
+  & .tb-detail .tb-flags .tb-tag, & .tb-detail .tb-flags .tb-flag { display: inline-block; padding: 1px 6px 0; font: 13px/1.15 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); background: none; border: 0; box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.3); }
+  & .tb-detail .tb-flags :is(.tb-tag.route, .tb-tag.lacquer, .tb-flag.red) { color: #fff; background: var(--t-miss); box-shadow: none; }
+  & .tb-detail .tb-flags :is(.tb-tag.move, .tb-tag.lifted) { color: var(--t-ink); background: var(--k-people); box-shadow: none; }
+  & .tb-detail .tb-flags .tb-tag.hot { color: var(--t-ink); background: var(--k-pocket); box-shadow: none; }
+  & .tb-detail .tb-oddsbar { display: flex; gap: 3px; height: auto; margin: 10px 0 0; }
+  & .tb-detail .tb-oddsbar i { display: block; min-width: 0; height: auto; padding-top: 6px; transform: none; background: none; border-top: 2px solid; font: 13px/1 var(--pixel); letter-spacing: 0.14em; overflow: visible; place-items: unset; }
+  & .tb-detail .tb-oddsbar i span { display: block; transform: none; white-space: nowrap; }
+  & .tb-detail .tb-oddsbar .clean { color: var(--t-ok); border-color: var(--t-ok); background: none; }
+  & .tb-detail .tb-oddsbar .cost { color: var(--t-amber); border-color: var(--t-amber); background: none; }
+  & .tb-detail .tb-oddsbar .miss { color: var(--t-miss); border-color: var(--t-miss); background: none; }
+  & .tb-detail .tb-sure .tb-oddsbar { display: none; }
+  & .tb-detail .tb-noroll { display: none; }
+  & .tb-detail .tb-res { display: grid; gap: 3px; margin-top: 10px; }
+  & .tb-detail .tb-res-row { grid-template-columns: 34px 1fr; column-gap: 10px; font: 13px/1.4 var(--mono); }
+  & .tb-detail .tb-res-k { font: 15px/1.3 var(--pixel); letter-spacing: 0.08em; }
+  & .tb-detail .tb-sure .tb-res-row { grid-template-columns: 58px 1fr; }
+  & .tb-detail .tb-sure .tb-res-k { font: 14px/1.4 var(--pixel); letter-spacing: 0.16em; }
+  /* The key and what follows it: ROLL first, the effect after it, small. */
+  & .tb-detail .tb-act { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: center; gap: 14px; margin: 0; padding-top: 12px; }
+  & .tb-detail .tb-go { display: flex; justify-content: flex-start; margin: 12px 0 0; pointer-events: auto; }
+  & .tb-detail .tb-act .tb-go { margin: 0; }
+  & .tb-detail .tb-say { display: flex; gap: 7px; padding: 0; font: 13px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); white-space: nowrap; }
+  /* (The head says the effect.) */
+  & .tb-detail .tb-say { display: none; }
+  & .tb-detail .tb-side-word { display: none; }
+  & .tb-detail .tb-eff { color: var(--t-text); }
+  & .tb-detail .tb-key { --kc: var(--ui); padding: 6px 16px 4px; font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-ink); background: var(--kc); box-shadow: none; clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px); cursor: pointer; }
+  & .tb-detail .tb-key::after { content: '⏎'; margin-left: 10px; opacity: 0.6; }
+  & .tb-detail .tb-key:hover { filter: brightness(1.15); }
+  & .tb-detail .tb-call.none .tb-key, & .tb-detail .tb-plain.none .tb-key { opacity: 0.45; }
+
+  /* WALK and PRESS ON: the word in the trace's caps, what it means under it; no picture. */
+  & .tb-deal > .tb-card.art-panel { width: 100%; aspect-ratio: auto; padding: 2px 0 12px; border: 0; background: none; color: var(--t-text); filter: none; }
+  & .tb-deal > .tb-card.art-panel > .tb-face { display: block; min-height: 0; padding: 0; }
+  & .tb-deal > .tb-card.art-panel .tb-panel-word { font: 22px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .tb-deal > .tb-card.art-panel.sel .tb-panel-word, & .tb-deal > .tb-card.art-panel:hover .tb-panel-word { color: #fff; }
+  & .tb-deal > .tb-card.art-panel .tb-panel-sub { margin-top: 5px; font: 14px/1.4 var(--pixel); letter-spacing: 0.16em; }
+
+  /* ---------- a roll waiting: the rolled card a line in the trace's caps; its costs on the margin's own rail ---------- */
+  & .tb-deal > :is(.tb-costs, .tb-costs-leaving, .tb-offers) { margin-left: 0; }
+  & .tb-deal > :is(.tb-costs, .tb-costs-leaving)::before { left: -18px; }
+  & .tb-deal > :is(.tb-costs, .tb-costs-leaving) :is(.tb-costs-head, .tb-cost)::before { left: -30px; }
+  & .tb-deal > :is(.tb-costs, .tb-costs-leaving) .tb-cost:is(.pickable:hover, .pickable:focus-visible, .picked, .kb)::before { left: -35px; }
+  & .tb-deal > .tb-parked > .tb-card .tb-side .tb-art, & .tb-deal > .tb-parked > .tb-card .tb-pos-piece { display: none; }
+  & .tb-deal > .tb-parked > .tb-card .tb-side { height: 26px; }
+  & .tb-deal > .tb-parked > .tb-card .tb-statname { font: 22px/1 var(--pixel); letter-spacing: 0.22em; color: #fff; }
+  & .tb-deal > .tb-parked > .tb-card .tb-pos { top: 4px; font: 14px/1 var(--pixel); letter-spacing: 0.18em; opacity: 0.8; }
+  & .tb-deal > .tb-parked > .tb-card .tb-line { font: 14px/1.45 var(--chat-font, var(--mono)); }
+
+  /* ---------- the hand right under the choices; the levers small keys with their price after them ---------- */
+  & > .tb-bottom { padding-top: 12px; gap: 12px; }
+  & .tb-onroll { gap: 8px; }
+  & .tb-onroll-keys { flex-wrap: wrap; row-gap: 6px; }
+  & .tb-onroll .tb-push, & .tb-onroll .tb-trade button { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; min-width: 0; padding: 4px 10px 2px; font: 14px/1 var(--pixel); letter-spacing: 0.18em; color: var(--ui); background: rgba(5, 2, 10, 0.4); border: 0; border-radius: 0; box-shadow: inset 0 0 0 1px var(--ui); clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px); }
+  & .tb-onroll .tb-trade button { color: var(--t-dim); box-shadow: inset 0 0 0 1px rgba(230, 238, 247, 0.4); }
+  & .tb-onroll .tb-push img, & .tb-onroll .tb-push .tb-chip, & .tb-onroll .tb-push[hidden] { display: none; }
+  & .tb-onroll :is(.tb-push, .tb-trade button)[aria-pressed='true'] { color: var(--t-ink); background: var(--ui); box-shadow: none; }
+  & .tb-onroll .tb-trade button:disabled { opacity: 0.45; }
+  & .tb-onroll-note { font: 13px/1 var(--pixel); letter-spacing: 0.14em; color: var(--t-dim); }
+
+  /* ---------- a card's details beside the margin: dark glass, no frame, its head on a hairline ---------- */
+  & .tb-info.hv-frame { clip-path: none; padding: 14px 18px 14px 26px; background: linear-gradient(90deg, rgba(5, 2, 10, 0.94), rgba(5, 2, 10, 0.86)); }
+  & .tb-info.hv-frame::before { content: none; }
+}
+
+/* With no glass under the choices, the margin's stretch of the dim is darker (the figure past 75% stays clear). */
+#game.tb-dim:has(> .tb.hud.tb-job:not(.phone):not(.tb-setup):not(.tb-deduction):not(.tb-accounting):not(.tb-ended):not([hidden]))::after,
+#game.tb-dim:has(> .tb.hud.tb-setup:not(.phone):not(.tb-deduction):not(.tb-accounting):not(.tb-ended):not([hidden]))::after {
+  background: linear-gradient(180deg, transparent 50%, rgba(6, 2, 12, 0.35) 78%, rgba(6, 2, 12, 0.6)),
+    linear-gradient(90deg, rgba(5, 2, 12, 0.84), rgba(5, 2, 12, 0.8) 45%, rgba(5, 2, 12, 0.62) 48.5%, rgba(5, 2, 12, 0.56) 69%, rgba(5, 2, 12, 0.22) 79%, rgba(5, 2, 12, 0.32));
+}
+/* The text panel at the story table: in the margin, on its rail, the choices and the hand stepped back behind it. */
+#game:has(> .tb.hud.tb-job:not(.phone, .tb-setup, .tb-deduction, .tb-accounting, .tb-ended):not([hidden])) > .feed-root.feed-stage:not(.expanded) .bs-panel:not([hidden]) { left: calc(var(--hud-log-x) + var(--hud-log-w) + 23px); top: calc(var(--hud-log-y) - 104px); width: 404px; }
+/* (The margin's 360px: the rows' words a little tighter than in the room.) */
+#game:has(> .tb.hud.tb-job:not(.phone, .tb-setup, .tb-deduction, .tb-accounting, .tb-ended):not([hidden])) > .feed-root.feed-stage:not(.expanded) .bs-panel { & .bs-row { gap: 12px; letter-spacing: 0.14em; } & .bs-words i, & .bs-speaker { padding: 1px 5px; } & .bs-track { width: 120px; } }
+#game:has(> .tb.hud.tb-job:not(.phone, .tb-setup, .tb-deduction, .tb-accounting, .tb-ended):not([hidden])) > .feed-root.feed-stage:not(.expanded) .bs-panel::before { background: linear-gradient(90deg, rgba(5, 2, 10, 0.9), rgba(5, 2, 10, 0.82)); }
+#game:has(> .feed-root .bs-panel:not([hidden])) > .tb.hud.tb-job:not(.phone, .tb-setup, .tb-deduction, .tb-accounting, .tb-ended) > :is(.tb-middle, .tb-bottom) { visibility: hidden; }
+
+/* GO IN in the same language, so the first beat after it doesn't jump: each way in a row on the rail, its name in the
+   trace's caps, what it rolls and its rule at the right; the chosen one ringed, lit, and how it goes wrong under it. */
+#game > .tb.hud.tb-setup:not(.phone) {
+  /* The margin starts 6px left of the rail (its background), so the chosen way's ring sits whole on it. */
+  & > .tb-middle { margin-left: -6px; padding-left: 24px; background-position: 6px 0; }
+  & .ts-approach .tb-deal { gap: 4px; }
+  & .ts-approach .tb-deal > .tb-card { position: relative; overflow: visible; padding: 2px 0 10px; clip-path: none; box-shadow: none; background: none; filter: none; }
+  & .ts-approach .tb-deal > .tb-card::before { content: ''; position: absolute; inset: auto; left: -18px; top: 11px; width: 10px; height: 1px; mix-blend-mode: normal; background: var(--ui); opacity: 0.8; z-index: 0; }
+  & .ts-approach .tb-deal > .tb-card.chosen::before { left: -22px; top: 7px; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid var(--ui); border-radius: 50%; background: var(--t-ink); box-shadow: 0 0 6px var(--ui); opacity: 1; }
+  & .ts-approach .tb-card .tbc { display: block; background: none; border: 0; box-shadow: none; clip-path: none; }
+  & .ts-approach .tb-card .tbc-pic { display: none; }
+  & .ts-approach .tb-card .tbc-body { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: 12px; align-items: baseline; margin: 0; padding: 0; background: none; text-align: left; }
+  & .ts-approach .tb-card .tbc-name { grid-row: 1; grid-column: 1; margin: 0; font: 22px/1 var(--pixel); letter-spacing: 0.22em; color: var(--t-dim); text-shadow: 0 1px 2px #000; }
+  & .ts-approach .tb-card .tbc-note { grid-column: 2; justify-self: end; margin: 0; font: 13px/1.35 var(--pixel); letter-spacing: 0.14em; text-align: right; }
+  /* What it rolls on the name's line; its rules only on the open one (and on its hover panel), under how it goes wrong. */
+  & .ts-approach .tb-card .tbc-stats { grid-row: 1; }
+  & .ts-approach .tb-card:not(.chosen) .tbc-note:not(.tbc-stats) { display: none; }
+  & .ts-approach .tb-card.chosen .tbc-note:not(.tbc-stats) { grid-column: 1 / -1; justify-self: start; text-align: left; }
+  /* Open: the name lit, how it goes wrong in the column's voice across the row, the rules under it. */
+  & .ts-approach .tb-card.chosen .tbc-name { color: #fff; text-shadow: 0 0 10px color-mix(in srgb, var(--ui) 40%, transparent), 0 1px 2px #000; }
+  & .ts-approach .tb-card.chosen .tbc-wrong { display: block; grid-row: 2; grid-column: 1 / -1; margin: 6px 0 4px; font: 15px/1.45 var(--chat-font, var(--mono)); color: #fff; text-align: left; }
+  & .ts-approach .tb-card:hover:not(.chosen) .tbc-name { color: var(--t-text); }
+  & .ts-buttons { padding-left: 0; }
+}
+
+/* ── Readability pass (playtest 2026-11-17, "what would help improve readability?" → 1–3):
+   1. glass: the dim is a dark wash over the whole margin, fading out before the contact (the figure stays clear);
+   2. type: pixel caps only for short labels and numbers, at 0.06–0.12em, nothing under 14px; anything read as a sentence
+      in mono at 14px+;
+   3. colour: green, amber and pink mean the results alone; a position is plain words with its danger as a three-step
+      meter (no colour), the clean chance and the dice count in the text's own grey. ── */
+#game.tb-dim:has(> .tb.hud.tb-job:not(.phone):not(.tb-setup):not(.tb-deduction):not(.tb-accounting):not(.tb-ended):not([hidden]))::after,
+#game.tb-dim:has(> .tb.hud.tb-setup:not(.phone):not(.tb-deduction):not(.tb-accounting):not(.tb-ended):not([hidden]))::after {
+  background: linear-gradient(180deg, transparent 50%, rgba(6, 2, 12, 0.35) 78%, rgba(6, 2, 12, 0.6)),
+    linear-gradient(90deg, rgba(5, 2, 12, 0.84), rgba(5, 2, 12, 0.82) 46%, rgba(5, 2, 12, 0.8) 48.5%, rgba(5, 2, 12, 0.78) 69%, rgba(5, 2, 12, 0.5) 72.5%, rgba(5, 2, 12, 0.22) 77%, rgba(5, 2, 12, 0.32));
+}
+
+#game > :is(.tb.hud.tb-job:not(.phone, .tb-deduction, .tb-accounting, .tb-ended), .tb.hud.tb-setup:not(.phone)) {
+  & .tb-group-label { letter-spacing: 0.14em; }
+  & .tb-hand :is(.g-deck, .g-pockets) .tbc-name { letter-spacing: 0.1em; }
+  & .tb-hand .tbc-name { letter-spacing: 0.08em; }
+  & .tb-hand :is(.tbc-note, .tbc-ab, .tbc-tr) { font-size: 14px; letter-spacing: 0.06em; }
+  & .tb-onroll .tb-push, & .tb-onroll .tb-trade button { letter-spacing: 0.1em; }
+  & .tb-onroll-note { font-size: 14px; letter-spacing: 0.08em; }
+  & .tb-info { & .hv-head { letter-spacing: 0.12em; } & .hv-gist { font-size: 14.5px; } & .hv-rows { font-size: 14px; } & .hv-k { font-size: 15px; letter-spacing: 0.08em; } }
+}
+
+#game > .tb.hud.tb-job:not(.phone, .tb-setup, .tb-deduction, .tb-accounting, .tb-ended) {
+  /* A row. */
+  & .tb-deal > .tb-card .tb-statname { font-size: 22px; letter-spacing: 0.08em; }
+  & .tb-deal > .tb-card .tb-line { font-size: 14px; color: rgba(217, 228, 234, 0.72); }
+  & .tb-deal > .tb-card .tb-leads { font-size: 14px; letter-spacing: 0.08em; }
+  & .tb-deal > .tb-card .tb-sum { font-size: 15px; letter-spacing: 0.06em; color: var(--t-text); }
+  & .tb-deal > .tb-card .tb-sum[data-pct]::after { color: var(--t-dim); opacity: 1; }
+  & .tb-deal > .tb-card > .tb-face.tb-plain::after { font-size: 14px; letter-spacing: 0.08em; }
+  /* The position: plain words and a meter, DARK one bar, OPEN two, ON THE WIRE three. */
+  & .tb-deal > .tb-card .tb-pos, & .tb-deal > .tb-parked > .tb-card .tb-pos { display: flex; align-items: center; gap: 7px; font-size: 14px; letter-spacing: 0.08em; color: var(--t-text); opacity: 1; }
+  & .tb-deal > .tb-card .tb-pos::after, & .tb-deal > .tb-parked > .tb-card .tb-pos::after {
+    content: ''; width: 20px; height: 9px; flex: none;
+    background: linear-gradient(90deg, currentColor 0 5px, transparent 5px 7px, var(--b2, transparent) 7px 12px, transparent 12px 14px, var(--b3, transparent) 14px 19px, transparent 19px);
+    box-shadow: inset 0 0 0 0 transparent; opacity: 0.9;
+  }
+  & :is(.tb-deal > .tb-card, .tb-deal > .tb-parked > .tb-card)[data-pos='open'] .tb-pos::after { --b2: currentColor; }
+  & :is(.tb-deal > .tb-card, .tb-deal > .tb-parked > .tb-card)[data-pos='wire'] .tb-pos::after { --b2: currentColor; --b3: currentColor; }
+  & .tb-deal > .tb-card.sel .tb-pos { color: #fff; }
+
+  /* The detail. */
+  & .tb-detail-head { font-size: 15px; letter-spacing: 0.12em; }
+  & .tb-detail-body { font-size: 14px; }
+  & .tb-detail .tb-names .tb-src { font-size: 14px; letter-spacing: 0.06em; }
+  & .tb-detail .tb-flags .tb-tag, & .tb-detail .tb-flags .tb-flag { font-size: 14px; letter-spacing: 0.08em; }
+  & .tb-detail .tb-oddsbar i { font-size: 14px; letter-spacing: 0.06em; }
+  & .tb-detail .tb-res-row { font-size: 14px; line-height: 1.45; }
+  & .tb-detail .tb-res-k { font-size: 16px; letter-spacing: 0.02em; }
+  & .tb-detail .tb-sure .tb-res-k { font-size: 15px; letter-spacing: 0.08em; }
+  & .tb-detail .tb-key { letter-spacing: 0.14em; }
+
+  /* The rolled card and WALK / PRESS ON. */
+  & .tb-deal > .tb-parked > .tb-card .tb-statname { letter-spacing: 0.08em; }
+  & .tb-deal > .tb-card.art-panel .tb-panel-word { letter-spacing: 0.1em; }
+  & .tb-deal > .tb-card.art-panel .tb-panel-sub { letter-spacing: 0.06em; }
+}
+
+/* GO IN's ways in, the same. */
+#game > .tb.hud.tb-setup:not(.phone) {
+  & .ts-approach .tb-card .tbc-name { letter-spacing: 0.08em; color: var(--t-text); }
+  & .ts-approach .tb-card .tbc-note { font-size: 14px; letter-spacing: 0.06em; }
 }

@@ -9,7 +9,7 @@ for: soren
 bars: field-deck
 once: true
 starts: rue-hab
-after: rue_one and trust>=mid
+after: rue_one
 trust: 1 / 2
 pitch: Nine thousand sol of a dead man's rent has a new owner. She wants to see the paper.
 posted-by: Rue

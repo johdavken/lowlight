@@ -70,9 +70,12 @@ export class FakeNode {
   }
   /** When `start(when)` scheduled it (0 = now). */
   startAt = 0;
-  start(when = 0): void {
+  /** Where in its buffer `start(when, offset)` began (seconds). */
+  startOffset = 0;
+  start(when = 0, offset = 0): void {
     this.started = true;
     this.startAt = when;
+    this.startOffset = offset;
   }
   stop(): void {
     if (this.stopped) throw new Error('already stopped');

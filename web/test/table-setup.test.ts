@@ -408,3 +408,49 @@ describe('SETUP sounds its own moments', () => {
     expect(cue.mock.calls.map((c) => c[0])).toEqual(['crew', 'move', 'go']);
   });
 });
+
+// GO IN on the story table (2026-11-17): the job table's layout. table-trace.css turns it on with `--story-table: 1`; jsdom
+// loads no CSS, so each test sets it on the card, then a fresh offer redraws it as the story table draws it.
+describe('SETUP on the story table', () => {
+  const story = () => {
+    const r = open();
+    $('.tb-setup').style.setProperty('--story-table', '1');
+    r.s.update(OFFER);
+    return r;
+  };
+
+  it('the crew is one PEOPLE list: everyone ready as a row, a click brings them (lit, first) or leaves them; three at most', () => {
+    const { s, onGo } = story();
+    const rows = () => $$('.g-people .tb-slot').map((b) => `${b.dataset.id}${b.classList.contains('ts-wait') ? '+' : ''}${b.dataset.state === 'locked' ? '!' : ''}`);
+    expect(rows()).toEqual(['dez+', 'moss+', 'koji+', 'ash+']);
+    expect($('.ts-ready').hidden).toBe(true);
+    for (const id of ['koji', 'dez', 'moss']) $(`.g-people .tb-slot[data-id="${id}"]`).click();
+    expect(rows()).toEqual(['koji', 'dez', 'moss', 'ash+!']);
+    expect($('.g-people .tb-group-label').textContent).toBe('PEOPLE 3/3');
+    $('.g-people .tb-slot[data-id="ash"]').click();
+    $('.g-people .tb-slot[data-id="dez"]').click();
+    expect(rows()).toEqual(['koji', 'moss', 'dez+', 'ash+']);
+    s.go();
+    expect(onGo).toHaveBeenCalledWith({ approach: 'quiet', people: ['koji', 'moss'], favour: true });
+  });
+
+  it('↑↓ (move) step the way in round, the chosen one open; GO IN sends it', () => {
+    const { s, onGo } = story();
+    const chosen = () => $$('.ts-approach .tb-card').filter((c) => c.getAttribute('aria-expanded') === 'true').map((c) => c.dataset.id);
+    expect(chosen()).toEqual(['quiet']);
+    s.move(1);
+    s.move(1);
+    expect(chosen()).toEqual(['hard']);
+    s.move(1);
+    s.move(-1);
+    expect(chosen()).toEqual(['hard']);
+    s.go();
+    expect(onGo).toHaveBeenCalledWith(expect.objectContaining({ approach: 'hard' }));
+  });
+
+  it('off the story table the crew keeps PEOPLE places and the READY CREW strip', () => {
+    open();
+    expect($('.ts-ready').hidden).toBe(false);
+    expect($$('.g-people .tb-slot').every((b) => b.dataset.state === 'empty')).toBe(true);
+  });
+});

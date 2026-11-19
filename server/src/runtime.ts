@@ -1,3 +1,6 @@
+import type { CastFace } from '../../shared/narration-images';
+import type { Crop } from '../../shared/types';
+import type { Pronoun } from '../../shared/pronoun';
 import type { CaseFile } from '../../shared/cases';
 import type { AccountsFile } from '../../shared/accounts';
 import { fittingPhotos } from '../../shared/photos';
@@ -12,7 +15,8 @@ import type { StockItem } from '../../shared/stock';
 import type { Deck } from '../../shared/gear';
 import type { Program } from '../../shared/programs';
 import type { RoomRegistry } from './rooms';
-import { completeOnce, completeOnceWithUsage, NARRATOR_MAX_TOKENS, NARRATOR_TEMPERATURE } from './scenario';
+import { completeOnce, completeOnceWithUsage, NARRATOR_MAX_TOKENS, NARRATOR_TEMPERATURE, thinksFirst } from './scenario';
+import { MOVES_MAX_TOKENS } from './moves-prompt';
 import { RESIDUAL_TEMPERATURE, RESIDUAL_TIMEOUT_MS, ResidualRunner, plansApply, promisesApply, witnessSceneFor, type WitnessScene } from './residual-runner';
 import type { WrittenThreads } from './cipher-run';
 import type { CompletionMessage } from './turn';
@@ -106,6 +110,8 @@ export interface AgentRuntime {
   modelLabel?: () => Promise<string>;
   /** A direct character: one non-streaming request to her current model (scenario cards' narrator). */
   narrate?: (messages: CompletionMessage[]) => Promise<string>;
+  /** The off-screen beat's one call on her model (spec 2026-11-18 §2): thinking off, unless her model must think. */
+  beat?: (messages: CompletionMessage[]) => Promise<{ text: string; tokensIn: number | null; tokensOut: number | null } | null>;
   /** Probes her provider and updates the room's link status (broadcast to her tabs if it changed). */
   checkHealth(): Promise<void>;
   /** A rebuild's changes go live: the room restores to what the database now holds, and changed panels refresh. */
@@ -173,12 +179,17 @@ export interface RuntimeOptions {
   quests?: {
     book(): QuestEntry[];
     extras?(): Extra[];
+    /** The shared cast list (narration images spec 2026-11-18): recurring people's one face. */
+    cast?(): ReadonlyMap<string, CastFace>;
+    /** A contact's figure for a narration image: its URL and the head crop. Null: no figure. */
+    figureOf?(id: string): { url: string; crop: Crop } | null;
     decks?(): Deck[];
     /** The program catalog (spec 2026-11-02-programs §1.6). */
     programs?(): Program[];
     placeOf(sceneId: string): string | null;
     placeName(placeId: string): string;
     contactName(id: string): string;
+    contactPronoun?(id: string): Pronoun;
     /** Small jobs (spec 2026-10-19): a place's district, the terminal words, the fixers' stock. */
     districtOf?(placeId: string): string | null;
     words?(): string[];
@@ -213,6 +224,8 @@ export interface RuntimeOptions {
     districtName?(id: string): string;
     /** Voiced job beats: the recorded clips for a row's texts. */
     clips?(quest: string, texts: readonly string[]): string[];
+    /** A job's GO IN page clip (its pitch and brief, voiced), or null. */
+    setupVoice?(quest: string): string | null;
   };
 }
 
@@ -682,6 +695,19 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
     tie: (p) => cp?.tieFor(id, p) ?? null,
     // The story clock: each turn's row is stamped with it, and every tab hears it move.
     ...(cp ? { witnessedLine: witnessedNow } : {}),
+    // Off-screen moves (spec 2026-11-18 §4.3, §5): only the active playthrough's player hears them.
+    ...(cp
+      ? {
+          movesSince: (p: string) => {
+            const now = cp.clockNow();
+            return now !== null && cp.playerNow() === p ? cp.movesSince(id, now) : null;
+          },
+          wordLine: (p: string) => {
+            const now = cp.clockNow();
+            return now !== null && cp.playerNow() === p ? cp.wordFor(id, now) : null;
+          },
+        }
+      : {}),
     ...(cp
       ? {
           witnessedScene: (p: string) => {
@@ -718,10 +744,13 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             contact: id,
             book: () => opts.quests!.book(),
             extras: () => opts.quests!.extras?.() ?? [],
+            ...(opts.quests!.cast ? { cast: () => opts.quests!.cast!() } : {}),
+            ...(opts.quests!.figureOf ? { figureOf: (cid: string) => opts.quests!.figureOf!(cid) } : {}),
             status: (p: string) => cp.questStatus(p) ?? [],
             placeId: () => opts.quests!.placeOf(room.state.sceneId),
             placeName: (pid: string) => opts.quests!.placeName(pid),
             contactName: (cid: string) => opts.quests!.contactName(cid),
+            contactPronoun: (cid: string) => opts.quests!.contactPronoun?.(cid) ?? 'they',
             ctx: (p: string) => {
               const status = cp.questStatus(p);
               if (status === null) return null;
@@ -762,6 +791,7 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
             ...(opts.quests!.crewToldUntil ? { crewToldUntil: opts.quests!.crewToldUntil } : {}),
             ...(opts.quests!.districtName ? { districtName: (id: string) => opts.quests!.districtName!(id) } : {}),
             ...(opts.quests!.clips ? { clips: (quest: string, texts: readonly string[]) => opts.quests!.clips!(quest, texts) } : {}),
+            ...(opts.quests!.setupVoice ? { setupVoice: (quest: string) => opts.quests!.setupVoice!(quest) } : {}),
           },
         }
       : {}),
@@ -831,6 +861,8 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
                 },
               }
             : {}),
+          // Once the cut went through, the world undoes later off-screen beats (off-screen moves spec §3, review M3).
+          onRewound: () => cp.rewound(),
           beforeRewind: () => cp.checkpointNow({ trigger: 'rewind', contactId: id, name: 'Before rewind' }),
         }
       : {}),
@@ -934,6 +966,12 @@ export function createAgentRuntime(rec: AgentRecord, rooms: RoomRegistry, opts: 
           modelLabel: () => catalog.labelSoon(routeNow(modelStore.get())?.model ?? modelStore.get(), 1_500),
           narrate: (messages: CompletionMessage[]) =>
             completeOnce({ ...wire(), messages, temperature: NARRATOR_TEMPERATURE, maxTokens: NARRATOR_MAX_TOKENS, ...narratorThinking() }),
+          beat: async (messages: CompletionMessage[]) => {
+            // No key, no route: a quiet skip, never a request that fails (final review I1).
+            if (!routeNow(modelStore.get()) && !apiKey()) return null;
+            const w = wire();
+            return completeOnceWithUsage({ ...w, messages, temperature: NARRATOR_TEMPERATURE, maxTokens: MOVES_MAX_TOKENS, thinking: thinksFirst(w.model) ? 'low' : 'off' });
+          },
         }
       : {}),
     ...(picker ? { models: picker } : {}),

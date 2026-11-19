@@ -77,6 +77,15 @@ describe('residentInfo', () => {
     expect(info.sprite.outfitByScene).toEqual({ 'karasu/noodle-stall': 'work' });
     expect(info.thumb).toBe('/api/residents/hae/thumb');
   });
+
+  it('her sprite ref carries no lights when her character.json sets none', () => {
+    expect(residentInfo(loadResidents(CHARACTERS, warn).get('hae')!).sprite).not.toHaveProperty('lights');
+  });
+
+  it('her sprite ref carries her face point (breath on the figures)', () => {
+    const rec = loadResidents(CHARACTERS, warn).get('hae')!;
+    expect(residentInfo(rec).sprite.face).toEqual(rec.face);
+  });
 });
 
 describe('a resident\'s snapped art', () => {
@@ -89,6 +98,19 @@ describe('a resident\'s snapped art', () => {
     expect(residentInfo(loadResidents(root, warn).get('hae')!).sprite).not.toHaveProperty('pixel');
     fs.writeFileSync(file, JSON.stringify({ ...c, sprite: { ...c.sprite, pixel: true } }));
     expect(residentInfo(loadResidents(root, warn).get('hae')!).sprite.pixel).toBe(true);
+  });
+});
+
+describe('a resident\'s mirror', () => {
+  it('is on unless her file turns it off', () => {
+    fs.cpSync(path.join(CHARACTERS, 'hae'), path.join(root, 'hae'), { recursive: true });
+    const file = path.join(root, 'hae', 'character.json');
+    const c = JSON.parse(fs.readFileSync(file, 'utf8'));
+    const { mirror: _, ...plain } = c.sprite;
+    fs.writeFileSync(file, JSON.stringify({ ...c, sprite: plain }));
+    expect(residentInfo(loadResidents(root, warn).get('hae')!).sprite.mirror).toBe(true);
+    fs.writeFileSync(file, JSON.stringify({ ...c, sprite: { ...plain, mirror: false } }));
+    expect(residentInfo(loadResidents(root, warn).get('hae')!).sprite).not.toHaveProperty('mirror');
   });
 });
 

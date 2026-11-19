@@ -74,6 +74,18 @@ describe('settings', () => {
     expect(JSON.parse(fs.readFileSync(file(d), 'utf8'))).not.toHaveProperty('narratorThinking');
   });
 
+  it('worldMoves is on by default, persists off, and on leaves no field (off-screen moves spec §6)', () => {
+    const d = tempDir('nix-set-');
+    const s = openSettings(d);
+    expect(s.worldMoves()).toBe(true);
+    s.setWorldMoves(false);
+    expect(openSettings(d).worldMoves()).toBe(false);
+    expect(JSON.parse(fs.readFileSync(file(d), 'utf8')).worldMoves).toBe(false);
+    s.setWorldMoves(true);
+    expect(openSettings(d).worldMoves()).toBe(true);
+    expect(JSON.parse(fs.readFileSync(file(d), 'utf8'))).not.toHaveProperty('worldMoves');
+  });
+
   it('replyLength and chatThinking default to normal and auto, persist, and leave no field at the default', () => {
     const d = tempDir('nix-set-');
     const s = openSettings(d);

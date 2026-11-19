@@ -327,5 +327,12 @@
       "to": "velvet/glass-orchid",
       "way": "down the back stairs to the floor"
     }
-  ]
+  ],
+  "figureLight": {
+    "key": {
+      "side": "left",
+      "height": 0.1,
+      "strength": 0.6
+    }
+  }
 }

@@ -99,6 +99,12 @@ describe('DevPanel', () => {
     expect(send).toHaveBeenCalledWith({ type: 'dev_action', tool: 'power_out', args: {} });
   });
 
+  it('+NERVE gives one NERVE back (for testing Graft)', () => {
+    const { root, send } = setup();
+    root.querySelector<HTMLButtonElement>('.dp-nerve-up')!.click();
+    expect(send).toHaveBeenCalledWith({ type: 'dev_action', tool: 'nerve_up', args: {} });
+  });
+
   it('backtick toggles the panel when the chat input is whitespace-only', () => {
     const { chatTa, panel } = setup();
     chatTa.value = '   \n\t ';

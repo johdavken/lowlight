@@ -153,7 +153,7 @@ describe('loadAgents', () => {
       png(path.join(charactersDir, 'nix', 'sprite.png'));
       setChar({ sprite: { src: 'sprite.png' } });
       const rec = byId('nix');
-      expect(rec.info.sprite).toEqual({ url: '/api/agents/nix/sprite', crop: { top: 0, bottom: 0.5 } });
+      expect(rec.info.sprite).toEqual({ url: '/api/agents/nix/sprite', crop: { top: 0, bottom: 0.5 }, face: { x: 0.5, y: 0.08 }, mirror: true });
       expect(rec.sprite).toEqual({ file: path.join(charactersDir, 'nix', 'sprite.png'), crop: { top: 0, bottom: 0.5 }, expressions: {}, outfits: {}, outfitByScene: {}, outfitWears: {} });
     });
 
@@ -193,6 +193,16 @@ describe('loadAgents', () => {
       expect(byId('nix').info.sprite).not.toHaveProperty('waist');
     });
 
+    it('a contact is mirrored unless sprite.mirror is false', () => {
+      png(path.join(charactersDir, 'nix', 'sprite.png'));
+      setChar({ sprite: { src: 'sprite.png' } });
+      expect(byId('nix').info.sprite).toMatchObject({ mirror: true });
+      setChar({ sprite: { src: 'sprite.png', mirror: true } });
+      expect(byId('nix').info.sprite).toMatchObject({ mirror: true });
+      setChar({ sprite: { src: 'sprite.png', mirror: false } });
+      expect(byId('nix').info.sprite).not.toHaveProperty('mirror');
+    });
+
     it('a snapped sprite (sprite.pixel) reaches her sprite ref as pixel: true; anything else sends nothing', () => {
       png(path.join(charactersDir, 'nix', 'sprite.png'));
       setChar({ sprite: { src: 'sprite.png', pixel: true } });
@@ -207,8 +217,36 @@ describe('loadAgents', () => {
       png(path.join(charactersDir, 'nix', 'sprite.png'));
       setChar({ sprite: { src: 'sprite.png', waist } });
       const rec = byId('nix');
-      expect(rec.info.sprite).toEqual({ url: '/api/agents/nix/sprite', crop: { top: 0, bottom: 0.5 } });
+      expect(rec.info.sprite).toEqual({ url: '/api/agents/nix/sprite', crop: { top: 0, bottom: 0.5 }, face: { x: 0.5, y: 0.08 }, mirror: true });
       expect(warnings.some((w) => w.includes('sprite.waist'))).toBe(true);
+    });
+
+    it('sprite.lights (clicked lights on the figures) go on her sprite ref; none when unset', () => {
+      png(path.join(charactersDir, 'nix', 'sprite.png'));
+      const lights = [
+        { x: 0.6, y: 0.08, r: 0.012, color: '#ff8800' },
+        { x: 0.44, y: 0.07, r: 0.01, color: '#FF2244' },
+      ];
+      setChar({ sprite: { src: 'sprite.png', lights } });
+      expect(byId('nix').info.sprite!.lights).toEqual([lights[0], { ...lights[1], color: '#ff2244' }]);
+      setChar({ sprite: { src: 'sprite.png' } });
+      expect(byId('nix').info.sprite).not.toHaveProperty('lights');
+    });
+
+    it('a bad light is dropped with a warning; the good ones and the sprite stay', () => {
+      png(path.join(charactersDir, 'nix', 'sprite.png'));
+      const good = { x: 0.6, y: 0.08, r: 0.012, color: '#ff8800' };
+      setChar({ sprite: { src: 'sprite.png', lights: [good, { x: 0.5, y: 0.1, r: 0.5, color: '#fff' }, { x: 0.5, y: 0.1, r: 0.01 }, { x: 2, y: 0.1, r: 0.01, color: '#fff' }] } });
+      expect(byId('nix').info.sprite!.lights).toEqual([good]);
+      expect(warnings.filter((w) => w.includes('sprite.lights')).length).toBe(3);
+    });
+
+    it('at most six lights; the rest are dropped with a warning', () => {
+      png(path.join(charactersDir, 'nix', 'sprite.png'));
+      const l = (i: number) => ({ x: 0.1 * i + 0.05, y: 0.1, r: 0.01, color: '#00ffcc' });
+      setChar({ sprite: { src: 'sprite.png', lights: [0, 1, 2, 3, 4, 5, 6].map(l) } });
+      expect(byId('nix').info.sprite!.lights).toHaveLength(6);
+      expect(warnings.some((w) => w.includes('sprite.lights'))).toBe(true);
     });
 
     it('agents without a sprite have none', () => {

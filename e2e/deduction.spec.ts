@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { awaitGreeting, DIRECT, goIn, skipSplash, startQuest } from './fixtures';
+import { awaitGreeting, DIRECT, goIn, skipSplash, startQuest, pickCard } from './fixtures';
 
 // The deduction board (spec 2026-11-09): earn cards, file a clash, name, file, accuse, land on the verdict's outcome.
 // A Rue playthrough of its own: the fixture job is for: rue, so no other spec meets it.
@@ -23,7 +23,7 @@ test('the board: earn cards, file a clash, name, file, accuse, land on the outco
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Board Test');
   await goIn(page);
-  await page.locator('.tb-card[data-choice="look"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="look"]'));
 
   // The board: three cards held, two missing face down.
   const board = page.locator('.tb-dboard');
@@ -114,7 +114,7 @@ test('ACCUSE stays clear of the fan with a full hand and three long deductions f
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Board Test');
   await goIn(page);
-  await page.locator('.tb-card[data-choice="look"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="look"]'));
   const board = page.locator('.tb-dboard');
   await expect(board.locator('.dd-hand .dd-card')).toHaveCount(14);
   await expect(board.locator('.dd-suspect.on .dd-bslot.full')).toHaveCount(3);

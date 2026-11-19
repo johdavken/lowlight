@@ -55,6 +55,7 @@
 }
 .solo-text { min-width: 0; }
 .solo-name { font-size: 30px; letter-spacing: 0.15em; color: var(--a); }
+.solo-rec { margin-left: 12px; font-size: 16px; letter-spacing: 0.25em; color: var(--ui-red, #ff4d4d); vertical-align: middle; }
 .solo-last { margin-left: 12px; font-size: 16px; letter-spacing: 0.25em; color: var(--p1); vertical-align: middle; }
 .solo-line { overflow: hidden; font-family: var(--mono); font-size: 15px; color: #cfc4e6; text-overflow: ellipsis; white-space: nowrap; }
 .solo-error { min-height: 1.2em; margin: 8px 0; font-size: 18px; letter-spacing: 0.15em; color: #ff4f80; }

@@ -210,6 +210,22 @@ export const sceneSchema = z
     /** A venue's hours (story moods spec §5): last call, closing and closed follow them. */
     // A bad value is dropped, not the room (the loader says so): a typo mustn't strand a contact's start room.
     hours: z.object({ open: hhmm, close: hhmm }).strict().optional().catch(undefined),
+    /** How the room lights the stage figures (figure lighting spec §3). */
+    figureLight: z
+      .object({
+        key: z
+          .union([
+            z.enum(['auto', 'off']),
+            z.object({ side: z.enum(['left', 'right']), height: unit(), color: hexSchema.optional(), strength: unit() }).strict(),
+          ])
+          .optional(),
+        keyStrength: unit().optional(),
+        depth: z.number().min(0).max(600).optional(),
+        rim: z.number().min(0).max(2).optional(),
+        breath: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     /** Small things that happen or can be noticed here, one per turn in rotation (shared/room-details.ts). */
     details: z.array(z.string().trim().min(1).max(ROOM_DETAIL_MAX)).max(ROOM_DETAILS_MAX).optional(),
   })

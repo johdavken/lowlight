@@ -48,10 +48,10 @@ export function freeDraw(o: { crew: CrewState; book: CrewBook; seed: string; ext
   return { book: o.book, seed: o.seed, faces: o.extras, usedFaces, usedNames, origins: o.districts };
 }
 
-/** Whether a job's free card is up and nobody's taken it (crew spec §5): the CREW word's dot. */
-export function freeHireWaiting(o: { crew: CrewState; seed: string; jobCards: { runKey: string; endAt: number }[]; now: number }): boolean {
+/** Whether a job's free card is up and nobody's taken it (crew spec §5): the CREW word's dot. A `kept` card (a once job's: a story's hire) waits past 06:00 until it's hired (playtest). */
+export function freeHireWaiting(o: { crew: CrewState; seed: string; jobCards: { runKey: string; endAt: number; kept?: true }[]; now: number }): boolean {
   const hired = new Set(o.crew.members.map((m) => m.recruit.id));
-  return o.jobCards.some((j) => o.now >= j.endAt && o.now < nextSixAfter(j.endAt) && !hired.has(jobRecruitId(o.seed, j.runKey)));
+  return o.jobCards.some((j) => o.now >= j.endAt && (j.kept || o.now < nextSixAfter(j.endAt)) && !hired.has(jobRecruitId(o.seed, j.runKey)));
 }
 
 export function crewView(o: {
@@ -74,7 +74,7 @@ export function crewView(o: {
   /** `tier`: the district's rep tier as the story week began, so the card holds all week; absent: tonight's. */
   vouchers?: { contact: string; name: string; accent?: string; place: string; placeName: string; district: string; spec: Specialty | null; tier?: 1 | 2 | 3 | 4 }[];
   /** Ended job runs whose outcome gave `gives: recruit` (crew spec §5); each shows until the next 06:00 after `endAt`. */
-  jobCards?: ({ runKey: string; title: string; place: string; placeName: string; district: string; endAt: number } & JobHire)[];
+  jobCards?: ({ runKey: string; title: string; place: string; placeName: string; district: string; endAt: number; kept?: true } & JobHire)[];
   /** Whether any spring file is written (SPRING THEM needs one). */
   springs?: boolean;
   /** Recruits whose rescue is under way (`rescueOpen`): SPRING THEM waits for it, across 06:00. */
@@ -149,7 +149,7 @@ export function crewView(o: {
       if (fresh(c)) hires.push({ place: v.place, name: v.placeName, district: v.district, cards: [c], vouched: { contact: v.contact, name: v.name, ...(v.accent ? { accent: v.accent } : {}) } });
     }
     for (const j of o.jobCards ?? []) {
-      if (o.now < j.endAt || o.now >= nextSixAfter(j.endAt)) continue;
+      if (o.now < j.endAt || (!j.kept && o.now >= nextSixAfter(j.endAt))) continue;
       const c = jobRecruitCard({ ...free, ...j });
       if (!fresh(c)) continue;
       const at = hires.find((h) => h.place === j.place && !h.vouched);

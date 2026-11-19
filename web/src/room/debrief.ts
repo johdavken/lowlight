@@ -110,7 +110,7 @@ const PAY_CUE_MS = 700;
 const KEEP_CUE_MS = 1900;
 
 /** Counts `node` up to `to` (`N SOL`), or sets it. */
-function countUp(node: HTMLElement, to: number, reduced: boolean): void {
+export function countUp(node: HTMLElement, to: number, reduced: boolean): void {
   const say = (n: number) => (node.textContent = `${n < 0 ? `−${-n}` : n} SOL`);
   say(reduced ? to : 0);
   if (reduced || to === 0) return;
@@ -214,10 +214,12 @@ export function debriefEl(d: Debrief, o: { cue(name: 'clean' | 'messy' | 'blown'
   if (d.loot) sums.append(el('div', 'db-loot', `A LOT OF ${d.loot.label}${d.loot.lost ? ' · NO ROOM IN THE STASH' : ''}`));
   totals.append(sums);
   if (d.heat.delta !== 0) totals.append(...heatLines(d));
-  // A trust job (Intake board spec §2): her word when it changed, and no rep line (rep doesn't move).
-  if (d.trust !== undefined) {
-    if (d.trust) totals.append(el('div', 'db-trust', `${d.trust.name.toUpperCase()} · ${d.trust.before.toUpperCase()} → ${d.trust.after.toUpperCase()}`));
-  } else {
+  // A judging clock (Kroll's desk): what it decided, whatever her word does.
+  if (d.judge) totals.append(el('div', `db-judge${d.judge.delta > 0 ? ' up' : d.judge.delta < 0 ? ' down' : ''}`, `${d.judge.label} ${d.judge.value}/${d.judge.size}${d.judge.words ? ` · ${d.judge.words}` : ''}`));
+  // Her word when it changed (a trust job, Intake board spec §2, or a judging clock).
+  if (d.trust) totals.append(el('div', 'db-trust', `${d.trust.name.toUpperCase()} · ${d.trust.before.toUpperCase()} → ${d.trust.after.toUpperCase()}`));
+  // No rep line only on a trust: stake job (rep doesn't move); a judging clock leaves rep paid.
+  if (d.trust === undefined || d.judge) {
     totals.append(el('div', 'db-rep', `REP ${upper(d.rep.district)} ${d.rep.before} → ${d.rep.after}`));
     const [was, now] = [repTier(d.rep.before), repTier(d.rep.after)];
     if (was !== now) totals.append(el('div', 'db-cross', `${upper(d.rep.district)} · ${TIER_NAMES[was - 1]} → ${TIER_NAMES[now - 1]}`));

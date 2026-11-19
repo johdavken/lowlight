@@ -1201,6 +1201,8 @@ describe('schedules', () => {
     const s = await start({ others: ['cass'], prepare });
     const player = s.built.world.active()!.player;
     await s.api('POST', '/api/playthroughs', { player, startContact: 'cass' });
+    // These tests WAIT past even hours: no background beat against the stub (off-screen moves minor M6).
+    expect((await s.api('PUT', '/api/world-moves', { on: false })).status).toBe(200);
     // Nix known from the start, so she's listed as a contact (a tie).
     return s;
   }
@@ -1357,6 +1359,121 @@ describe('schedules', () => {
     expect(whereIs(s, 'nix')).toBe('karasu/lowlight-intake');
     await wait(s, { until: '05:00' }); // the 04:00 block started
     expect(whereIs(s, 'nix')).toBe('karasu/ribbon-rooftop');
+  });
+
+  // Off-screen moves (spec 2026-11-18 §4.1, §5).
+  const going = (beat: number, until: number, place = 'karasu/lowlight-intake') => ({ beat, at: beat - 20, who: 'nix', line: 'x', place: 'karasu/noodle-stall', effect: { kind: 'going' as const, place, until } });
+
+  it('a going move places her from its beat until its end, over her schedule', async () => {
+    const s = await world();
+    const w = s.built.world;
+    s.built.playthroughs.setMoves(w.active()!.id, [going(1440, 1560)], 1440);
+    expect(w.placeAt('nix', 1500)).toBe('karasu/lowlight-intake');
+    // Before its beat ran, the map already showed her at the stall: that stands.
+    expect(w.placeAt('nix', 1430)).toBe('karasu/noodle-stall');
+  });
+
+  it('when a going move ends she stays where it took her until her next block starts', async () => {
+    const s = await world();
+    const w = s.built.world;
+    s.built.playthroughs.setMoves(w.active()!.id, [going(1440, 1560)], 1440);
+    expect(w.placeAt('nix', 1580)).toBe('karasu/lowlight-intake');
+    // 04:00 the next day: her roof block starts.
+    expect(w.placeAt('nix', 1440 + 250)).toBe('karasu/ribbon-rooftop');
+  });
+
+  it("a going move from before you last left her doesn't count: you were with her since", async () => {
+    const s = await world();
+    const w = s.built.world;
+    const id = w.active()!.id;
+    s.built.playthroughs.setMoves(id, [going(1440, 1560)], 1440);
+    s.built.playthroughs.setParted(id, { nix: 1500 });
+    expect(w.placeAt('nix', 1520)).not.toBe('karasu/lowlight-intake');
+    expect(w.placeAt('nix', 1580)).not.toBe('karasu/lowlight-intake');
+  });
+
+  it('walking in keeps the parting it ended as since; a since later than the clock never happened', async () => {
+    const s = await world();
+    const w = s.built.world;
+    w.setLocation('nix');
+    await wait(s, { minutes: 60 });
+    w.setLocation('cass');
+    const left = w.active()!.parted!.nix;
+    expect(left).toBe(1260);
+    await wait(s, { minutes: 30 });
+    w.setLocation('nix');
+    expect(w.active()!.since).toEqual({ nix: 1260 });
+    expect(w.active()!.parted?.nix).toBeUndefined();
+    s.built.playthroughs.setSince(w.active()!.id, { nix: 1260, cass: 99999 });
+    w.clockChanged();
+    expect(w.active()!.since).toEqual({ nix: 1260 });
+  });
+
+  it('only a rewind undoes a beat: later beats go; a regenerate leaves them waiting (off-screen moves spec §3)', async () => {
+    const s = await world();
+    const w = s.built.world;
+    const id = w.active()!.id;
+    const mv = (beat: number) => ({ beat, at: beat - 20, who: 'nix', line: 'x', place: 'karasu/noodle-stall' });
+    // The clock is at 20:00 (1200): both beats are later than it.
+    s.built.playthroughs.setMoves(id, [mv(1320), mv(1440)], 1440);
+    w.clockChanged();
+    expect(w.active()!.moves?.map((m) => m.beat)).toEqual([1320, 1440]);
+    w.rewound();
+    w.clockChanged();
+    expect(w.active()!.moves).toBeUndefined();
+    expect(w.active()!.beat).toBeUndefined();
+  });
+
+  it("a rewind's flag is spent on the next clock change, even when nothing goes (Review Focus 4)", async () => {
+    const s = await world();
+    const w = s.built.world;
+    const id = w.active()!.id;
+    s.built.playthroughs.setMoves(id, [{ beat: 1320, at: 1300, who: 'nix', line: 'x', place: 'karasu/noodle-stall' }], 1320);
+    await wait(s, { minutes: 150 }); // 22:30: the beat stands
+    w.rewound();
+    w.clockChanged();
+    expect(w.active()!.beat).toBe(1320);
+    s.built.playthroughs.setMoves(id, [{ beat: 1440, at: 1400, who: 'nix', line: 'x', place: 'karasu/noodle-stall' }], 1440);
+    w.clockChanged();
+    expect(w.active()!.beat).toBe(1440);
+  });
+
+  it('a rewind keeps a beat that ran with no moves, so it never runs again (Tasks 3–4 review I1)', async () => {
+    const s = await world();
+    const w = s.built.world;
+    const id = w.active()!.id;
+    const mv = (beat: number) => ({ beat, at: beat - 20, who: 'nix', line: 'x', place: 'karasu/noodle-stall' });
+    // Beats at 22:00 (moves), 00:00 (none), 02:00 (moves); the clock goes back to 01:00.
+    s.built.playthroughs.setMoves(id, [mv(1320), mv(1560)], 1560);
+    s.built.playthroughs.setClockFloor(id, 1500);
+    w.rewound();
+    w.clockChanged();
+    expect(w.active()!.moves?.map((m) => m.beat)).toEqual([1320]);
+    expect(w.active()!.beat).toBe(1440);
+  });
+
+  it('when a going ends, a block that started while she was away places her (Tasks 3–4 review M2)', async () => {
+    const s = await world();
+    const w = s.built.world;
+    // A going from 02:00 to 05:00; her roof block starts at 04:00, during it.
+    s.built.playthroughs.setMoves(w.active()!.id, [going(1560, 1740)], 1560);
+    expect(w.placeAt('nix', 1700)).toBe('karasu/lowlight-intake');
+    expect(w.placeAt('nix', 1750)).toBe('karasu/ribbon-rooftop');
+  });
+
+  it("her since line and the word another contact hears (off-screen moves spec §4.3, §5)", async () => {
+    const s = await world();
+    const w = s.built.world;
+    const id = w.active()!.id;
+    await wait(s, { minutes: 150 }); // 22:30
+    const word = { beat: 1320, at: 1250, who: 'nix', line: 'Paid off the stall boss.', place: 'karasu/noodle-stall', effect: { kind: 'word' as const } };
+    s.built.playthroughs.setMoves(id, [word], 1320);
+    expect(w.movesSince('nix', w.clockNow()!)).toContain('20:50 Paid off the stall boss.');
+    expect(w.movesSince('cass', w.clockNow()!)).toBeNull();
+    // Cass (you're with her, so her room is open) is in Karasu: she heard. Nix never hears her own word.
+    await s.built.runtime('cass');
+    expect(w.wordFor('cass', w.clockNow()!)).toContain('Paid off the stall boss., 20:50');
+    expect(w.wordFor('nix', w.clockNow()!)).toBeNull();
   });
 
   it('her place on comms: her schedule, never your room (comms plan Task 1)', async () => {

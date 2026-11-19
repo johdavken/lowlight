@@ -280,5 +280,8 @@
       "amount": 0.35,
       "lean": 0.3
     }
-  ]
+  ],
+  "figureLight": {
+    "breath": true
+  }
 }

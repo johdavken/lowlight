@@ -529,6 +529,11 @@
     "bed": {
       "src": "sound/bed.ogg",
       "level": 0.4
+    },
+    "music": {
+      "songs": [
+        "Time by the Freight.ogg"
+      ]
     }
   },
   "effects": [
@@ -582,5 +587,8 @@
       "to": "spine/deck-market",
       "way": "along the pylons to the deck market"
     }
-  ]
+  ],
+  "figureLight": {
+    "breath": true
+  }
 }

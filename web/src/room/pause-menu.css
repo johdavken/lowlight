@@ -98,7 +98,7 @@
 .pause-menu .sys-paged .sys-head { position: relative; display: flex; align-items: center; gap: 12px; padding: 6px 0 4px 30px; font: 15px/1 var(--pixel); letter-spacing: 0.34em; color: var(--c); text-shadow: 0 0 8px color-mix(in srgb, var(--c) 40%, transparent); }
 .pause-menu .sys-paged .sys-head::before { content: ''; position: absolute; left: 1px; top: 50%; width: 7px; height: 7px; margin-top: -4px; background: var(--c); transform: rotate(45deg); box-shadow: 0 0 6px var(--c); }
 .pause-menu .sys-paged .sys-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--c) 40%, transparent), transparent 70%); }
-.pause-menu .sys-paged .sys-row { position: relative; gap: 14px; padding: 3px 0 3px 30px; white-space: nowrap; text-shadow: 0 1px 2px #000; background: none; box-shadow: none; }
+.pause-menu .sys-paged .sys-row { position: relative; gap: 14px; padding: 2px 0 2px 30px; white-space: nowrap; text-shadow: 0 1px 2px #000; background: none; box-shadow: none; }
 .pause-menu .sys-paged .sys-row::before { content: ''; position: absolute; left: 4px; top: 50%; width: 9px; height: 1px; background: color-mix(in srgb, var(--c) 60%, transparent); }
 .pause-menu .sys-paged .sys-label { margin-right: 0; color: inherit; }
 .pause-menu .sys-paged .sys-line { display: block; flex: 1; min-width: 20px; height: 1px; }

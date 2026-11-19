@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { awaitGreeting, DIRECT, expectTableClear, goIn, send, settleCostStep, skipSplash, startQuest } from './fixtures';
+import { awaitGreeting, DIRECT, expectDiceOnFloor, expectTableClear, goIn, send, settleCostStep, skipSplash, startQuest } from './fixtures';
 
 // The tier cut (spec 2026-11-03): Two Step at the Intake (e2e/serve.ts), in a playthrough of its own as Cass, who starts
 // Trusted in Karasu (NIX_TEST_REP), so the other specs' player keeps a Nobody's boards. Two Step is `for: cass`, so it lists
@@ -56,7 +56,7 @@ test('tier 2: SETUP says so, a card shows the cut, a called recruit lifts it (ti
   await startQuest(page, 'Two Step');
   await expect(page.locator('.ts-tierline')).toContainText('TIER 2');
   await page.screenshot({ path: 'test-results/tier-setup.png' });
-  await page.locator(`.ts-ready .tb-slot[data-id="${rid}"]`).click();
+  await page.locator(`.g-people .tb-slot.ts-wait[data-id="${rid}"]`).click();
   await goIn(page);
 
   const talk = page.locator('.tb-card[data-choice="talk"]');
@@ -124,6 +124,8 @@ test('SETUP: the printed approach cards clear the JOB column, the hand and GO IN
     for (const c of cards) {
       const pic = box(c.querySelector('.tbc-print')!);
       for (const t of c.querySelectorAll('.tbc-body > *')) {
+        // A closed way in on the story table hides what goes wrong: only the words shown count.
+        if (!(t as HTMLElement).offsetParent) continue;
         const r = document.createRange();
         r.selectNodeContents(t);
         const b = r.getBoundingClientRect();
@@ -147,7 +149,7 @@ test('the table stays clear with a hand up: the deal, each roll, its costs (posi
   await expect(page.locator('.crew-screen')).toBeHidden();
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Two Step');
-  await page.locator(`.ts-ready .tb-slot[data-id="${rid}"]`).click();
+  await page.locator(`.g-people .tb-slot.ts-wait[data-id="${rid}"]`).click();
   await goIn(page);
 
   const playable = page.locator('.tb-deal > .tb-card:has(.tb-odds):not(.none)');
@@ -192,9 +194,7 @@ test('the table stays clear with a hand up: the deal, each roll, its costs (posi
     await page.waitForTimeout(200);
     await page.screenshot({ path: `test-results/clear-${beat}-roll.png` });
     await expectTableClear(page, `beat ${beat}: the roll landed`);
-    const hand = (await page.locator('.tb-hand').boundingBox())!;
-    const box = (await dice.boundingBox())!;
-    expect(box.y + box.height).toBeLessThanOrEqual(hand.y);
+    await expectDiceOnFloor(page, dice, `beat ${beat}`);
     // The next beat's deal lands once the result has had its hold.
     await page.waitForTimeout(2_000);
   }

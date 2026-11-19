@@ -10,7 +10,7 @@ import { openDb, type Db } from '../src/db';
 import { ChatRelay, type ChatRelayDeps } from '../src/chat-relay';
 import { fakePlayers } from './fixtures/players';
 import { Journal } from '../src/journal';
-import { LIGHTS_LINE, SCENE_GREET_INSTRUCTIONS, jobTextLine } from '../src/instructions';
+import { LIGHTS_LINE, SCENE_GREET_INSTRUCTIONS, jobTextLine, moveTextLine } from '../src/instructions';
 import { writeSummary } from '../src/summary';
 import type { Backend, TurnRequest } from '../src/backend';
 import type { ChatMessage, ServerEvent } from '../../shared/types';
@@ -553,5 +553,34 @@ describe('a job text (job texts spec §3)', () => {
     expect(await send(relay)).toMatchObject({ ok: false });
     expect(texts(db)).toEqual([]);
     expect(db.getMeta('told.hicks.arrears')).toBeNull();
+  });
+});
+
+// Move texts (off-screen moves spec §4.2): something she did off-screen, and she'd tell you.
+describe('a move text (off-screen moves spec §4.2)', () => {
+  const send = (relay: ChatRelay) => relay.sendMoveText('hicks', { about: 'the drive', due: 1320 });
+  it('writes a hidden row stamped at the beat, and her reply is her text', async () => {
+    const { relay, db, reqs } = relayWith(['found it. come by.']);
+    expect(await send(relay)).toMatchObject({ ok: true });
+    const rows = texts(db);
+    expect(rows[0]).toMatchObject({ role: 'user', mode: 'text', promised: true, clock: 1320, text: moveTextLine({ you: 'hicks', about: 'the drive' }) });
+    expect(reqs[0].messages.at(-1)!.content).toContain('something you did while you were apart: the drive');
+    expect(rows[1]).toMatchObject({ role: 'agent', text: 'found it. come by.' });
+    // Not a job: nothing told.
+    expect(db.writes().some((w) => w.key.startsWith('told.'))).toBe(false);
+  });
+  it("doesn't spend or mark a standing promise, sent or cut", async () => {
+    const { relay, db } = relayWith(['found it.']);
+    const kept = JSON.stringify({ when: { at: 2000 }, about: 'x', from: 'p1', since: 900 });
+    db.setMeta('promise.hicks', kept);
+    await send(relay);
+    expect(db.getMeta('promise.hicks')).toBe(kept);
+    expect(await relay.deleteTexts('hicks', texts(db).at(-1)!.id)).toMatchObject({ ok: true });
+    expect(db.getMeta('promisespent.hicks')).toBeNull();
+  });
+  it('a failed move text leaves nothing behind', async () => {
+    const { relay, db } = relayWith(['*sighs*']);
+    expect(await send(relay)).toMatchObject({ ok: false });
+    expect(texts(db)).toEqual([]);
   });
 });

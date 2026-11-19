@@ -1,3 +1,4 @@
+import { withImageTokens } from '../src/room/narration-image';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -122,6 +123,12 @@ describe('quest cards', () => {
 });
 
 describe('the story in the cards panel', () => {
+  it('never prints a narration image token (spec 2026-11-18): the panel shows the prose alone', () => {
+    const h = host();
+    mountQuestCards(h, { onChoose: vi.fn(), onTalk: vi.fn() }).show(ACTIVE, withImageTokens('*Boots on the stairs.*', [{ para: 0, name: 'mirek', url: '/api/extras/local-01' }]));
+    expect(h.querySelector('.qc-story')!.textContent).toBe('Boots on the stairs.');
+  });
+
   it('shows the written text above the cards, and folds on the title', () => {
     const h = host();
     mountQuestCards(h, { onChoose: vi.fn(), onTalk: vi.fn() }).show(ACTIVE, '*Boots on the stairs.* "Evening."');

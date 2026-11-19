@@ -49,6 +49,8 @@ export interface WhoIsWhere {
   inside?: Record<string, SideRoom[]>;
   /** Comms (spec 2026-10-20 §1): on the line now, and whether you can go on it (her deal in force). */
   comms?: { on: boolean; can: boolean; /** Her scheduled room now: a plain GO there. */ herAt?: string | null };
+  /** RECOMMENDED (Kroll's desk spec): a place id → its card's tag, where a recommended contact's job starts. */
+  recommended?: Record<string, string>;
 }
 
 /** `confirm`: in to a place or a district (the camera goes there). `go`: GO, you set off. `fold`: a district folded in the list. `zoom`, `sweep`, `dark`: the MAP panel's own (a wheel step, the camera's long ease, a district blacking out). */

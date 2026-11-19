@@ -4,12 +4,15 @@
  * replies. The box shows one page at a time, which is why beats were taken out of it (f3abcfd0). The table keeps
  * its cards and gets the height back. `job-col` on the feed's root moves her line over, as `has-portrait` does.
  */
+import { decodeImage, IMAGE_MS, placeImageTokens, primeImage, unindentImages } from './narration-image';
 import './job-column.css';
 import { passiveLabels } from '../ui/passive';
 import { markLore } from '../ui/lore-hover';
 import { proseNodes } from './table/el';
 import { DECODE_MS, decodeIn, scrambleIn } from './table/decode';
 import { mountFrame } from '../ui/holo-frame';
+import { typeIn } from '../ui/type-in';
+import type { TextEffect } from '../ui/box-prefs';
 
 /** The name a line shows (`RUE`), from its label (`RUE (ON COMMS)`): being on comms is drawn as a mark, not words. */
 const nameOf = (who: string) => who.replace(/\s*\(ON COMMS\)$/i, '');
@@ -26,6 +29,14 @@ export interface JobColumn {
    * writing); yours stand plain. Each line is kept by `key`, so a redraw doesn't replay its decode.
    */
   setThread(thread: { head: ThreadLine[]; foot: ThreadLine[] }): void;
+  /**
+   * On the crew rules' board (`crew-board` on the stage) new words type in at the box settings' TEXT speed and in its
+   * TEXT EFFECT, as her comms line does (ui/type-in.ts); the story table's page is as it was.
+   */
+  setTextSpeed(scale: number): void;
+  setTextEffect(e: TextEffect): void;
+  /** Shows the rest of what's typing now; true when something was. */
+  finishTyping(): boolean;
 }
 
 /** One line of the talk beside a job: `who` labels it (`RUE (ON COMMS)`, `SOREN`); `you`: the player's, plain. */
@@ -105,10 +116,66 @@ function quoted(text: string): Node[] {
   let at = 0;
   for (const m of text.matchAll(/“[^”\n]*”|"[^"\n]*"/g)) {
     if (m.index > at) out.push(document.createTextNode(text.slice(at, m.index)));
-    out.push(Object.assign(document.createElement('span'), { className: 'jc-t-quote', textContent: m[0] }));
+    // Curled as her replies' words are (talkNodes), so the job's quotes and hers look the same.
+    out.push(Object.assign(document.createElement('span'), { className: 'jc-t-quote', textContent: m[0].startsWith('"') ? `“${m[0].slice(1, -1)}”` : m[0] }));
     at = m.index + m[0].length;
   }
   if (at < text.length) out.push(document.createTextNode(text.slice(at)));
+  return out;
+}
+
+/**
+ * The job's text with the contact's own words (`{{ }}`) told as her replies are (playtest 2026-11-17: her scripted lines
+ * and her generated ones in one voice): each paragraph holding them leaves the NARRATOR block for a block of its own
+ * under her name, ON COMMS, her words in the comms colour and the narration around them (`Ember says.`) in the actions'
+ * grey. The rest of the text stays in NARRATOR blocks, one between each of hers.
+ */
+export function scriptedLines(story: HTMLElement, who: string): HTMLElement[] {
+  if (!who || !story.querySelector('.jc-line')) return [story];
+  // The paragraphs: the text breaks at `\n` + INDENT (draw's join), in its text nodes only.
+  const paras: Node[][] = [[]];
+  for (const n of [...story.childNodes]) {
+    if (!(n instanceof Text) || !n.data.includes('\n')) {
+      paras[paras.length - 1].push(n);
+      continue;
+    }
+    n.data.split('\n').forEach((piece, i) => {
+      if (i) paras.push([]);
+      const t = i ? piece.replace(new RegExp(`^${INDENT}`), '') : piece;
+      if (t) paras[paras.length - 1].push(document.createTextNode(t));
+    });
+  }
+  const out: HTMLElement[] = [];
+  let narr: HTMLElement | null = null;
+  for (const p of paras.filter((x) => x.length)) {
+    const hers = p.some((n) => n instanceof HTMLElement && (n.classList.contains('jc-line') || n.querySelector('.jc-line')));
+    if (!hers) {
+      if (narr) narr.append(document.createTextNode(`\n${INDENT}`));
+      else out.push((narr = Object.assign(document.createElement('div'), { className: 'jc-story' })));
+      narr.append(...p);
+      continue;
+    }
+    narr = null;
+    const block = Object.assign(document.createElement('div'), { className: 'jc-reply jc-scripted' });
+    block.dataset.who = `${who} (ON COMMS)`;
+    block.dataset.name = who;
+    const words = Object.assign(document.createElement('span'), { className: 'jc-reply-text' });
+    // An *italic* stretch reads as the rest of the narration here: its words and lines, unwrapped.
+    const flat = p.flatMap((n) => (n instanceof Element && n.localName === 'em' ? [...n.childNodes] : [n]));
+    for (const n of flat) {
+      if (n instanceof HTMLElement && n.classList.contains('jc-line')) {
+        const t = n.textContent ?? '';
+        words.append(Object.assign(document.createElement('span'), { className: 'jc-t-say', textContent: /^".*"$/s.test(t.trim()) ? `“${t.trim().slice(1, -1)}”` : t }));
+      } else if (n instanceof Text) {
+        // Leading and trailing spaces stay outside the grey, so words don't run together.
+        const t = n.textContent ?? '';
+        if (!t.trim()) words.append(document.createTextNode(t));
+        else words.append(Object.assign(document.createElement('span'), { className: 'jc-t-act', textContent: t }));
+      } else words.append(n);
+    }
+    block.append(words);
+    out.push(block);
+  }
   return out;
 }
 
@@ -151,6 +218,21 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
   body.className = 'jc-body';
   // The fade at the top shows only when there's more above (scrolled down).
   body.addEventListener('scroll', () => col.classList.toggle('jc-more', body.scrollTop > 2), { passive: true });
+  // The board's typing (playtest: "make the page type at the text speed too"): new words only; her noise while she
+  // writes stays as it is; a block's label waits for its first word.
+  const typing = () => layerHost.classList.contains('crew-board');
+  // Narration images (spec 2026-11-18): each is one held step of the typing; with DECODE it clears out of noise.
+  let effect: TextEffect = 'type';
+  const images = new Map<string, HTMLElement>();
+  const typer = typeIn(body, {
+    reduced: () => o.reduced?.() ?? false,
+    active: typing,
+    skip: '.jc-noise',
+    blocks: '.jc-story, .jc-reply, .jc-say',
+    objects: { selector: '.jc-img', ms: IMAGE_MS, reach: (el, ms) => decodeImage(el, effect === 'decode' && !o.reduced?.() ? ms : 0) },
+  });
+  // A click on the page shows the rest, as a click on her text in the box does.
+  body.addEventListener('click', () => void typer.finish());
   col.append(top, body);
   layer.append(col);
   layerHost.append(layer);
@@ -165,8 +247,10 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
   const lineNodesByKey = new Map<string, { node: HTMLElement; decoded: string | null }>();
   /** The text's nodes, with the words on the line drawn apart. */
   const draw = () => {
+    typer.strip();
     // The job's own text under NARRATOR (playtest 2026-11-11), its paragraphs on lines of their own, indented, no blank lines.
-    const nodes = proseNodes(shownText.trim().replace(/\n+/g, `\n${INDENT}`)).flatMap((n) => {
+    // A paragraph an image heads starts flush (unindented), the image first on its line, so its first line wraps too.
+    const nodes = proseNodes(unindentImages(shownText.trim().replace(/\n+/g, `\n${INDENT}`), INDENT)).flatMap((n) => {
       if (n instanceof Text) return lineNodes(n.data, line.who, line.words);
       (n as HTMLElement).replaceChildren(...lineNodes(n.textContent ?? '', line.who, line.words));
       return [n];
@@ -177,9 +261,13 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
     for (const n of nodes) if (n instanceof HTMLElement && n.localName === 'em') n.replaceChildren(...[...n.childNodes].flatMap((c) => (c instanceof Text ? quoted(c.data) : [c])));
     story[0]?.append(...nodes.flatMap((n) => (n instanceof Text ? quoted(n.data) : [n])));
     const of = (ls: ThreadLine[]) => ls.flatMap((l) => lineNodesByKey.get(l.key)?.node ?? []);
-    body.replaceChildren(...of(thread.head), ...story, ...of(thread.foot), ...(shownExtra ? [shownExtra] : []));
+    body.replaceChildren(...of(thread.head), ...(story[0] ? scriptedLines(story[0], line.who) : []), ...of(thread.foot), ...(shownExtra ? [shownExtra] : []));
+    placeImageTokens(body, images);
+    body.classList.toggle('jc-decode', effect === 'decode');
+    for (const el of body.querySelectorAll<HTMLElement>('.jc-img')) primeImage(el);
     passiveLabels(body);
     markLore(body);
+    typer.changed();
   };
   /** A line's words: yours plain; hers noise while she writes, then decoded once into her actions and speech. */
   const fillLine = (l: ThreadLine) => {
@@ -218,8 +306,12 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
     words.replaceChildren(t);
     // Told the traditional way: actions plain, what's said in quotes (talkParts).
     const prose = () => t.replaceChildren(...talkNodes(text));
-    // Yours, an edit of a line already in, or reduced motion: no decode.
-    if (l.you || !first || o.reduced?.()) return prose();
+    // Yours, an edit of a line already in, or reduced motion: no decode. On the board her line types instead (typer).
+    if (l.you || !first || o.reduced?.() || typing()) {
+      prose();
+      if (h.node.isConnected) typer.changed();
+      return;
+    }
     // The letters lock in as the finished text reads, then take their parts' colours.
     decodeIn(t, talkParts(text).plain);
     setTimeout(() => {
@@ -250,6 +342,8 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
     lineNodesByKey.clear();
     shown = '';
     col.classList.remove('jc-new');
+    typer.reset();
+    images.clear();
     col.hidden = true;
     split(false);
   };
@@ -279,6 +373,12 @@ export function mountJobColumn(root: HTMLElement, layerHost: HTMLElement, onLine
       line = { who, words };
       if (!col.hidden) draw();
     },
+    setTextSpeed: (scale) => typer.setTextSpeed(scale),
+    setTextEffect: (e) => {
+      effect = e;
+      typer.setTextEffect(e);
+    },
+    finishTyping: () => typer.finish(),
     setThread(t) {
       const before = [...thread.head, ...thread.foot].map((l) => l.key).join('|');
       const footBefore = thread.foot.map((l) => l.key).join('|');

@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { PNG } from 'pngjs';
 import type { ServerResponse } from 'node:http';
-import { BAD_KEY, DIRECT, SECOND, STUB_OR_LOG_PORT } from './fixtures';
+import { BAD_KEY, DIRECT, E2E_MOVES_PLAYER, SECOND, STUB_OR_LOG_PORT } from './fixtures';
 
 /**
  * A reply long enough to span at least 3 pages of the room's dialogue box: plain prose sentences
@@ -122,6 +122,21 @@ export async function startFakeOpenRouter(opts: { logPort?: number | null } = {}
       // Encounter cards' narrator: three fixed events.
       if ((body as { stream?: boolean }).stream === false && body.messages?.[0]?.content?.startsWith('You write events')) {
         const content = JSON.stringify(E2E_ENCOUNTERS);
+        return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }));
+      }
+      // Off-screen moves' beat (spec 2026-11-18): nobody moves, unless the player is E2E_MOVES_PLAYER. Then the first
+      // mover goes from where the request's spans put her to another place on its list (e2e/moves.spec.ts).
+      if ((body as { stream?: boolean }).stream === false && body.messages?.[0]?.content?.startsWith('You keep the city moving')) {
+        const user = body.messages.at(-1)?.content ?? '';
+        let moves: unknown[] = [];
+        if (user.includes(`[player: ${E2E_MOVES_PLAYER}]`)) {
+          const places = [...(/\[places: (.*)\]/.exec(user)?.[1] ?? '').matchAll(/(\S+) "([^"]+)"/g)].map((m) => ({ id: m[1], name: m[2] }));
+          const mover = /\[mover: (\S+) [^\n]*\n\s*where: (\S+) "[^"]*" (\d\d:\d\d)–/.exec(user);
+          const from = mover ? places.find((p) => p.id === mover[2]) : undefined;
+          const to = places.find((p) => p.id !== from?.id);
+          if (mover && from && to) moves = [{ id: mover[1], at: mover[3], line: 'Walked out on a bad deal.', place: from.id, effect: { kind: 'going', place: to.id, until: '23:59' } }];
+        }
+        const content = JSON.stringify({ moves });
         return void res.writeHead(200, { 'Content-Type': 'application/json' }).end(JSON.stringify({ choices: [{ message: { role: 'assistant', content } }] }));
       }
       // SUGGEST: the player's next line, with a "Name:" in front to be cleaned off; a steer is echoed back. Asked for three angles, PLAIN is that line.

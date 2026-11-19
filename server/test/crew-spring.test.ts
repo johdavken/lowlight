@@ -209,7 +209,23 @@ describe('gives: recruit at a job end (crew spec §5)', () => {
     expect(run.done).toBe(true);
     expect(run.recruit).toEqual({ spec: 'muscle', grade: 1 });
     const debrief = t.db.recentMessages('hicks', 20).flatMap((m) => (m.quest?.debrief ? [m.quest.debrief as Debrief] : [])).at(-1)!;
-    expect(debrief.recruit).toBe('RECRUIT · SAIDA RAHM · FREE AT HAES-NOODLES UNTIL 06:00');
+    expect(debrief.recruit).toBe('RECRUIT · SAIDA RAHM · FREE AT HAES-NOODLES UNTIL 06:00 · HIRE ON CREW');
+  });
+
+  it("hire-at: the line and the draw put the card at that place, not where the job starts (Kroll's desk)", async () => {
+    const elsewhere = entry('night-shift', MISSION.replace('starts: haes-noodles\n', 'starts: haes-noodles\nhire-at: low-roller\n').replace('*Clean.*\npay: 400\n', '*Clean.*\npay: 400\ngives: recruit muscle hand\n'));
+    const drawn: { place: string; district: string }[] = [];
+    const t = relayWith({ book: [elsewhere], dezEvents: [], rolls: [6, 6] });
+    const draw = t.relay['deps'].quests!.jobRecruit!;
+    t.relay['deps'].quests!.jobRecruit = (j) => (drawn.push({ place: j.place, district: j.district }), draw(j));
+    await t.relay.startQuest('hicks', 'night-shift');
+    await t.relay.chooseQuest('hicks', { id: 'night-shift', beat: 'door', choice: 'roof' });
+    await t.relay.chooseQuest('hicks', { id: 'night-shift', beat: 'desk', choice: 'wipe' });
+    const debrief = t.db.recentMessages('hicks', 20).flatMap((m) => (m.quest?.debrief ? [m.quest.debrief as Debrief] : [])).at(-1)!;
+    expect(debrief.recruit).toBe('RECRUIT · SAIDA RAHM · FREE AT LOW-ROLLER UNTIL 06:00 · HIRE ON CREW');
+    // Drawn from the card's place's district, as the CREW screen's card is (app.ts jobCardsOf), so the names agree.
+    expect(drawn.length).toBeGreaterThan(0);
+    for (const d of drawn) expect(d).toEqual({ place: 'low-roller', district: 'strand' });
   });
 
   it('{hire} in the ending is the name on the card, and the draw gets what the job wrote', async () => {

@@ -96,6 +96,10 @@ describe('parseAccountsFile', () => {
     expect(problemsOf(FILE + '- DESK × KESTREL: "Again."\n').some((m) => m.includes('twice'))).toBe(true);
     expect(problemsOf(FILE + '- KESTREL × POST: "Never."\n').some((m) => m.includes('never meet'))).toBe(true);
   });
+
+  it("refuses a job clock's count (foo>=2): an accounts file has no clocks to read", () => {
+    expect(problemsOf(swap('- knows LENS unmarked if turn=truth', '- knows LENS unmarked if foo>=2')).some((m) => m.includes('foo>=2'))).toBe(true);
+  });
 });
 
 describe('applyAccountsMove', () => {

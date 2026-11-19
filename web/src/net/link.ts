@@ -78,3 +78,16 @@ export async function putNarratorThinking(thinking: NarratorThinking): Promise<N
   if (!res.ok) throw new Error(`/api/narrator-thinking: HTTP ${res.status}`);
   return ((await res.json()) as { thinking: NarratorThinking }).thinking;
 }
+
+/** SYS → WORLD MOVES (off-screen moves spec §6), as saved in data/settings.json. */
+export async function getWorldMoves(): Promise<boolean> {
+  const res = await fetch('/api/world-moves');
+  if (!res.ok) throw new Error(`/api/world-moves: HTTP ${res.status}`);
+  return ((await res.json()) as { on: boolean }).on;
+}
+
+export async function putWorldMoves(on: boolean): Promise<boolean> {
+  const res = await fetch('/api/world-moves', { method: 'PUT', headers: json, body: JSON.stringify({ on }) });
+  if (!res.ok) throw new Error(`/api/world-moves: HTTP ${res.status}`);
+  return ((await res.json()) as { on: boolean }).on;
+}

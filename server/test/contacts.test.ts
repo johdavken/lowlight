@@ -380,3 +380,21 @@ describe("PEOPLE's wardrobe", () => {
     expect('outfits' in plain).toBe(false);
   });
 });
+
+describe('recommended (Kroll\'s desk spec)', () => {
+  it('a recommended tie goes first, with the field set; the rest keep their order and carry none', () => {
+    const chars = tempDir('contacts-');
+    const seen: [string, { trust: number; warmth: number } | null][] = [];
+    const recommended = (id: string, standing: { trust: number; warmth: number } | null) => {
+      seen.push([id, standing]);
+      return id === 'vee' ? { title: 'Come Up', pitch: 'A floor that never sleeps.', from: '09:00', place: 'sdg-floor' } : null;
+    };
+    const stand = () => ({ word: 'w', trust: 2, warmth: 1, last: null });
+    const list = knownContacts(chars, playthrough(), ROSTER, { ...names, ties: { vee: 't' }, standing: stand, recommended });
+    expect(list.map((c) => c.id)).toEqual(['vee', 'nix']);
+    expect(list[0]!.recommended).toEqual({ title: 'Come Up', pitch: 'A floor that never sleeps.', from: '09:00', place: 'sdg-floor' });
+    expect('recommended' in list[1]!).toBe(false);
+    // Her standing values go in, for her job's gate.
+    expect(seen).toContainEqual(['vee', { trust: 2, warmth: 1 }]);
+  });
+});

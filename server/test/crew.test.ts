@@ -323,6 +323,20 @@ describe('a job card on GET /api/crew (crew spec §5)', () => {
     expect(card).toMatchObject({ cost: 0, loyalty: 50, from: { job: questKey(s.pt.player, 'weigh-station@0'), title: 'Weigh Station' }, recruit: { spec: 'muscle', grade: 1 } });
   });
 
+  it("hire-at: an ended run's free card sits at the job's hire-at place, not where it starts (Kroll's desk)", async () => {
+    const text = fs.readFileSync('world/quests/weigh-station.md', 'utf8').replace('starts: long-haul\n', 'starts: long-haul\nhire-at: low-roller\n');
+    const s = await start({ quests: { 'weigh-station': text } });
+    const db = s.open('nix');
+    db.insertMessage(s.pt.player, line('n1', 10));
+    db.setReplyStamp({ messageId: 'n1', take: 0 });
+    const run = { variant: 0, wait: null, picks: [], flags: {}, at: 1, beat: null, done: true, take: 'full', setup: { approach: 'quiet', people: [], favour: false, at: 1100, endAt: 1150 }, recruit: { spec: 'muscle', grade: 1 } };
+    db.setMeta(questKey(s.pt.player, 'weigh-station@0'), JSON.stringify(run));
+    db.setReplyStamp(null);
+    const v = JSON.parse((await s.built.app.inject({ method: 'GET', url: '/api/crew' })).body).crew;
+    const fromJob = (h: { cards: { from?: { job?: string } }[] }) => h.cards.some((c) => c.from?.job === questKey(s.pt.player, 'weigh-station@0'));
+    expect(v.hires.filter(fromJob).map((h: { place: string }) => h.place)).toEqual(['low-roller']);
+  });
+
   it("/api/kit crewFree: a job's free card lights the dot until it's hired or 06:00 takes it", async () => {
     const s = await start();
     const kit = async () => JSON.parse((await s.built.app.inject({ method: 'GET', url: '/api/kit' })).body).kit;
@@ -346,5 +360,6 @@ describe('a job card on GET /api/crew (crew spec §5)', () => {
     const o = { crew: { members: [] } as unknown as CrewState, seed: 's', jobCards: [j] };
     expect(freeHireWaiting({ ...o, now: 1300 })).toBe(true);
     expect(freeHireWaiting({ ...o, now: 1800 })).toBe(false);
+    expect(freeHireWaiting({ ...o, jobCards: [{ ...j, kept: true }], now: 1800 + 5 * 1440 })).toBe(true);
   });
 });

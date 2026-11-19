@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { generateScenes } from '../gen-placeholders';
@@ -21,6 +21,8 @@ beforeEach(async () => {
   await generateScenes(scenesDir);
   source = (await SceneRegistry.load(scenesDir)).registry.get('lowlight-intake')!;
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 const snapshot = (dir: string) =>
   fs.readdirSync(dir, { recursive: true, withFileTypes: true }).filter((d) => d.isFile()).map((d) => path.join(d.parentPath, d.name)).sort()
@@ -117,6 +119,24 @@ describe('installScene (Review Focus 5)', () => {
     const { registry, errors } = await SceneRegistry.load(scenesDir);
     expect(errors).toEqual([]);
     expect(registry.get('lowlight-intake-art')).toBeDefined();
+  });
+
+  it('staging on another drive (the art store) still installs, over the old room, leaving no swap folders (playtest)', async () => {
+    const rename = fs.renameSync;
+    const staging = path.join(root, 'staging');
+    // A rename out of the staging folder fails as it would across drives.
+    vi.spyOn(fs, 'renameSync').mockImplementation((from, to) => {
+      if (String(from).startsWith(staging)) throw Object.assign(new Error('EXDEV: cross-device link not permitted'), { code: 'EXDEV' });
+      rename(from, to);
+    });
+    const json = buildSceneJson(source, spec, source.layers.map((def) => ({ def })));
+    const files = layerFiles((p) => (p > 0 ? 480 + Math.ceil(p * 48) : 480));
+    for (let i = 0; i < 2; i++) expect(await installScene(scenesDir, staging, 'lowlight-intake-art', files, json)).toEqual([]);
+    const { registry, errors } = await SceneRegistry.load(scenesDir);
+    expect(errors).toEqual([]);
+    expect(registry.get('lowlight-intake-art')).toBeDefined();
+    expect(fs.readdirSync(scenesDir).filter((n) => n.includes('lowlight-intake-art.'))).toEqual([]);
+    expect(fs.existsSync(staging)).toBe(false);
   });
 
   const sized = () => layerFiles((p) => (p > 0 ? 480 + Math.ceil(p * 48) : 480));

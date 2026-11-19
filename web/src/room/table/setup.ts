@@ -6,7 +6,7 @@
 import { APPROACHES, MAX_CONTACTS, MAX_PEOPLE, type Approach } from '../../../../shared/hand';
 import type { SetupOffer } from '../../../../shared/types';
 import { cardEl, trayHead, mountDeal, type TableCard } from './deal';
-import { el, isPhone, type TableCue } from './el';
+import { el, isPhone, isStoryTable, type TableCue, wheelSteps } from './el';
 import { approachInfo, contactInfo, favourInfo, GOES_WRONG, mountCardInfo, programInfo, recruitInfo, slotInfo, type Info } from './card-info';
 import { mountTableShell } from './shell';
 import { setHints } from '../../landing/hint-line';
@@ -35,6 +35,8 @@ export interface SetupCard {
   /** Enter and Esc on SETUP (main.ts): what GO IN and BACK do. */
   go(): void;
   back(): void;
+  /** ↑↓ on the story table (main.ts): the next or the last way in. */
+  move(dir: 1 | -1): void;
   close(): void;
   isOpen(): boolean;
 }
@@ -65,10 +67,12 @@ export function mountSetup(
     const k = kon ? hostRect(root, kon) : null;
     const run: Pt | null = k && k.width > 0 ? [k.left, (k.top + k.bottom) / 2] : null;
     traceVia(root, 'head', headLinePoints([x, y], run, root.offsetWidth - 60));
+    // On the story table (as at the job table, job-table.ts drawTrace) the rail runs down the page's left only.
+    if (shell.log && isStoryTable(root)) return traceVia(root, 'rail', [[x, y + 4], [x, Math.round(hostRect(root, shell.log).bottom)]], undefined, { ring: false });
     const bottom = hostRect(root, shell.bottom);
     const railY = Math.round(bottom.top + 2);
     const ends = [...shell.bottom.children].map((c) => hostRect(root, c)).filter((r) => r.width > 0).map((r) => r.right);
-    traceVia(root, 'rail', [[x, y + 6], [x, railY], [Math.round(Math.max(bottom.left + 200, ...ends)), railY]]);
+    traceVia(root, 'rail', [[x, y + 4], [x, railY], [Math.round(Math.max(bottom.left + 200, ...ends)), railY]], undefined, { ring: false });
   };
   const queueTrace = () => {
     if (typeof requestAnimationFrame !== 'function') return;
@@ -124,8 +128,13 @@ export function mountSetup(
   // HARD's TAKE 1 head start is from tier 2 up (balancing 2026-11-01).
   const hardStart = o.tier !== null && o.tier >= 2 ? 'START TAKE 1 · ALARM 1' : 'START ALARM 1';
   deal.deal(APPROACHES.map((a): TableCard => ({ id: a, face: approachFace(a, a.toUpperCase(), GOES_WRONG[a], { ...APPROACH_RULES[a], ...(FORCED_FIRST ? {} : { first: undefined }), ...(a === 'hard' ? { start: hardStart } : {}) }), state: 'up' })));
+  // The wheel over the ways in steps the chosen one along, as ↑↓ do.
+  wheelSteps(how, { over: (e) => e.target instanceof Element && e.target.closest('.tb-card') !== null && fan === null, step: (dir) => card.move(dir) });
   const markApproach = () => {
-    for (const c of how.querySelectorAll<HTMLElement>('.tb-card')) c.classList.toggle('chosen', c.dataset.id === approach);
+    for (const c of how.querySelectorAll<HTMLElement>('.tb-card')) {
+      c.classList.toggle('chosen', c.dataset.id === approach);
+      c.setAttribute('aria-expanded', String(c.dataset.id === approach));
+    }
   };
   markApproach();
 
@@ -215,8 +224,25 @@ export function mountSetup(
         return c ? { id: `contact:${c.id}`, face: contactFace(c), state: 'up' } : { id: `c${i + 1}`, face: artFace('empty', 'NO CONTACT'), state: 'empty' };
       }),
     ];
+    // The story table (as the job table's hand): one PEOPLE list of rows, who comes lit, who's ready under them; a click
+    // brings or leaves. Elsewhere PEOPLE's places and the READY CREW strip.
+    const story = isStoryTable(shell.root);
+    const crewRows = (): HTMLElement => {
+      const full = people.length >= MAX_PEOPLE;
+      const brought = people.flatMap((id) => offer.crew.filter((c) => c.id === id));
+      const cards = [...brought, ...offer.crew.filter((c) => !people.includes(c.id))].map((c): TableCard => ({ id: c.id, face: crewFace(c), state: people.includes(c.id) || !full ? 'up' : 'locked' }));
+      const box = group('PEOPLE', cards, (id) => {
+        if (people.includes(id)) people.splice(people.indexOf(id), 1);
+        else if (people.length < MAX_PEOPLE) people.push(id);
+        o.cue?.(people.includes(id) ? 'crew' : 'move');
+        render();
+      }, `PEOPLE ${people.length}/${MAX_PEOPLE}`, offer.tierLine, 'ts-tierline');
+      for (const b of box.querySelectorAll<HTMLElement>('.tb-slot')) b.classList.toggle('ts-wait', !people.includes(b.dataset.id ?? ''));
+      if (!offer.crew.length) box.append(el('div', 'tb-sub', 'NO CREW READY'));
+      return box;
+    };
     hand.replaceChildren(
-      group('PEOPLE', slots, (id) => {
+      story ? crewRows() : group('PEOPLE', slots, (id) => {
         people.splice(people.indexOf(id), 1);
         o.cue?.('move');
         render();
@@ -278,7 +304,9 @@ export function mountSetup(
       slide(Math.sign(e.deltaY));
     }, { passive: false });
     ready.replaceChildren(head, strip);
-    for (const c of waiting) {
+    ready.hidden = story;
+    // On the story table everyone ready is in the PEOPLE list (crewRows): the strip stays empty.
+    for (const c of story ? [] : waiting) {
       const b = cardEl({ id: c.id, face: crewFace(c), state: people.length >= MAX_PEOPLE ? 'locked' : 'up' }, 'tb-slot');
       b.addEventListener('click', () => {
         if (people.length >= MAX_PEOPLE || people.includes(c.id)) return;
@@ -288,7 +316,7 @@ export function mountSetup(
       });
       strip.append(b);
     }
-    if (!offer.crew.length) ready.append(el('div', 'tb-sub', 'NO CREW READY'));
+    if (!offer.crew.length && !story) ready.append(el('div', 'tb-sub', 'NO CREW READY'));
     queueTrace();
   };
   render();
@@ -350,11 +378,11 @@ export function mountSetup(
     queueTrace();
     const keyLine = el('div', 'tb-keys');
     shell.root.append(keyLine);
-    setHints(keyLine, '[ENTER] GO IN · [ESC] BACK');
+    setHints(keyLine, isStoryTable(shell.root) ? '[↑↓] WAY IN · [ENTER] GO IN · [ESC] BACK' : '[ENTER] GO IN · [ESC] BACK');
   }
   // Graft tips (tips spec §1): how you go in, who you bring when there's anyone ready, and the favour slot.
   o.tips?.offer(['approach', ...(offer.crew.length ? (['people'] as const) : []), ...(decked ? [] : (['favour'] as const)), ...(decked && (offer.deck?.slots ?? 0) > 0 ? (['program'] as const) : []), ...(offer.tierLine ? (['tier'] as const) : []), ...(!decked && offer.contacts.length ? (['contact'] as const) : [])], shell.root);
-  return {
+  const card: SetupCard = {
     refuse(text) {
       refusal.textContent = text;
     },
@@ -374,6 +402,13 @@ export function mountSetup(
     // With the tray open GO IN and BACK are out of sight: both keys close it first.
     go: () => (fan ? closeFan() : go.click()),
     back: () => (fan ? closeFan() : back.click()),
+    move(dir) {
+      if (fan) return;
+      approach = APPROACHES[(APPROACHES.indexOf(approach) + (dir > 0 ? 1 : APPROACHES.length - 1)) % APPROACHES.length];
+      o.cue?.('move');
+      markApproach();
+    },
     isOpen: () => !shell.root.hidden && shell.root.isConnected,
   };
+  return card;
 }

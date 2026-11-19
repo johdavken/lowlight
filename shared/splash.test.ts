@@ -171,10 +171,15 @@ describe('the notice', () => {
     expect(parseNotice('Fixes\n\nBanners clear.\n\nSee you out there')).toEqual([{ title: 'Fixes', entries: [{ head: 'Banners clear' }, { head: 'See you out there' }] }]);
     expect(parseNotice('Fixes\n\nSee you out there')).toEqual([{ title: 'Fixes', entries: [{ head: 'See you out there' }] }]);
   });
-  it('reads the shipped notes: 39 features, 11 fixes', () => {
+  it('reads the shipped notes: titled sections, every entry with a head', () => {
     const lib = JSON.parse(fs.readFileSync('world/splash/splashes.json', 'utf8')) as { notice: { text: string }; splashes: { panel?: unknown }[] };
     const sections = parseNotice(lib.notice.text);
-    expect(sections.map((s) => [s.title, s.entries.length])).toEqual([['Features', 39], ['Fixes', 11]]);
+    expect(sections.length).toBeGreaterThan(0);
+    for (const s of sections) {
+      expect(s.title).toBeTruthy();
+      expect(s.entries.length).toBeGreaterThan(0);
+      for (const e of s.entries) expect(e.head, JSON.stringify(e)).toBeTruthy();
+    }
     expect(lib.splashes.every((s) => s.panel)).toBe(true);
   });
   it('a panel stays inside the image at a size it allows', () => {

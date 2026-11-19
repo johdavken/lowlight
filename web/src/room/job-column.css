@@ -141,8 +141,10 @@
 .jc-t-say { color: var(--jc-said); }
 .jc-reply:not(.jc-here) .jc-t-say { color: var(--jc-com); }
 .jc-t-who { font: 13px var(--pixel); letter-spacing: 0.2em; color: var(--beat-c, #ff8a3c); }
-/* The job's own text in the theme's narration, and what's said in it in the warm white of anything said. */
-.jc-story, .jc-story em { color: var(--jc-narr); }
+/* The job's own text reads as her replies do (playtest 2026-11-17: her scripted words and her generated ones should be
+   one voice): its narration and its *italic* upright in the actions' grey, what's said in it in the warm white of
+   anything said. */
+.jc-story, .jc-story em { color: var(--jc-act); font-style: normal; }
 .jc-t-quote { color: var(--jc-said); }
 /* Words on comms in the job's text (`{{ }}`) run on inline in the comms cyan, the narration around them naming who
    speaks (`"…," Nix says.`): no line of their own, no label (playtest 2026-11-11). */
@@ -265,3 +267,35 @@
 /* In person she isn't on the line: her words without the scanlines. Yours: your colour, under your name. */
 .jc-reply.jc-here { -webkit-mask-image: none; mask-image: none; }
 .jc-say { --who: var(--user, #7fe9ff); display: block; margin: 8px 0; font-style: normal; color: var(--jc-said); }
+
+/* Narration images (spec 2026-11-18): a face at the start of the paragraph that introduces someone, the text wrapping to
+   its right. Full size from the start (nothing reflows as it resolves). The typer's one character for it is kept out of
+   sight without shrinking its font (the e2e layout check's 14px floor). */
+.jc-img { position: relative; float: left; width: 80px; height: 108px; margin: 4px 12px 4px 0; overflow: hidden; box-sizing: border-box; border: 1px solid color-mix(in srgb, var(--jc-dim, #8fa3ad) 55%, transparent); background: rgba(5, 2, 10, 0.6); shape-outside: margin-box; }
+.jc-img > img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: top; image-rendering: pixelated; }
+/* A contact's figure: its head crop (the sprite's crop, fractions of its height) scaled into the box. */
+.jc-img.jc-img-figure > img { position: absolute; left: 50%; top: calc(-108px * var(--crop-top) / (var(--crop-bottom) - var(--crop-top))); width: auto; height: calc(108px / (var(--crop-bottom) - var(--crop-top))); max-width: none; transform: translateX(-50%); object-fit: initial; }
+.jc-img.jc-img-missing > img { visibility: hidden; }
+.jc-img-ch { position: absolute; width: 1px; height: 1px; overflow: hidden; color: transparent; clip-path: inset(50%); white-space: nowrap; }
+.jc-img-ch .nw::before, .jc-img-ch .nw::after { content: none !important; }
+/* Not yet reached by the typing: the picture waits, its noise up with DECODE, an empty frame with plain typing. */
+.jc-img:has([data-tw='rest']) > img { visibility: hidden; }
+.jc-img-noise { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; pointer-events: none; display: none; }
+.jc-body.jc-decode .jc-img:has([data-tw='rest']) > .jc-img-noise, .jc-img.decoding > .jc-img-noise { display: block; }
+.jc-img .type-cursor { display: none; }
+
+/* A scene picture (a moment, an object): a band across the column over its paragraph, the text below it. */
+.jc-img.jc-img-scene { float: none; display: block; width: 100%; height: 150px; margin: 8px 0 10px; shape-outside: none; }
+.jc-img.jc-img-scene > img { object-position: center; }
+
+/* The narrator's controls (voice-strip.ts): on the column's top edge, left of the TEXT tag, in the board's red, while
+   the page has narration. The ink behind them cuts the frame's line, as the tag does. */
+.jc-voice { position: absolute; z-index: 3; top: -26px; right: 66px; display: flex; align-items: center; gap: 6px; padding: 0 8px; background: var(--ink, #05020a); pointer-events: auto; --c: var(--ui-red, #ff4d4d); }
+.jc-voice[hidden] { display: none; }
+.jc-voice button { all: unset; cursor: pointer; display: grid; place-items: center; height: 20px; min-width: 18px; color: var(--c); font: 14px/1 var(--pixel); letter-spacing: 0.16em; text-shadow: 0 0 6px color-mix(in srgb, var(--c) 45%, transparent); opacity: 0.85; }
+.jc-voice button:hover, .jc-voice button:focus-visible { opacity: 1; text-shadow: 0 0 10px var(--c); }
+.jc-voice .jcv-icon { width: 12px; height: 12px; fill: currentColor; filter: drop-shadow(0 0 3px color-mix(in srgb, var(--c) 55%, transparent)); }
+.jc-voice .jcv-icon .jcv-line { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: square; }
+.jc-voice .jcv-play .jcvi-pause, .jc-voice .jcv-play[data-state='playing'] .jcvi-play { display: none; }
+.jc-voice .jcv-play[data-state='playing'] .jcvi-pause { display: block; }
+.jc-voice .jcv-vol { padding-left: 4px; }

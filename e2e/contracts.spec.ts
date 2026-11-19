@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { awaitGreeting, DIRECT, send, skipSplash } from './fixtures';
+import { awaitGreeting, DIRECT, pickCard, send, skipSplash } from './fixtures';
 
 // Contracts (spec 2026-11-04): The Test Contract at the Intake (e2e/serve.ts), in a playthrough of its own as Cass, whose
 // Trusted rep offers it (NIX_TEST_REP). The playthrough it found is put back.
@@ -312,7 +312,7 @@ test('a full hand in another room: three crew and a Q3 deck, and no inset to cle
   await page.waitForTimeout(2500);
   await page.screenshot({ path: 'test-results/full-hand.png' });
   await expect(page.locator('.ci')).toHaveCount(0);
-  await expect(page.locator('.jc-line')).toHaveText('One guard, one camera, one door.');
+  await expect(page.locator('.jc-scripted .jc-t-say')).toHaveText('One guard, one camera, one door.');
 });
 
 test('RUMORS: the rumor, START, the offer, then its pieces wait on ELSEWHERE', async ({ page }) => {
@@ -333,7 +333,7 @@ test('RUMORS: the rumor, START, the offer, then its pieces wait on ELSEWHERE', a
   await page.locator('.ql-file .ql-goto').click();
   const take = page.locator('.qc-card[data-choice="take"], .tb-card[data-choice="take"]').first();
   await expect(take).toBeVisible({ timeout: 10_000 });
-  await take.click();
+  await pickCard(take);
   await expect(page.locator('.qc-card:visible, .tb-card:visible')).toHaveCount(0, { timeout: 15_000 });
   // The pick back to the wait: its outcome stays up through her answer, and nothing has ended.
   await expect(page.locator('.qc-story')).toContainText('He closes the ledger.');

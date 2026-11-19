@@ -23,6 +23,8 @@ interface SettingsData {
   replyLength?: ReplyLength;
   /** SYS → REPLY THINKING; absent: auto. */
   chatThinking?: ChatThinking;
+  /** SYS → WORLD MOVES (off-screen moves spec §6); absent: on. */
+  worldMoves?: false;
 }
 
 export interface Settings {
@@ -42,6 +44,9 @@ export interface Settings {
   setReplyLength(l: ReplyLength): void;
   chatThinking(): ChatThinking;
   setChatThinking(t: ChatThinking): void;
+  /** SYS → WORLD MOVES: whether off-screen beats run (on by default). */
+  worldMoves(): boolean;
+  setWorldMoves(on: boolean): void;
   /** The browser token; generated and saved the first time it's asked for. */
   roomToken(): string;
   /** First boot: everything from the old files, in one write. */
@@ -77,6 +82,7 @@ function read(file: string): SettingsData | null | 'bad' {
     ...((NARRATOR_THINKING as readonly unknown[]).includes(o.narratorThinking) && o.narratorThinking !== 'auto' ? { narratorThinking: o.narratorThinking as NarratorThinking } : {}),
     ...((REPLY_LENGTHS as readonly unknown[]).includes(o.replyLength) && o.replyLength !== 'normal' ? { replyLength: o.replyLength as ReplyLength } : {}),
     ...((CHAT_THINKING as readonly unknown[]).includes(o.chatThinking) && o.chatThinking !== 'auto' ? { chatThinking: o.chatThinking as ChatThinking } : {}),
+    ...(o.worldMoves === false ? { worldMoves: false as const } : {}),
   };
 }
 
@@ -123,6 +129,12 @@ export function openSettings(dataDir: string, log: (m: string) => void = (m) => 
     setCharacterModel(id, model) {
       if (model === null) delete data.characterModels[id];
       else data.characterModels[id] = model;
+      write();
+    },
+    worldMoves: () => data.worldMoves !== false,
+    setWorldMoves(on) {
+      if (on) delete data.worldMoves;
+      else data.worldMoves = false;
       write();
     },
     narratorThinking: () => data.narratorThinking ?? 'auto',

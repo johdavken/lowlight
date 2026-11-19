@@ -351,6 +351,10 @@
   ],
   "sound": {
     "indoor": true,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    },
     "hum": 0.3,
     "music": {
       "songs": [
@@ -364,11 +368,7 @@
         "level": 0.6,
         "onEntry": true
       }
-    ],
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.3
-    }
+    ]
   },
   "effects": [
     {

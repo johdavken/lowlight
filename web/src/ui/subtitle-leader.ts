@@ -38,8 +38,8 @@ export interface SubtitleLeader {
   observe(el: Element): void;
 }
 
-/** How far in from the box's right end the leader lands: clear of the keys on the head line. */
-const KEYS_CLEAR = 190;
+/** How far in from the box's right end the leader lands: clear of the keys on the head line (the TEXT key 62px, style.css --bs-key-w, and the line's four). */
+const KEYS_CLEAR = 226;
 
 /** The right end of the name row's last word (name, time, model, takes), in the root's px; 0 with no row. */
 function nameEnd(box: HTMLElement, local: (x: number, y: number) => readonly [number, number]): number {
@@ -92,7 +92,7 @@ export function mountSubtitleLeader(root: HTMLElement, box: HTMLElement): Subtit
       to = [x + 8, y];
     }
     // Out of the head line on the speaker's side: past the name row on the left, just left of the keys on the right
-    // (the settings key and the line's four, 26px each, end 164px in from the box's right).
+    // (the TEXT key, 62px, and the line's four, 26px each, end 200px in from the box's right).
     const right = to[0] > (bx0 + bx1) / 2;
     const from = [right ? bx1 - KEYS_CLEAR : Math.min(Math.max(bx0 + 240, nameEnd(box, local) + 24), bx1 - KEYS_CLEAR), by0] as const;
     const pts = leaderPath(from, to);

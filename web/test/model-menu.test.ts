@@ -171,3 +171,18 @@ describe('ModelMenu search', () => {
     expect(sent).toEqual([{ type: 'set_model', model: 'mistral/nope' }]);
   });
 });
+
+describe('ModelMenu: mount', () => {
+  it('moves the panel to another root, open or not, and back', () => {
+    const { root, menu } = setup();
+    const other = document.createElement('div');
+    document.body.append(other);
+    menu.mount(other);
+    expect(other.querySelector('.model-menu')).not.toBeNull();
+    expect(root.querySelector('.model-menu')).toBeNull();
+    expect(menu.isOpen).toBe(true);
+    menu.mount(root);
+    expect(root.querySelectorAll('.model-menu')).toHaveLength(1);
+    expect(other.querySelector('.model-menu')).toBeNull();
+  });
+});

@@ -230,5 +230,8 @@
         385
       ]
     }
-  ]
+  ],
+  "figureLight": {
+    "breath": true
+  }
 }

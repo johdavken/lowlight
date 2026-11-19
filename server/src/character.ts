@@ -1,3 +1,5 @@
+import { normalizeHex } from '../../shared/color';
+import { FIGURE_LIGHT_R_MAX, FIGURE_LIGHT_R_MIN, FIGURE_LIGHTS_MAX, type FigureLightPoint } from '../../shared/types';
 import { WAIST_MAX, WAIST_MIN } from '../../shared/waist';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,6 +31,10 @@ export const spriteSchema = z.object({
   waist: z.unknown().optional(),
   // Studio's SNAP: the art is on the cast's pixel grid, so the game draws it with hard pixels.
   pixel: z.unknown().optional(),
+  // Studio's MIRROR: she faces the other way on the stage by default (absent: on).
+  mirror: z.unknown().optional(),
+  // Lights on her (clicked lights), checked one by one (resolveSprite): a bad one costs only itself.
+  lights: z.unknown().optional(),
 });
 export const DEFAULT_CROP = { top: 0, bottom: 0.5 };
 
@@ -310,7 +316,33 @@ export function scheduleReader(charactersDir: string, hasRoom: (id: string) => b
   });
 }
 
-export function resolveSprite(dir: string, raw: unknown, warn: (msg: string) => void, fallback: string): { file: string; crop: Crop; waist?: number; pixel?: true } | null {
+/** `sprite.lights`, each one checked: a bad light (out of the image, a radius out of bounds, no colour) or one past the sixth is dropped with a warning. */
+export function resolveFigureLights(raw: unknown, warn: (msg: string) => void): FigureLightPoint[] {
+  if (raw === undefined) return [];
+  if (!Array.isArray(raw)) {
+    warn('sprite.lights must be a list; no lights on her');
+    return [];
+  }
+  const out: FigureLightPoint[] = [];
+  raw.forEach((l, i) => {
+    const o = (l && typeof l === 'object' ? l : {}) as Record<string, unknown>;
+    const share = (v: unknown) => typeof v === 'number' && v >= 0 && v <= 1;
+    const color = typeof o.color === 'string' ? normalizeHex(o.color) : null;
+    const r = o.r;
+    if (!share(o.x) || !share(o.y) || typeof r !== 'number' || r < FIGURE_LIGHT_R_MIN || r > FIGURE_LIGHT_R_MAX || !color) {
+      warn(`sprite.lights[${i}] needs x and y from 0 to 1, r from ${FIGURE_LIGHT_R_MIN} to ${FIGURE_LIGHT_R_MAX} and a hex color; dropping it`);
+      return;
+    }
+    if (out.length >= FIGURE_LIGHTS_MAX) {
+      warn(`sprite.lights[${i}]: at most ${FIGURE_LIGHTS_MAX} lights; dropping it`);
+      return;
+    }
+    out.push({ x: o.x as number, y: o.y as number, r, color });
+  });
+  return out;
+}
+
+export function resolveSprite(dir: string, raw: unknown, warn: (msg: string) => void, fallback: string): { file: string; crop: Crop; waist?: number; pixel?: true; mirror?: boolean; lights?: FigureLightPoint[] } | null {
   if (raw === undefined) return null;
   const parsed = spriteSchema.safeParse(raw);
   if (!parsed.success) {
@@ -326,11 +358,14 @@ export function resolveSprite(dir: string, raw: unknown, warn: (msg: string) => 
   const w = parsed.data.waist;
   const waist = w === undefined ? undefined : typeof w === 'number' && w >= WAIST_MIN && w <= WAIST_MAX ? w : null;
   if (waist === null) warn(`sprite.waist must be a number from ${WAIST_MIN} to ${WAIST_MAX}; standing her as drawn`);
+  const lights = resolveFigureLights(parsed.data.lights, warn);
   return {
     file,
     crop: parsed.data.crop ?? DEFAULT_CROP,
     ...(typeof waist === 'number' ? { waist } : {}),
     ...(parsed.data.pixel === true ? { pixel: true as const } : {}),
+    ...(typeof parsed.data.mirror === 'boolean' ? { mirror: parsed.data.mirror } : {}),
+    ...(lights.length > 0 ? { lights } : {}),
   };
 }
 

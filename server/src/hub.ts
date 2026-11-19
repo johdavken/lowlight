@@ -193,7 +193,13 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
       if (v.setup === undefined) return { type: 'quest_start', id: v.id };
       {
         // The hand's SETUP card (spec 2026-10-29-the-hand §1): the server judges who's ready and the favour.
-        const st = v.setup as { approach?: unknown; people?: unknown; favour?: unknown; contacts?: unknown; programs?: unknown };
+        const st = v.setup as { crew?: unknown; approach?: unknown; people?: unknown; favour?: unknown; contacts?: unknown; programs?: unknown };
+        const ids = (xs: unknown, max: number, len = Infinity) => Array.isArray(xs) && xs.length <= max && xs.every((x) => typeof x === 'string' && x.length > 0 && x.length <= len);
+        // A crew-rules job's GO IN (spec 2026-11-17 crew rules): people and programs, nothing else; the server judges both.
+        if (isPlainObject(st) && st.crew === true) {
+          if (!ids(st.people, MAX_PEOPLE) || !ids(st.programs, 3, 40)) return `quest_start crew 'setup' must be { crew: true, people (at most ${MAX_PEOPLE}), programs (at most 3) }`;
+          return { type: 'quest_start', id: v.id, setup: { crew: true, people: st.people as string[], programs: st.programs as string[] } };
+        }
         if (!isPlainObject(st) || !APPROACHES.includes(st.approach as Approach) || typeof st.favour !== 'boolean' || !Array.isArray(st.people) || st.people.length > MAX_PEOPLE || !st.people.every((p) => typeof p === 'string' && p !== ''))
           return `quest_start 'setup' must be { approach, people (at most ${MAX_PEOPLE}), favour }`;
         // Contact cards (spec 2026-10-31-contact-cards §2): bare character ids, at most MAX_CONTACTS.
@@ -241,6 +247,7 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
       if (v.card !== undefined && (typeof v.card !== 'string' || v.card === '' || v.card.length > 80)) return "quest_choose 'card' must be a card id";
       if (v.press !== undefined && (typeof v.press !== 'string' || v.press === '' || v.press.length > 80)) return "quest_choose 'press' must be a card id";
       if (v.post !== undefined && (typeof v.post !== 'string' || v.post === '' || v.post.length > 80)) return "quest_choose 'post' must be a recruit id";
+      if (v.by !== undefined && (typeof v.by !== 'string' || v.by === '' || v.by.length > 80)) return "quest_choose 'by' must be a hand card id";
       // Programs (programs spec §2.2): ids to load and to run, at most a deck's slots each.
       if (v.programs !== undefined && !validPrograms(v.programs)) return "quest_choose 'programs' must be { load, run }, each at most 3 ids of at most 40 characters";
       return {
@@ -255,8 +262,15 @@ export function validateClientEvent(v: unknown): ClientEvent | string {
         ...(typeof v.card === 'string' ? { card: v.card } : {}),
         ...(typeof v.press === 'string' ? { press: v.press } : {}),
         ...(typeof v.post === 'string' ? { post: v.post } : {}),
+        ...(typeof v.by === 'string' ? { by: v.by } : {}),
         ...(v.programs !== undefined ? { programs: v.programs as { load: string[]; run: string[] } } : {}),
       };
+    case 'quest_move': {
+      // Crew rules: a recruit's move or a beat program; the server judges it against the run.
+      const card = (x: unknown) => typeof x === 'string' && x !== '' && x.length <= 80;
+      if (typeof v.id !== 'string' || typeof v.beat !== 'string' || !card(v.card)) return "quest_move needs string 'id', 'beat' and 'card'";
+      return { type: 'quest_move', id: v.id, beat: v.beat, card: v.card as string };
+    }
     case 'quest_walk':
       if (typeof v.id !== 'string' || v.id === '') return "quest_walk needs a string 'id'";
       return { type: 'quest_walk', id: v.id };
@@ -677,6 +691,12 @@ export function createHub(deps: HubDeps): Hub {
       deps.powerOut?.();
       return;
     }
+    // +NERVE (for testing Graft): one back, mid-job too.
+    if (tool === 'nerve_up') {
+      const r = deps.getRelay().devNerve(player);
+      if (typeof r === 'string') send(ws, { type: 'dev_log', level: 'error', text: r });
+      return;
+    }
     devOrigin = player;
     let result: Result;
     try {
@@ -1035,7 +1055,7 @@ export function createHub(deps: HubDeps): Hub {
       case 'quest_choose': {
         const relay = deps.getRelay();
         if (pickChecking) return send(ws, { type: 'notice', text: 'wait for her to finish', for: 'quest' });
-        const done = event.type === 'quest_start' ? relay.startQuest(player, event.id, event.setup) : relay.chooseQuest(player, { id: event.id, beat: event.beat, choice: event.choice, ...(event.said !== undefined ? { said: event.said } : {}), ...(event.moves ? { moves: event.moves } : {}), ...(event.push ? { push: event.push } : {}), ...(event.trade ? { trade: event.trade } : {}), ...(event.card ? { card: event.card } : {}), ...(event.press ? { press: event.press } : {}), ...(event.post ? { post: event.post } : {}), ...(event.programs ? { programs: event.programs } : {}) });
+        const done = event.type === 'quest_start' ? relay.startQuest(player, event.id, event.setup) : relay.chooseQuest(player, { id: event.id, beat: event.beat, choice: event.choice, ...(event.said !== undefined ? { said: event.said } : {}), ...(event.moves ? { moves: event.moves } : {}), ...(event.push ? { push: event.push } : {}), ...(event.trade ? { trade: event.trade } : {}), ...(event.card ? { card: event.card } : {}), ...(event.press ? { press: event.press } : {}), ...(event.post ? { post: event.post } : {}), ...(event.by ? { by: event.by } : {}), ...(event.programs ? { programs: event.programs } : {}) });
         done.then((r) => (typeof r === 'string' ? send(ws, { type: 'notice', text: r, for: 'quest' }) : undefined)).catch(reportAsyncError(ws, event.type));
         return;
       }
@@ -1045,6 +1065,14 @@ export function createHub(deps: HubDeps): Hub {
           .boardMove(player, { id: event.id, move: event.move })
           .then((r) => (typeof r === 'string' ? send(ws, { type: 'notice', text: r, for: 'quest' }) : undefined))
           .catch(reportAsyncError(ws, 'quest_board'));
+        return;
+      }
+      case 'quest_move': {
+        deps
+          .getRelay()
+          .crewMove(player, { id: event.id, beat: event.beat, card: event.card })
+          .then((r) => (typeof r === 'string' ? send(ws, { type: 'notice', text: r, for: 'quest' }) : undefined))
+          .catch(reportAsyncError(ws, 'quest_move'));
         return;
       }
       case 'quest_accounts': {

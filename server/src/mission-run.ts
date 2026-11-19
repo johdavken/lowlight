@@ -15,6 +15,8 @@ import { holds, isLegacyRoll, PUSH_ID, type DiceRoll, type Roll, type CondCtx, t
 import type { Stats } from '../../shared/stats';
 import type { Debrief } from '../../shared/types';
 import { COSTS } from '../../shared/costs';
+import type { Recruit } from '../../shared/crew';
+import type { Specialty } from '../../shared/crew-book';
 
 /** A REROLL card saved before the table (the web's replay still names it). */
 export const REROLL = '!reroll';
@@ -160,7 +162,7 @@ export function buildDebrief(o: { q: QuestEntry; run: QuestRun; tier: Tier; dist
   const pushes = push
     ? push.log.map((l): NonNullable<Debrief['pushes']>[number] => {
         const roll = o.run.picks.find((p) => p.beat === l.beat && p.choice === l.choice)?.roll;
-        return { line: lineOf(l.beat, l.choice), ...(roll ? rollRow(roll) : {}), result: l.result, sol: l.sol };
+        return { line: lineOf(l.beat, l.choice), ...(roll ? rollRow(roll) : {}), result: l.result, sol: l.sol, ...(l.missed ? { missed: true as const } : {}) };
       })
     : [];
   const checks = o.run.picks.flatMap((p): Debrief['checks'] => {
@@ -212,7 +214,8 @@ export function contractBlock(o: { title: string; stage: 'waiting' | 'night' | '
  * isn't on the hook for but knows from where she works (`known-by:`).
  */
 export function boardBlock(o: { title: string; postedBy: string | null; brief: string | null; player: string; knows: 'own' | 'heard' | null }): string {
-  const said = [o.postedBy ? `Posted by: ${o.postedBy}` : '', o.brief ?? ''].filter(Boolean).join(' ');
+  // A name ends its sentence before the brief starts ("Posted by: Rue Rue has work…", playtest).
+  const said = [o.postedBy ? `Posted by: ${/[.!?]$/.test(o.postedBy.trim()) ? o.postedBy.trim() : `${o.postedBy.trim()}.`}` : '', o.brief ?? ''].filter(Boolean).join(' ');
   if (o.knows === 'own') return `[board — ${o.title}: your own job, so you know this. ${said}]`;
   if (o.knows === 'heard') return `[board — ${o.title}: not your job, but you heard about it at work, so you know this. ${said} If what ${o.player} tells you doesn't fit, you can say so.]`;
   return `[board — ${o.title}: what ${o.player} knows about this job and you don't yet. ${said} All you know of it is what ${o.player} has told you. If you want to know who offered it or what's involved, ask ${o.player}. Until ${o.player} says it, don't use any of it: not who posted it, not what kind of person they are. Never name anyone else as the source. If what ${o.player} tells you doesn't fit this, doubt it without saying why.]`;
@@ -262,10 +265,12 @@ export function effectEvent(e: Effects, at: number, o: { pay?: number | null; di
 }
 
 
-/** One line on the player for her opening: the stats above 5, the deck, the heat. */
-export function playerKitLine(name: string, stats: Stats, deck: Deck | null, heat: number): string {
-  const strong = (Object.entries(stats) as [string, number][]).filter(([k, v]) => k !== 'edge' && v > 5).map(([k, v]) => `${k.toUpperCase()} ${v}`);
-  return `${name}: ${strong.length ? strong.join(', ') : 'nothing above average'}; ${deck ? `carries ${withArticle(deck.name)}` : 'no deck'}; heat ${heat} of 10`;
+/**
+ * One line on the player for her opening: the deck and the heat. No stats: her note says never to mention numbers, and
+ * "TECH 7" read as something to say (Run Sheet, playtest).
+ */
+export function playerKitLine(name: string, deck: Deck | null, heat: number): string {
+  return `${name}: ${deck ? `carries ${withArticle(deck.name)}` : 'no deck'}; heat ${heat} of 10`;
 }
 
 /** Her [mission] block as you set out: the job and who you are on it. */
@@ -301,7 +306,8 @@ export function missionSummary(q: QuestEntry, run: QuestRun, decks: Deck[], debr
   const choices = [...q.beats.values()].flat().flatMap((b) => b.choices.map((c) => ({ beat: b.id, c })));
   // A reserved card's pick isn't a line.
   const lines = run.picks.filter((p) => !p.beat.startsWith('!')).map((p) => {
-    const line = choices.find((x) => x.beat === p.beat && x.c.id === p.choice)?.c.line ?? p.choice;
+    // A crew-rules pick lists what was done, as she was told it (final review I3); others, and old picks, the card's line.
+    const line = p.told ?? choices.find((x) => x.beat === p.beat && x.c.id === p.choice)?.c.line ?? p.choice;
     const r = p.roll;
     const how = r ? (r.pass ? (isLegacyRoll(r) && r.rolls.length > 1 ? ' — it worked, not the first time' : !isLegacyRoll(r) && r.kind === 'cost' && !r.steadied && !(r.costs?.length && r.costs.every((c) => c.how !== 'taken')) ? ' — it worked, at a cost' : ' — it worked') : " — it didn't work") : '';
     return `- ${line}${how}`;
@@ -325,11 +331,12 @@ export function missionSummary(q: QuestEntry, run: QuestRun, decks: Deck[], debr
     ev.some((e) => (e.nerve ?? 0) < 0) ? 'They kept their nerve.' : null,
     run.getaway ? 'They had to get out fast.' : null,
     debrief ? alarmWords(run.alarm ?? 0) : null,
-    // A trust job (Intake board spec §2): rep didn't move; her standing may have.
+    // A trust job (Intake board spec §2) or a judging clock: her standing may have moved.
     debrief?.trustMoved ? `Their standing with you went ${debrief.trustMoved}.` : null,
     debrief?.retainer ? (debrief.retainer.paid ? 'Your retainer was paid.' : "Your retainer wasn't paid: they came up short.") : null,
     debrief?.cut ? `You took your cut: ${debrief.cut.amount} sol.` : null,
-    debrief && debrief.trust === undefined && rep
+    // Rep is off only on a `trust:` stake job; a judging clock (Kroll's desk) leaves it paid.
+    debrief && (debrief.trust === undefined || debrief.judge) && rep
       ? `Their name in ${rep.district} ${rep.after > rep.before ? 'went up' : rep.after < rep.before ? 'went down' : 'held'}${debrief.cover ? ` (${debrief.cover === 'burner' ? 'a burner' : 'a fall guy'} covered it)` : ''}.`
       : null,
   ].filter(Boolean);
@@ -356,6 +363,27 @@ export function repFromEnv(player: string, env: NodeJS.ProcessEnv = process.env)
 export function solFromEnv(player: string, env: NodeJS.ProcessEnv = process.env): number {
   const m = /^([a-z0-9-]+):(\d{1,6})$/.exec(env.NIX_TEST_SOL ?? '');
   return m && m[1] === player ? Number(m[2]) : 0;
+}
+
+/** Test-only (e2e): the names and faces `NIX_TEST_CREW` hires under, one per specialty. */
+const TEST_CREW: Record<string, { name: string; face: string }> = {
+  face: { name: 'Juno Sato', face: 'local-01' },
+  muscle: { name: 'Pell Okoro', face: 'sdg-01' },
+  runner: { name: 'Ren Takagi', face: 'sdg-02' },
+  ears: { name: 'Mika Arai', face: 'local-08' },
+};
+
+/**
+ * Test-only (e2e): `NIX_TEST_CREW="silas:face,muscle,runner,ears"` starts that player with one ready GREEN recruit of
+ * each specialty named, hired free at the start (a crew-rules job's GO IN needs people to bring); other players, unset
+ * or unreadable: none.
+ */
+export function crewFromEnv(player: string, env: NodeJS.ProcessEnv = process.env): Recruit[] {
+  const m = /^([a-z0-9-]+):([a-z,]+)$/.exec(env.NIX_TEST_CREW ?? '');
+  if (!m || m[1] !== player) return [];
+  const specs = m[2].split(',');
+  if (specs.some((s) => !TEST_CREW[s])) return [];
+  return specs.map((s) => ({ id: `e2e-${s}`, name: TEST_CREW[s].name, face: TEST_CREW[s].face, origin: '', spec: s as Specialty, grade: 0, traits: [], hidden: null, pitch: '', wage: 0 }));
 }
 
 /** Test-only (e2e): `NIX_TEST_TRUST="cass@nix-direct:6"` starts that player's trust with that contact there (the arrangement needs high trust); unset or unreadable: none. */

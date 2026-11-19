@@ -9,7 +9,8 @@ import type { QuestState } from '../../../../shared/types';
 type Route = NonNullable<NonNullable<QuestState['active']>['route']>;
 type RouteBeat = Route['ways'][number]['beats'][number];
 const NS = 'http://www.w3.org/2000/svg';
-const W = 336;
+/** The route's width on the table (`o.width` overrides it: the story table's route beside the job's line is wider). */
+const W0 = 336;
 const [T, M, B] = [18, 44, 70];
 /** A pixel-caps letter's advance at the route's size. */
 const CH = 7.6;
@@ -36,7 +37,7 @@ const svg = <K extends keyof SVGElementTagNameMap>(tag: K, attrs: Record<string,
   return n;
 };
 
-function ladder(beats: RouteBeat[], route: Route, at: string): HTMLElement {
+function ladder(beats: RouteBeat[], route: Route, at: string, W = W0): HTMLElement {
   const box = document.createElement('div');
   box.className = 'rt-ladder';
   const per = W / Math.max(1, beats.length);
@@ -54,9 +55,10 @@ function ladder(beats: RouteBeat[], route: Route, at: string): HTMLElement {
  * `at`: the beat you're on. `pick`: before the fork, the way the selected card leads (lit; the other dim). `hot`: the
  * beat you're on is covered by a held post (its ring in the crew's colour).
  */
-export function routeEl(route: Route, at: string, o: { pick?: number | null; hot?: boolean } = {}): HTMLElement | SVGSVGElement {
+export function routeEl(route: Route, at: string, o: { pick?: number | null; hot?: boolean; width?: number } = {}): HTMLElement | SVGSVGElement {
+  const W = o.width ?? W0;
   const on = wayOf(route, at);
-  if (route.ways.length !== 2) return ladder((route.ways[on ?? 0] ?? route.ways[0]).beats, route, at);
+  if (route.ways.length !== 2) return ladder((route.ways[on ?? 0] ?? route.ways[0]).beats, route, at, W);
   const [a, b] = route.ways.map((w) => w.beats);
   let p = 0;
   while (p < a.length && p < b.length && a[p].id === b[p].id) p++;
@@ -64,7 +66,7 @@ export function routeEl(route: Route, at: string, o: { pick?: number | null; hot
   while (s < a.length - p && s < b.length - p && a[a.length - 1 - s].id === b[b.length - 1 - s].id) s++;
   const [ma, mb] = [a.slice(p, a.length - s), b.slice(p, b.length - s)];
   // Not a fork-and-rejoin after a shared start (a way that only adds beats): the ladder says it better.
-  if (p === 0 || !ma.length || !mb.length) return ladder((route.ways[on ?? 0] ?? route.ways[0]).beats, route, at);
+  if (p === 0 || !ma.length || !mb.length) return ladder((route.ways[on ?? 0] ?? route.ways[0]).beats, route, at, W);
   const head = a.slice(0, p);
   const tail = a.slice(a.length - s);
   const mid = Math.max(ma.length, mb.length);

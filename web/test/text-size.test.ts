@@ -33,11 +33,13 @@ describe('TEXT SIZE (fixed stage §6)', () => {
     expect(() => saveTextSize(115)).not.toThrow();
   });
 
-  it('steps 85 → 150 and stops at the ends', () => {
+  it('steps 50 → 150 and stops at the ends', () => {
     expect(stepTextSize(100, 1)).toBe(115);
     expect(stepTextSize(100, -1)).toBe(85);
+    expect(stepTextSize(85, -1)).toBe(70);
+    expect(stepTextSize(60, -1)).toBe(50);
     expect(stepTextSize(150, 1)).toBe(150);
-    expect(stepTextSize(85, -1)).toBe(85);
+    expect(stepTextSize(50, -1)).toBe(50);
     expect(stepTextSize(115, 3)).toBe(130);
   });
 

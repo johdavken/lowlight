@@ -42,6 +42,14 @@ export function ditherMask(step: number, incoming: boolean, steps = DISSOLVE_STE
   return url;
 }
 
+/**
+ * Whether dither cell (`cx`, `cy`) shows at step `step`: exactly what `ditherMask(step, incoming, steps)`
+ * shows, for drawing the dissolve into a canvas (figure lighting). A cell is DITHER_CELL_PX art pixels.
+ */
+export function ditherKeep(step: number, cx: number, cy: number, incoming: boolean, steps = DISSOLVE_STEPS): boolean {
+  return BAYER4[cy % 4][cx % 4] < (step / steps) * 16 === incoming;
+}
+
 /** The mask tile's size as percentages of the art box, so a dither cell is DITHER_CELL_PX of her own pixels. */
 export function ditherTile(width: number, height: number): string {
   const side = 4 * DITHER_CELL_PX;

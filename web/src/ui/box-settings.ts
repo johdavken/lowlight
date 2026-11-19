@@ -13,6 +13,8 @@ import type { TextSpeed } from './typing';
 import { setTip } from './hover-tag';
 
 export type BoxRow = 'text' | 'size' | 'font' | 'auto' | 'effect' | 'colour' | 'glass' | 'line' | 'keys';
+/** The LINE section's rows: the chat box's own look and keys. */
+const LINE_ROWS: readonly BoxRow[] = ['colour', 'glass', 'line', 'keys'];
 
 const SPEEDS: TextSpeed[] = ['slow', 'normal', 'fast', 'instant'];
 const KEYS: ChatKeys[] = ['glyphs', 'labels'];
@@ -35,15 +37,16 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return n;
 }
 
-/** The sliders glyph on the key. */
-const GLYPH =
-  '<svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.3" fill="none"/><rect x="9" y="2" width="3" height="4" fill="currentColor"/><rect x="4" y="6" width="3" height="4" fill="currentColor"/><rect x="10" y="10" width="3" height="4" fill="currentColor"/></svg>';
+/** The key as a trace node (playtest 2026-11-17, red trace): a ring the line runs into, then the word. */
+const GLYPH = '<i class="bs-ring" aria-hidden="true"></i><span class="bs-word">TEXT</span>';
 
 export class BoxSettings {
   readonly key = el('button', 'bs-key');
   readonly panel = el('div', 'bs-panel');
   private readonly rows = {} as Record<BoxRow, HTMLElement>;
   private readonly order: BoxRow[] = [];
+  /** The LINE section's head: it and its rows step out on the crew rules' board, which has no chat box (textOnly). */
+  private readonly lineSec = el('div', 'bs-sec', 'LINE');
   /** The foot: a row's tip in its own two-line space, the keys under it, so nothing moves as the tip changes. */
   private readonly foot = el('div', 'bs-foot');
   private readonly tip = el('span', 'bs-tip');
@@ -132,7 +135,7 @@ export class BoxSettings {
       this.row('font', 'FONT', font),
       this.row('auto', 'AUTO PAGE', this.auto),
       this.row('effect', 'TEXT EFFECT', this.effect),
-      el('div', 'bs-sec', 'LINE'),
+      this.lineSec,
       this.row('colour', 'COLOUR', this.colours),
       this.row('glass', 'SHADE', glass),
       this.row('line', 'SPEAKER LINE', this.line),
@@ -153,6 +156,7 @@ export class BoxSettings {
   open(): void {
     if (this.isOpen) return;
     panelCue('sys');
+    this.showScope();
     this.panel.hidden = false;
     this.key.classList.add('on');
     this.key.setAttribute('aria-expanded', 'true');
@@ -328,6 +332,26 @@ export class BoxSettings {
     return r;
   }
 
+  /**
+   * Only what applies (playtest): on the crew rules' board the chat box is hidden, so the LINE section (the box's colour,
+   * shade, speaker line and keys) steps out and the panel lists the TEXT rows alone. Read as it opens.
+   */
+  get textOnly(): boolean {
+    return this.panel.closest('.crew-board') !== null;
+  }
+
+  private showScope(): void {
+    const only = this.textOnly;
+    this.panel.classList.toggle('bs-text-only', only);
+    this.lineSec.hidden = only;
+    for (const id of LINE_ROWS) this.rows[id].hidden = only;
+  }
+
+  /** The rows ↑ ↓ step through: the ones shown. */
+  private shownRows(): BoxRow[] {
+    return this.order.filter((id) => !this.rows[id].hidden);
+  }
+
   private setFocus(id: BoxRow): void {
     this.focus = id;
     for (const [k, r] of Object.entries(this.rows)) r.classList.toggle('on', k === id);
@@ -394,8 +418,9 @@ export class BoxSettings {
     e.stopImmediatePropagation();
     if (k === 'Escape') return this.close();
     if (k === 'ArrowUp' || k === 'ArrowDown') {
-      const at = this.order.indexOf(this.focus);
-      this.setFocus(this.order[Math.max(0, Math.min(this.order.length - 1, at + (k === 'ArrowDown' ? 1 : -1)))]);
+      const rows = this.shownRows();
+      const at = rows.indexOf(this.focus);
+      this.setFocus(rows[Math.max(0, Math.min(rows.length - 1, at + (k === 'ArrowDown' ? 1 : -1)))]);
       return;
     }
     if (k === 'ArrowRight' || k === 'ArrowLeft') panelCue('setting');

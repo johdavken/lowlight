@@ -7,7 +7,8 @@
   "sprite": {
     "src": "hae-outfit-work.png",
     "pixel": true,
-    "waist": 0.385
+    "waist": 0.325,
+    "mirror": false
   },
   "outfits": { "work": "hae-outfit-work.png" },
   "outfitByScene": { "karasu/noodle-stall": "work" },

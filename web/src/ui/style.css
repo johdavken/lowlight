@@ -22,6 +22,8 @@
   /* One colour for the UI's own lines (playtest pick 2026-11-15): the bar, the corners, keys, rails, hovers. People keep
      their colours, cyan (--user) is the player's alone, amber is what needs you. TRACE_RED in trace-panel.ts is the same. */
   --ui-red: #ff4d4d;
+  /* The box settings key's width (ring and TEXT, .bs-key): what stands beside it and the beat line it ends keep clear of it. */
+  --bs-key-w: 62px;
   --hud: rgba(255, 77, 77, 0.9);
   --hud-dim: rgba(255, 77, 77, 0.55);
   --pixel: 'VT323', ui-monospace, monospace;
@@ -425,9 +427,9 @@
 .unshown { visibility: hidden; }
 /* TEXT EFFECT DECODE (the box's settings): the text ahead of the cursor shows as glyph noise in the box's colour, dim,
    and the letters lock in as she types (typing.ts noiseOf, feed.ts flicker). */
-.text .unshown.noise { visibility: visible; color: transparent !important; text-shadow: none !important; }
-.text .unshown.noise .nw { position: relative; }
-.text .unshown.noise .nw::after {
+:is(.text, .bw-say, .jc-body) .unshown.noise { visibility: visible; color: transparent !important; text-shadow: none !important; }
+:is(.text, .bw-say, .jc-body) .unshown.noise .nw { position: relative; }
+:is(.text, .bw-say, .jc-body) .unshown.noise .nw::after {
   content: attr(data-n);
   position: absolute;
   left: 0;
@@ -1161,7 +1163,8 @@
    Portraits, monograms and silhouettes still stand on the box. */
 :root { --fig-full: 1035px; --fig-floor: -270px; --fig-x: 112px; }
 .stage-left[data-kind='sprite'],
-.stage-right[data-kind='sprite'] {
+.stage-right[data-kind='sprite'],
+.stage-resident[data-kind='sprite'] {
   --fig-hh: var(--fig-full);
   bottom: calc(var(--fig-floor) - var(--fig-drop, 0) * var(--fig-full));
   width: calc(var(--fig-hh) * var(--fig-aspect, 0.667));
@@ -1171,7 +1174,15 @@
 .stage-left[data-kind='sprite'] { left: var(--fig-x); }
 .stage-right[data-kind='sprite'] { right: var(--fig-x); }
 .stage-left[data-kind='sprite'] .stage-art,
-.stage-right[data-kind='sprite'] .stage-art { background-size: 100% 100%; background-position: center top; }
+.stage-right[data-kind='sprite'] .stage-art,
+.stage-resident[data-kind='sprite'] .stage-art { background-size: 100% 100%; background-position: center top; }
+/* Three on stage (experiment 2026-11-17): the place's resident (Hae at the stall) takes the contact's spot on the
+   right, and your contact steps in to the middle, a little toward you (dead centre is right: 455px). */
+:root { --fig-mid-x: 530px; }
+.stage-resident { right: var(--edge-x); }
+.stage-resident[hidden] { display: none; }
+.stage-resident[data-kind='sprite'] { right: var(--fig-x); }
+#stage-figures.three-up .stage-right[data-kind='sprite'] { right: var(--fig-mid-x); }
 /* SYS → MIRROR: the art flipped. The light filter flips with it, so stage-light.ts swaps its sides. */
 .stage-figure[data-mirror] .stage-art { transform: scaleX(-1); }
 /* Snapped art (Studio SNAP, sprite.pixel): hard pixels, not the browser's smoothing. */
@@ -1374,7 +1385,7 @@
 .line-keys {
   position: absolute;
   z-index: 25;
-  right: calc(var(--sub-x) + 36px);
+  right: calc(var(--sub-x) + var(--bs-key-w) + 10px);
   bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-max)) + 8px);
   display: flex;
   justify-content: flex-end;
@@ -1382,7 +1393,7 @@
   pointer-events: auto;
 }
 .line-keys .key { flex: none; }
-.feed-root.job-col .line-keys { right: calc(var(--sub-x) + var(--job-w) + 24px + 36px); bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-h)) + 8px); }
+.feed-root.job-col .line-keys { right: calc(var(--sub-x) + var(--job-w) + 24px + var(--bs-key-w) + 10px); bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-h)) + 8px); }
 .feed-root.box-empty .line-keys { display: none; }
 /* At a table (not a phone's) the box is held empty and the line is the JOB column's: the keys keep their old corner, two
    by two at the bottom left. */
@@ -1479,38 +1490,35 @@
    right end, the scene keys' fine outline in the box's colour, faint until pointed at, lit while its panel is open. */
 .bs-key, .bs-panel { --bc: var(--ui-red); }
 .bs-key {
-  --kl: color-mix(in srgb, var(--bc) 55%, rgba(230, 238, 247, 0.3));
   position: absolute;
   z-index: 25;
   right: var(--sub-x);
   bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-max)) + 8px);
-  width: 26px;
+  width: var(--bs-key-w);
   height: 26px;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  gap: 7px;
   padding: 0;
   border: 0;
   background: none;
-  color: color-mix(in srgb, var(--bc) 75%, #fff);
+  font: 14px/1 var(--pixel);
+  letter-spacing: 0.22em;
+  color: color-mix(in srgb, var(--bc) 80%, #fff);
+  text-shadow: 0 1px 2px #000;
   opacity: 0.85;
   cursor: pointer;
   pointer-events: auto;
 }
 .feed-root.job-col .bs-key { right: calc(var(--sub-x) + var(--job-w) + 24px); bottom: calc(var(--feed-bottom) + min(var(--box-fit, var(--box-h)), var(--box-h)) + 8px); }
-.bs-key::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 7px 7px no-repeat,
-    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--kl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 7px 7px no-repeat,
-    rgba(5, 2, 10, 0.55);
-  box-shadow: inset 0 0 0 1px var(--kl);
-  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-}
-.bs-key:hover, .bs-key:focus-visible, .bs-key.on { --kl: var(--bc); opacity: 1; color: #fff; filter: drop-shadow(0 0 4px var(--bc)); outline: none; }
-.bs-key svg { width: 16px; height: 16px; }
+/* The key as a trace node (playtest 2026-11-17): the ring a trace line runs into (ui/trace-lead.ts draws the same), then
+   the word. Hollow at rest, lit on hover, filled while its panel is open. */
+.bs-ring { flex: none; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1px currentColor; background: rgba(5, 2, 10, 0.6); }
+.bs-word { padding-top: 2px; }
+.bs-key:hover, .bs-key:focus-visible, .bs-key.on { opacity: 1; color: #fff; text-shadow: 0 0 6px var(--bc), 0 1px 2px #000; outline: none; }
+.bs-key:hover .bs-ring, .bs-key:focus-visible .bs-ring { box-shadow: inset 0 0 0 1px var(--bc), 0 0 5px var(--bc); }
+.bs-key.on .bs-ring { background: var(--bc); box-shadow: 0 0 6px var(--bc); }
+.bs-key:focus-visible .bs-word { text-decoration: underline; text-underline-offset: 4px; }
 /* The panel: the box's glass rising over its right end, cut top-left and bottom-right, its head the name plate. */
 .bs-panel {
   --pl: color-mix(in srgb, var(--bc) 40%, #e6eef7);
@@ -1528,7 +1536,7 @@
   .feed-root.feed-stage:not(.expanded) .feed { anchor-name: --sub-box; }
   .bs-key, .bs-panel, .line-keys { position-anchor: --sub-box; }
   .bs-key, .feed-root.job-col .bs-key { right: anchor(right); bottom: calc(anchor(top) + 8px); }
-  .line-keys, .feed-root.job-col .line-keys { right: calc(anchor(right) + 36px); bottom: calc(anchor(top) + 8px); }
+  .line-keys, .feed-root.job-col .line-keys { right: calc(anchor(right) + var(--bs-key-w) + 10px); bottom: calc(anchor(top) + 8px); }
   .bs-panel, .feed-root.job-col .bs-panel { right: anchor(right); bottom: calc(anchor(top) + 46px); }
 }
 .bs-panel[hidden] { display: none; }
@@ -1538,23 +1546,20 @@
   inset: 0;
   z-index: -1;
   backdrop-filter: blur(calc(6px * var(--ui-blur, 1))) brightness(0.55);
-  background:
-    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--pl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 0 0 / 17px 17px no-repeat,
-    linear-gradient(to bottom right, transparent calc(50% - 0.6px), var(--pl) calc(50% - 0.6px) calc(50% + 0.6px), transparent calc(50% + 0.6px)) 100% 100% / 17px 17px no-repeat,
-    linear-gradient(var(--pl), var(--pl)) 16px 0 / 100% 1px no-repeat,
-    linear-gradient(var(--pl), var(--pl)) 0 100% / calc(100% - 16px) 1px no-repeat,
-    linear-gradient(var(--pl), var(--pl)) 0 16px / 1px 100% no-repeat,
-    linear-gradient(var(--pl), var(--pl)) 100% 0 / 1px calc(100% - 16px) no-repeat,
-    rgba(5, 2, 10, 0.9);
-  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
-  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--bc) 45%, transparent));
+  background: linear-gradient(90deg, rgba(5, 2, 10, 0.92), rgba(5, 2, 10, 0.86) 70%, rgba(5, 2, 10, 0.7));
 }
-/* Its head: a word in pixel caps on a fading hairline, as the trace panels' heads. */
-.bs-head { position: relative; display: flex; align-items: center; gap: 10px; padding: 14px 22px 0 34px; }
-.bs-head::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--bc) 60%, transparent), transparent); }
-.bs-panel .bs-plate { font: 17px/1 var(--pixel); letter-spacing: 0.22em; color: var(--bc); }
-.bs-rows { position: relative; padding: 6px 22px 4px 20px; }
-.bs-sec { margin: 6px 0 2px 14px; font: 13px var(--pixel); letter-spacing: 0.3em; color: var(--bc); opacity: 0.75; }
+/* Red trace (playtest 2026-11-17, as trace-panel.css): no frame. The name stands on the head line, which starts at a
+   ring; a rail runs down from the ring past every row, a tick to each, the row you're on ringed on it. */
+.bs-head { position: relative; display: flex; align-items: flex-end; padding: 16px 22px 9px 34px; }
+.bs-head::before { content: ''; position: absolute; left: 13px; bottom: -4px; width: 9px; height: 9px; box-sizing: border-box; border: 1px solid var(--bc); border-radius: 50%; background: rgba(5, 2, 10, 0.9); box-shadow: 0 0 6px color-mix(in srgb, var(--bc) 55%, transparent); z-index: 1; }
+.bs-head::after { content: ''; position: absolute; left: 17px; right: 0; bottom: 0; height: 1px; background: linear-gradient(90deg, var(--bc), color-mix(in srgb, var(--bc) 45%, transparent) 70%, transparent); box-shadow: 0 0 4px color-mix(in srgb, var(--bc) 40%, transparent); }
+.bs-panel .bs-plate { font: 22px/1 var(--pixel); letter-spacing: 0.42em; color: var(--bc); text-shadow: 0 0 12px color-mix(in srgb, var(--bc) 45%, transparent); }
+.bs-rows { position: relative; padding: 8px 22px 6px 34px; }
+.bs-rows::before { content: ''; position: absolute; left: 17px; top: 0; bottom: 0; width: 1px; background: linear-gradient(var(--bc), color-mix(in srgb, var(--bc) 30%, transparent)); }
+/* A section: pixel caps on a hairline that fades, a tick back to the rail. */
+.bs-sec { position: relative; display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; font: 13px/1 var(--pixel); letter-spacing: 0.3em; color: var(--bc); }
+.bs-sec::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, color-mix(in srgb, var(--bc) 50%, transparent), transparent); }
+.bs-sec::before { content: ''; position: absolute; left: -17px; top: 50%; width: 11px; height: 1px; background: var(--bc); opacity: 0.6; }
 .bs-row {
   position: relative;
   display: flex;
@@ -1562,14 +1567,17 @@
   justify-content: space-between;
   gap: 18px;
   height: 32px;
-  padding: 0 10px 0 14px;
+  padding: 0 10px 0 10px;
   font: 16px var(--pixel);
   letter-spacing: 0.18em;
-  color: color-mix(in srgb, var(--bc) 25%, #e6eef7);
+  color: rgba(217, 228, 234, 0.72);
   cursor: default;
 }
-.bs-row.on { background: linear-gradient(90deg, color-mix(in srgb, var(--bc) 22%, transparent), transparent 85%); }
-.bs-row.on::before { content: ''; position: absolute; left: 0; top: 4px; bottom: 4px; width: 3px; background: var(--bc); box-shadow: 0 0 6px var(--bc); }
+/* A row or section that doesn't apply where the panel opens (box-settings.ts showScope: the board has no chat box). */
+.bs-row[hidden], .bs-sec[hidden] { display: none; }
+.bs-row::before { content: ''; position: absolute; left: -17px; top: 50%; width: 9px; height: 1px; background: var(--bc); opacity: 0.45; }
+.bs-row.on { color: #fff; background: linear-gradient(90deg, color-mix(in srgb, var(--bc) 16%, transparent), transparent 80%); }
+.bs-row.on::before { left: -21px; width: 9px; height: 9px; margin-top: -5px; box-sizing: border-box; border: 1px solid var(--bc); border-radius: 50%; background: rgba(5, 2, 10, 0.95); box-shadow: 0 0 6px var(--bc); opacity: 1; }
 .bs-label { white-space: nowrap; }
 .bs-value { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
 .bs-words i, .bs-speaker { padding: 1px 7px; font-style: normal; color: rgba(223, 233, 239, 0.45); cursor: pointer; }
@@ -1585,7 +1593,8 @@
 .bs-track { position: relative; width: 150px; height: 6px; cursor: pointer; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bc) 45%, rgba(230, 238, 247, 0.25)); }
 .bs-track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bc); }
 .bs-pct { min-width: 44px; text-align: right; color: #f2ecf7; }
-.bs-foot { padding: 2px 20px 10px 34px; font: 13px var(--pixel); color: color-mix(in srgb, var(--bc) 25%, #e6eef7); }
+/* The foot: the row's tip and the keys under a hairline, as a trace panel's key line. */
+.bs-foot { margin: 4px 22px 0 34px; padding: 9px 0 12px; border-top: 1px solid rgba(230, 238, 247, 0.16); font: 13px var(--pixel); color: rgba(217, 228, 234, 0.75); }
 /* The tip keeps two lines whether or not there is one (playtest: swapping it with the keys made the panel jump). */
 .bs-tip { display: block; height: 32px; line-height: 16px; white-space: normal; letter-spacing: 0.08em; opacity: 0.95; }
 .bs-nav { display: block; letter-spacing: 0.18em; opacity: 0.7; }
@@ -1607,9 +1616,8 @@
 #game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage.box-empty:not(.expanded) .feed { width: 280px; }
 /* The key and its panel in the column's colour (the job's amber, or a fixed BOX COLOUR); the panel opens to the column's
    right, over the moment, so the column shows each change as it's made (playtest). */
-#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) :is(.bs-key, .bs-panel) { --bc: #ffc56b; right: auto; bottom: auto; }
-#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage.fixed-accent:not(.expanded) :is(.bs-key, .bs-panel) { --bc: var(--fixed-hc); }
-#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { display: grid; left: calc(var(--hud-log-x) + var(--hud-log-w) - 82px); top: calc(var(--hud-log-y) - 30px); }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) :is(.bs-key, .bs-panel) { right: auto; bottom: auto; }
+#game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-key { --bc: var(--ui-red); display: flex; left: calc(var(--hud-log-x) + var(--hud-log-w)); top: calc(var(--hud-log-y) - 30px); translate: -100% 0; }
 #game:has(> .tb.hud:not([hidden]):not(.phone)) > .feed-root.feed-stage:not(.expanded) .bs-panel:not([hidden]) { display: block; left: calc(var(--hud-log-x) + var(--hud-log-w) + 20px); top: calc(var(--hud-log-y) - 2px); }
 
 /* The scene stack in the room HUD's vector look (playtest, after the line's keys): small keys as fine outlines with no
@@ -1842,7 +1850,9 @@
 .dp-preset-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
 .dp-preset-btn,
 .dp-sim-run,
-.dp-stage-copy {
+.dp-stage-copy,
+.dp-power-out,
+.dp-nerve-up {
   font: inherit;
   font-size: 12px;
   letter-spacing: 0.08em;
@@ -1855,7 +1865,9 @@
 }
 .dp-preset-btn:hover,
 .dp-sim-run:hover,
-.dp-stage-copy:hover {
+.dp-stage-copy:hover,
+.dp-power-out:hover,
+.dp-nerve-up:hover {
   color: #04121a;
   background: var(--hud);
 }
@@ -1887,6 +1899,8 @@
 .dp-stage .dp-slider-row { grid-template-columns: 104px 1fr 34px; }
 .dp-stage .dp-slider-label { white-space: nowrap; }
 .dp-stage-copy { margin-top: 6px; }
+.dp-power-out { margin-top: 6px; }
+.dp-nerve-up { justify-self: start; }
 /* STAGE › EXPRESSION: her face picker (hidden when she has none). */
 .dp-expression { margin-bottom: 6px; }
 .dp-expression[hidden] { display: none; }
@@ -2321,7 +2335,7 @@ body.ui-hidden > #devpanel {
 .qc-odds { margin-left: 0.5em; font: 15px var(--pixel); letter-spacing: 0.14em; color: #ffc56b; white-space: nowrap; }
 .qc-said { font-family: var(--chat-font, var(--mono)); }
 .qc-next { font-family: var(--chat-font, var(--mono)); }
-.stage-left[data-kind='sprite'], .stage-right[data-kind='sprite'] { transition: opacity 300ms ease, left 420ms ease, right 420ms ease; }
+.stage-left[data-kind='sprite'], .stage-right[data-kind='sprite'], .stage-resident[data-kind='sprite'] { transition: opacity 300ms ease, left 420ms ease, right 420ms ease; }
 #game.quest-up { --fig-x: 40px; }
 .qc-story { scrollbar-width: thin; scrollbar-color: rgba(127, 233, 255, 0.45) transparent; }
 /* New-player quick wins: the list's pitch and deadline, the hint under the cards, the lit card's question, WAIT UNTIL, QUEST's glow. */
@@ -2436,6 +2450,9 @@ body.ui-hidden > #devpanel {
 .db-heat-now { color: #ff8f6b; }
 .db-cross,
 .db-trust { color: #7fe9ff; }
+.db-judge { color: #e8dcc4; }
+.db-judge.up { color: #6be38a; }
+.db-judge.down { color: #ff6b6b; }
 .db-cover { color: #ffc56b; }
 @keyframes db-stamp { 0% { opacity: 0; transform: scale(1.6); } 100% { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .db-tier { animation: none; } }
@@ -2499,3 +2516,11 @@ svg.hv-lead[data-lead='tag'] { z-index: 61; }
 .dp-cipher-meta { white-space: pre-wrap; color: rgba(255, 217, 230, 0.6); }
 .dp-cipher-clue { color: rgba(255, 217, 230, 0.85); }
 .dp-cipher-clue.off { color: rgba(255, 120, 120, 0.8); }
+
+/* The figure light (figure-light.ts, figure lighting spec 2026-11-16): a lit sprite figure draws her art, face and
+   light in one canvas over her art box; her own background, faces and the tint's filter step aside while it's up. */
+.stage-lit { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.stage-figure[data-pixel] .stage-lit { image-rendering: pixelated; }
+.stage-figure[data-lit] .stage-art { background-image: none !important; filter: none !important; }
+.stage-figure[data-lit] .stage-face { visibility: hidden; }
+

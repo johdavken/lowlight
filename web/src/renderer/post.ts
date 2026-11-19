@@ -1,3 +1,4 @@
+import type { RoomFinish } from './index';
 import { ColorMatrixFilter, Container, Graphics, Rectangle, Sprite, Texture, type Filter } from 'pixi.js';
 import { AdvancedBloomFilter, CRTFilter, GlitchFilter, GodrayFilter, RGBSplitFilter } from 'pixi-filters';
 import { SignalFilter } from './signal';
@@ -26,7 +27,20 @@ export function createBloom(unit = 1): AdvancedBloomFilter {
   return bloom;
 }
 
-/** Vertical alpha ramp, faint at the top and dense at the bottom. */
+/** The fog's ramp down the room's frame, `[share of the height, alpha]`: faint at the top, dense at the bottom. The figures' fog is built from it too (figure-light.ts). */
+export const FOG_STOPS: readonly (readonly [number, number])[] = [
+  [0, 0.05],
+  [0.45, 0.3],
+  [0.8, 0.75],
+  [1, 1],
+];
+
+/** A sprite tint (0xrrggbb) as rgb, 0..1. */
+export function tintRgb(n: number): [number, number, number] {
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
+/** Vertical alpha ramp, faint at the top and dense at the bottom (FOG_STOPS). */
 function fogTexture(): Texture {
   const c = document.createElement('canvas');
   c.width = 1;
@@ -34,10 +48,7 @@ function fogTexture(): Texture {
   const ctx = c.getContext('2d');
   if (!ctx) throw new Error('2d canvas unavailable');
   const g = ctx.createLinearGradient(0, 0, 0, RENDER_H);
-  g.addColorStop(0, 'rgba(255,255,255,0.05)');
-  g.addColorStop(0.45, 'rgba(255,255,255,0.3)');
-  g.addColorStop(0.8, 'rgba(255,255,255,0.75)');
-  g.addColorStop(1, 'rgba(255,255,255,1)');
+  for (const [at, alpha] of FOG_STOPS) g.addColorStop(at, `rgba(255,255,255,${alpha})`);
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 1, RENDER_H);
   const tex = Texture.from(c);
@@ -143,16 +154,21 @@ export class WeatherLayer {
  * `glitch(amount)` (0..1) ramps the split toward ±6 art px and adds GlitchFilter slice tearing.
  * `signal(amount)` (0..1) collapses the picture to a line and out, under the scanlines.
  */
+/** The CRT pass's settings (the figures wear the same, figure-light.ts). */
+export const CRT = { lineContrast: 0.15, vignetting: 0.35, vignettingAlpha: 0.8, vignettingBlur: 0.35 } as const;
+
+/**
+ * The CRT pass's line width at a view `scale` (screen px per render-texture px, at least 1). Its period is
+ * ~5.24·lineWidth/2 screen px (min 5.24): aligned to whole art pixels.
+ */
+export function crtLineWidth(scale: number): number {
+  const s = Math.max(1, scale);
+  const rows = Math.max(1, Math.ceil(5.24 / s));
+  return Math.max(1, (2 * rows * s) / 5.24);
+}
+
 export class Grade {
-  private readonly crt = new CRTFilter({
-    curvature: 0,
-    lineContrast: 0.15,
-    lineWidth: 1,
-    vignetting: 0.35,
-    vignettingAlpha: 0.8,
-    vignettingBlur: 0.35,
-    noise: 0,
-  });
+  private readonly crt = new CRTFilter({ curvature: 0, lineWidth: 1, noise: 0, ...CRT });
   private readonly split = new RGBSplitFilter();
   private readonly glitchFx = new GlitchFilter({ slices: 12, offset: 0, fillMode: 2, average: false });
   private readonly signalFx = new SignalFilter();
@@ -169,10 +185,13 @@ export class Grade {
   /** Integer upscale factor of the view (screen px per render-texture px). */
   setScale(scale: number): void {
     this.scale = Math.max(1, scale);
-    // Scanline period is ~5.24·lineWidth/2 screen px (min 5.24): align it to whole art pixels.
-    const rows = Math.max(1, Math.ceil(5.24 / this.scale));
-    this.crt.lineWidth = Math.max(1, (2 * rows * this.scale) / 5.24);
+    this.crt.lineWidth = crtLineWidth(this.scale);
     this.apply();
+  }
+
+  /** The CRT pass as it is now (off with SYS → POST EFFECTS off), for the figures to wear the same. */
+  crtState(): RoomFinish['crt'] {
+    return { on: this.post, lineWidth: this.crt.lineWidth, ...CRT };
   }
 
   setPost(on: boolean): void {

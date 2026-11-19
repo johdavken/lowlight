@@ -94,21 +94,25 @@ describe('the JOB column (a job’s text beside the subtitles)', () => {
     col.clear();
     expect(jc.classList.contains('jc-new')).toBe(false);
   });
-  it('the words on the line stand apart in CRT, inline in the narration (playtest 2026-11-11), kept by who said them', () => {
+  it("the words on the line stand as her replies do (playtest 2026-11-17): their paragraph a block under her name, ON COMMS", () => {
     const c = mountJobColumn(feed, game);
     c.setOnLine('Silas', ['"Oh."']);
-    c.show('Job', '*On the line, Silas says, "Oh."*\n\n*Nothing else.*');
-    const said = col().querySelectorAll<HTMLElement>('.jc-body .jc-line');
-    expect(said).toHaveLength(1);
-    expect(said[0].textContent).toBe('"Oh."');
-    expect(said[0].dataset.who).toBe('Silas (ON COMMS)');
+    c.show('Job', '*Nothing yet.*\n\n*On the line, Silas says, "Oh."*\n\n*Nothing else.*');
+    const blocks = [...col().querySelectorAll<HTMLElement>('.jc-body > *')];
+    expect(blocks.map((b) => b.className)).toEqual(['jc-story', 'jc-reply jc-scripted', 'jc-story']);
+    expect(blocks[1].dataset.who).toBe('Silas (ON COMMS)');
+    expect(blocks[1].dataset.name).toBe('Silas');
+    expect(blocks[1].querySelector('.jc-t-say')!.textContent).toBe('“Oh.”');
+    expect(blocks[1].querySelector('.jc-t-act')!.textContent).toBe('On the line, Silas says, ');
+    expect(blocks[2].textContent).toBe('Nothing else.');
+    expect(col().querySelector('.jc-line')).toBeNull();
   });
   it('a new line on the same text redraws it', () => {
     const c = mountJobColumn(feed, game);
     c.show('Job', 'He says "Oh."');
-    expect(col().querySelector('.jc-line')).toBeNull();
+    expect(col().querySelector('.jc-scripted')).toBeNull();
     c.setOnLine('Silas', ['"Oh."']);
-    expect(col().querySelector('.jc-line')?.textContent).toBe('"Oh."');
+    expect(col().querySelector('.jc-scripted .jc-t-say')?.textContent).toBe('“Oh.”');
   });
 });
 
@@ -188,8 +192,9 @@ describe('the job text in the column (playtest 2026-11-11)', () => {
     const c = mountJobColumn(feed, game, undefined, { reduced: () => true });
     c.show('Run Sheet', 'The warden looks up. "Shut," he says. “Come back Monday.”');
     const story = game.querySelector('.jc-story')!;
-    expect([...story.querySelectorAll('.jc-t-quote')].map((q) => q.textContent)).toEqual(['"Shut,"', '“Come back Monday.”']);
-    expect(story.textContent).toBe('The warden looks up. "Shut," he says. “Come back Monday.”');
+    expect([...story.querySelectorAll('.jc-t-quote')].map((q) => q.textContent)).toEqual(['“Shut,”', '“Come back Monday.”']);
+    // Curled, as her replies' words are.
+    expect(story.textContent).toBe('The warden looks up. “Shut,” he says. “Come back Monday.”');
   });
   it('a beat written all in asterisks: its quotes stand apart too; the words on comms keep their own colour', () => {
     const feed = document.createElement('div');
@@ -198,8 +203,9 @@ describe('the job text in the column (playtest 2026-11-11)', () => {
     const c = mountJobColumn(feed, game, undefined, { reduced: () => true });
     c.setOnLine('Nix', ['"Not if she likes her."']);
     c.show('Job', '*"I sweep floors," she says. "Not if she likes her." Nix says.*');
-    const story = game.querySelector('.jc-story')!;
-    expect([...story.querySelectorAll('em .jc-t-quote')].map((q) => q.textContent)).toEqual(['"I sweep floors,"']);
-    expect(story.querySelector('em .jc-line')!.textContent).toBe('"Not if she likes her."');
+    // The paragraph holds Nix's words on the line: it's hers, and another's quote in it keeps the warm white.
+    const block = game.querySelector<HTMLElement>('.jc-scripted')!;
+    expect([...block.querySelectorAll('.jc-t-quote')].map((q) => q.textContent)).toEqual(['“I sweep floors,”']);
+    expect(block.querySelector('.jc-t-say')!.textContent).toBe('“Not if she likes her.”');
   });
 });

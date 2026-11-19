@@ -1,7 +1,8 @@
 /** Who's where on the city map: residents at their pins, you and your contact where your room is, and each pin's side rooms. */
 import { playerFace } from '../../net/player-face';
 import type { CityMapData } from '../../../../shared/map-schema';
-import type { ResidentInfo, SceneDef } from '../../../../shared/types';
+import type { ContactEntry, ResidentInfo, SceneDef } from '../../../../shared/types';
+import { recommendedTag } from '../../room/people-contacts';
 import { exitPlaces, sideRooms, type SideRoom } from '../../../../shared/exits';
 import { residentOf } from '../../room/resident';
 import { hereFor, type MapPerson, type WhoIsWhere } from './city-map';
@@ -49,4 +50,11 @@ export function mapWho(o: MapWhoInputs): WhoIsWhere {
   // In a side room you stand at its home, but GO there still walks you back into that room.
   const away = m.places.find((p) => p.id === here)?.scene !== o.sceneId;
   return { here, ...(away ? { away: true } : {}), people, busy: o.busy, gigBlock: o.gigBlock, inside };
+}
+
+/** RECOMMENDED on the map (Kroll's desk spec): each recommended contact's job place → its card's tag. */
+export function recommendedPins(contacts: readonly ContactEntry[]): Record<string, string> {
+  const pins: Record<string, string> = {};
+  for (const c of contacts) if (c.recommended && !(c.recommended.place in pins)) pins[c.recommended.place] = recommendedTag(c.recommended);
+  return pins;
 }

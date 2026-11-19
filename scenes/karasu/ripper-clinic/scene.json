@@ -19,8 +19,7 @@
         "steriliser": "room_e_steriliser.png",
         "monitors": "room_e_monitors.png",
         "desk_lamp": "room_e_desk_lamp.png",
-        "hand_sign": "room_e_hand_sign.png",
-        "street": "room_e_street.png"
+        "hand_sign": "room_e_hand_sign.png"
       }
     }
   ],
@@ -71,7 +70,7 @@
       "color": "#a35cff",
       "intensity": 0.35,
       "radius": 240,
-      "flicker": 0
+      "flicker": 0.66
     },
     {
       "id": "monitors",
@@ -81,7 +80,7 @@
         180
       ],
       "color": "#4dff9a",
-      "intensity": 0.35,
+      "intensity": 0.6,
       "radius": 340,
       "flicker": 0.03
     },
@@ -108,19 +107,6 @@
       "intensity": 0.5,
       "radius": 360,
       "flicker": 0.02
-    },
-    {
-      "id": "street",
-      "label": "the street outside, through the transom and under the shutter",
-      "pos": [
-        1400,
-        420
-      ],
-      "color": "#ffb070",
-      "intensity": 0.3,
-      "radius": 420,
-      "flicker": 0,
-      "outside": true
     }
   ],
   "defaults": {
@@ -133,21 +119,101 @@
   },
   "presets": {
     "late": {
-      "ambientLevel": 0.21,
+      "ambientLevel": 0.24,
       "timeOfDay": "late-night",
-      "lights": {}
+      "lights": {
+        "surgical_lamp": {
+          "intensity": 0.15
+        },
+        "chrome_cabinet": {
+          "intensity": 0.3
+        },
+        "script_fridge": {
+          "intensity": 0.34
+        },
+        "steriliser": {
+          "intensity": 0.26
+        },
+        "monitors": {
+          "intensity": 0.45
+        },
+        "desk_lamp": {
+          "intensity": 0.34
+        },
+        "hand_sign": {
+          "intensity": 0.38
+        }
+      }
     },
     "quiet": {
-      "ambientLevel": 0.25,
-      "weatherLevel": 0,
-      "fog": 0.15,
-      "lights": {}
+      "ambientLevel": 0.29,
+      "weatherLevel": 0.16,
+      "fog": 0.08,
+      "lights": {
+        "surgical_lamp": {
+          "intensity": 0.15,
+          "flicker": 0
+        },
+        "chrome_cabinet": {
+          "intensity": 0.3,
+          "flicker": 0
+        },
+        "script_fridge": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "steriliser": {
+          "intensity": 0.26,
+          "flicker": 0
+        },
+        "monitors": {
+          "intensity": 0.45,
+          "flicker": 0
+        },
+        "desk_lamp": {
+          "intensity": 0.34,
+          "flicker": 0
+        },
+        "hand_sign": {
+          "intensity": 0.38,
+          "flicker": 0
+        }
+      }
     },
     "tense": {
       "ambient": "#2a0f1c",
-      "ambientLevel": 0.21,
-      "fog": 0.35,
-      "lights": {}
+      "ambientLevel": 0.24,
+      "fog": 0.25,
+      "lights": {
+        "surgical_lamp": {
+          "intensity": 0.1,
+          "flicker": 0.2
+        },
+        "chrome_cabinet": {
+          "intensity": 0.2,
+          "flicker": 0.2
+        },
+        "script_fridge": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "steriliser": {
+          "intensity": 0.18,
+          "flicker": 0.4
+        },
+        "monitors": {
+          "intensity": 0.3,
+          "flicker": 0.23
+        },
+        "desk_lamp": {
+          "intensity": 0.23,
+          "flicker": 0.2
+        },
+        "hand_sign": {
+          "intensity": 0.25,
+          "flicker": 0.22
+        }
+      }
     },
     "in-surgery": {
       "lights": {
@@ -200,9 +266,6 @@
         },
         "hand_sign": {
           "intensity": 0
-        },
-        "street": {
-          "intensity": 0
         }
       }
     }
@@ -210,25 +273,29 @@
   "weatherArea": [
     [
       [
-        1283,
-        55
+        1293,
+        128
       ],
       [
         1378,
         55
       ],
       [
-        1378,
-        205
+        1377,
+        177
       ],
       [
-        1283,
-        205
+        1290,
+        179
       ]
     ]
   ],
   "sound": {
     "indoor": true,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    },
     "hum": 0.4,
     "music": {
       "songs": [
@@ -242,11 +309,7 @@
         "level": 0.6,
         "onEntry": true
       }
-    ],
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.3
-    }
+    ]
   },
   "effects": [
     {
@@ -260,6 +323,40 @@
       "source": "car",
       "every": 70,
       "strength": 0.7
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        93,
+        123,
+        67,
+        90
+      ],
+      "light": "surgical_lamp",
+      "scroll": 0,
+      "picture": "art"
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        184,
+        140,
+        75,
+        76
+      ],
+      "light": "surgical_lamp",
+      "scroll": 0
+    },
+    {
+      "kind": "screen",
+      "rect": [
+        282,
+        150,
+        71,
+        73
+      ],
+      "light": "surgical_lamp",
+      "scroll": 0
     }
   ]
 }

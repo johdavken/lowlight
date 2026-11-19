@@ -270,6 +270,19 @@ describe('a trust job (Intake board spec §2)', () => {
   });
 });
 
+describe("a judging clock (Kroll's desk)", () => {
+  it('its verdict on a line of its own, her word only when it changed, and the rep it paid', () => {
+    const { n } = show({ ...D, trust: null, judge: { label: 'WHAT KROLL SEES', value: 0, size: 3, delta: 1, words: 'NOTHING ON THE GLASS · TRUST ▲' } });
+    expect(text(n, '.db-judge')).toEqual(['WHAT KROLL SEES 0/3 · NOTHING ON THE GLASS · TRUST ▲']);
+    expect(n.querySelector('.db-trust')).toBeNull();
+    expect(text(n, '.db-rep')).toEqual(['REP KARASU 30 → 37']);
+    const moved = show({ ...D, trust: { name: 'Kroll', before: 'Trusts you', after: 'Sizing you up' }, judge: { label: 'WHAT KROLL SEES', value: 3, size: 3, delta: -2, words: 'WHAT THE GLASS CAUGHT · TRUST ▼▼' } }).n;
+    expect(text(moved, '.db-judge')).toEqual(['WHAT KROLL SEES 3/3 · WHAT THE GLASS CAUGHT · TRUST ▼▼']);
+    expect(text(moved, '.db-trust')).toEqual(['KROLL · TRUSTS YOU → SIZING YOU UP']);
+    expect(text(moved, '.db-rep')).toEqual(['REP KARASU 30 → 37']);
+  });
+});
+
 describe('her cut (Tier 2 spec §3)', () => {
   it('NIX\'S CUT · 25% · −40 SOL', () => {
     expect(text(show({ ...D, cut: { name: 'Nix', pct: 25, amount: 40 } }).n, '.db-cut')).toEqual(["NIX'S CUT · 25% · −40 SOL"]);

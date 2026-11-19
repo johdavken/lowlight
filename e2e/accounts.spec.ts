@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { awaitGreeting, DIRECT, goIn, skipSplash, startQuest } from './fixtures';
+import { awaitGreeting, DIRECT, goIn, skipSplash, startQuest, pickCard } from './fixtures';
 
 // The accounts board (Two Stories spec 2026-11-10): earn a card, get pressed, fill both accounts, TELL, land on told.
 // A Rue playthrough of its own: the fixture job is for: rue, so no other spec meets it.
@@ -23,7 +23,7 @@ test('the accounts board: earn a card, get pressed, fill both, TELL, land on tol
   await page.locator('.hud-quest').click();
   await startQuest(page, 'Story Test');
   await goIn(page);
-  await page.locator('.tb-card[data-choice="go"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="go"]'));
 
   // The board: two listeners side by side, the eye between them, the camera held face down.
   const board = page.locator('.tb-accounts');

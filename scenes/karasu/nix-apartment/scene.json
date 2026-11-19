@@ -452,16 +452,16 @@
   ],
   "sound": {
     "indoor": true,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    },
     "hum": 0.3,
     "music": {
       "songs": [
         "Nix.ogg"
       ],
       "level": 1
-    },
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.3
     }
   },
   "weatherHidden": true,

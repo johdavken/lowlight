@@ -9,7 +9,7 @@ import { deckNotes, EFFECT_NAMES, kindResult, POSITION_NAMES, type Effect, type 
 import { APPROACH_STATS, SPEC_STAT, type Approach } from '../../../../shared/hand';
 import { HOT_LOAD_NERVE, type ProgramKind } from '../../../../shared/programs';
 import { clearLead, hostRect, traceLead } from '../../ui/trace-lead';
-import { el } from './el';
+import { el, isStoryTable } from './el';
 import { litNodes } from './tips';
 
 export type Info = { title: string; lines: string[] };
@@ -173,7 +173,12 @@ export function mountCardInfo(root: HTMLElement, lookup: (card: HTMLElement) => 
   };
   /** Beside the card, the side with room, else under it, kept inside the root (a phone's table scrolls); a leader from the card's edge to the panel. */
   const place = (card: HTMLElement) => {
-    const c = hostRect(root, card);
+    // The story table's hand stands in the margin: a row's panel opens past the margin's right edge (over the room),
+    // not over the row's own ability tags.
+    const row = isStoryTable(root) ? card.closest<HTMLElement>('.tb-bottom') : null;
+    const c0 = hostRect(root, card);
+    const edge = row ? hostRect(root, row).right : 0;
+    const c = row ? { ...c0, right: edge, width: edge - c0.left } : c0;
     const w = panel.offsetWidth;
     const h = panel.offsetHeight;
     const right = c.right + LEAD_GAP;
@@ -209,7 +214,10 @@ export function mountCardInfo(root: HTMLElement, lookup: (card: HTMLElement) => 
     }
     const gist = first === undefined ? [] : [el('div', 'tb-info-line tb-info-gist hv-gist')];
     gist[0]?.append(...litNodes(first!));
-    panel.replaceChildren(el('div', 'tb-info-title hv-head', info.title), ...gist, ...(rest.length ? [rows] : []));
+    // A crew row on the story table: their face at portrait size heads the panel (the row's is 36px).
+    const src = isStoryTable(root) ? card.closest('.g-people')?.querySelector<HTMLImageElement>(`[data-id="${CSS.escape(card.dataset.id ?? '')}"] img.tbc-face`)?.src : undefined;
+    const face = src ? [Object.assign(el('img', 'tb-info-face'), { src, alt: '' })] : [];
+    panel.replaceChildren(...face, el('div', 'tb-info-title hv-head', info.title), ...gist, ...(rest.length ? [rows] : []));
     panel.hidden = false;
     place(card);
     return true;

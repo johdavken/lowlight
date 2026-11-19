@@ -6,6 +6,7 @@
 import { ALARM_MAX, deckNotes, EFFECT_NAMES, POSITION_NAMES, type Pool } from '../../../shared/dice';
 import type { ChatMessage, Debrief, QuestState } from '../../../shared/types';
 import { debriefEl } from './debrief';
+import { stripImageTokens, withImageTokens } from './narration-image';
 import { hhmmOf, minuteOfDay } from '../../../shared/clock';
 import { passiveLabels } from '../ui/passive';
 import { markLore } from '../ui/lore-hover';
@@ -64,7 +65,8 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
 /** Written text with its *actions* in italics, as the box shows them; a passive line's ⟦LABEL⟧ as its faint label. */
 function storyEl(text: string): HTMLElement {
   const box = el('div', 'qc-story');
-  for (const [i, part] of text.split(/\*([^*\n]+)\*/).entries()) {
+  // Narration images show in the JOB column only: here the prose alone (spec 2026-11-18).
+  for (const [i, part] of stripImageTokens(text).split(/\*([^*\n]+)\*/).entries()) {
     if (part === '') continue;
     box.append(i % 2 === 1 ? el('em', '', part) : document.createTextNode(part));
   }
@@ -377,8 +379,10 @@ export function latestQuestStory(rows: readonly ChatMessage[]): { id: string; ti
   if (!m?.quest) return null;
   const pick = m.quest.pick?.line;
   const unpicked = (t: string) => (pick && t.startsWith(pick) ? t.slice(pick.length).replace(/^\n+/, '') : t);
-  const text = unpicked(m.text);
+  // Narration images (spec 2026-11-18) go in as tokens at their paragraphs before any cut, so they stay where they belong.
+  const images = m.quest.images ?? [];
+  const text = unpicked(withImageTokens(m.text, images));
   const held = m.quest.held;
-  const before = held && held.at > 0 && held.at < m.text.length ? unpicked(m.text.slice(0, held.at)).trimEnd() : '';
+  const before = held && held.at > 0 && held.at < m.text.length ? unpicked(withImageTokens(m.text.slice(0, held.at), images)).trimEnd() : '';
   return { id: m.id, title: m.quest.title, text, ...(before ? { before } : {}), ended: m.quest.beat === null && m.quest.waiting !== true, ...(m.quest.rewards?.length ? { rewards: m.quest.rewards } : {}) };
 }

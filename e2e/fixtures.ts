@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 import type { ClientEvent, PlaythroughInfo } from '../shared/types';
 import type {} from '../web/src/main'; // window.__nixRoom
 
@@ -35,6 +35,9 @@ export const SECOND = {
   bio: 'Alpha keeps the workspace. Quiet, plain, never late.',
   fact: { label: 'KNOWN FOR', value: 'Keeping the workspace quiet.' },
 } as const;
+
+/** The persona whose beats the fake OpenRouter answers with a move (off-screen moves e2e); everyone else's are quiet. */
+export const E2E_MOVES_PLAYER = 'Moves Tester';
 
 // This worker's (or server's) ports: each worker has a game server of its own (e2e/ports.ts).
 import { RUN_TAG, SLOT, STUB_OR_LOG_PORT } from './ports';
@@ -320,6 +323,29 @@ export async function goIn(page: Page): Promise<void> {
 }
 
 /**
+ * Picks a choice on the job table. The story table (table-trace.css `--story-table`, mockup graft-margin.html) opens a
+ * closed card on the first click and rolls the open one on the second; the classic table rolls on the first. A card
+ * that isn't one of the beat's choices acts on the first click and isn't left open, so it gets no second.
+ */
+export async function pickCard(card: Locator): Promise<void> {
+  const opens = await card.evaluate((e) => {
+    const tb = e.closest('.tb');
+    return Boolean(tb) && getComputedStyle(tb!).getPropertyValue('--story-table').trim() === '1' && !e.classList.contains('sel');
+  });
+  await card.click();
+  if (opens && (await card.count()) === 1 && (await card.evaluate((e) => e.classList.contains('sel') && !e.classList.contains('is-locked')))) await card.click();
+}
+
+/** The story table's dice land on the floor in front of the contact: right of the margin, over the key line (check-anim.ts onFloor). */
+export async function expectDiceOnFloor(page: Page, dice: Locator, label: string): Promise<void> {
+  const box = (await dice.boundingBox())!;
+  const margin = (await page.locator('.tb.hud > .tb-middle').boundingBox())!;
+  const stage = (await page.locator('#game').boundingBox())!;
+  expect(box.x, `${label}: right of the margin`).toBeGreaterThanOrEqual(margin.x + margin.width - 1);
+  expect(box.y + box.height, `${label}: over the key line`).toBeLessThanOrEqual(stage.y + stage.height - 40);
+}
+
+/**
  * Settles one step of a dealt roll on the table (roll lifecycle spec §1.5): picks the first free cost, else TAKES IT on
  * the first picked one. True when it clicked something.
  */
@@ -351,8 +377,17 @@ export async function expectTableClear(page: Page, label: string): Promise<void>
       for (; n; n = n.parentElement) if (getComputedStyle(n).opacity === '0' || getComputedStyle(n).visibility === 'hidden') return false;
       return r.width > 0 && r.height > 0;
     };
-    const boxes = (sel: string) => [...document.querySelectorAll(sel)].filter(shown).map((e) => ({ name: sel, r: e.getBoundingClientRect() }));
-    const moment = ['.tb-deal > .tb-card', '.tb-deal > .tb-card .tb-src', '.tb-parked > .tb-card', '.tb-roll .qc-stamp', '.tb-roll .qc-says', '.tb-costs'].flatMap(boxes);
+    // What the story table's margin scrolls out of view isn't there: a box is clipped to the deal it scrolls in.
+    const clip = (e: Element, r: DOMRect) => {
+      const d = e.closest('.tb-deal');
+      if (!d || e.closest('.tb-roll.on-floor') || d.scrollHeight <= d.clientHeight) return r;
+      const c = d.getBoundingClientRect();
+      const top = Math.max(r.top, c.top);
+      const bottom = Math.min(r.bottom, c.bottom);
+      return new DOMRect(r.left, top, r.width, Math.max(0, bottom - top));
+    };
+    const boxes = (sel: string) => [...document.querySelectorAll(sel)].filter(shown).map((e) => ({ name: sel, r: clip(e, e.getBoundingClientRect()) })).filter((b) => b.r.height > 0);
+    const moment = ['.tb-deal > .tb-card', '.tb-deal > .tb-card .tb-src', '.tb-parked > .tb-card', '.tb-roll .tb-roll-dice', '.tb-roll .qc-stamp', '.tb-roll .qc-says', '.tb-costs', '.tb-offers'].flatMap(boxes);
     const around = ['.tb-hand', '.tb-levers', '.jc'].flatMap(boxes);
     const meets = (a: DOMRect, b: DOMRect) => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
     const out: string[] = [];
@@ -361,6 +396,8 @@ export async function expectTableClear(page: Page, label: string): Promise<void>
       for (const n of moment.slice(i + 1)) {
         // A tab belongs to its card, and the stamp's line sits under the stamp.
         if (m.name !== n.name && n.name.includes(m.name)) continue;
+        // The dice, their stamp and its line are one tray.
+        if (m.name.startsWith('.tb-roll ') && n.name.startsWith('.tb-roll ')) continue;
         if (meets(m.r, n.r) && !(m.name === '.tb-deal > .tb-card' && n.name === '.tb-deal > .tb-card .tb-src')) out.push(`${m.name} on ${n.name}`);
       }
     });

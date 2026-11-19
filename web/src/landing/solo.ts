@@ -6,7 +6,7 @@
 import type { AroundEntry, ContactEntry, PlaythroughInfo } from '../../../shared/types';
 import { ApiError, type PlaythroughApi } from '../net/playthroughs';
 import { formatClock, parseHhmm } from '../../../shared/clock';
-import { lineFor } from '../room/people-contacts';
+import { lineFor, recommendedTag } from '../room/people-contacts';
 import { openSavePrompt, saveFailure } from '../room/save-prompt';
 import { FighterStrip } from './fighter-strip';
 import type { AgentsResponse, LandingAgent } from './landing';
@@ -102,7 +102,10 @@ export function mountSolo(root: HTMLElement, deps: SoloDeps): { destroy(): void 
 
   function render(): void {
     const last = active?.location?.contactId;
-    const ordered = [...known.filter((c) => c.id === last), ...known.filter((c) => c.id !== last)];
+    // RECOMMENDED first (Kroll's desk spec), then the one you left, then the rest.
+    const rec = known.filter((c) => c.recommended);
+    const rest = known.filter((c) => !c.recommended);
+    const ordered = [...rec, ...rest.filter((c) => c.id === last), ...rest.filter((c) => c.id !== last)];
     if (ordered.length === 0 && strangers.length === 0) {
       list.replaceChildren(el('div', 'solo-empty', '// NO ONE TO CALL'));
       return;
@@ -118,8 +121,10 @@ export function mountSolo(root: HTMLElement, deps: SoloDeps): { destroy(): void 
         else face.textContent = c.name.charAt(0).toUpperCase();
         const text = el('div', 'solo-text');
         const name = el('div', 'solo-name', c.name.toUpperCase());
+        if (c.recommended) name.append(el('span', 'solo-rec', recommendedTag(c.recommended)));
         if (c.id === last) name.append(el('span', 'solo-last', 'LAST WITH'));
-        text.append(name, el('div', 'solo-line', lineFor(c)));
+        // Her job's pitch stands in for her usual line.
+        text.append(name, el('div', 'solo-line', c.recommended?.pitch ?? lineFor(c)));
         row.append(face, text);
         row.addEventListener('click', () => void pick(c.id));
         row.addEventListener('focus', moved);

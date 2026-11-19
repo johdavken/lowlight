@@ -1,5 +1,5 @@
 /**
- * SYS (spec 2026-10-15): volume, music, voice, ambient, tips, mirror, frame rate, render scale, effects, blur, post effects, her model, reply length, reply thinking, narrator thinking and
+ * SYS (spec 2026-10-15): volume, music, voice, ambient, tips, mirror, frame rate, render scale, effects, blur, post effects, figure light, her model, reply length, reply thinking, narrator thinking and
  * the link, one row each, grouped SOUND · STAGE · GAME · MODEL. Since 2026-11-16 it opens as PAUSED's SETTINGS page
  * (pause-menu.ts, in the pause's red trace); a HUD without a pause menu still drops it under the SYS word. The chat box's own settings (text speed, text size,
  * font, chat keys) moved to the box's settings key (box-settings.ts).
@@ -13,7 +13,7 @@ import type { SoundView } from './hud';
 import { FRAME_RATES, type FrameRate } from './frame-rate';
 import { EFFECTS_LEVELS, RENDER_SCALES, type EffectsLevel, type RenderScale } from './graphics-prefs';
 
-export type SysRow = 'sound' | 'music' | 'voice' | 'ui' | 'ambient' | 'bg' | 'tips' | 'intro' | 'mirror' | 'fps' | 'scale' | 'fx' | 'blur' | 'post' | 'model' | 'length' | 'rthink' | 'think' | 'link';
+export type SysRow = 'sound' | 'music' | 'voice' | 'ui' | 'ambient' | 'bg' | 'tips' | 'intro' | 'world' | 'mirror' | 'fps' | 'scale' | 'fx' | 'blur' | 'post' | 'figure' | 'model' | 'length' | 'rthink' | 'think' | 'link';
 
 const FOOT = '← → OR SCROLL TO CHANGE · ESC CLOSES';
 
@@ -25,12 +25,14 @@ const HINTS: Partial<Record<SysRow, string>> = {
   ui: 'The menus’, panels’ and table’s own sounds: rows, tabs, cards, dice.',
   bg: 'MUTE stops the sound while the game’s window isn’t the one you’re using. Hidden or minimised, it always stops.',
   ambient: 'The room’s own sound: rain on the glass, room tone, the hum of the lights.',
+  world: 'Others act while you’re away, and you hear of it later. Costs about one call every 2 story hours.',
   intro: 'The LOWLIGHT card and the city’s lines before the splash. SKIP starts the game on the splash.',
   tips: 'Graft’s one-time tips on your first jobs. SHOW AGAIN brings back every tip you’ve seen.',
   fps: 'How often the room redraws. Lower runs cooler and saves battery.',
   scale: 'How many pixels the room is drawn with. Lower is lighter on the GPU, most of all on a high-resolution screen; the pixel art barely changes.',
   blur: 'The frosted glass behind panels and the blurred room beside the stage. Off is lighter on the GPU; panels keep their darkening.',
   post: 'Scanlines and the vignette over the room. Glitches and signal drops still play.',
+  figure: "The room's lamps shape you and your contact. Off, they take its light as a flat tint.",
   fx: 'The room’s moving extras. LOW drops dust and rain on the glass; OFF drops steam, smoke and passing lights too.',
   link: 'Whether the game can reach the model right now.',
   mirror: 'Flips the contact on the stage to face the other way. Kept per contact.',
@@ -59,6 +61,8 @@ export interface SysMenuHandlers {
   onTipsAgain(): void;
   /** INTRO: true skips the opening card on start up. */
   onIntro(skip: boolean): void;
+  /** WORLD MOVES (off-screen moves spec §6): off-screen beats on or off. */
+  onWorldMoves(on: boolean): void;
   /** MIRROR: her figure on the stage flipped to face the other way, or not. */
   onMirror(on: boolean): void;
   /** FRAME RATE: a word picked (a click, or ← → stepping to the next one). */
@@ -71,6 +75,8 @@ export interface SysMenuHandlers {
   onBlur(on: boolean): void;
   /** POST EFFECTS: on or off. */
   onPost(on: boolean): void;
+  /** FIGURE LIGHT: on or off. */
+  onFigureLight(on: boolean): void;
   /** Opens the MODEL menu (SYS has closed by then). */
   onModel(): void;
   /** NARRATOR THINKING: a word picked (a click, or ← → stepping to the next one). */
@@ -88,8 +94,8 @@ const CELLS = 10;
 /** The groups, in order; the rows go in this order for ↑ ↓ too. */
 const GROUPS: { id: string; label: string; rows: SysRow[] }[] = [
   { id: 'sound', label: 'SOUND', rows: ['sound', 'music', 'voice', 'ui', 'ambient', 'bg'] },
-  { id: 'stage', label: 'STAGE', rows: ['mirror', 'fps', 'scale', 'fx', 'blur', 'post'] },
-  { id: 'game', label: 'GAME', rows: ['tips', 'intro'] },
+  { id: 'stage', label: 'STAGE', rows: ['mirror', 'fps', 'scale', 'fx', 'blur', 'post', 'figure'] },
+  { id: 'game', label: 'GAME', rows: ['tips', 'intro', 'world'] },
   { id: 'model', label: 'MODEL', rows: ['model', 'length', 'rthink', 'think', 'link'] },
 ];
 /** Each menu's rows get their own ids (aria-activedescendant names the focused one). */
@@ -127,6 +133,8 @@ export class SysMenu {
   private tipsOn = true;
   private readonly intro = el('span', 'sys-value sys-keys sys-intro');
   private introSkipped = false;
+  private readonly world = el('span', 'sys-value sys-keys sys-world');
+  private worldOn = true;
   private readonly mirror = el('span', 'sys-value sys-keys sys-mirror');
   private mirrorOn = false;
   private readonly fps = el('span', 'sys-value sys-keys sys-fps');
@@ -139,6 +147,8 @@ export class SysMenu {
   private blurOn = true;
   private readonly post = el('span', 'sys-value sys-keys sys-post');
   private postOn = true;
+  private readonly figure = el('span', 'sys-value sys-keys sys-figure');
+  private figureOn = true;
   private readonly model = el('span', 'sys-value hud-model');
   private readonly think = el('span', 'sys-value sys-keys sys-think');
   private thinking: NarratorThinking = 'auto';
@@ -204,6 +214,16 @@ export class SysMenu {
     const intro = this.row('intro', 'INTRO', this.intro);
     for (const on of [true, false]) {
       const w = el('i', '', on ? 'ON' : 'OFF');
+      w.dataset.world = on ? 'on' : 'off';
+      w.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.h.onWorldMoves(on);
+      });
+      this.world.append(w);
+    }
+    const world = this.row('world', 'WORLD MOVES', this.world);
+    for (const on of [true, false]) {
+      const w = el('i', '', on ? 'ON' : 'OFF');
       w.dataset.mirror = on ? 'on' : 'off';
       w.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -255,8 +275,10 @@ export class SysMenu {
     };
     onOff(this.blur, (on) => this.h.onBlur(on));
     onOff(this.post, (on) => this.h.onPost(on));
+    onOff(this.figure, (on) => this.h.onFigureLight(on));
     const blur = this.row('blur', 'BLUR', this.blur);
     const post = this.row('post', 'POST EFFECTS', this.post);
+    const figure = this.row('figure', 'FIGURE LIGHT', this.figure);
     const model = this.row('model', 'MODEL', this.model);
     for (const t of NARRATOR_THINKING) {
       const w = el('i', '', t.toUpperCase());
@@ -290,7 +312,7 @@ export class SysMenu {
     const rthink = this.row('rthink', 'REPLY THINKING', this.rthink);
     const link = this.row('link', 'LINK', this.link);
     // In GROUPS's order: ↑ ↓ walk the rows as the object lists them.
-    this.rows = { sound, music, voice, ui, ambient, bg, mirror, fps, scale, fx, blur, post, tips, intro, model, length, rthink, think, link };
+    this.rows = { sound, music, voice, ui, ambient, bg, mirror, fps, scale, fx, blur, post, figure, tips, intro, world, model, length, rthink, think, link };
     model.hidden = length.hidden = rthink.hidden = think.hidden = music.hidden = voice.hidden = ui.hidden = ambient.hidden = bg.hidden = true;
     sound.addEventListener('click', () => this.h.onMute());
     model.addEventListener('click', () => {
@@ -391,6 +413,12 @@ export class SysMenu {
   }
 
   /** Lights INTRO's PLAY or SKIP. */
+  /** Lights WORLD MOVES' word in use. */
+  showWorldMoves(on: boolean): void {
+    this.worldOn = on;
+    for (const w of this.world.children) w.classList.toggle('on', (w as HTMLElement).dataset.world === (on ? 'on' : 'off'));
+  }
+
   showIntro(skip: boolean): void {
     this.introSkipped = skip;
     for (const w of this.intro.children) w.classList.toggle('on', (w as HTMLElement).dataset.intro === (skip ? 'skip' : 'play'));
@@ -412,6 +440,12 @@ export class SysMenu {
   showBlur(on: boolean): void {
     this.blurOn = on;
     for (const w of this.blur.children) w.classList.toggle('on', (w as HTMLElement).dataset.on === (on ? 'on' : 'off'));
+  }
+
+  /** Lights FIGURE LIGHT's ON or OFF. */
+  showFigureLight(on: boolean): void {
+    this.figureOn = on;
+    for (const w of this.figure.children) w.classList.toggle('on', (w as HTMLElement).dataset.on === (on ? 'on' : 'off'));
   }
 
   /** Lights POST EFFECTS' ON or OFF. */
@@ -551,6 +585,8 @@ export class SysMenu {
       else this.h.onTipsAgain();
     } else if (this.focus === 'intro') {
       if (d !== 0) this.h.onIntro(!this.introSkipped);
+    } else if (this.focus === 'world') {
+      if (d !== 0) this.h.onWorldMoves(!this.worldOn);
     } else if (this.focus === 'mirror') {
       if (d !== 0) this.h.onMirror(!this.mirrorOn);
     } else if (this.focus === 'fps') {
@@ -572,6 +608,8 @@ export class SysMenu {
       if (d !== 0) this.h.onBlur(!this.blurOn);
     } else if (this.focus === 'post') {
       if (d !== 0) this.h.onPost(!this.postOn);
+    } else if (this.focus === 'figure') {
+      if (d !== 0) this.h.onFigureLight(!this.figureOn);
     } else if (this.focus === 'length') {
       if (d !== 0) {
         const n = REPLY_LENGTHS.length;

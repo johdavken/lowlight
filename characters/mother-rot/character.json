@@ -9,7 +9,8 @@
   "sprite": {
     "src": "mother-rot-base.png",
     "pixel": true,
-    "waist": 0.445
+    "waist": 0.445,
+    "lights": [{ "x": 0.614, "y": 0.077, "r": 0.011, "color": "#ffa22e" }]
   },
   "expressions": {
     "annoyed": "mother-rot-annoyed.png",

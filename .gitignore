@@ -53,3 +53,6 @@ web/public/map/tiles-dark/
 web/public/map/tiles-mask/
 web/public/map/tiles.json
 web/public/map/windows.json
+
+# Studio swaps a character folder in here on save (studio/server/characters.ts); only left behind by a crash.
+.studio-character-swap/

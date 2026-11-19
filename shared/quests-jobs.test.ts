@@ -62,6 +62,33 @@ describe('job front matter', () => {
     expect(r.ok ? [] : r.problems.map((x) => x.message).filter((m) => /go only in a mission/.test(m))).toHaveLength(1);
   });
 
+  it('district: names where a job pays, apart from where it starts; only on a job, and only a district on the map', () => {
+    expect(ok(JOB.replace('tier: 2', 'tier: 2\ndistrict: spine')).district).toBe('spine');
+    expect(ok(JOB).district).toBeUndefined();
+    const fields = (text: string, k: Parameters<typeof parseQuestFile>[2]) => { const r = parseQuestFile('x', text, k); return r.ok ? [] : r.problems.filter((p) => p.field === 'district').map((p) => p.message); };
+    expect(fields(TRAIL.replace(/^---\n/, '---\ndistrict: spine\n'), { roster: null, places: null })).toHaveLength(1);
+    const districts = new Set(['nexus', 'spine']);
+    expect(fields(JOB.replace('tier: 2', 'tier: 2\ndistrict: nowhere'), { ...known, districts })).toEqual(["no district 'nowhere' on the map"]);
+    expect(fields(JOB.replace('tier: 2', 'tier: 2\ndistrict: spine'), { ...known, districts })).toEqual([]);
+    // Without the map's districts (tools, job-sim), any id is let through.
+    expect(fields(JOB.replace('tier: 2', 'tier: 2\ndistrict: nowhere'), known)).toEqual([]);
+  });
+
+  it("hire-at: puts a job's free hire card somewhere else than where it starts; only on a job that gives a recruit, at a place on the map", () => {
+    const GIFT = JOB.replace('*All of it.*\npay: full\n', '*All of it.*\npay: full\ngives: recruit runner green\n');
+    expect(ok(GIFT.replace('tier: 2', 'tier: 2\nhire-at: haes-noodles')).hireAt).toBe('haes-noodles');
+    expect(ok(GIFT).hireAt).toBeUndefined();
+    // A recruit given only in an ending's version counts.
+    const inVersion = JOB.replace('## paid\n*All of it.*\npay: full\n', '## paid if door=hard\n*All of it.*\npay: full\ngives: recruit runner green\ntake: full\n→ end\n\n## paid\n*All of it.*\npay: full\n');
+    expect(ok(inVersion.replace('tier: 2', 'tier: 2\nhire-at: haes-noodles')).hireAt).toBe('haes-noodles');
+    const fields = (text: string, k: Parameters<typeof parseQuestFile>[2] = known) => { const r = parseQuestFile('x', text, k); return r.ok ? [] : r.problems.filter((p) => p.field === 'hire-at').map((p) => p.message); };
+    expect(fields(JOB.replace('tier: 2', 'tier: 2\nhire-at: haes-noodles'))).toEqual(['hire-at: goes with gives: recruit on an ending']);
+    expect(fields(GIFT.replace('tier: 2', 'tier: 2\nhire-at: nowhere'))).toEqual(["no place 'nowhere' on the map"]);
+    // Without the map's places (tools, job-sim), any id is let through.
+    expect(fields(GIFT.replace('tier: 2', 'tier: 2\nhire-at: nowhere'), { ...known, places: null })).toEqual([]);
+    expect(fields(TRAIL.replace(/^---\n/, '---\nhire-at: haes-noodles\n'), { roster: null, places: null })).toContain('hire-at: goes only on a job (kind: mission or contract)');
+  });
+
   it('problems', () => {
     one(JOB.replace('tier: 2', 'tier: 5'), /tier/);
     one(JOB.replace('pay: 350-450', 'pay: 500-400'), /pay/);

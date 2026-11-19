@@ -18,8 +18,8 @@ export interface Row extends RowGeom {
 }
 
 /** Reading pace: a row is given this long a letter, never less than READ_MIN_MS. */
-export const READ_MS_PER_CHAR = 40;
-export const READ_MIN_MS = 1200;
+export const READ_MS_PER_CHAR = 33; // 40 until 2026-11-16, then 20 % faster (playtest)
+export const READ_MIN_MS = 1000;
 /** At the end of a page, its last window is held this share of its full reading time (most of it was read on the way). */
 export const END_READ = 0.6;
 /** Wheel delta that moves a row (about a notch). */

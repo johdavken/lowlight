@@ -68,6 +68,30 @@ describe('BoxSettings (the box settings key)', () => {
     expect(key('a').defaultPrevented).toBe(false);
   });
 
+  it('on the crew rules board it lists only the TEXT rows, and ↑ ↓ step only those; off the board, all of them again (playtest)', () => {
+    const shownRows = () => [...root.querySelectorAll<HTMLElement>('.bs-row')].filter((r) => !r.hidden).map((r) => r.dataset.row);
+    const shownSecs = () => [...root.querySelectorAll<HTMLElement>('.bs-sec')].filter((s) => !s.hidden).map((s) => s.textContent);
+    const game = document.createElement('div');
+    game.className = 'crew-board';
+    document.body.append(game);
+    game.append(root);
+    bs.open();
+    expect(bs.textOnly).toBe(true);
+    expect(shownRows()).toEqual(['text', 'size', 'font', 'auto', 'effect']);
+    expect(shownSecs()).toEqual(['TEXT']);
+    for (let i = 0; i < 20; i++) key('ArrowDown');
+    expect(focused()).toBe('effect');
+    key('Escape');
+    // The story table and the room: the board is down, the whole panel is back.
+    game.classList.remove('crew-board');
+    bs.open();
+    expect(bs.textOnly).toBe(false);
+    expect(shownRows()).toEqual(['text', 'size', 'font', 'auto', 'effect', 'colour', 'glass', 'line', 'keys']);
+    expect(shownSecs()).toEqual(['TEXT', 'LINE']);
+    for (let i = 0; i < 20; i++) key('ArrowDown');
+    expect(focused()).toBe('keys');
+  });
+
   it('an Alt chord, the archive or a walk-out closes it and lets the key by', () => {
     bs.open();
     expect(key('s', { altKey: true }).defaultPrevented).toBe(false);

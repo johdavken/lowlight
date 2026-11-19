@@ -111,9 +111,10 @@
 .fighter.p2 { right: 0; --side: var(--p2); }
 .fighter-art {
   position: absolute;
-  bottom: -40px;
+  /* The room's size and floor (style.css --fig-full/--fig-floor), waist on the room's line via --fig-drop. */
+  bottom: calc(var(--fig-floor, -270px) - var(--fig-drop, 0) * var(--fig-full, 1035px));
   left: 510px;
-  height: 860px;
+  height: var(--fig-full, 1035px);
   transform: translateX(-50%);
   image-rendering: pixelated;
   pointer-events: none;

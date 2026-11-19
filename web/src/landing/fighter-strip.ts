@@ -4,6 +4,7 @@ import { COPY } from './copy';
 import type { PlaythroughPersona } from '../../../shared/persona';
 import type { LandingAgent } from './landing';
 import type { Fact } from '../../../shared/types';
+import { figureDrop } from '../ui/figure';
 
 export type Side = 'p1' | 'p2';
 
@@ -295,6 +296,8 @@ export class FighterStrip {
       this.artSrc = src;
       flash(img, 'swap', this.reducedMotion);
     }
+    // Stand her as the room does: waist on the shared line (face and sprite both read it from the column).
+    this.el.style.setProperty('--fig-drop', String(figureDrop(a.sprite?.waist)));
     // The server picks the select face; an agent from before it did shows happy.
     const face = locked ? (a.sprite?.selectFace !== undefined ? a.sprite.selectFace : a.sprite?.expressions?.happy) : undefined;
     this.renderFace(img, face != null && !this.failedArt.has(face) ? face : null);

@@ -376,6 +376,24 @@ describe('/api/reply-prefs', () => {
   });
 });
 
+describe('/api/world-moves (off-screen moves spec §6)', () => {
+  const put = (app: Awaited<ReturnType<typeof start>>['app'], body: unknown) => app.inject({ method: 'PUT', url: '/api/world-moves', payload: body as object });
+
+  it('GET is on until switched off; PUT saves it', async () => {
+    const { app, settings } = await start();
+    expect((await app.inject({ method: 'GET', url: '/api/world-moves' })).json()).toEqual({ on: true });
+    expect((await put(app, { on: false })).json()).toEqual({ on: false });
+    expect(settings.worldMoves()).toBe(false);
+  });
+
+  it.each([{ on: 'no' }, {}, null])('PUT %j → 400, nothing written', async (body) => {
+    const { app, settings } = await start();
+    const res = await put(app, body);
+    expect(res.statusCode).toBe(400);
+    expect(settings.worldMoves()).toBe(true);
+  });
+});
+
 describe('/api/narrator-thinking', () => {
   const putThinking = (app: Awaited<ReturnType<typeof start>>['app'], body: unknown, origin?: string) =>
     app.inject({ method: 'PUT', url: '/api/narrator-thinking', payload: body as object, headers: origin ? { origin } : {} });

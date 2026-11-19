@@ -573,6 +573,12 @@
       ]
     ]
   ],
+  "sound": {
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    }
+  },
   "effects": [
     {
       "kind": "screen",
@@ -730,11 +736,5 @@
   "hours": {
     "open": "12:00",
     "close": "02:00"
-  },
-  "sound": {
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.3
-    }
   }
 }

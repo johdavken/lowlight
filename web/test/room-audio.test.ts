@@ -39,6 +39,8 @@ function setup(opts: { available?: boolean; saved?: SoundSettings; scale?: numbe
     cancelThunder: vi.fn(),
     speak: vi.fn(),
     hush: vi.fn(),
+    pauseVoice: vi.fn(),
+    playVoice: vi.fn(),
     state: vi.fn(() => ({ available: true, unlocked: true, context: ctxState, voices: [], mix: null })),
     onStateChange: vi.fn((fn: () => void) => (changed = fn)),
   };
@@ -297,6 +299,19 @@ describe('createRoomAudio', () => {
     expect(engine.speak).toHaveBeenLastCalledWith(['/a.ogg', '/b.ogg'], undefined);
     audio.hush();
     expect(engine.hush).toHaveBeenCalledTimes(1);
+  });
+
+  it("the narrator's pause and play reach the engine once unlocked, and the VOICE level reads back", () => {
+    const { engine, audio } = setup();
+    audio.pauseVoice();
+    expect(engine.pauseVoice).not.toHaveBeenCalled();
+    audio.gesture();
+    audio.pauseVoice();
+    audio.playVoice();
+    expect(engine.pauseVoice).toHaveBeenCalledTimes(1);
+    expect(engine.playVoice).toHaveBeenCalledTimes(1);
+    audio.voiceStep(2);
+    expect(audio.voiceLevel()).toBeCloseTo(0.85);
   });
 
   it('suspends while hidden and resumes when visible; frames tick the engine once unlocked', () => {

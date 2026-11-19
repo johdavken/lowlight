@@ -150,6 +150,33 @@ describe('world.branch', () => {
     expect(r.location).toEqual({ contactId: 'nix', sceneId: startRoom });
   });
 
+  it('keeps the off-screen moves, beat and since that stood at its line (off-screen moves spec §3)', async () => {
+    const s = await start();
+    const nix = s.open(s.pt.id, 'nix');
+    nix.insertMessage(s.pt.player, { ...line('m1', 10), clock: 1400 });
+    nix.close();
+    const mv = (beat: number) => ({ beat, at: beat - 20, who: 'cass', line: 'x', place: 'karasu/noodle-stall' });
+    s.built.playthroughs.setMoves(s.pt.id, [mv(1320), mv(1440)], 1440);
+    s.built.playthroughs.setSince(s.pt.id, { nix: 1300, cass: 1420 });
+    const r = s.built.world.branch('nix', 'm1', 'A branch');
+    if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
+    const b = s.built.playthroughs.get(r.id)!;
+    expect(b.moves?.map((m) => m.beat)).toEqual([1320]);
+    expect(b.beat).toBe(1320);
+    expect(b.since).toEqual({ nix: 1300 });
+  });
+
+  it('a playthrough without moves branches without them (Review Focus 5)', async () => {
+    const s = await start();
+    const { nix, cass } = seed(s);
+    nix.close();
+    cass.close();
+    const r = s.built.world.branch('nix', 'n10', 'A branch');
+    if (r === 'unknown' || 'busy' in r) throw new Error(`branch failed: ${JSON.stringify(r)}`);
+    const b = s.built.playthroughs.get(r.id)!;
+    expect('moves' in b || 'beat' in b || 'since' in b).toBe(false);
+  });
+
   it('a branch from a solo playthrough is not solo', async () => {
     const s = await start();
     const { nix, cass } = seed(s);

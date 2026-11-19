@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { buyAtFixer, expectTableClear, fixerItem, firstPlaythrough, goIn, nixAt, questRow, questTab, send, settleCostStep, skipSplash } from './fixtures';
+import { buyAtFixer, expectTableClear, fixerItem, firstPlaythrough, goIn, nixAt, questRow, questTab, send, settleCostStep, skipSplash, pickCard } from './fixtures';
 
 test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST, TAKE IT), the pay on YOU', async ({ page }) => {
   const errors: string[] = [];
@@ -50,7 +50,7 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   await expectTableClear(page, 'the deal');
 
   // The roll keeps a 2: a miss in the open deals three costs to pick two (roll lifecycle spec §1), beside the roll.
-  await page.locator('.tb-card[data-choice="roof"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="roof"]'));
   // The card slides aside for the dice, and they land with the stamp beside it, clear of everything.
   await expect(page.locator('.tb-deal .tb-roll canvas')).toHaveAttribute('data-lit', /\d/, { timeout: 10_000 });
   await page.screenshot({ path: 'test-results/missions-landed.png' });
@@ -108,7 +108,7 @@ test('mission: a MISSION row, dice on a card, a miss dealing costs (pick, RESIST
   await expect(replies).toHaveCount(before + 1);
 
   // The last check keeps a 6 and pays; her closing line ends it.
-  await page.locator('.tb-card[data-choice="wipe"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="wipe"]'));
   await expect(replies).toHaveCount(before + 2, { timeout: 10_000 });
 
   // YOU shows the pay and the deck it gave, fetched as it opens (a WAIT since the last quest move would have cooled the heat).
@@ -176,7 +176,7 @@ test('programs: load SOLVENT at SETUP, run it twice, the debrief counts it', asy
   await expect(page.locator('.tb-card[data-choice="roof"] .tb-tag.lacquer')).toHaveCount(0);
   await expect(page.locator('.tb-card[data-choice="roof"] .tb-side-word')).toHaveText('DARK');
   await page.screenshot({ path: 'test-results/programs-load.png' });
-  await page.locator('.tb-card[data-choice="roof"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="roof"]'));
   const wipe = page.locator('.tb-card[data-choice="wipe"]');
   const pickable = page.locator('.tb-costs .tb-cost.pickable');
   await expect(wipe.or(pickable.first())).toBeVisible({ timeout: 10_000 });
@@ -196,7 +196,7 @@ test('programs: load SOLVENT at SETUP, run it twice, the debrief counts it', asy
   await expect(solvent).toHaveAttribute('data-state', 'up');
   await solvent.click();
   await expect(solvent).toHaveClass(/\bon\b/);
-  await page.locator('.tb-card[data-choice="wipe"]').click();
+  await pickCard(page.locator('.tb-card[data-choice="wipe"]'));
   await expect(wipe.or(pickable.first()).or(page.locator('.db-program-line').first())).toBeVisible({ timeout: 10_000 });
   while (await settleCostStep(page)) await page.waitForTimeout(300);
   await expect(page.locator('.db-program-line').first()).toHaveText('SOLVENT · RAN 2 · TECH IN THE DARK', { timeout: 10_000 });

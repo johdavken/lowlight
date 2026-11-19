@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { applyUiBlur, loadBlur, loadPost, saveBlur, savePost, effectsLeftOut, loadEffects, loadRenderScale, renderScaleFactor, saveEffects, saveRenderScale } from '../src/ui/graphics-prefs';
+import { loadFigureLight, saveFigureLight, applyUiBlur, loadBlur, loadPost, saveBlur, savePost, effectsLeftOut, loadEffects, loadRenderScale, renderScaleFactor, saveEffects, saveRenderScale } from '../src/ui/graphics-prefs';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -50,5 +50,13 @@ describe('graphics prefs (SYS → RENDER SCALE, EFFECTS)', () => {
     expect(root.style.getPropertyValue('--ui-blur')).toBe('0');
     applyUiBlur(true, root);
     expect(root.style.getPropertyValue('--ui-blur')).toBe('1');
+  });
+
+  it('FIGURE LIGHT starts on and keeps off', () => {
+    expect(loadFigureLight()).toBe(true);
+    saveFigureLight(false);
+    expect(loadFigureLight()).toBe(false);
+    saveFigureLight(true);
+    expect(loadFigureLight()).toBe(true);
   });
 });

@@ -89,7 +89,8 @@ export function paths(q: QuestEntry): JobPath[] & { loop?: string } {
     }
     const versions = versionsOf(id, flags);
     const cards = versions.flatMap((v) => v.choices);
-    const rolled = versions.some((v) => rolledOn(v).length > 0);
+    // A crew-rules beat counts as its cards' ways (crew rules spec): there's no roll, but it's a step of the route.
+    const rolled = versions.some((v) => rolledOn(v).length > 0 || v.choices.some((c) => (c.ways?.length ?? 0) > 0));
     const here = rolled ? [...beats, { id, beat: versions.at(-1)!, versions }] : beats;
     const forks = new Set(cards.map(nextOf)).size > 1;
     let ended = cards.length === 0;

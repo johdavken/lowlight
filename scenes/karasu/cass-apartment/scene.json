@@ -406,14 +406,14 @@
   ],
   "sound": {
     "indoor": true,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    },
     "music": {
       "songs": [
         "No Light in Lowlight.ogg"
       ]
-    },
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.3
     }
   },
   "effects": [

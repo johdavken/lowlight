@@ -552,16 +552,16 @@
   ],
   "sound": {
     "indoor": true,
+    "bed": {
+      "src": "sound/bed.ogg",
+      "level": 0.3
+    },
     "hum": 0.2,
     "music": {
       "songs": [
         "Drowned.ogg"
       ],
       "level": 1
-    },
-    "bed": {
-      "src": "sound/bed.ogg",
-      "level": 0.3
     }
   },
   "effects": [

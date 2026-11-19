@@ -52,6 +52,15 @@ describe('crewView: free cards and SPRING THEM (crew spec §5)', () => {
     expect(view({ jobCards: [card], now: DAY + 360 }).hires).toEqual([]);
   });
 
+  it("a kept job card (a once job's hire) waits past 06:00 until it's hired", () => {
+    const kept = { ...card, kept: true as const };
+    expect(view({ jobCards: [kept], now: 1290 }).hires).toEqual([]);
+    const v = view({ jobCards: [kept], now: 5 * DAY + 400 });
+    expect(v.hires[0].cards[0]).toMatchObject({ cost: 0, from: { job: card.runKey } });
+    const hired: CrewEvent = { type: 'hire', at: 1400, recruit: v.hires[0].cards[0].recruit!, place: 'long-haul', cost: 0, loyalty: 50 };
+    expect(view({ jobCards: [kept], crew: [[hired]], now: 5 * DAY + 400 }).hires).toEqual([]);
+  });
+
   it('a hired free card leaves the list', () => {
     const c = view({ vouchers: [cass] }).hires[0].cards[0];
     const hired: CrewEvent = { type: 'hire', at: 1100, recruit: c.recruit!, place: 'the-tilt', cost: 0, loyalty: 70, vouched: 'cass' };

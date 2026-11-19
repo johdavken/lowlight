@@ -473,5 +473,8 @@
       "amount": 1,
       "lean": -0.65
     }
-  ]
+  ],
+  "figureLight": {
+    "breath": true
+  }
 }

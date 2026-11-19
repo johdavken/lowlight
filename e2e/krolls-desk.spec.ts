@@ -89,9 +89,12 @@ test("Come Up on the board: Soren at Kroll's floor, alone, both clocks, to a CLE
   // its typing character hidden at a full-size font (the layout floor).
   const mirek = page.locator('.jc-body .jc-img[data-img="mirek"]');
   await expect(mirek).toHaveCount(1);
-  // Under a loaded run the typing may not have reached his paragraph yet (his face waits for it): finish the page.
-  await page.locator('.jc-body').click();
-  await expect(mirek.locator('img')).toBeVisible();
+  // Under a loaded run the typing may not have reached his paragraph yet (his face waits for it): finish the page,
+  // again if a redraw starts it typing once more.
+  await expect(async () => {
+    await page.locator('.jc-body').click();
+    await expect(mirek.locator('img')).toBeVisible({ timeout: 500 });
+  }).toPass({ timeout: 20_000 });
   expect(await mirek.evaluate((n) => [Math.round(n.getBoundingClientRect().width), parseFloat(getComputedStyle(n.querySelector('.jc-img-ch')!).fontSize) >= 14])).toEqual([expect.any(Number), true]);
   expect(await mirek.evaluate((n) => (n.querySelector('img') as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
   await shot(page, 'come-up-02-desk');
@@ -108,8 +111,11 @@ test("Come Up on the board: Soren at Kroll's floor, alone, both clocks, to a CLE
   await shot(page, 'come-up-02a-coat-decoding');
   // The typing reaches it after the market's long paragraph (slow under a loaded run): a click finishes the page, which
   // shows the face whole, its noise gone; the paragraph wraps to its right.
-  await page.locator('.jc-body').click();
-  await expect(coat.locator('img')).toBeVisible({ timeout: 10_000 });
+  // Her reply redraws the held-back market text, which can start it typing again after a click: finish until it holds.
+  await expect(async () => {
+    await page.locator('.jc-body').click();
+    await expect(coat.locator('img')).toBeVisible({ timeout: 500 });
+  }).toPass({ timeout: 20_000 });
   await expect(coat.locator('canvas')).toHaveCount(0, { timeout: 10_000 });
   await expect(page.locator('.jc-body .jc-img[data-img="mirek"]')).toHaveCount(0);
   await shot(page, 'come-up-02a-coat');

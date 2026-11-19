@@ -376,6 +376,7 @@ Made by Farban in ChatGPT (OpenAI image generation; each file's C2PA manifest na
 | `world/lore/soma.webp` | The Soma logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/soma.png` | Cropped to the logo, 669×200, WebP |
 | `world/lore/voltaic-logistics.webp` | The Voltaic Logistics logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/voltaic-logistics.png` | Cropped to the logo, 1002×200, WebP |
 | `world/lore/titan.webp` | The Titan logo over its entry in the lore book | ChatGPT · 2026-11-07 · original `art/corps/titan.png` | Cropped to the logo, 324×320, WebP |
+| `world/lore/the-branch.webp` | The branch's raven over SDG's plainclothes entry in the lore book | ChatGPT · from the Sentinel field deck's card art · original in the art store at `lore/the-branch-raven.webp` | Recoloured to the SDG logo's grey on transparent, 275×200, WebP |
 
 Added 2026-10-10; 2026-10-12 (characters, rooms, map, app icon); 2026-10-23 (the later cast, the other rooms and re-arts, extras, quests, logo and Patreon art, from the licensing audit); 2026-11-07 (corp logos).
 
